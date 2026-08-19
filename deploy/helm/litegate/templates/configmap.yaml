@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "litegate.fullname" . }}
+  labels:
+    {{- include "litegate.labels" . | nindent 4 }}
+data:
+  LITELLM_URL: {{ .Values.config.litellmUrl | quote }}
+  LITELLM_UI_URL: {{ .Values.config.litellmUiUrl | quote }}
+  ROOT_URL: {{ .Values.config.rootUrl | quote }}
+  LOGO_URL: {{ .Values.config.logoUrl | quote }}
+  SUPPORT_TICKET_URL: {{ .Values.config.supportTicketUrl | quote }}
+  LOCAL_USERS_ENABLED: {{ .Values.config.localUsersEnabled | quote }}
+  LOCAL_USERS_DB_PATH: {{ .Values.config.localUsersDbPath | quote }}
+  ADMIN_EMAILS: {{ .Values.config.adminEmails | quote }}
+  ADMIN_GROUPS: {{ .Values.config.adminGroups | quote }}
+  {{- if .Values.config.localAuthUsername }}
+  LOCAL_AUTH_USERNAME: {{ .Values.config.localAuthUsername | quote }}
+  {{- end }}
+  {{- if .Values.config.oidcIssuerUrl }}
+  OIDC_ISSUER_URL: {{ .Values.config.oidcIssuerUrl | quote }}
+  OIDC_CLIENT_ID: {{ .Values.config.oidcClientId | quote }}
+  OIDC_REDIRECT_URI: {{ .Values.config.oidcRedirectUri | quote }}
+  OIDC_SCOPES: {{ .Values.config.oidcScopes | quote }}
+  OIDC_GROUPS_CLAIM: {{ .Values.config.oidcGroupsClaim | quote }}
+  {{- end }}
+  {{- if .Values.config.keyMaxBudget }}
+  KEY_MAX_BUDGET: {{ .Values.config.keyMaxBudget | quote }}
+  {{- end }}
+  {{- if .Values.config.keyBudgetDuration }}
+  KEY_BUDGET_DURATION: {{ .Values.config.keyBudgetDuration | quote }}
+  {{- end }}
+  {{- if .Values.config.keyModels }}
+  KEY_MODELS: {{ .Values.config.keyModels | quote }}
+  {{- end }}
+  {{- if .Values.config.keyDuration }}
+  KEY_DURATION: {{ .Values.config.keyDuration | quote }}
+  {{- end }}
+  {{- if .Values.config.keyTpmLimit }}
+  KEY_TPM_LIMIT: {{ .Values.config.keyTpmLimit | quote }}
+  {{- end }}
+  {{- if .Values.config.keyRpmLimit }}
+  KEY_RPM_LIMIT: {{ .Values.config.keyRpmLimit | quote }}
+  {{- end }}
+  {{- if .Values.config.keyTeamId }}
+  KEY_TEAM_ID: {{ .Values.config.keyTeamId | quote }}
+  {{- end }}

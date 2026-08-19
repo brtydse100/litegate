@@ -1,0 +1,60 @@
+# LiteGate - local configuration
+# Edit this file then run: docker compose up --build
+# Environment variables always take precedence over values here.
+
+# Required
+litellm_master_key: "sk-your-litellm-master-key"
+jwt_secret: "change-me-min-32-chars-random-string"
+
+# LiteLLM location
+litellm_url: "http://host.docker.internal:4000"
+
+# SSO (OIDC) - leave blank to disable
+oidc_issuer_url: ""
+oidc_client_id: ""
+oidc_client_secret: ""
+oidc_redirect_uri: "http://localhost/api/auth/callback"
+# Add provider-specific scopes when needed, for example: "openid email profile groups"
+oidc_scopes: "openid email profile"
+# ID-token claim containing group names; dot notation supports nested claims.
+oidc_groups_claim: "groups"
+
+# Local admin login - remove in production
+local_auth_username: "admin"
+local_auth_password: "changeme"
+
+# Admin-created local accounts (stored in /app/backend/data/litegate.db)
+local_users_enabled: true
+
+# Comma-separated SSO email addresses that receive LiteGate admin access
+admin_emails: ""
+# Comma-separated SSO group names that receive admin access
+admin_groups: ""
+
+# Optional admin credential for /api/v1 automation (send as X-API-Key)
+# management_api_key: "generate-a-long-random-secret"
+
+# Root URL of the portal (used for SSO redirect after login)
+root_url: "http://localhost"
+
+# Logo shown in the header and above the main content.
+# Can be an external URL or a path served by nginx (e.g. /logo.svg).
+# To use a local file: place it in frontend/public/ then set: /logo.svg
+logo_url: ""
+
+# URL of the LiteLLM web UI - adds an "Open LiteLLM Hub" button.
+# Typically the same host as litellm_url but accessible from the browser.
+litellm_ui_url: "http://localhost:4000"
+
+# Key defaults (applied to every generated key)
+# key_max_budget: 10.0
+# key_budget_duration: "30d"
+# key_models:
+#   - gpt-4
+#   - gpt-3.5-turbo
+# key_duration: "90d"
+# key_tpm_limit: 100000
+# key_rpm_limit: 1000
+
+# URL for the Open Support Ticket button (leave blank to hide)
+support_ticket_url: ""

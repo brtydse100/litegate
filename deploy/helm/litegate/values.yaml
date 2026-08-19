@@ -1,0 +1,85 @@
+replicaCount: 1
+
+image:
+  repository: litegate
+  tag: "1.0.0"  # always pin to a specific tag; never use 'latest' in production
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: litegate.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+config:
+  # Required
+  litellmMasterKey: "sk-your-litellm-master-key"
+  jwtSecret: "change-me-min-32-chars-random-string"
+
+  # LiteLLM backend URL (reachable from inside the pod)
+  litellmUrl: "http://litellm:4000"
+
+  # Public URL of the LiteLLM web UI shown as "Open LiteLLM Hub" button
+  litellmUiUrl: ""
+
+  # SSO (OIDC) - leave all blank to disable
+  oidcIssuerUrl: ""
+  oidcClientId: ""
+  oidcClientSecret: ""
+  oidcRedirectUri: ""
+  oidcScopes: "openid email profile"
+  oidcGroupsClaim: "groups"
+
+  # Local admin login (remove in production by leaving both blank)
+  localAuthUsername: "admin"
+  localAuthPassword: "changeme"
+
+  # Admin-created local accounts and SSO administrators
+  localUsersEnabled: "true"
+  localUsersDbPath: "/app/backend/data/litegate.db"
+  adminEmails: ""
+  adminGroups: ""
+
+  # Optional credential for the management API (send as X-API-Key)
+  managementApiKey: ""
+
+  # Root URL of the portal (used for SSO redirect)
+  rootUrl: "http://litegate.example.com"
+
+  # Logo URL shown in the header (external URL or /logo.svg)
+  logoUrl: ""
+
+  # Support ticket button URL (leave blank to hide)
+  supportTicketUrl: ""
+
+  # Key budget/limit defaults (uncomment to enable)
+  # keyMaxBudget: "10.0"
+  # keyBudgetDuration: "30d"
+  # keyModels: '["gpt-4","gpt-3.5-turbo"]'
+  # keyDuration: "90d"
+  # keyTpmLimit: "100000"
+  # keyRpmLimit: "1000"
+  # keyTeamId: ""
+
+resources: {}
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

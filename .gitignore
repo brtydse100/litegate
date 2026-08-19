@@ -1,0 +1,33 @@
+# Dependencies
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+
+# Python bytecode
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Runtime data
+backend/data/*.db
+backend/data/*.db-*
+
+# Credentials — edit deploy/config.yaml instead
+deploy/.env
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Claude Code
+.claude/

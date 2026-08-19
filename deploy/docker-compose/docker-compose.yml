@@ -1,0 +1,18 @@
+services:
+  litegate:
+    build:
+      context: ../..
+      dockerfile: deploy/docker-compose/Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      - ./config.yaml:/app/backend/config.yaml:ro
+      - litegate-data:/app/backend/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # To override a single value without editing config.yaml, use:
+    # environment:
+    #   - LITELLM_MASTER_KEY=sk-override
+
+volumes:
+  litegate-data:
