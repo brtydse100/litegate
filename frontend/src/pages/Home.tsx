@@ -139,7 +139,7 @@ export default function Home() {
           {!keys.isLoading && !confirmRegenerate && (!hasKey ? <button onClick={() => create.mutate()} disabled={create.isPending} className="w-full max-w-lg rounded-2xl bg-indigo-600 px-8 py-5 text-lg font-bold text-white shadow-xl shadow-indigo-600/25 hover:bg-indigo-500 disabled:opacity-50"><span className="flex items-center justify-center gap-2"><Zap size={23} />{create.isPending ? "Creating..." : "Create API key"}</span></button> : <button onClick={() => setConfirmRegenerate(true)} className="flex w-full max-w-lg items-center justify-center gap-2 rounded-xl border border-[#2A2E42] px-5 py-3 text-sm text-gray-300 hover:bg-[#1A1D27]"><RefreshCw size={15} /> Regenerate key</button>)}
 
           {hasKey && <AccessSnapshot keys={keyList} />}
-          {(hasKey || isAdmin) && <BulkKeyEditor keys={keyList} isAdmin={isAdmin} />}
+          {isAdmin && <BulkKeyEditor />}
 
           {(config?.litellm_ui_url || config?.support_ticket_url) && <div className="flex w-full max-w-lg flex-col gap-3 sm:flex-row">
             {config.litellm_ui_url && <a href={config.litellm_ui_url} target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-indigo-500/30 bg-indigo-600/10 px-5 py-3 text-sm text-indigo-300 hover:bg-indigo-600/20"><ExternalLink size={15} /> Model hub</a>}

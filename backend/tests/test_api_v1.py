@@ -13,35 +13,23 @@ def setup_function():
 
 
 @pytest.mark.asyncio
-async def test_user_can_bulk_update_only_owned_keys():
+async def test_user_cannot_bulk_update_keys():
     actor = ApiActor(CurrentUser(user_id="user-1", email="u@example.com"))
     payload = BulkKeyUpdateRequest(keys=["owned-key"], settings={"rpm_limit": 25})
-    with (
-        patch("app.routers.api_v1.llm.list_user_keys", new=AsyncMock(return_value=[{"token": "owned-key"}])),
-        patch("app.routers.api_v1.llm.update_key", new=AsyncMock(return_value={})) as update,
-    ):
-        result = await bulk_update_keys(payload, actor)
-    assert result["updated"] == 1
-    update.assert_awaited_once_with("owned-key", {"rpm_limit": 25})
-
-
-@pytest.mark.asyncio
-async def test_user_cannot_bulk_update_unowned_key():
-    actor = ApiActor(CurrentUser(user_id="user-1", email="u@example.com"))
-    payload = BulkKeyUpdateRequest(keys=["someone-elses-key"], settings={"blocked": True})
-    with patch("app.routers.api_v1.llm.list_user_keys", new=AsyncMock(return_value=[{"token": "owned-key"}])):
+    with patch("app.routers.api_v1.llm.update_key", new=AsyncMock(return_value={})) as update:
         with pytest.raises(HTTPException) as exc:
             await bulk_update_keys(payload, actor)
     assert exc.value.status_code == 403
+    update.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_key_proof_can_update_only_itself():
+async def test_key_proof_cannot_bulk_update_keys():
     actor = ApiActor(
         CurrentUser(user_id="key-holder", email="", auth_source="litellm_key"),
         proof_key="sk-proof",
     )
-    payload = BulkKeyUpdateRequest(keys=["different-key"], settings={"tpm_limit": 100})
+    payload = BulkKeyUpdateRequest(keys=["sk-proof"], settings={"tpm_limit": 100})
     with pytest.raises(HTTPException) as exc:
         await bulk_update_keys(payload, actor)
     assert exc.value.status_code == 403

@@ -7,7 +7,7 @@ Interactive OpenAPI documentation is available at `/api/docs` on every LiteGate 
 Use one of these credentials:
 
 1. A portal session JWT as `Authorization: Bearer <portal-token>`.
-2. A LiteLLM virtual key as `Authorization: Bearer <litellm-key>`. It can edit only itself.
+2. A LiteLLM virtual key as `Authorization: Bearer <litellm-key>`. It can identify and inspect only itself; it cannot bulk-edit keys.
 3. The optional `management_api_key` as `X-API-Key: <management-key>`. It has admin access and should be stored like a password.
 
 Check the active identity:
@@ -51,7 +51,7 @@ curl -X POST https://litegate.example.com/api/v1/keys \
   -d '{"user_id":"automation:ci","email":"ci@example.com"}'
 ```
 
-Bulk-edit key settings:
+Bulk-edit key settings as an administrator. This endpoint requires an admin portal session or the management API key:
 
 ```bash
 curl -X PATCH https://litegate.example.com/api/v1/keys/bulk \

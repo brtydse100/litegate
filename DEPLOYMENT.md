@@ -50,7 +50,16 @@ oidc_redirect_uri: "http://localhost/api/auth/callback"
 root_url: "http://localhost"
 ```
 
-### Step 2 — Build and start
+### Step 2 — Pull the package and start
+
+The release image is published to GitHub Container Registry. The image Compose
+file defaults to `latest`; set `LITEGATE_VERSION` to pin a release.
+
+```bash
+docker compose -f docker-compose.image.yml up -d
+```
+
+To build locally from the checked-out source instead:
 
 ```bash
 docker compose up --build
@@ -94,7 +103,7 @@ If your build machine has no internet, pre-pull the base images first:
 
 ```bash
 docker pull node:20-alpine
-docker pull python:3.11-slim
+docker pull python:3.12-slim
 docker compose up --build
 ```
 
@@ -109,8 +118,8 @@ docker compose up --build
 ### Step 1 — Build and push the image
 
 ```bash
-docker build -t your-registry.io/litegate:1.0 .
-docker push your-registry.io/litegate:1.0
+docker build -f deploy/docker-compose/Dockerfile -t your-registry.io/litegate:2.0.0 .
+docker push your-registry.io/litegate:2.0.0
 ```
 
 ### Step 2 — Install

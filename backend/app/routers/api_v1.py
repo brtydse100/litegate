@@ -135,20 +135,9 @@ async def bulk_update_keys(
     payload: BulkKeyUpdateRequest,
     actor: ApiActor = Depends(get_api_actor),
 ):
+    """Apply one settings change to multiple keys. Administrator access is required."""
+    _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
-    if actor.proof_key:
-        if len(payload.keys) != 1 or not hmac.compare_digest(payload.keys[0], actor.proof_key):
-            raise HTTPException(status_code=403, detail="Key authentication can update only that exact key")
-    elif not actor.is_admin:
-        owned = {
-            value
-            for key in await llm.list_user_keys(actor.user.user_id)
-            for value in (key.get("token"), key.get("api_key"), key.get("key"))
-            if value
-        }
-        unauthorized = [key for key in payload.keys if key not in owned]
-        if unauthorized:
-            raise HTTPException(status_code=403, detail="One or more keys are not owned by this user")
 
     changes = payload.settings.model_dump(exclude_unset=True)
     semaphore = asyncio.Semaphore(5)

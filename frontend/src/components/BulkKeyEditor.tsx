@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
 import { api } from "../api/client";
@@ -6,10 +6,9 @@ import type { KeyInfo, KeySettingsUpdate } from "../types";
 
 const inputClass = "rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none";
 
-export default function BulkKeyEditor({ keys, isAdmin }: { keys: KeyInfo[]; isAdmin: boolean }) {
+export default function BulkKeyEditor() {
   const queryClient = useQueryClient();
   const keyToken = (key: KeyInfo) => key.token ?? key.api_key ?? key.key ?? "";
-  const ownedTokens = useMemo(() => keys.map(keyToken).filter(Boolean), [keys]);
   const [editorOpen, setEditorOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string[]>([]);
@@ -27,7 +26,7 @@ export default function BulkKeyEditor({ keys, isAdmin }: { keys: KeyInfo[]; isAd
   const adminKeys = useQuery({
     queryKey: ["admin-keys", page],
     queryFn: () => api.listAllKeys(page, 25),
-    enabled: isAdmin && editorOpen,
+    enabled: editorOpen,
     placeholderData: previous => previous,
   });
 
@@ -43,12 +42,10 @@ export default function BulkKeyEditor({ keys, isAdmin }: { keys: KeyInfo[]; isAd
   function submit(event: React.FormEvent) {
     event.preventDefault();
     setLocalError("");
-    const targetKeys = isAdmin
-      ? Array.from(new Set([
-          ...selected,
-          ...targets.split(/[\n,]/).map(value => value.trim()).filter(Boolean),
-        ]))
-      : ownedTokens;
+    const targetKeys = Array.from(new Set([
+      ...selected,
+      ...targets.split(/[\n,]/).map(value => value.trim()).filter(Boolean),
+    ]));
     if (!targetKeys.length) { setLocalError("No editable key is available."); return; }
     const settings: KeySettingsUpdate = {};
     if (alias.trim()) settings.key_alias = alias.trim();
@@ -83,7 +80,7 @@ export default function BulkKeyEditor({ keys, isAdmin }: { keys: KeyInfo[]; isAd
     <details onToggle={event => setEditorOpen(event.currentTarget.open)} className="w-full max-w-lg rounded-xl border border-[#2A2E42] bg-[#1A1D27]">
       <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-medium text-gray-200"><SlidersHorizontal size={16} /> Bulk edit key settings {selected.length > 0 && <span className="ml-auto rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] text-indigo-300">{selected.length} selected</span>}</summary>
       <form onSubmit={submit} className="grid gap-3 border-t border-[#2A2E42] p-4 sm:grid-cols-2">
-        {isAdmin && <div className="space-y-2 sm:col-span-2">
+        <div className="space-y-2 sm:col-span-2">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-gray-300">1. Choose keys</p>
             {adminKeys.data && <span className="text-[10px] text-gray-500">{adminKeys.data.total} total</span>}
@@ -111,8 +108,8 @@ export default function BulkKeyEditor({ keys, isAdmin }: { keys: KeyInfo[]; isAd
             </> : <p className="p-4 text-center text-xs text-gray-500">No keys found.</p>}
           </div>
           <details><summary className="cursor-pointer text-[11px] text-gray-500 hover:text-gray-300">Or paste key IDs manually</summary><textarea className={`${inputClass} mt-2 min-h-16 w-full`} value={targets} onChange={e => setTargets(e.target.value)} placeholder="One key per line" /></details>
-        </div>}
-        <p className="text-xs font-medium text-gray-300 sm:col-span-2">{isAdmin ? "2." : "1."} Choose settings to change</p>
+        </div>
+        <p className="text-xs font-medium text-gray-300 sm:col-span-2">2. Choose settings to change</p>
         <input className={inputClass} value={alias} onChange={e => setAlias(e.target.value)} placeholder="Alias" />
         <input className={inputClass} value={models} onChange={e => setModels(e.target.value)} placeholder="Models, comma-separated" />
         <input className={inputClass} value={budget} onChange={e => setBudget(e.target.value)} type="number" min="0" step="any" placeholder="Max budget" />
@@ -123,7 +120,7 @@ export default function BulkKeyEditor({ keys, isAdmin }: { keys: KeyInfo[]; isAd
         <select className={inputClass} value={blocked} onChange={e => setBlocked(e.target.value)}><option value="">Blocked: no change</option><option value="false">Unblock</option><option value="true">Block</option></select>
         {error && <p className="text-xs text-red-400 sm:col-span-2">{error}</p>}
         {update.data && <p className={`text-xs sm:col-span-2 ${update.data.failed ? "text-amber-300" : "text-green-400"}`}>{update.data.updated} updated, {update.data.failed} failed.</p>}
-        <button disabled={update.isPending || (isAdmin && selected.length === 0 && !targets.trim())} className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 sm:col-span-2">{update.isPending ? "Updating..." : `Update ${isAdmin ? `${selected.length || targets.split(/[\n,]/).filter(Boolean).length} selected` : "my"} keys`}</button>
+        <button disabled={update.isPending || (selected.length === 0 && !targets.trim())} className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 sm:col-span-2">{update.isPending ? "Updating..." : `Update ${selected.length || targets.split(/[\n,]/).filter(Boolean).length} selected keys`}</button>
       </form>
     </details>
   );

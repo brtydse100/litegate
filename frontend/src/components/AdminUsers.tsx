@@ -53,7 +53,7 @@ export default function AdminUsers() {
         </div>
         <div className="border-y border-[#2A2E42] bg-[#1A1D27] p-4 md:border-x md:border-y-0">
           <div className="flex items-center gap-2 text-sm font-medium text-gray-200"><Shield size={15} className="text-indigo-400" /> User or admin?</div>
-          <p className="mt-1.5 text-xs leading-5 text-gray-500"><span className="text-gray-300">Users</span> manage only their own API access. <span className="text-gray-300">Admins</span> manage all keys and local accounts.</p>
+          <p className="mt-1.5 text-xs leading-5 text-gray-500"><span className="text-gray-300">Users</span> create or regenerate their own key. <span className="text-gray-300">Admins</span> manage all keys and local accounts.</p>
         </div>
         <div className="bg-[#1A1D27] p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-gray-200"><Bot size={15} className="text-emerald-400" /> Automation agents</div>

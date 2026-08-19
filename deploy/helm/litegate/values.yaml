@@ -1,8 +1,8 @@
 replicaCount: 1
 
 image:
-  repository: litegate
-  tag: "1.0.0"  # always pin to a specific tag; never use 'latest' in production
+  repository: ghcr.io/brtydse100/litegate
+  tag: "2.0.0"  # always pin to a specific tag; never use 'latest' in production
   pullPolicy: IfNotPresent
 
 service:

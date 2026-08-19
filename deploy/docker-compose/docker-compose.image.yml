@@ -1,0 +1,15 @@
+services:
+  litegate:
+    image: ghcr.io/brtydse100/litegate:${LITEGATE_VERSION:-latest}
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./config.yaml:/app/backend/config.yaml:ro
+      - litegate-data:/app/backend/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  litegate-data:
