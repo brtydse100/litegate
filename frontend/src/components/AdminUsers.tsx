@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, UserPlus } from "lucide-react";
+import { Bot, Info, Shield, UserPlus } from "lucide-react";
 import { api } from "../api/client";
 
 const inputClass = "rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none";
@@ -41,19 +41,38 @@ export default function AdminUsers() {
   return (
     <section className="w-full max-w-4xl space-y-5">
       <div>
-        <h2 className="text-xl font-semibold text-white">Local users</h2>
-        <p className="mt-1 text-sm text-gray-500">Add people who cannot use SSO. Passwords are salted and hashed.</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-indigo-400">Users</p>
+        <h2 className="mt-1 text-xl font-semibold text-white">Local user access</h2>
+        <p className="mt-1 text-sm text-gray-500">Manage password-based accounts for people who cannot sign in with your organization&apos;s SSO.</p>
+      </div>
+
+      <div className="grid overflow-hidden rounded-xl border border-[#2A2E42] bg-[#2A2E42] md:grid-cols-3 md:gap-px">
+        <div className="bg-[#1A1D27] p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-200"><Info size={15} className="text-sky-400" /> When to use this</div>
+          <p className="mt-1.5 text-xs leading-5 text-gray-500">Create a local account for contractors, emergency access, or anyone without SSO. People covered by SSO should keep using SSO.</p>
+        </div>
+        <div className="border-y border-[#2A2E42] bg-[#1A1D27] p-4 md:border-x md:border-y-0">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-200"><Shield size={15} className="text-indigo-400" /> User or admin?</div>
+          <p className="mt-1.5 text-xs leading-5 text-gray-500"><span className="text-gray-300">Users</span> manage only their own API access. <span className="text-gray-300">Admins</span> manage all keys and local accounts.</p>
+        </div>
+        <div className="bg-[#1A1D27] p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-200"><Bot size={15} className="text-emerald-400" /> Automation agents</div>
+          <p className="mt-1.5 text-xs leading-5 text-gray-500">Use the management API key for trusted agents that need admin automation. Never give an agent a shared human password.</p>
+        </div>
       </div>
 
       {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{(error as Error).message}</p>}
 
       <form onSubmit={submit} className="grid gap-3 rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-5 md:grid-cols-2">
-        <div className="md:col-span-2 flex items-center gap-2 text-sm font-medium text-gray-200"><UserPlus size={16} /> Add local user</div>
+        <div className="md:col-span-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-200"><UserPlus size={16} /> Add local user</div>
+          <p className="mt-1 text-xs text-gray-500">Creates a separate username and password for this portal.</p>
+        </div>
         <input className={inputClass} value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" minLength={3} required />
         <input className={inputClass} value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" required />
         <input className={inputClass} value={password} onChange={e => setPassword(e.target.value)} placeholder="Temporary password (10+ characters)" type="password" minLength={10} required />
-        <select className={inputClass} value={role} onChange={e => setRole(e.target.value as "user" | "admin")}>
-          <option value="user">User</option><option value="admin">Admin</option>
+        <select aria-label="Role" className={inputClass} value={role} onChange={e => setRole(e.target.value as "user" | "admin")}>
+          <option value="user">User — own API access only</option><option value="admin">Admin — full management access</option>
         </select>
         <button disabled={create.isPending} className="md:col-span-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50">
           {create.isPending ? "Adding..." : "Add user"}
@@ -61,6 +80,10 @@ export default function AdminUsers() {
       </form>
 
       <div className="overflow-hidden rounded-xl border border-[#2A2E42] bg-[#1A1D27]">
+        <div className="border-b border-[#2A2E42] px-4 py-3">
+          <p className="text-sm font-medium text-gray-200">Account actions</p>
+          <p className="mt-1 text-xs leading-5 text-gray-500"><span className="text-gray-300">Reset password</span> replaces the current password. <span className="text-gray-300">Make admin/user</span> changes management access. <span className="text-gray-300">Disable</span> immediately blocks portal access without deleting the account.</p>
+        </div>
         {users.isLoading ? <div className="h-32 animate-pulse bg-[#22263A]" /> : users.data?.length ? (
           <div className="divide-y divide-[#2A2E42]">
             {users.data.map(account => (
