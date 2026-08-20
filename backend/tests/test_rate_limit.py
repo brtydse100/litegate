@@ -1,6 +1,6 @@
 import pytest
 from fastapi import HTTPException
-from app.rate_limit import check_key_rate_limit, _key_ops, _MAX_KEY_OPS
+from app.rate_limit import check_key_rate_limit, key_rate_limit_status, _key_ops, _MAX_KEY_OPS
 
 
 def setup_function():
@@ -18,6 +18,8 @@ def test_blocks_at_limit():
     with pytest.raises(HTTPException) as exc:
         check_key_rate_limit("user-b")
     assert exc.value.status_code == 429
+    assert exc.value.headers == {"Retry-After": "60"}
+    assert key_rate_limit_status("user-b") == {"limit": 5, "remaining": 0, "retry_after": 60}
 
 
 def test_users_are_isolated():

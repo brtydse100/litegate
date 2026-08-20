@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Edit3, Plus, Search, ShieldAlert, Trash2, Users, X } from "lucide-react";
 import { api } from "../api/client";
+import { useOperationLimit } from "../hooks/useOperationLimit";
 import type { TeamCreatePayload, TeamInfo, TeamUpdatePayload } from "../types";
 import TeamMembersDialog from "./TeamMembersDialog";
 
@@ -17,9 +18,10 @@ function nullableNumber(value: string): number | null {
   return value === "" ? null : Number(value);
 }
 
-function TeamEditor({ state, pending, error, onClose, onCreate, onUpdate }: {
+function TeamEditor({ state, pending, operationsBlocked, error, onClose, onCreate, onUpdate }: {
   state: EditorState;
   pending: boolean;
+  operationsBlocked: boolean;
   error?: string;
   onClose: () => void;
   onCreate: (payload: TeamCreatePayload) => void;
@@ -80,26 +82,27 @@ function TeamEditor({ state, pending, error, onClose, onCreate, onUpdate }: {
           <label className="flex items-center gap-2 text-sm text-gray-300 sm:col-span-2"><input type="checkbox" checked={blocked} onChange={event => setBlocked(event.target.checked)} /> Block requests from this team</label>
         </div>
         {error && <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>}
-        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 hover:bg-[#22263A]">Cancel</button><button disabled={pending || !alias.trim()} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50">{pending ? "Saving..." : state.mode === "create" ? "Create team" : "Save changes"}</button></div>
+        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 hover:bg-[#22263A]">Cancel</button><button disabled={pending || operationsBlocked || !alias.trim()} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">{pending ? "Saving..." : operationsBlocked ? "Team actions paused" : state.mode === "create" ? "Create team" : "Save changes"}</button></div>
       </form>
     </div>
   );
 }
 
-function DeleteTeamDialog({ team, pending, error, onClose, onDelete }: { team: TeamInfo; pending: boolean; error?: string; onClose: () => void; onDelete: () => void }) {
+function DeleteTeamDialog({ team, pending, operationsBlocked, error, onClose, onDelete }: { team: TeamInfo; pending: boolean; operationsBlocked: boolean; error?: string; onClose: () => void; onDelete: () => void }) {
   const [confirmation, setConfirmation] = useState("");
   return <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-team-title">
     <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-[#1A1D27] p-5 shadow-2xl">
       <div className="flex items-start gap-3"><div className="rounded-lg bg-red-500/10 p-2 text-red-400"><ShieldAlert size={20} /></div><div className="min-w-0 flex-1"><h3 id="delete-team-title" className="font-semibold text-white">Delete {team.team_alias || team.team_id}?</h3><p className="mt-1 text-xs leading-5 text-gray-400">LiteLLM deletes this team and its team-scoped API keys. This cannot be undone by LiteGate.</p></div><button onClick={onClose} aria-label="Close delete dialog" className="text-gray-500 hover:text-white"><X size={18} /></button></div>
       <label className="mt-4 block space-y-1 text-xs text-gray-400"><span>Type <code className="text-red-300">{team.team_id}</code> to confirm</span><input autoFocus className={inputClass} value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label>
       {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
-      <div className="mt-5 flex justify-end gap-2"><button onClick={onClose} className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300">Cancel</button><button onClick={onDelete} disabled={pending || confirmation !== team.team_id} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-40">{pending ? "Deleting..." : "Delete team and keys"}</button></div>
+      <div className="mt-5 flex justify-end gap-2"><button onClick={onClose} className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300">Cancel</button><button onClick={onDelete} disabled={pending || operationsBlocked || confirmation !== team.team_id} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40">{pending ? "Deleting..." : operationsBlocked ? "Team actions paused" : "Delete team and keys"}</button></div>
     </div>
   </div>;
 }
 
 export default function AdminTeams() {
   const queryClient = useQueryClient();
+  const { operationsBlocked, retryAfter, refreshOperationLimit } = useOperationLimit();
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -108,10 +111,10 @@ export default function AdminTeams() {
   const [memberTeam, setMemberTeam] = useState<TeamInfo | null>(null);
 
   const teams = useQuery({ queryKey: ["teams", page, search], queryFn: () => api.listTeams(page, 25, search), placeholderData: previous => previous });
-  const create = useMutation({ mutationFn: api.createTeam, onSuccess: () => { setEditor(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); } });
-  const update = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: TeamUpdatePayload }) => api.updateTeam(id, payload), onSuccess: () => { setEditor(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); void queryClient.invalidateQueries({ queryKey: ["keys"] }); } });
-  const remove = useMutation({ mutationFn: api.deleteTeam, onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); void queryClient.invalidateQueries({ queryKey: ["keys"] }); } });
-  const moveMember = useMutation({ mutationFn: ({ sourceTeamId, userId, destinationTeamId }: { sourceTeamId: string; userId: string; destinationTeamId: string }) => api.moveTeamMember(sourceTeamId, { user_id: userId, destination_team_id: destinationTeamId, confirm_policy_change: true }), onSuccess: () => { setMemberTeam(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); void queryClient.invalidateQueries({ queryKey: ["keys"] }); } });
+  const create = useMutation({ mutationFn: api.createTeam, onSuccess: () => { setEditor(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); }, onSettled: refreshOperationLimit });
+  const update = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: TeamUpdatePayload }) => api.updateTeam(id, payload), onSuccess: () => { setEditor(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); void queryClient.invalidateQueries({ queryKey: ["keys"] }); }, onSettled: refreshOperationLimit });
+  const remove = useMutation({ mutationFn: api.deleteTeam, onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); void queryClient.invalidateQueries({ queryKey: ["keys"] }); }, onSettled: refreshOperationLimit });
+  const moveMember = useMutation({ mutationFn: ({ sourceTeamId, userId, destinationTeamId }: { sourceTeamId: string; userId: string; destinationTeamId: string }) => api.moveTeamMember(sourceTeamId, { user_id: userId, destination_team_id: destinationTeamId, confirm_policy_change: true }), onSuccess: () => { setMemberTeam(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); void queryClient.invalidateQueries({ queryKey: ["keys"] }); }, onSettled: refreshOperationLimit });
 
   function applySearch(event: React.FormEvent) { event.preventDefault(); setPage(1); setSearch(searchInput.trim()); }
   function openCreate() { create.reset(); update.reset(); setEditor({ mode: "create" }); }
@@ -124,9 +127,10 @@ export default function AdminTeams() {
   const editorError = (editor?.mode === "create" ? create.error : update.error) as Error | null;
 
   return <section className="w-full max-w-5xl space-y-5">
-    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="text-xs font-medium uppercase tracking-wider text-cyan-400">Teams</p><h2 className="mt-1 text-xl font-semibold text-white">LiteLLM team policy</h2><p className="mt-1 text-sm text-gray-500">Manage team budgets, model access, rate limits, and availability without opening the LiteLLM admin UI.</p></div><button onClick={openCreate} className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500"><Plus size={16} /> Create team</button></div>
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><p className="text-xs font-medium uppercase tracking-wider text-cyan-400">Teams</p><h2 className="mt-1 text-xl font-semibold text-white">LiteLLM team policy</h2><p className="mt-1 text-sm text-gray-500">Manage team budgets, model access, rate limits, and availability without opening the LiteLLM admin UI.</p></div><button onClick={openCreate} disabled={operationsBlocked} className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"><Plus size={16} /> {operationsBlocked ? "Team actions paused" : "Create team"}</button></div>
 
     <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs leading-5 text-amber-100/70"><span className="font-medium text-amber-200">Deletion is intentionally guarded.</span> Deleting a LiteLLM team also deletes its team-scoped keys. Teams referenced by SSO mapping or <code>KEY_TEAM_ID</code> cannot be deleted until that configuration is changed.</div>
+    {operationsBlocked && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">Team actions are paused. Try again in {retryAfter || 1} seconds.</p>}
 
     <form onSubmit={applySearch} className="flex gap-2"><div className="relative min-w-0 flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" /><input aria-label="Search teams" className={`${inputClass} pl-9`} value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="Search team name or ID" maxLength={128} /></div><button className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 hover:bg-[#1A1D27]">Search</button></form>
 
@@ -139,15 +143,15 @@ export default function AdminTeams() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><Building2 size={16} className="text-cyan-400" /><h3 className="truncate text-sm font-semibold text-white">{team.team_alias || "Unnamed team"}</h3>{team.blocked && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">Blocked</span>}{team.default_key_team && <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300">Default key team</span>}{team.mapped_groups.map(group => <span key={group} className="rounded bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-300">SSO: {group}</span>)}</div><p className="mt-1 truncate font-mono text-[11px] text-gray-600" title={team.team_id}>{team.team_id}</p></div>
             <div className="grid grid-cols-3 gap-4 text-xs lg:min-w-80"><div><p className="text-gray-600">Budget</p><p className="mt-0.5 text-gray-300">{team.max_budget != null ? `$${team.max_budget}` : "Unlimited"}</p></div><div><p className="text-gray-600">Usage</p><p className="mt-0.5 text-gray-300">${(team.spend ?? 0).toFixed(2)}</p></div><div><p className="text-gray-600">Members / keys</p><p className="mt-0.5 text-gray-300">{team.members_count ?? 0} / {team.keys_count ?? 0}</p></div><div><p className="text-gray-600">Models</p><p className="mt-0.5 text-gray-300">{team.models?.length ? team.models.length : "All"}</p></div><div><p className="text-gray-600">TPM</p><p className="mt-0.5 text-gray-300">{team.tpm_limit?.toLocaleString() ?? "Default"}</p></div><div><p className="text-gray-600">RPM</p><p className="mt-0.5 text-gray-300">{team.rpm_limit?.toLocaleString() ?? "Default"}</p></div></div>
-            <div className="flex flex-wrap gap-2"><button onClick={() => openMembers(team)} className="flex items-center gap-1.5 rounded-lg border border-cyan-500/20 px-3 py-2 text-xs text-cyan-300 hover:bg-cyan-500/10"><Users size={13} /> Members</button><button onClick={() => openEdit(team)} className="flex items-center gap-1.5 rounded-lg border border-[#2A2E42] px-3 py-2 text-xs text-gray-300 hover:bg-[#22263A]"><Edit3 size={13} /> Edit</button><button onClick={() => openDelete(team)} disabled={protectedTeam} title={protectedTeam ? "Remove SSO/default-team configuration references first" : "Delete team"} className="flex items-center gap-1.5 rounded-lg border border-red-500/20 px-3 py-2 text-xs text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-35"><Trash2 size={13} /> Delete</button></div>
+            <div className="flex flex-wrap gap-2"><button onClick={() => openMembers(team)} disabled={operationsBlocked} className="flex items-center gap-1.5 rounded-lg border border-cyan-500/20 px-3 py-2 text-xs text-cyan-300 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-35"><Users size={13} /> Members</button><button onClick={() => openEdit(team)} disabled={operationsBlocked} className="flex items-center gap-1.5 rounded-lg border border-[#2A2E42] px-3 py-2 text-xs text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-35"><Edit3 size={13} /> Edit</button><button onClick={() => openDelete(team)} disabled={protectedTeam || operationsBlocked} title={protectedTeam ? "Remove SSO/default-team configuration references first" : operationsBlocked ? "Wait for the operation cooldown" : "Delete team"} className="flex items-center gap-1.5 rounded-lg border border-red-500/20 px-3 py-2 text-xs text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-35"><Trash2 size={13} /> Delete</button></div>
           </div>
         </article>;
       })}</div> : <p className="p-10 text-center text-sm text-gray-500">{search ? "No teams match this search." : "No LiteLLM teams yet. Create the first team to define a shared budget and model policy."}</p>}
       <div className="flex items-center justify-between border-t border-[#2A2E42] px-4 py-3 text-xs"><button onClick={() => setPage(value => Math.max(1, value - 1))} disabled={page <= 1} className="text-gray-400 disabled:opacity-30">Previous</button><span className="text-gray-600">Page {page} of {pageCount}</span><button onClick={() => setPage(value => Math.min(pageCount, value + 1))} disabled={page >= pageCount} className="text-gray-400 disabled:opacity-30">Next</button></div>
     </div>
 
-    {editor && <TeamEditor key={editor.mode === "edit" ? editor.team.team_id : "create"} state={editor} pending={create.isPending || update.isPending} error={editorError?.message} onClose={() => setEditor(null)} onCreate={payload => create.mutate(payload)} onUpdate={(id, payload) => update.mutate({ id, payload })} />}
-    {deleteTarget && <DeleteTeamDialog team={deleteTarget} pending={remove.isPending} error={(remove.error as Error | null)?.message} onClose={() => setDeleteTarget(null)} onDelete={() => remove.mutate(deleteTarget.team_id)} />}
-    {memberTeam && <TeamMembersDialog team={memberTeam} pending={moveMember.isPending} error={(moveMember.error as Error | null)?.message} onClose={() => setMemberTeam(null)} onMove={(userId, destinationTeamId) => moveMember.mutate({ sourceTeamId: memberTeam.team_id, userId, destinationTeamId })} />}
+    {editor && <TeamEditor key={editor.mode === "edit" ? editor.team.team_id : "create"} state={editor} pending={create.isPending || update.isPending} operationsBlocked={operationsBlocked} error={editorError?.message} onClose={() => setEditor(null)} onCreate={payload => create.mutate(payload)} onUpdate={(id, payload) => update.mutate({ id, payload })} />}
+    {deleteTarget && <DeleteTeamDialog team={deleteTarget} pending={remove.isPending} operationsBlocked={operationsBlocked} error={(remove.error as Error | null)?.message} onClose={() => setDeleteTarget(null)} onDelete={() => remove.mutate(deleteTarget.team_id)} />}
+    {memberTeam && <TeamMembersDialog team={memberTeam} pending={moveMember.isPending} operationsBlocked={operationsBlocked} error={(moveMember.error as Error | null)?.message} onClose={() => setMemberTeam(null)} onMove={(userId, destinationTeamId) => moveMember.mutate({ sourceTeamId: memberTeam.team_id, userId, destinationTeamId })} />}
   </section>;
 }

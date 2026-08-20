@@ -6,6 +6,7 @@ import AdminTeams from "../components/AdminTeams";
 import BulkKeyEditor from "../components/BulkKeyEditor";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
+import { useOperationLimit } from "../hooks/useOperationLimit";
 import type { KeyInfo } from "../types";
 
 interface PortalConfig {
@@ -77,11 +78,12 @@ export default function Home() {
 
   const portal = useQuery({ queryKey: ["portal-config"], queryFn: fetchPortalConfig, staleTime: Infinity });
   const keys = useQuery({ queryKey: ["keys"], queryFn: api.listKeys });
+  const { operationsBlocked, retryAfter, refreshOperationLimit } = useOperationLimit();
   const keyList = keys.data?.keys ?? [];
   const hasKey = keyList.length > 0;
 
-  const create = useMutation({ mutationFn: api.createKey, onSuccess: result => { setNewKey(result.key); void queryClient.invalidateQueries({ queryKey: ["keys"] }); } });
-  const regenerate = useMutation({ mutationFn: api.regenerateKey, onSuccess: result => { setNewKey(result.key); setConfirmRegenerate(false); void queryClient.invalidateQueries({ queryKey: ["keys"] }); } });
+  const create = useMutation({ mutationFn: api.createKey, onSuccess: result => { setNewKey(result.key); void queryClient.invalidateQueries({ queryKey: ["keys"] }); }, onSettled: refreshOperationLimit });
+  const regenerate = useMutation({ mutationFn: api.regenerateKey, onSuccess: result => { setNewKey(result.key); setConfirmRegenerate(false); void queryClient.invalidateQueries({ queryKey: ["keys"] }); }, onSettled: refreshOperationLimit });
   const mutationError = create.error ?? regenerate.error ?? keys.error;
 
   async function copyNewKey() {
@@ -127,6 +129,8 @@ export default function Home() {
 
           {mutationError && <p className="w-full max-w-lg rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-center text-sm text-red-300">{(mutationError as Error).message}</p>}
 
+          {operationsBlocked && <p className="w-full max-w-lg rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-200">Key actions are paused. Try again in {retryAfter || 1} seconds.</p>}
+
           {newKey && <div className="w-full max-w-lg space-y-3 rounded-xl border border-green-500/30 bg-green-500/10 p-5">
             <p className="text-center text-sm font-medium text-green-300">Copy this key now — it will not be shown in full again.</p>
             <div className="flex gap-2"><code className="min-w-0 flex-1 truncate rounded bg-[#0F1117] px-3 py-2 text-sm text-green-200">{newKey}</code><button onClick={copyNewKey} className="rounded bg-green-500/15 px-3 text-green-300">{copied ? <Check size={15} /> : <Copy size={15} />}</button></div>
@@ -135,12 +139,12 @@ export default function Home() {
 
           {confirmRegenerate && <div className="w-full max-w-lg space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">
             <p className="text-sm font-medium text-amber-200">Replace the current key?</p><p className="text-xs text-gray-400">The old key stops working immediately.</p>
-            <div className="flex gap-2"><button onClick={() => regenerate.mutate()} disabled={regenerate.isPending} className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-50">{regenerate.isPending ? "Replacing..." : "Replace key"}</button><button onClick={() => setConfirmRegenerate(false)} className="rounded-lg border border-[#2A2E42] px-4 py-2 text-xs text-gray-300">Cancel</button></div>
+            <div className="flex gap-2"><button onClick={() => regenerate.mutate()} disabled={regenerate.isPending || operationsBlocked} className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50">{regenerate.isPending ? "Replacing..." : operationsBlocked ? "Temporarily paused" : "Replace key"}</button><button onClick={() => setConfirmRegenerate(false)} className="rounded-lg border border-[#2A2E42] px-4 py-2 text-xs text-gray-300">Cancel</button></div>
           </div>}
 
           {keys.isLoading ? <div className="h-28 w-full max-w-lg animate-pulse rounded-xl bg-[#1A1D27]" /> : keyList.map((keyInfo, index) => <KeyCard key={keyInfo.token ?? index} keyInfo={keyInfo} />)}
 
-          {!keys.isLoading && !confirmRegenerate && (!hasKey ? <button onClick={() => create.mutate()} disabled={create.isPending} className="w-full max-w-lg rounded-2xl bg-indigo-600 px-8 py-5 text-lg font-bold text-white shadow-xl shadow-indigo-600/25 hover:bg-indigo-500 disabled:opacity-50"><span className="flex items-center justify-center gap-2"><Zap size={23} />{create.isPending ? "Creating..." : "Create API key"}</span></button> : <button onClick={() => setConfirmRegenerate(true)} className="flex w-full max-w-lg items-center justify-center gap-2 rounded-xl border border-[#2A2E42] px-5 py-3 text-sm text-gray-300 hover:bg-[#1A1D27]"><RefreshCw size={15} /> Regenerate key</button>)}
+          {!keys.isLoading && !confirmRegenerate && (!hasKey ? <button onClick={() => create.mutate()} disabled={create.isPending || operationsBlocked} className="w-full max-w-lg rounded-2xl bg-indigo-600 px-8 py-5 text-lg font-bold text-white shadow-xl shadow-indigo-600/25 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"><span className="flex items-center justify-center gap-2"><Zap size={23} />{create.isPending ? "Creating..." : operationsBlocked ? "Key actions paused" : "Create API key"}</span></button> : <button onClick={() => setConfirmRegenerate(true)} disabled={operationsBlocked} className="flex w-full max-w-lg items-center justify-center gap-2 rounded-xl border border-[#2A2E42] px-5 py-3 text-sm text-gray-300 hover:bg-[#1A1D27] disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw size={15} /> {operationsBlocked ? "Regeneration paused" : "Regenerate key"}</button>)}
 
           {hasKey && <AccessSnapshot keys={keyList} />}
           {isAdmin && <BulkKeyEditor />}

@@ -12,8 +12,8 @@ Signed-in users can:
 - reveal a newly created secret once and copy it;
 - view masked identifiers, allowed models, expiration, spend, budget, TPM, and
   RPM;
-- regenerate a personal key after confirmation, immediately invalidating the old
-  key; and
+- regenerate a personal key after confirmation while carrying its accumulated
+  spend into the replacement and invalidating the old key; and
 - follow configured links to a support system or LiteLLM model hub.
 
 New keys inherit the installation defaults for models, budget, reset interval,
@@ -22,6 +22,11 @@ provider groups to existing LiteLLM teams so new or regenerated keys use the
 matched team's model and budget policy. See
 [SSO team mapping](authentication.md#mapping-sso-groups-to-litellm-teams) and
 the [configuration guide](configuration.md#key-defaults).
+
+The portal disables key, local-account, team, and bulk-edit controls when the
+server-side mutation limit is exhausted and shows the live cooldown. This
+prevents repeated clicks while retaining the backend rate limit as the
+authoritative protection.
 
 ## User and administrator roles
 
@@ -104,7 +109,7 @@ paginated to avoid loading every key at once.
 
 ## Deployment and customization
 
-- The frontend and backend ship together in one Docker image behind Nginx.
+- The frontend and backend ship together in one non-root Docker image behind Nginx.
 - Docker Compose persists local accounts in a named volume.
 - The included Helm chart supports a persistent volume claim.
 - A health endpoint is available at `/api/health`.

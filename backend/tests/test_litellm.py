@@ -2,6 +2,7 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
+from app.services import litellm
 
 
 @pytest.mark.asyncio
@@ -88,6 +89,33 @@ async def test_generate_key_sets_alias_from_email():
 
 
 @pytest.mark.asyncio
+async def test_generate_key_sets_initial_spend_and_replacement_alias():
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(return_value={"key": "sk-abc"})
+    captured: dict = {}
+
+    async def fake_post(url, json, headers, timeout):
+        captured.update(json)
+        return mock_response
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        instance = AsyncMock()
+        instance.post = fake_post
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=instance)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+        await litellm.generate_key(
+            "user-1",
+            "alice@example.com",
+            initial_spend=4.25,
+            key_alias="rotation-1",
+        )
+
+    assert captured["spend"] == 4.25
+    assert captured["key_alias"] == "rotation-1"
+
+
+@pytest.mark.asyncio
 async def test_generate_key_explicit_team_overrides_default(monkeypatch):
     mock_response = MagicMock()
     mock_response.raise_for_status = MagicMock()
@@ -98,7 +126,6 @@ async def test_generate_key_explicit_team_overrides_default(monkeypatch):
         captured.update(json)
         return mock_response
 
-    from app.services import litellm
     monkeypatch.setattr(litellm.settings, "key_team_id", "team-default")
     with patch("httpx.AsyncClient") as mock_client_class:
         instance = AsyncMock()
@@ -109,6 +136,17 @@ async def test_generate_key_explicit_team_overrides_default(monkeypatch):
         await litellm.generate_key("user-1", "alice@example.com", "team-sso")
 
     assert captured["team_id"] == "team-sso"
+
+
+def test_total_key_spend_ignores_invalid_and_negative_values():
+    keys = [
+        {"spend": 1.25},
+        {"spend": "2.5"},
+        {"spend": -3},
+        {"spend": "not-a-number"},
+        {"spend": float("inf")},
+    ]
+    assert litellm.total_key_spend(keys) == 3.75
 
 
 @pytest.mark.asyncio

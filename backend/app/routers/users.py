@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.dependencies import require_admin
 from app.models import CurrentUser, LocalUserCreate, LocalUserInfo, LocalUserUpdate
+from app.rate_limit import check_key_rate_limit
 from app.services import litellm as llm
 from app.services import local_users
 
@@ -16,7 +17,8 @@ async def list_local_users(_: CurrentUser = Depends(require_admin)):
 
 
 @router.post("", response_model=LocalUserInfo, status_code=status.HTTP_201_CREATED)
-async def create_local_user(payload: LocalUserCreate, _: CurrentUser = Depends(require_admin)):
+async def create_local_user(payload: LocalUserCreate, current_user: CurrentUser = Depends(require_admin)):
+    check_key_rate_limit(current_user.user_id)
     try:
         user = await asyncio.to_thread(
             local_users.create_user, payload.username, payload.email, payload.password, payload.role
@@ -33,6 +35,7 @@ async def update_local_user(
     payload: LocalUserUpdate,
     current_user: CurrentUser = Depends(require_admin),
 ):
+    check_key_rate_limit(current_user.user_id)
     existing = local_users.get_user(username)
     if not existing:
         raise HTTPException(status_code=404, detail="Local user not found")

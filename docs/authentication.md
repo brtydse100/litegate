@@ -144,7 +144,9 @@ virtual key cannot authorize `PATCH /api/v1/keys/bulk`.
 - Local role and active state are checked on every authenticated request.
 - Users cannot disable themselves or remove their own administrator role through
   the API.
-- Key-changing operations are limited to five per identity per minute.
+- Key, local-account, team, and bulk-edit mutations share a limit of five
+  operations per identity per minute. The portal disables mutation controls and
+  shows the cooldown after that allowance is exhausted.
 - Bulk updates use a five-request concurrency bound.
 - Included Nginx configurations set CSP, anti-clickjacking, MIME-sniffing, and
   referrer headers.

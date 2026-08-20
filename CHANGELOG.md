@@ -7,6 +7,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-08-20
+
+### Added
+
+- The portal now disables key, account, team, and bulk-edit mutation controls while the authenticated user has exhausted the server-side operation allowance, with a live retry countdown.
+- Local-account mutations now use the same server-side allowance as key and team changes, preventing rapid repeated role, password, or enable/disable requests.
+
+### Changed
+
+- Key regeneration carries accumulated spend into the replacement key, preventing credential rotation from refreshing a per-key allowance.
+- Replacement keys are created before old credentials are revoked, with rollback if old-key cleanup fails.
+
+### Security
+
+- The all-in-one container now runs as the dedicated unprivileged UID/GID `10001:10001`, drops Linux capabilities in Helm, prevents privilege escalation, and uses the runtime-default seccomp profile.
+- Nginx listens on unprivileged container port `8080`; Docker Compose and the Helm Service continue exposing port `80`.
+
+### Deployment
+
+- Existing Docker volumes created by earlier root-running images may require a one-time ownership migration before upgrading.
+
 ## [2.3.0] - 2026-08-20
 
 ### Added
@@ -91,7 +112,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.3.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.4.0...HEAD
+[2.4.0]: https://github.com/brtydse100/litegate/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/brtydse100/litegate/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/brtydse100/litegate/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/brtydse100/litegate/compare/v2.0.0...v2.1.0

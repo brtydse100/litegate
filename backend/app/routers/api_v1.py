@@ -333,6 +333,7 @@ async def api_list_users(actor: ApiActor = Depends(get_api_actor)):
 @router.post("/users", response_model=LocalUserInfo, status_code=status.HTTP_201_CREATED)
 async def api_create_user(payload: LocalUserCreate, actor: ApiActor = Depends(get_api_actor)):
     _require_api_admin(actor)
+    check_key_rate_limit(actor.user.user_id)
     try:
         user = await asyncio.to_thread(
             local_users.create_user, payload.username, payload.email, payload.password, payload.role
@@ -350,6 +351,7 @@ async def api_update_user(
     actor: ApiActor = Depends(get_api_actor),
 ):
     _require_api_admin(actor)
+    check_key_rate_limit(actor.user.user_id)
     existing = local_users.get_user(username)
     if not existing:
         raise HTTPException(status_code=404, detail="Local user not found")

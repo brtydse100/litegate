@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
 import { api } from "../api/client";
+import { useOperationLimit } from "../hooks/useOperationLimit";
 import type { KeyInfo, KeySettingsUpdate } from "../types";
 
 const inputClass = "rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none";
 
 export default function BulkKeyEditor() {
   const queryClient = useQueryClient();
+  const { operationsBlocked, retryAfter, refreshOperationLimit } = useOperationLimit();
   const keyToken = (key: KeyInfo) => key.token ?? key.api_key ?? key.key ?? "";
   const [editorOpen, setEditorOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -37,10 +39,12 @@ export default function BulkKeyEditor() {
       void queryClient.invalidateQueries({ queryKey: ["keys"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-keys"] });
     },
+    onSettled: refreshOperationLimit,
   });
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (operationsBlocked || update.isPending) return;
     setLocalError("");
     const targetKeys = Array.from(new Set([
       ...selected,
@@ -119,8 +123,9 @@ export default function BulkKeyEditor() {
         <input className={inputClass} value={duration} onChange={e => setDuration(e.target.value)} placeholder="New duration (e.g. 90d)" />
         <select className={inputClass} value={blocked} onChange={e => setBlocked(e.target.value)}><option value="">Blocked: no change</option><option value="false">Unblock</option><option value="true">Block</option></select>
         {error && <p className="text-xs text-red-400 sm:col-span-2">{error}</p>}
+        {operationsBlocked && <p className="text-xs text-amber-300 sm:col-span-2">Bulk updates are paused. Try again in {retryAfter || 1} seconds.</p>}
         {update.data && <p className={`text-xs sm:col-span-2 ${update.data.failed ? "text-amber-300" : "text-green-400"}`}>{update.data.updated} updated, {update.data.failed} failed.</p>}
-        <button disabled={update.isPending || (selected.length === 0 && !targets.trim())} className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 sm:col-span-2">{update.isPending ? "Updating..." : `Update ${selected.length || targets.split(/[\n,]/).filter(Boolean).length} selected keys`}</button>
+        <button disabled={update.isPending || operationsBlocked || (selected.length === 0 && !targets.trim())} className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2">{update.isPending ? "Updating..." : operationsBlocked ? "Bulk updates paused" : `Update ${selected.length || targets.split(/[\n,]/).filter(Boolean).length} selected keys`}</button>
       </form>
     </details>
   );

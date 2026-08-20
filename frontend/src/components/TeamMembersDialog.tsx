@@ -6,9 +6,10 @@ import type { TeamInfo, TeamMember } from "../types";
 
 const fieldClass = "w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none";
 
-export default function TeamMembersDialog({ team, pending, error, onClose, onMove }: {
+export default function TeamMembersDialog({ team, pending, operationsBlocked, error, onClose, onMove }: {
   team: TeamInfo;
   pending: boolean;
+  operationsBlocked: boolean;
   error?: string;
   onClose: () => void;
   onMove: (userId: string, destinationTeamId: string) => void;
@@ -49,7 +50,7 @@ export default function TeamMembersDialog({ team, pending, error, onClose, onMov
       <div className="mt-4 overflow-hidden rounded-xl border border-[#2A2E42]">
         {members.length ? members.map((member, index) => <div key={member.user_id || member.user_email || index} className="flex flex-col gap-3 border-b border-[#2A2E42] p-3 last:border-b-0 sm:flex-row sm:items-center">
           <div className="flex min-w-0 flex-1 items-center gap-3"><div className="rounded-lg bg-cyan-500/10 p-2 text-cyan-300"><UserRound size={16} /></div><div className="min-w-0"><p className="truncate text-sm text-gray-200">{member.user_email || member.user_id || "Unknown member"}</p>{member.user_email && member.user_id && <p className="truncate font-mono text-[10px] text-gray-600">{member.user_id}</p>}</div><span className="rounded bg-[#22263A] px-2 py-0.5 text-[10px] text-gray-400">{member.role}</span></div>
-          <button onClick={() => chooseMember(member)} disabled={protectedTeam || !member.user_id} title={!member.user_id ? "A stable LiteLLM user ID is required" : protectedTeam ? "Change the team mapping/default configuration first" : "Move member"} className="flex items-center justify-center gap-1.5 rounded-lg border border-[#2A2E42] px-3 py-2 text-xs text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-35">Move <ArrowRight size={13} /></button>
+          <button onClick={() => chooseMember(member)} disabled={protectedTeam || operationsBlocked || !member.user_id} title={!member.user_id ? "A stable LiteLLM user ID is required" : protectedTeam ? "Change the team mapping/default configuration first" : operationsBlocked ? "Wait for the operation cooldown" : "Move member"} className="flex items-center justify-center gap-1.5 rounded-lg border border-[#2A2E42] px-3 py-2 text-xs text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-35">Move <ArrowRight size={13} /></button>
         </div>) : <p className="p-8 text-center text-sm text-gray-500">This team has no members yet.</p>}
       </div>
 
@@ -62,7 +63,7 @@ export default function TeamMembersDialog({ team, pending, error, onClose, onMov
         {destinations.error && <p className="mt-2 text-xs text-red-300">{(destinations.error as Error).message}</p>}
         <label className="mt-4 flex items-start gap-2 text-xs leading-5 text-gray-300"><input className="mt-1" type="checkbox" checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)} /><span><KeyRound size={13} className="mr-1 inline" />I understand the user's moved keys will immediately inherit the destination team's models, limits, and budget policy.</span></label>
         {error && <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>}
-        <div className="mt-4 flex justify-end gap-2"><button onClick={() => setSelected(null)} className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300">Cancel</button><button onClick={() => onMove(selected.user_id!, destinationId)} disabled={pending || !destinationId || !acknowledged} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-40">{pending ? "Moving safely..." : "Move user and keys"}</button></div>
+        <div className="mt-4 flex justify-end gap-2"><button onClick={() => setSelected(null)} className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300">Cancel</button><button onClick={() => onMove(selected.user_id!, destinationId)} disabled={pending || operationsBlocked || !destinationId || !acknowledged} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40">{pending ? "Moving safely..." : operationsBlocked ? "Team actions paused" : "Move user and keys"}</button></div>
       </div>}
     </div>
   </div>;

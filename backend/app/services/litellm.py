@@ -1,4 +1,5 @@
 import json
+import math
 
 import httpx
 from typing import Optional, List, Any, NoReturn
@@ -336,9 +337,31 @@ async def move_user_team_keys(
     return len(source_keys)
 
 
-async def generate_key(user_id: str, email: str = "", team_id: Optional[str] = None) -> dict:
+def total_key_spend(keys: List[dict]) -> float:
+    """Return a safe cumulative spend value for credential replacement."""
+    total = 0.0
+    for key in keys:
+        try:
+            value = float(key.get("spend", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(value) and value > 0:
+            total += value
+    return total
+
+
+async def generate_key(
+    user_id: str,
+    email: str = "",
+    team_id: Optional[str] = None,
+    *,
+    initial_spend: float = 0.0,
+    key_alias: Optional[str] = None,
+) -> dict:
     name = email.split("@")[0] if email else user_id.split(":")[-1]
-    payload: dict[str, Any] = {"user_id": user_id, "key_alias": f"{name}'s key"}
+    payload: dict[str, Any] = {"user_id": user_id, "key_alias": key_alias or f"{name}'s key"}
+    if initial_spend > 0:
+        payload["spend"] = initial_spend
     if settings.key_max_budget is not None:
         payload["max_budget"] = settings.key_max_budget
     if settings.key_budget_duration:

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Info, Shield, UserPlus } from "lucide-react";
 import { api } from "../api/client";
+import { useOperationLimit } from "../hooks/useOperationLimit";
 
 const inputClass = "rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none";
 
@@ -11,6 +12,7 @@ export default function AdminUsers() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"user" | "admin">("user");
+  const { operationsBlocked, retryAfter, refreshOperationLimit } = useOperationLimit();
 
   const users = useQuery({ queryKey: ["local-users"], queryFn: api.listUsers });
   const create = useMutation({
@@ -19,19 +21,23 @@ export default function AdminUsers() {
       setUsername(""); setEmail(""); setPassword(""); setRole("user");
       void queryClient.invalidateQueries({ queryKey: ["local-users"] });
     },
+    onSettled: refreshOperationLimit,
   });
   const update = useMutation({
     mutationFn: ({ name, payload }: { name: string; payload: { active?: boolean; role?: "user" | "admin"; password?: string } }) =>
       api.updateUser(name, payload),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["local-users"] }),
+    onSettled: refreshOperationLimit,
   });
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (operationsBlocked || create.isPending || update.isPending) return;
     create.mutate({ username, email, password, role });
   }
 
   function resetPassword(name: string) {
+    if (operationsBlocked || update.isPending) return;
     const next = window.prompt(`New password for ${name} (at least 10 characters)`);
     if (next) update.mutate({ name, payload: { password: next } });
   }
@@ -62,6 +68,7 @@ export default function AdminUsers() {
       </div>
 
       {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{(error as Error).message}</p>}
+      {operationsBlocked && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">Account actions are paused. Try again in {retryAfter || 1} seconds.</p>}
 
       <form onSubmit={submit} className="grid gap-3 rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-5 md:grid-cols-2">
         <div className="md:col-span-2">
@@ -74,8 +81,8 @@ export default function AdminUsers() {
         <select aria-label="Role" className={inputClass} value={role} onChange={e => setRole(e.target.value as "user" | "admin")}>
           <option value="user">User — own API access only</option><option value="admin">Admin — full management access</option>
         </select>
-        <button disabled={create.isPending} className="md:col-span-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50">
-          {create.isPending ? "Adding..." : "Add user"}
+        <button disabled={create.isPending || update.isPending || operationsBlocked} className="md:col-span-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
+          {create.isPending ? "Adding..." : operationsBlocked ? "Account actions paused" : "Add user"}
         </button>
       </form>
 
@@ -97,9 +104,9 @@ export default function AdminUsers() {
                   <p className="truncate text-xs text-gray-500">{account.email}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <button onClick={() => resetPassword(account.username)} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A]">Reset password</button>
-                  <button onClick={() => update.mutate({ name: account.username, payload: { role: account.role === "admin" ? "user" : "admin" } })} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A]">Make {account.role === "admin" ? "user" : "admin"}</button>
-                  <button onClick={() => update.mutate({ name: account.username, payload: { active: !account.active } })} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A]">{account.active ? "Disable" : "Enable"}</button>
+                  <button onClick={() => resetPassword(account.username)} disabled={update.isPending || operationsBlocked} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40">Reset password</button>
+                  <button onClick={() => update.mutate({ name: account.username, payload: { role: account.role === "admin" ? "user" : "admin" } })} disabled={update.isPending || operationsBlocked} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40">Make {account.role === "admin" ? "user" : "admin"}</button>
+                  <button onClick={() => update.mutate({ name: account.username, payload: { active: !account.active } })} disabled={update.isPending || operationsBlocked} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40">{account.active ? "Disable" : "Enable"}</button>
                 </div>
               </div>
             ))}

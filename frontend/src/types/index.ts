@@ -65,6 +65,12 @@ export interface KeyCreateResponse {
   expires?: string | null;
 }
 
+export interface OperationLimit {
+  limit: number;
+  remaining: number;
+  retry_after: number;
+}
+
 export interface TeamInfo {
   team_id: string;
   team_alias?: string | null;

@@ -34,6 +34,9 @@ export const api = {
 
   listKeys: () => request<{ keys: import("../types").KeyInfo[] }>("/keys"),
 
+  getOperationLimit: () =>
+    request<import("../types").OperationLimit>("/keys/operation-limit"),
+
   listAllKeys: (page = 1, size = 25) =>
     request<import("../types").AdminKeyPage>(`/v1/keys?all=true&page=${page}&size=${size}`),
 

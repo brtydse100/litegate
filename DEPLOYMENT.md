@@ -7,7 +7,7 @@ LiteGate is a self-hosted portal that lets your team generate and manage their o
 ## How it works
 
 ```
-Browser → nginx (port 80)
+Browser → host port 80 → nginx (container port 8080)
               ├── /api/* → FastAPI backend (internal port 8000)
               └── /*     → React frontend (static files)
 ```
@@ -84,6 +84,21 @@ docker compose down
 docker compose up --build
 ```
 
+### Upgrading an existing data volume to 2.4+
+
+LiteGate 2.4 runs as the unprivileged user `10001:10001`. Fresh volumes are
+ready automatically. A volume first created by LiteGate 2.3 or earlier may be
+owned by root; migrate it once before starting the new image:
+
+```bash
+docker compose -f docker-compose.image.yml run --rm --user 0 \
+  --entrypoint chown litegate -R 10001:10001 /app/backend/data
+docker compose -f docker-compose.image.yml up -d
+```
+
+The container listens on port `8080`; the supplied Compose mapping keeps the
+browser URL on host port `80`.
+
 ### Offline usage
 
 Once built, the image contains everything it needs:
@@ -125,8 +140,8 @@ docker compose up --build
 ### Step 1 — Build and push the image
 
 ```bash
-docker build -f deploy/docker-compose/Dockerfile -t your-registry.io/litegate:2.3.0 .
-docker push your-registry.io/litegate:2.3.0
+docker build -f deploy/docker-compose/Dockerfile -t your-registry.io/litegate:2.4.0 .
+docker push your-registry.io/litegate:2.4.0
 ```
 
 ### Step 2 — Install
@@ -134,7 +149,7 @@ docker push your-registry.io/litegate:2.3.0
 ```bash
 helm install litegate ./deploy/helm/litegate \
   --set image.repository=your-registry.io/litegate \
-  --set image.tag=2.3.0 \
+  --set image.tag=2.4.0 \
   --set config.litellmUrl=http://litellm-svc:4000 \
   --set config.litellmMasterKey=sk-your-key \
   --set config.jwtSecret=$(openssl rand -base64 32) \
@@ -150,7 +165,7 @@ helm install litegate ./deploy/helm/litegate \
 ### Step 3 — Upgrade after changes
 
 ```bash
-helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.3.0
+helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.4.0
 ```
 
 ### SSO roles and LiteLLM teams in Helm
@@ -188,6 +203,10 @@ LiteLLM team-admin role. `oidcGroupTeamMapping` adds the user as a regular
 LiteLLM team member and assigns the first matched team to newly generated or
 regenerated keys. Both settings read from `oidcGroupsClaim`, use
 case-insensitive group-name matching, and support dotted claim paths.
+
+The chart's default pod and container security contexts enforce the image's
+non-root UID/GID, drop all capabilities, prevent privilege escalation, apply the
+runtime-default seccomp profile, and use `fsGroup: 10001` for the data volume.
 
 ---
 
@@ -258,6 +277,11 @@ key_rpm_limit: 1000           # requests per minute
 ```
 
 Leave any line commented out to use LiteLLM's defaults.
+
+When a user regenerates a key, LiteGate transfers the old key's accumulated
+spend to the replacement. The configured per-key budget therefore cannot be
+reset through rotation. User and team budgets in LiteLLM remain recommended as
+shared ceilings across all credentials and tools.
 
 ---
 

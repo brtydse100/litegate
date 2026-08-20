@@ -10,13 +10,14 @@ roles, budgets, limits, models, and key policy.
 ## Why LiteGate?
 
 - Give each user a personal LiteLLM key without exposing the master key.
+- Preserve accumulated per-key spend when a user regenerates a credential.
 - Support generic OpenID Connect SSO and persistent local accounts.
 - Assign administrators by SSO email or group membership.
 - Map SSO groups to existing LiteLLM teams for team budgets and model policy.
 - Create, search, edit, block, safely delete, and move members between LiteLLM teams from an admin tab.
 - Let administrators bulk-edit key policy from the portal or API.
 - Give trusted automation agents admin access through a management API key.
-- Run the React frontend and FastAPI backend as a single Docker image.
+- Run the React frontend and FastAPI backend as a non-root single Docker image.
 - Keep the dashboard responsive by avoiding raw spend-log downloads on page load.
 
 ## Access model
@@ -82,7 +83,7 @@ docker compose -f docker-compose.image.yml up -d
 ```
 
 This pulls `ghcr.io/brtydse100/litegate:latest` for `linux/amd64`. To pin a
-release, set `LITEGATE_VERSION`, for example `LITEGATE_VERSION=2.3.0`. Other
+release, set `LITEGATE_VERSION`, for example `LITEGATE_VERSION=2.4.0`. Other
 architectures can build locally from source:
 
 ```bash
@@ -113,7 +114,9 @@ ReDoc at `/api/redoc` and the OpenAPI document at `/api/openapi.json`.
 LiteGate verifies OIDC token signatures and claims, uses short-lived signed OIDC
 state, and stores local passwords as salted PBKDF2-SHA256 hashes. Account status
 and local roles are rechecked on authenticated requests. Key-changing operations
-are rate limited, bulk updates use bounded concurrency, and the included Nginx
+and administrative mutations are rate limited with disabled controls during
+cooldowns, credential regeneration carries prior key spend, bulk updates use
+bounded concurrency, and the included Nginx
 configuration adds common browser security headers.
 
 For production, use HTTPS, restrict access to configuration and secrets, rotate

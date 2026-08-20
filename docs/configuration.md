@@ -98,6 +98,11 @@ Administrators can override supported settings later with the portal bulk editor
 or `PATCH /api/v1/keys/bulk`. Normal users cannot bulk-edit keys. See
 [Features and access model](features.md#administrator-only-bulk-editing).
 
+Regeneration carries the accumulated spend from the old credential into its
+replacement. This prevents users from refreshing a per-key allowance by rotating
+the key. LiteLLM also tracks spend at user and team scope; configure those budgets
+as an additional shared ceiling when a person may own keys outside LiteGate.
+
 ## Portal integration settings
 
 | Setting | Default | Purpose |

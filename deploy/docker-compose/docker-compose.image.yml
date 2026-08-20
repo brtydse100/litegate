@@ -4,7 +4,7 @@ services:
     pull_policy: always
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "80:8080"
     volumes:
       - ./config.yaml:/app/backend/config.yaml:ro
       - litegate-data:/app/backend/data
