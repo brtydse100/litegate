@@ -125,8 +125,8 @@ docker compose up --build
 ### Step 1 — Build and push the image
 
 ```bash
-docker build -f deploy/docker-compose/Dockerfile -t your-registry.io/litegate:2.0.0 .
-docker push your-registry.io/litegate:2.0.0
+docker build -f deploy/docker-compose/Dockerfile -t your-registry.io/litegate:2.1.0 .
+docker push your-registry.io/litegate:2.1.0
 ```
 
 ### Step 2 — Install
@@ -134,7 +134,7 @@ docker push your-registry.io/litegate:2.0.0
 ```bash
 helm install litegate ./deploy/helm/litegate \
   --set image.repository=your-registry.io/litegate \
-  --set image.tag=1.0 \
+  --set image.tag=2.1.0 \
   --set config.litellmUrl=http://litellm-svc:4000 \
   --set config.litellmMasterKey=sk-your-key \
   --set config.jwtSecret=$(openssl rand -base64 32) \
@@ -150,8 +150,44 @@ helm install litegate ./deploy/helm/litegate \
 ### Step 3 — Upgrade after changes
 
 ```bash
-helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=1.1
+helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.1.0
 ```
+
+### SSO roles and LiteLLM teams in Helm
+
+The chart exposes the SSO role and team settings under `config`. Put them in a
+private values file rather than trying to express the team map with repeated
+`--set` flags:
+
+```yaml
+config:
+  oidcGroupsClaim: "groups"
+
+  # LiteGate role mapping: these users can manage local users and bulk-edit keys.
+  adminGroups: "Platform Admins,AI Operations"
+
+  # LiteLLM membership/key mapping: values are existing team IDs, not aliases.
+  oidcGroupTeamMapping:
+    Engineering: "team-engineering"
+    AI-Platform:
+      - "team-platform"
+      - "team-shared-services"
+  oidcRequireTeamMapping: true
+```
+
+Apply it with:
+
+```bash
+helm upgrade --install litegate ./deploy/helm/litegate \
+  --namespace litegate --create-namespace \
+  --values values.production.yaml
+```
+
+`adminGroups` controls the LiteGate `admin` role only. It does not grant the
+LiteLLM team-admin role. `oidcGroupTeamMapping` adds the user as a regular
+LiteLLM team member and assigns the first matched team to newly generated or
+regenerated keys. Both settings read from `oidcGroupsClaim`, use
+case-insensitive group-name matching, and support dotted claim paths.
 
 ---
 

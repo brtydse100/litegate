@@ -37,6 +37,7 @@ def test_portal_token_requires_subject():
 @pytest.mark.asyncio
 async def test_sso_callback_syncs_mapped_teams_and_embeds_them_in_token(monkeypatch):
     monkeypatch.setattr(auth.settings, "oidc_groups_claim", "groups")
+    monkeypatch.setattr(auth.settings, "admin_groups", "ENGINEERING")
     monkeypatch.setattr(
         auth.settings,
         "oidc_group_team_mapping",
@@ -67,7 +68,9 @@ async def test_sso_callback_syncs_mapped_teams_and_embeds_them_in_token(monkeypa
         "oidc-user", "user@example.com", ["team-primary", "team-shared"]
     )
     token = response.headers["location"].split("#token=", 1)[1]
-    assert decode_portal_token(token).team_ids == ["team-primary", "team-shared"]
+    user = decode_portal_token(token)
+    assert user.is_admin is True
+    assert user.team_ids == ["team-primary", "team-shared"]
 
 
 @pytest.mark.asyncio

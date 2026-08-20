@@ -7,6 +7,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Clarified Helm-specific SSO administrator-role and LiteLLM team-mapping values, and refreshed the deployment examples for the 2.1 release.
+
 ## [2.1.0] - 2026-08-20
 
 ### Added

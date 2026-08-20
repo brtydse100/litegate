@@ -37,6 +37,8 @@ config:
   oidcClientSecret: ""
   oidcRedirectUri: ""
   oidcScopes: "openid email profile"
+  # adminGroups and oidcGroupTeamMapping both read group names from this claim.
+  # Dot notation is supported, for example: realm_access.roles
   oidcGroupsClaim: "groups"
   # Map SSO group names to existing LiteLLM team IDs. A group can map to a
   # string or list; the first matched team is applied to new/regenerated keys.
@@ -57,6 +59,8 @@ config:
   localUsersEnabled: "true"
   localUsersDbPath: "/app/backend/data/litegate.db"
   adminEmails: ""
+  # Comma-separated SSO groups that receive the LiteGate administrator role.
+  # Matching is case-insensitive; this does not make users LiteLLM team admins.
   adminGroups: ""
 
   # Optional credential for the management API (send as X-API-Key)
