@@ -15,7 +15,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="LiteGate",
-    version="2.2.0",
+    version="2.3.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",

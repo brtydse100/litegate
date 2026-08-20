@@ -133,9 +133,12 @@ def _is_duplicate_team_member_response(response: httpx.Response) -> bool:
 
 
 async def add_user_to_team(user_id: str, email: str, team_id: str) -> dict:
-    # Match by the stable LiteLLM user ID only. Supplying both ID and email can
-    # make LiteLLM resolve the same member twice on some versions.
-    member: dict[str, str] = {"role": "user", "user_id": user_id}
+    return await add_team_member(team_id=team_id, user_id=user_id, role="user")
+
+
+async def add_team_member(team_id: str, user_id: str, role: str = "user") -> dict:
+    """Add one stable user ID to a team, tolerating an exact duplicate."""
+    member: dict[str, str] = {"role": role, "user_id": user_id}
     try:
         async with httpx.AsyncClient() as client:
             r = await client.post(
@@ -151,7 +154,7 @@ async def add_user_to_team(user_id: str, email: str, team_id: str) -> dict:
     except httpx.TransportError as e:
         _transport_error(e)
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
+        _team_operation_error(e)
 
 
 async def sync_user_team_memberships(user_id: str, email: str, team_ids: List[str]) -> None:
@@ -162,7 +165,12 @@ async def sync_user_team_memberships(user_id: str, email: str, team_ids: List[st
             await add_user_to_team(user_id, email, team_id)
 
 
-async def list_teams(page: int = 1, page_size: int = 25, search: str = "") -> dict:
+async def list_teams(
+    page: int = 1,
+    page_size: int = 25,
+    search: str = "",
+    exact_team_id: str = "",
+) -> dict:
     """Return a bounded team-management page from LiteLLM."""
     params: dict[str, Any] = {
         "page": page,
@@ -173,6 +181,8 @@ async def list_teams(page: int = 1, page_size: int = 25, search: str = "") -> di
     if search:
         params["search"] = search
         params["search_team_id_match"] = "prefix"
+    if exact_team_id:
+        params["team_id"] = exact_team_id
     try:
         async with httpx.AsyncClient() as client:
             r = await client.get(
@@ -196,6 +206,14 @@ async def list_teams(page: int = 1, page_size: int = 25, search: str = "") -> di
         _transport_error(e)
     except httpx.HTTPStatusError as e:
         _team_operation_error(e)
+
+
+async def get_team(team_id: str) -> Optional[dict]:
+    result = await list_teams(page=1, page_size=1, exact_team_id=team_id)
+    for team in result["teams"]:
+        if isinstance(team, dict) and team.get("team_id") == team_id:
+            return team
+    return None
 
 
 async def create_team(team: dict) -> dict:
@@ -247,6 +265,75 @@ async def delete_team(team_id: str) -> dict:
         _transport_error(e)
     except httpx.HTTPStatusError as e:
         _team_operation_error(e)
+
+
+async def remove_team_member(team_id: str, user_id: str) -> dict:
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{settings.litellm_url}/team/member_delete",
+                json={"team_id": team_id, "user_id": user_id},
+                headers=_headers(),
+                timeout=15,
+            )
+            r.raise_for_status()
+            return r.json()
+    except httpx.TransportError as e:
+        _transport_error(e)
+    except httpx.HTTPStatusError as e:
+        _team_operation_error(e)
+
+
+async def move_user_team_keys(
+    user_id: str,
+    source_team_id: str,
+    destination_team_id: str,
+    max_keys: int = 500,
+) -> int:
+    """Move every source-team key before membership removal can delete it."""
+    source_keys: list[str] = []
+    page = 1
+    while True:
+        result = await list_keys(page=page, size=100, user_id=user_id)
+        total = int(result.get("total", 0))
+        if total > max_keys:
+            raise HTTPException(
+                status_code=409,
+                detail=f"User has more than the safe move limit of {max_keys} keys",
+            )
+        for key in result.get("keys", []):
+            if not isinstance(key, dict) or key.get("team_id") != source_team_id:
+                continue
+            key_id = key.get("token") or key.get("key")
+            if key_id:
+                source_keys.append(str(key_id))
+        if page >= int(result.get("total_pages", 1)):
+            break
+        page += 1
+
+    for offset in range(0, len(source_keys), 100):
+        batch = source_keys[offset : offset + 100]
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.post(
+                    f"{settings.litellm_url}/key/bulk_update",
+                    json={"keys": [{"key": key, "team_id": destination_team_id} for key in batch]},
+                    headers=_headers(),
+                    timeout=20,
+                )
+                r.raise_for_status()
+                data = r.json()
+        except httpx.TransportError as e:
+            _transport_error(e)
+        except httpx.HTTPStatusError as e:
+            _team_operation_error(e)
+        failures = data.get("failed_updates") if isinstance(data, dict) else None
+        if failures:
+            raise HTTPException(
+                status_code=502,
+                detail="LiteLLM could not move every source-team key; the source membership was kept",
+            )
+    return len(source_keys)
 
 
 async def generate_key(user_id: str, email: str = "", team_id: Optional[str] = None) -> dict:

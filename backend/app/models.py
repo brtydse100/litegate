@@ -1,6 +1,6 @@
 ﻿from pydantic import BaseModel
 from pydantic import Field, field_validator, model_validator
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Literal
 from datetime import datetime
 
 
@@ -211,3 +211,14 @@ class TeamUpdateRequest(BaseModel):
         if not self.model_fields_set:
             raise ValueError("At least one team setting is required")
         return self
+
+
+class TeamMemberMoveRequest(BaseModel):
+    user_id: str = Field(min_length=1, max_length=128)
+    destination_team_id: str = Field(min_length=1, max_length=128)
+    confirm_policy_change: Literal[True]
+
+    @field_validator("user_id", "destination_team_id", mode="before")
+    @classmethod
+    def clean_member_move_ids(cls, value: str) -> str:
+        return value.strip()

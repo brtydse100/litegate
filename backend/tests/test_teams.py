@@ -3,13 +3,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.models import CurrentUser, TeamCreateRequest, TeamUpdateRequest
+from app.models import CurrentUser, TeamCreateRequest, TeamMemberMoveRequest, TeamUpdateRequest
 from app.rate_limit import _key_ops
 from app.routers.api_v1 import (
     ApiActor,
     api_create_team,
     api_delete_team,
     api_list_teams,
+    api_move_team_member,
     api_update_team,
 )
 
@@ -124,6 +125,139 @@ async def test_admin_can_delete_unreferenced_team(monkeypatch):
 
     assert result == {"deleted": True, "team_id": "team-old"}
     delete.assert_awaited_once_with("team-old")
+
+
+@pytest.mark.asyncio
+async def test_admin_moves_member_keys_before_removing_source(monkeypatch):
+    from app.routers import api_v1
+
+    monkeypatch.setattr(api_v1.settings, "oidc_group_team_mapping", {})
+    monkeypatch.setattr(api_v1.settings, "key_team_id", None)
+    source = {
+        "team_id": "team-source",
+        "members_with_roles": [{"user_id": "user-1", "role": "user"}],
+    }
+    destination = {"team_id": "team-destination", "members_with_roles": []}
+    payload = TeamMemberMoveRequest(
+        user_id="user-1",
+        destination_team_id="team-destination",
+        confirm_policy_change=True,
+    )
+    with (
+        patch("app.routers.api_v1.llm.get_team", new=AsyncMock(side_effect=[source, destination])),
+        patch("app.routers.api_v1.llm.add_team_member", new=AsyncMock()) as add,
+        patch("app.routers.api_v1.llm.move_user_team_keys", new=AsyncMock(return_value=2)) as move_keys,
+        patch("app.routers.api_v1.llm.remove_team_member", new=AsyncMock()) as remove,
+    ):
+        result = await api_move_team_member("team-source", payload, admin_actor())
+
+    add.assert_awaited_once_with(team_id="team-destination", user_id="user-1", role="user")
+    move_keys.assert_awaited_once_with(
+        user_id="user-1",
+        source_team_id="team-source",
+        destination_team_id="team-destination",
+    )
+    remove.assert_awaited_once_with("team-source", "user-1")
+    assert result["keys_moved"] == 2
+    assert result["destination_membership_existed"] is False
+
+
+@pytest.mark.asyncio
+async def test_move_keeps_source_membership_when_key_migration_fails(monkeypatch):
+    from app.routers import api_v1
+
+    monkeypatch.setattr(api_v1.settings, "oidc_group_team_mapping", {})
+    monkeypatch.setattr(api_v1.settings, "key_team_id", None)
+    source = {
+        "team_id": "team-source",
+        "members_with_roles": [{"user_id": "user-1", "role": "user"}],
+    }
+    destination = {"team_id": "team-destination", "members_with_roles": []}
+    payload = TeamMemberMoveRequest(
+        user_id="user-1",
+        destination_team_id="team-destination",
+        confirm_policy_change=True,
+    )
+    with (
+        patch("app.routers.api_v1.llm.get_team", new=AsyncMock(side_effect=[source, destination])),
+        patch("app.routers.api_v1.llm.add_team_member", new=AsyncMock()),
+        patch(
+            "app.routers.api_v1.llm.move_user_team_keys",
+            new=AsyncMock(side_effect=HTTPException(status_code=502, detail="key update failed")),
+        ),
+        patch("app.routers.api_v1.llm.remove_team_member", new=AsyncMock()) as remove,
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await api_move_team_member("team-source", payload, admin_actor())
+
+    assert exc.value.status_code == 502
+    assert "Source membership was kept" in str(exc.value.detail)
+    remove.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_configuration_managed_team_members_cannot_be_moved(monkeypatch):
+    from app.routers import api_v1
+
+    monkeypatch.setattr(api_v1.settings, "oidc_group_team_mapping", {"Engineering": "team-source"})
+    monkeypatch.setattr(api_v1.settings, "key_team_id", None)
+    payload = TeamMemberMoveRequest(
+        user_id="user-1",
+        destination_team_id="team-destination",
+        confirm_policy_change=True,
+    )
+    with patch("app.routers.api_v1.llm.get_team", new=AsyncMock()) as get_team:
+        with pytest.raises(HTTPException) as exc:
+            await api_move_team_member("team-source", payload, admin_actor())
+
+    assert exc.value.status_code == 409
+    assert "Engineering" in str(exc.value.detail)
+    get_team.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_move_rejects_non_admin():
+    payload = TeamMemberMoveRequest(
+        user_id="user-1",
+        destination_team_id="team-destination",
+        confirm_policy_change=True,
+    )
+    actor = ApiActor(CurrentUser(user_id="user", email="user@example.com"))
+    with pytest.raises(HTTPException) as exc:
+        await api_move_team_member("team-source", payload, actor)
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_move_user_team_keys_uses_bulk_key_reassignment():
+    from app.services import litellm
+
+    page = {
+        "keys": [
+            {"token": "key-source", "team_id": "team-source"},
+            {"token": "key-other", "team_id": "team-other"},
+        ],
+        "total": 2,
+        "total_pages": 1,
+    }
+    response = MagicMock(status_code=200)
+    response.raise_for_status = MagicMock()
+    response.json = MagicMock(return_value={"successful_updates": [{}], "failed_updates": []})
+    with (
+        patch("app.services.litellm.list_keys", new=AsyncMock(return_value=page)),
+        patch("httpx.AsyncClient") as client_class,
+    ):
+        client = AsyncMock()
+        client.post = AsyncMock(return_value=response)
+        client_class.return_value.__aenter__ = AsyncMock(return_value=client)
+        client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+        moved = await litellm.move_user_team_keys("user-1", "team-source", "team-destination")
+
+    assert moved == 1
+    assert client.post.await_args.args[0].endswith("/key/bulk_update")
+    assert client.post.await_args.kwargs["json"] == {
+        "keys": [{"key": "key-source", "team_id": "team-destination"}]
+    }
 
 
 @pytest.mark.asyncio

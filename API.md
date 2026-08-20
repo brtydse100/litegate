@@ -105,6 +105,25 @@ curl -X PATCH https://litegate.example.com/api/v1/teams/team-platform \
   -d '{"max_budget":300,"models":["gpt-4o-mini","claude-sonnet"]}'
 ```
 
+Move a member and every key scoped to the source team:
+
+```bash
+curl -X POST https://litegate.example.com/api/v1/teams/team-research/members/move \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id":"user-bob",
+    "destination_team_id":"team-platform",
+    "confirm_policy_change":true
+  }'
+```
+
+The move preserves the member's LiteLLM team role. LiteGate adds the destination
+membership, migrates and verifies up to 500 source-team keys, then removes the
+source membership. A failed key migration leaves the source membership in
+place. Moves out of teams referenced by `oidc_group_team_mapping` or
+`KEY_TEAM_ID` are rejected until configuration is changed.
+
 Delete a team:
 
 ```bash

@@ -7,6 +7,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-08-20
+
+### Added
+
+- An administrator-only, few-click workflow for viewing team members and moving a member to another LiteLLM team.
+- An administrator API endpoint for moving a team member and their source-team keys.
+
+### Security
+
+- Member moves add the destination membership and verify scoped-key migration before removing the source membership, avoiding LiteLLM's source-member deletion side effect.
+- The move requires explicit policy-change confirmation, is limited to 500 source-team keys, and is blocked for configuration-managed source teams.
+- Normal users cannot view team members or move them in either the portal or API.
+
+### Deployment
+
+- The public container is published as `ghcr.io/brtydse100/litegate:2.3.0` and `:latest` after the release workflow completes.
+
 ## [2.2.0] - 2026-08-20
 
 ### Added
@@ -74,7 +91,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/brtydse100/litegate/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/brtydse100/litegate/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/brtydse100/litegate/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/brtydse100/litegate/releases/tag/v2.0.0

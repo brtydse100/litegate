@@ -78,8 +78,15 @@ export interface TeamInfo {
   blocked: boolean;
   members_count?: number;
   keys_count?: number;
+  members_with_roles: TeamMember[];
   mapped_groups: string[];
   default_key_team: boolean;
+}
+
+export interface TeamMember {
+  user_id?: string | null;
+  user_email?: string | null;
+  role: "user" | "admin";
 }
 
 export interface TeamPage {
@@ -109,4 +116,19 @@ export interface TeamUpdatePayload {
   tpm_limit: number | null;
   rpm_limit: number | null;
   blocked: boolean;
+}
+
+export interface TeamMemberMovePayload {
+  user_id: string;
+  destination_team_id: string;
+  confirm_policy_change: true;
+}
+
+export interface TeamMemberMoveResult {
+  moved: boolean;
+  user_id: string;
+  source_team_id: string;
+  destination_team_id: string;
+  keys_moved: number;
+  destination_membership_existed: boolean;
 }

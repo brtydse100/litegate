@@ -125,8 +125,8 @@ docker compose up --build
 ### Step 1 — Build and push the image
 
 ```bash
-docker build -f deploy/docker-compose/Dockerfile -t your-registry.io/litegate:2.2.0 .
-docker push your-registry.io/litegate:2.2.0
+docker build -f deploy/docker-compose/Dockerfile -t your-registry.io/litegate:2.3.0 .
+docker push your-registry.io/litegate:2.3.0
 ```
 
 ### Step 2 — Install
@@ -134,7 +134,7 @@ docker push your-registry.io/litegate:2.2.0
 ```bash
 helm install litegate ./deploy/helm/litegate \
   --set image.repository=your-registry.io/litegate \
-  --set image.tag=2.2.0 \
+  --set image.tag=2.3.0 \
   --set config.litellmUrl=http://litellm-svc:4000 \
   --set config.litellmMasterKey=sk-your-key \
   --set config.jwtSecret=$(openssl rand -base64 32) \
@@ -150,7 +150,7 @@ helm install litegate ./deploy/helm/litegate \
 ### Step 3 — Upgrade after changes
 
 ```bash
-helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.2.0
+helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.3.0
 ```
 
 ### SSO roles and LiteLLM teams in Helm

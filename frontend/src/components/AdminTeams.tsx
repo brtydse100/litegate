@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Edit3, Plus, Search, ShieldAlert, Trash2, X } from "lucide-react";
+import { Building2, Edit3, Plus, Search, ShieldAlert, Trash2, Users, X } from "lucide-react";
 import { api } from "../api/client";
 import type { TeamCreatePayload, TeamInfo, TeamUpdatePayload } from "../types";
+import TeamMembersDialog from "./TeamMembersDialog";
 
 const inputClass = "w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none";
 
@@ -104,16 +105,19 @@ export default function AdminTeams() {
   const [search, setSearch] = useState("");
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TeamInfo | null>(null);
+  const [memberTeam, setMemberTeam] = useState<TeamInfo | null>(null);
 
   const teams = useQuery({ queryKey: ["teams", page, search], queryFn: () => api.listTeams(page, 25, search), placeholderData: previous => previous });
   const create = useMutation({ mutationFn: api.createTeam, onSuccess: () => { setEditor(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); } });
   const update = useMutation({ mutationFn: ({ id, payload }: { id: string; payload: TeamUpdatePayload }) => api.updateTeam(id, payload), onSuccess: () => { setEditor(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); void queryClient.invalidateQueries({ queryKey: ["keys"] }); } });
   const remove = useMutation({ mutationFn: api.deleteTeam, onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); void queryClient.invalidateQueries({ queryKey: ["keys"] }); } });
+  const moveMember = useMutation({ mutationFn: ({ sourceTeamId, userId, destinationTeamId }: { sourceTeamId: string; userId: string; destinationTeamId: string }) => api.moveTeamMember(sourceTeamId, { user_id: userId, destination_team_id: destinationTeamId, confirm_policy_change: true }), onSuccess: () => { setMemberTeam(null); void queryClient.invalidateQueries({ queryKey: ["teams"] }); void queryClient.invalidateQueries({ queryKey: ["keys"] }); } });
 
   function applySearch(event: React.FormEvent) { event.preventDefault(); setPage(1); setSearch(searchInput.trim()); }
   function openCreate() { create.reset(); update.reset(); setEditor({ mode: "create" }); }
   function openEdit(team: TeamInfo) { create.reset(); update.reset(); setEditor({ mode: "edit", team }); }
   function openDelete(team: TeamInfo) { remove.reset(); setDeleteTarget(team); }
+  function openMembers(team: TeamInfo) { moveMember.reset(); setMemberTeam(team); }
 
   const pageCount = Math.max(1, teams.data?.total_pages ?? 1);
   const pageError = teams.error as Error | null;
@@ -135,7 +139,7 @@ export default function AdminTeams() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><Building2 size={16} className="text-cyan-400" /><h3 className="truncate text-sm font-semibold text-white">{team.team_alias || "Unnamed team"}</h3>{team.blocked && <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">Blocked</span>}{team.default_key_team && <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300">Default key team</span>}{team.mapped_groups.map(group => <span key={group} className="rounded bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-300">SSO: {group}</span>)}</div><p className="mt-1 truncate font-mono text-[11px] text-gray-600" title={team.team_id}>{team.team_id}</p></div>
             <div className="grid grid-cols-3 gap-4 text-xs lg:min-w-80"><div><p className="text-gray-600">Budget</p><p className="mt-0.5 text-gray-300">{team.max_budget != null ? `$${team.max_budget}` : "Unlimited"}</p></div><div><p className="text-gray-600">Usage</p><p className="mt-0.5 text-gray-300">${(team.spend ?? 0).toFixed(2)}</p></div><div><p className="text-gray-600">Members / keys</p><p className="mt-0.5 text-gray-300">{team.members_count ?? 0} / {team.keys_count ?? 0}</p></div><div><p className="text-gray-600">Models</p><p className="mt-0.5 text-gray-300">{team.models?.length ? team.models.length : "All"}</p></div><div><p className="text-gray-600">TPM</p><p className="mt-0.5 text-gray-300">{team.tpm_limit?.toLocaleString() ?? "Default"}</p></div><div><p className="text-gray-600">RPM</p><p className="mt-0.5 text-gray-300">{team.rpm_limit?.toLocaleString() ?? "Default"}</p></div></div>
-            <div className="flex gap-2"><button onClick={() => openEdit(team)} className="flex items-center gap-1.5 rounded-lg border border-[#2A2E42] px-3 py-2 text-xs text-gray-300 hover:bg-[#22263A]"><Edit3 size={13} /> Edit</button><button onClick={() => openDelete(team)} disabled={protectedTeam} title={protectedTeam ? "Remove SSO/default-team configuration references first" : "Delete team"} className="flex items-center gap-1.5 rounded-lg border border-red-500/20 px-3 py-2 text-xs text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-35"><Trash2 size={13} /> Delete</button></div>
+            <div className="flex flex-wrap gap-2"><button onClick={() => openMembers(team)} className="flex items-center gap-1.5 rounded-lg border border-cyan-500/20 px-3 py-2 text-xs text-cyan-300 hover:bg-cyan-500/10"><Users size={13} /> Members</button><button onClick={() => openEdit(team)} className="flex items-center gap-1.5 rounded-lg border border-[#2A2E42] px-3 py-2 text-xs text-gray-300 hover:bg-[#22263A]"><Edit3 size={13} /> Edit</button><button onClick={() => openDelete(team)} disabled={protectedTeam} title={protectedTeam ? "Remove SSO/default-team configuration references first" : "Delete team"} className="flex items-center gap-1.5 rounded-lg border border-red-500/20 px-3 py-2 text-xs text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-35"><Trash2 size={13} /> Delete</button></div>
           </div>
         </article>;
       })}</div> : <p className="p-10 text-center text-sm text-gray-500">{search ? "No teams match this search." : "No LiteLLM teams yet. Create the first team to define a shared budget and model policy."}</p>}
@@ -144,5 +148,6 @@ export default function AdminTeams() {
 
     {editor && <TeamEditor key={editor.mode === "edit" ? editor.team.team_id : "create"} state={editor} pending={create.isPending || update.isPending} error={editorError?.message} onClose={() => setEditor(null)} onCreate={payload => create.mutate(payload)} onUpdate={(id, payload) => update.mutate({ id, payload })} />}
     {deleteTarget && <DeleteTeamDialog team={deleteTarget} pending={remove.isPending} error={(remove.error as Error | null)?.message} onClose={() => setDeleteTarget(null)} onDelete={() => remove.mutate(deleteTarget.team_id)} />}
+    {memberTeam && <TeamMembersDialog team={memberTeam} pending={moveMember.isPending} error={(moveMember.error as Error | null)?.message} onClose={() => setMemberTeam(null)} onMove={(userId, destinationTeamId) => moveMember.mutate({ sourceTeamId: memberTeam.team_id, userId, destinationTeamId })} />}
   </section>;
 }

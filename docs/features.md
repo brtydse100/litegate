@@ -40,9 +40,18 @@ request.
 
 The **Teams** tab lets administrators search and page through LiteLLM teams,
 create a team, and edit its name, models, budget, reset interval, TPM/RPM limits,
-or blocked state. The same operations are available to trusted automation through
-the [v1 API](../API.md#teams-admin-only). Normal users cannot see the tab or call
-the team endpoints.
+or blocked state. Its **Members** action also lets an administrator move a user
+to another team in a few clicks. The same operations are available to trusted
+automation through the [v1 API](../API.md#teams-admin-only). Normal users cannot
+see the tab or call the team endpoints.
+
+A move deliberately changes the policy applied to that user's source-team keys.
+LiteGate first adds the destination membership, reassigns and verifies every
+source-team key, and only then removes the source membership. The administrator
+must acknowledge the model, limit, and budget change. If key migration fails,
+the source membership is retained. Moves out of a team referenced by
+`oidc_group_team_mapping` or `KEY_TEAM_ID` are blocked because configuration
+would otherwise restore or conflict with the membership.
 
 Deletion is intentionally guarded because LiteLLM also deletes the team's
 scoped API keys. LiteGate requires an administrator to type the exact team ID
@@ -82,7 +91,7 @@ Automation supports:
 - creating keys for a specified user;
 - administrator-only bulk policy updates; and
 - creating, listing, disabling, and updating local users; and
-- creating, listing, updating, and safely deleting LiteLLM teams.
+- creating, listing, updating, safely deleting LiteLLM teams, and moving their members and scoped keys.
 
 See [API v1](../API.md) for endpoint and authentication details.
 

@@ -20,6 +20,7 @@ from app.models import (
     LocalUserInfo,
     LocalUserUpdate,
     TeamCreateRequest,
+    TeamMemberMoveRequest,
     TeamUpdateRequest,
 )
 from app.rate_limit import check_key_rate_limit
@@ -238,6 +239,89 @@ async def api_delete_team(
     check_key_rate_limit(actor.user.user_id)
     await llm.delete_team(team_id)
     return {"deleted": True, "team_id": team_id}
+
+
+@router.post("/teams/{source_team_id}/members/move")
+async def api_move_team_member(
+    source_team_id: Annotated[str, Path(min_length=1, max_length=128)],
+    payload: TeamMemberMoveRequest,
+    actor: ApiActor = Depends(get_api_actor),
+):
+    """Move a member and their source-team keys to another LiteLLM team."""
+    _require_api_admin(actor)
+    if source_team_id == payload.destination_team_id:
+        raise HTTPException(status_code=422, detail="Source and destination teams must be different")
+
+    mapped_groups, default_key_team = _team_config_references(source_team_id)
+    references = []
+    if mapped_groups:
+        references.append(f"SSO groups: {', '.join(mapped_groups)}")
+    if default_key_team:
+        references.append("KEY_TEAM_ID")
+    if references:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This team is configuration-managed; remove its reference before moving members ({'; '.join(references)})",
+        )
+
+    source_team = await llm.get_team(source_team_id)
+    if source_team is None:
+        raise HTTPException(status_code=404, detail="Source team not found")
+    destination_team = await llm.get_team(payload.destination_team_id)
+    if destination_team is None:
+        raise HTTPException(status_code=404, detail="Destination team not found")
+
+    source_member = next(
+        (
+            member
+            for member in source_team.get("members_with_roles", [])
+            if isinstance(member, dict) and member.get("user_id") == payload.user_id
+        ),
+        None,
+    )
+    if source_member is None:
+        raise HTTPException(status_code=404, detail="User is not a member of the source team")
+
+    check_key_rate_limit(actor.user.user_id)
+    destination_members = destination_team.get("members_with_roles", [])
+    already_in_destination = any(
+        isinstance(member, dict) and member.get("user_id") == payload.user_id
+        for member in destination_members
+    )
+    if not already_in_destination:
+        await llm.add_team_member(
+            team_id=payload.destination_team_id,
+            user_id=payload.user_id,
+            role=source_member.get("role") if source_member.get("role") in {"user", "admin"} else "user",
+        )
+
+    try:
+        moved_keys = await llm.move_user_team_keys(
+            user_id=payload.user_id,
+            source_team_id=source_team_id,
+            destination_team_id=payload.destination_team_id,
+        )
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=f"Destination membership is ready, but key migration did not finish. Source membership was kept. {exc.detail}",
+        ) from exc
+
+    try:
+        await llm.remove_team_member(source_team_id, payload.user_id)
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail="Keys and destination membership moved, but source membership removal failed. Retry the move or remove the source membership in LiteLLM.",
+        ) from exc
+    return {
+        "moved": True,
+        "user_id": payload.user_id,
+        "source_team_id": source_team_id,
+        "destination_team_id": payload.destination_team_id,
+        "keys_moved": moved_keys,
+        "destination_membership_existed": already_in_destination,
+    }
 
 
 @router.get("/users", response_model=list[LocalUserInfo])

@@ -87,4 +87,10 @@ export const api = {
     request<{ deleted: boolean; team_id: string }>(`/v1/teams/${encodeURIComponent(teamId)}`, {
       method: "DELETE",
     }),
+
+  moveTeamMember: (sourceTeamId: string, payload: import("../types").TeamMemberMovePayload) =>
+    request<import("../types").TeamMemberMoveResult>(`/v1/teams/${encodeURIComponent(sourceTeamId)}/members/move`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };
