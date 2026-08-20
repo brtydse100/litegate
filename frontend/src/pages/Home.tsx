@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Check, Copy, ExternalLink, Gauge, KeyRound, LogOut, RefreshCw, Shield, Ticket, Users, Zap } from "lucide-react";
 import AdminUsers from "../components/AdminUsers";
+import AdminTeams from "../components/AdminTeams";
 import BulkKeyEditor from "../components/BulkKeyEditor";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
@@ -69,7 +70,7 @@ function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
 export default function Home() {
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"keys" | "users">("keys");
+  const [tab, setTab] = useState<"keys" | "users" | "teams">("keys");
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
@@ -114,10 +115,11 @@ export default function Home() {
       {isAdmin && <nav className="mx-auto flex max-w-6xl gap-1 px-4 pt-5 sm:px-6">
         <button onClick={() => setTab("keys")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${tab === "keys" ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#1A1D27]"}`}><KeyRound size={15} /> Keys</button>
         <button onClick={() => setTab("users")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${tab === "users" ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#1A1D27]"}`}><Users size={15} /> Users</button>
+        <button onClick={() => setTab("teams")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${tab === "teams" ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#1A1D27]"}`}><Building2 size={15} /> Teams</button>
       </nav>}
 
       <main className={`mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 pb-16 ${isAdmin ? "pt-8" : "pt-12"} sm:px-6`}>
-        {tab === "users" && isAdmin ? <AdminUsers /> : <>
+        {tab === "users" && isAdmin ? <AdminUsers /> : tab === "teams" && isAdmin ? <AdminTeams /> : <>
           <div className="max-w-xl text-center">
             <h1 className="text-3xl font-bold text-white">Your API access</h1>
             <p className="mt-2 text-sm text-gray-500">Create and manage a LiteLLM key without loading expensive usage logs.</p>

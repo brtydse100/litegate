@@ -15,9 +15,9 @@ Use this page as the entry point for detailed LiteGate documentation.
 
 ## Important authorization boundary
 
-Bulk key editing is an administrator-only operation in both the web portal and
-the API. A normal user can create, inspect, and regenerate their personal key,
-but cannot open the bulk editor or call `PATCH /api/v1/keys/bulk` successfully.
+Bulk key editing and LiteLLM team management are administrator-only operations
+in both the web portal and API. A normal user can create, inspect, and regenerate
+their personal key, but cannot open these admin tools or call their routes.
 
 Trusted automation agents use the optional installation-wide
 `management_api_key` and send it in the `X-API-Key` header. This credential has
@@ -29,6 +29,6 @@ secret.
 - The Docker Compose example is in [`deploy/docker-compose`](../deploy/docker-compose/).
 - The Helm chart is in [`deploy/helm/litegate`](../deploy/helm/litegate/).
 - A ready-to-copy environment template is in [`.env.example`](../.env.example).
-- Release notes are in [`docs/releases`](releases/), including [LiteGate 2.1.0](releases/v2.1.0.md).
+- Release notes are in [`docs/releases`](releases/), including [LiteGate 2.2.0](releases/v2.2.0.md).
 - A deployed instance serves Swagger UI at `/api/docs`, ReDoc at `/api/redoc`,
   and OpenAPI JSON at `/api/openapi.json`.

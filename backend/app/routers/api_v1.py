@@ -3,9 +3,9 @@
 import asyncio
 import hmac
 from dataclasses import dataclass
-from typing import Optional
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, status
 from fastapi.security import HTTPAuthorizationCredentials
 from jwt import InvalidTokenError
 
@@ -19,6 +19,8 @@ from app.models import (
     LocalUserCreate,
     LocalUserInfo,
     LocalUserUpdate,
+    TeamCreateRequest,
+    TeamUpdateRequest,
 )
 from app.rate_limit import check_key_rate_limit
 from app.services import litellm as llm
@@ -76,6 +78,25 @@ async def get_api_actor(
 def _require_api_admin(actor: ApiActor) -> None:
     if not actor.is_admin:
         raise HTTPException(status_code=403, detail="Administrator access required")
+
+
+def _team_config_references(team_id: str) -> tuple[list[str], bool]:
+    mapped_groups: list[str] = []
+    for group, configured in settings.oidc_group_team_mapping.items():
+        team_ids = [configured] if isinstance(configured, str) else configured
+        if team_id in team_ids:
+            mapped_groups.append(group)
+    return mapped_groups, settings.key_team_id == team_id
+
+
+def _decorate_team(team: dict) -> dict:
+    team_id = str(team.get("team_id") or "")
+    mapped_groups, default_key_team = _team_config_references(team_id)
+    return {
+        **team,
+        "mapped_groups": mapped_groups,
+        "default_key_team": default_key_team,
+    }
 
 
 @router.get("/me")
@@ -158,6 +179,65 @@ async def bulk_update_keys(
     results = await asyncio.gather(*(update_one(key) for key in payload.keys))
     updated = sum(1 for result in results if result["updated"])
     return {"updated": updated, "failed": len(results) - updated, "results": results}
+
+
+@router.get("/teams")
+async def api_list_teams(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=25, ge=1, le=100),
+    search: str = Query(default="", max_length=128),
+    actor: ApiActor = Depends(get_api_actor),
+):
+    """List a bounded page of LiteLLM teams. Administrator access is required."""
+    _require_api_admin(actor)
+    result = await llm.list_teams(page=page, page_size=size, search=search.strip())
+    result["teams"] = [_decorate_team(team) for team in result["teams"] if isinstance(team, dict)]
+    return result
+
+
+@router.post("/teams", status_code=status.HTTP_201_CREATED)
+async def api_create_team(payload: TeamCreateRequest, actor: ApiActor = Depends(get_api_actor)):
+    """Create a LiteLLM team with core budget and access policy."""
+    _require_api_admin(actor)
+    check_key_rate_limit(actor.user.user_id)
+    created = await llm.create_team(payload.model_dump(exclude_none=True))
+    return _decorate_team(created)
+
+
+@router.patch("/teams/{team_id}")
+async def api_update_team(
+    team_id: Annotated[str, Path(min_length=1, max_length=128)],
+    payload: TeamUpdateRequest,
+    actor: ApiActor = Depends(get_api_actor),
+):
+    """Update a LiteLLM team's core budget and access policy."""
+    _require_api_admin(actor)
+    check_key_rate_limit(actor.user.user_id)
+    updated = await llm.update_team(team_id, payload.model_dump(exclude_unset=True))
+    return _decorate_team(updated)
+
+
+@router.delete("/teams/{team_id}")
+async def api_delete_team(
+    team_id: Annotated[str, Path(min_length=1, max_length=128)],
+    actor: ApiActor = Depends(get_api_actor),
+):
+    """Delete a team and its team-scoped keys after configuration safeguards."""
+    _require_api_admin(actor)
+    mapped_groups, default_key_team = _team_config_references(team_id)
+    references = []
+    if mapped_groups:
+        references.append(f"SSO groups: {', '.join(mapped_groups)}")
+    if default_key_team:
+        references.append("KEY_TEAM_ID")
+    if references:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Remove this team from LiteGate configuration before deleting it ({'; '.join(references)})",
+        )
+    check_key_rate_limit(actor.user.user_id)
+    await llm.delete_team(team_id)
+    return {"deleted": True, "team_id": team_id}
 
 
 @router.get("/users", response_model=list[LocalUserInfo])

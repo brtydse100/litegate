@@ -1,7 +1,7 @@
 import json
 
 import httpx
-from typing import Optional, List, Any
+from typing import Optional, List, Any, NoReturn
 from fastapi import HTTPException
 from app.config import settings
 
@@ -12,6 +12,27 @@ def _headers() -> dict:
 
 def _transport_error(e: httpx.TransportError) -> None:
     raise HTTPException(status_code=503, detail=f"Cannot reach LiteLLM at {settings.litellm_url}")
+
+
+def _team_operation_error(e: httpx.HTTPStatusError) -> NoReturn:
+    """Return a useful bounded LiteLLM error without exposing response internals."""
+    response = e.response
+    message = ""
+    try:
+        data = response.json()
+        if isinstance(data, dict):
+            detail = data.get("detail", data.get("error", data.get("message", "")))
+            if isinstance(detail, dict):
+                detail = detail.get("error", detail.get("message", ""))
+            if isinstance(detail, str):
+                message = detail.strip()
+    except (ValueError, TypeError):
+        pass
+    suffix = f": {message[:300]}" if message else ""
+    raise HTTPException(
+        status_code=502,
+        detail=f"LiteLLM team operation returned {response.status_code}{suffix}",
+    )
 
 
 async def get_user(user_id: str) -> Optional[dict]:
@@ -139,6 +160,93 @@ async def sync_user_team_memberships(user_id: str, email: str, team_ids: List[st
     for team_id in team_ids:
         if team_id not in existing:
             await add_user_to_team(user_id, email, team_id)
+
+
+async def list_teams(page: int = 1, page_size: int = 25, search: str = "") -> dict:
+    """Return a bounded team-management page from LiteLLM."""
+    params: dict[str, Any] = {
+        "page": page,
+        "page_size": page_size,
+        "sort_by": "team_alias",
+        "sort_order": "asc",
+    }
+    if search:
+        params["search"] = search
+        params["search_team_id_match"] = "prefix"
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                f"{settings.litellm_url}/v2/team/list",
+                params=params,
+                headers=_headers(),
+                timeout=15,
+            )
+            r.raise_for_status()
+            data = r.json()
+            if not isinstance(data, dict):
+                return {"teams": [], "total": 0, "page": page, "page_size": page_size, "total_pages": 0}
+            return {
+                "teams": data.get("teams") or [],
+                "total": int(data.get("total", 0)),
+                "page": int(data.get("page", page)),
+                "page_size": int(data.get("page_size", page_size)),
+                "total_pages": int(data.get("total_pages", 0)),
+            }
+    except httpx.TransportError as e:
+        _transport_error(e)
+    except httpx.HTTPStatusError as e:
+        _team_operation_error(e)
+
+
+async def create_team(team: dict) -> dict:
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{settings.litellm_url}/team/new",
+                json=team,
+                headers=_headers(),
+                timeout=15,
+            )
+            r.raise_for_status()
+            return r.json()
+    except httpx.TransportError as e:
+        _transport_error(e)
+    except httpx.HTTPStatusError as e:
+        _team_operation_error(e)
+
+
+async def update_team(team_id: str, changes: dict) -> dict:
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{settings.litellm_url}/team/update",
+                json={"team_id": team_id, **changes},
+                headers=_headers(),
+                timeout=15,
+            )
+            r.raise_for_status()
+            return r.json()
+    except httpx.TransportError as e:
+        _transport_error(e)
+    except httpx.HTTPStatusError as e:
+        _team_operation_error(e)
+
+
+async def delete_team(team_id: str) -> dict:
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{settings.litellm_url}/team/delete",
+                json={"team_ids": [team_id]},
+                headers=_headers(),
+                timeout=15,
+            )
+            r.raise_for_status()
+            return r.json()
+    except httpx.TransportError as e:
+        _transport_error(e)
+    except httpx.HTTPStatusError as e:
+        _team_operation_error(e)
 
 
 async def generate_key(user_id: str, email: str = "", team_id: Optional[str] = None) -> dict:

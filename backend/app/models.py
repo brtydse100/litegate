@@ -156,3 +156,58 @@ class BulkKeyUpdateRequest(BaseModel):
 class ApiKeyCreateRequest(BaseModel):
     user_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
     email: Optional[str] = Field(default=None, max_length=254)
+
+
+class TeamCreateRequest(BaseModel):
+    team_alias: str = Field(min_length=1, max_length=128)
+    team_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    models: List[str] = Field(default_factory=list)
+    max_budget: Optional[float] = Field(default=None, ge=0)
+    budget_duration: Optional[str] = Field(default=None, max_length=32)
+    tpm_limit: Optional[int] = Field(default=None, ge=0)
+    rpm_limit: Optional[int] = Field(default=None, ge=0)
+    blocked: bool = False
+
+    @field_validator("team_alias", "team_id", mode="before")
+    @classmethod
+    def clean_team_names(cls, value: Optional[str]) -> Optional[str]:
+        return value.strip() if value is not None else value
+
+    @field_validator("models")
+    @classmethod
+    def clean_team_models(cls, value: List[str]) -> List[str]:
+        cleaned = list(dict.fromkeys(model.strip() for model in value if model.strip()))
+        if len(cleaned) > 100:
+            raise ValueError("At most 100 models may be supplied")
+        return cleaned
+
+
+class TeamUpdateRequest(BaseModel):
+    team_alias: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    models: Optional[List[str]] = None
+    max_budget: Optional[float] = Field(default=None, ge=0)
+    budget_duration: Optional[str] = Field(default=None, max_length=32)
+    tpm_limit: Optional[int] = Field(default=None, ge=0)
+    rpm_limit: Optional[int] = Field(default=None, ge=0)
+    blocked: Optional[bool] = None
+
+    @field_validator("team_alias", mode="before")
+    @classmethod
+    def clean_team_alias(cls, value: Optional[str]) -> Optional[str]:
+        return value.strip() if value is not None else value
+
+    @field_validator("models")
+    @classmethod
+    def clean_optional_team_models(cls, value: Optional[List[str]]) -> Optional[List[str]]:
+        if value is None:
+            return value
+        cleaned = list(dict.fromkeys(model.strip() for model in value if model.strip()))
+        if len(cleaned) > 100:
+            raise ValueError("At most 100 models may be supplied")
+        return cleaned
+
+    @model_validator(mode="after")
+    def require_team_change(self):
+        if not self.model_fields_set:
+            raise ValueError("At least one team setting is required")
+        return self

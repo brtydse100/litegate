@@ -7,9 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-### Changed
+## [2.2.0] - 2026-08-20
+
+### Added
+
+- An administrator-only Teams tab for paginated search, team creation, and one-click policy editing.
+- Administrator API endpoints for listing, creating, updating, and deleting LiteLLM teams.
+
+### Security
+
+- Team deletion requires exact-ID confirmation in the portal and is blocked while a team is referenced by SSO mapping or the default key-team setting.
+- Normal users cannot access team management in either the portal or API.
+
+### Deployment
 
 - Clarified Helm-specific SSO administrator-role and LiteLLM team-mapping values, and refreshed the deployment examples for the 2.1 release.
+- The public container is published as `ghcr.io/brtydse100/litegate:2.2.0` and `:latest` after the release workflow completes.
 
 ## [2.1.0] - 2026-08-20
 
@@ -61,6 +74,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/brtydse100/litegate/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/brtydse100/litegate/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/brtydse100/litegate/releases/tag/v2.0.0

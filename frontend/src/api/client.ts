@@ -67,4 +67,24 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+
+  listTeams: (page = 1, size = 25, search = "") =>
+    request<import("../types").TeamPage>(`/v1/teams?page=${page}&size=${size}&search=${encodeURIComponent(search)}`),
+
+  createTeam: (payload: import("../types").TeamCreatePayload) =>
+    request<import("../types").TeamInfo>("/v1/teams", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateTeam: (teamId: string, payload: import("../types").TeamUpdatePayload) =>
+    request<import("../types").TeamInfo>(`/v1/teams/${encodeURIComponent(teamId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  deleteTeam: (teamId: string) =>
+    request<{ deleted: boolean; team_id: string }>(`/v1/teams/${encodeURIComponent(teamId)}`, {
+      method: "DELETE",
+    }),
 };

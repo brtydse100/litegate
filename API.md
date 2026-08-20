@@ -70,6 +70,57 @@ curl -X PATCH https://litegate.example.com/api/v1/keys/bulk \
 
 Supported bulk fields are `key_alias`, `models`, `max_budget`, `budget_duration`, `tpm_limit`, `rpm_limit`, `duration`, and `blocked`. Updates run with bounded concurrency and return a result for every key, so partial failures are visible.
 
+## Teams (admin only)
+
+List teams with server-side pagination and optional search:
+
+```bash
+curl "https://litegate.example.com/api/v1/teams?page=1&size=25&search=platform" \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
+```
+
+Create a team and its budget/model policy:
+
+```bash
+curl -X POST https://litegate.example.com/api/v1/teams \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "team_alias":"Platform",
+    "team_id":"team-platform",
+    "models":["gpt-4o-mini"],
+    "max_budget":250,
+    "budget_duration":"30d",
+    "rpm_limit":100,
+    "blocked":false
+  }'
+```
+
+Edit only the fields that should change:
+
+```bash
+curl -X PATCH https://litegate.example.com/api/v1/teams/team-platform \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"max_budget":300,"models":["gpt-4o-mini","claude-sonnet"]}'
+```
+
+Delete a team:
+
+```bash
+curl -X DELETE https://litegate.example.com/api/v1/teams/team-platform \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
+```
+
+Team management requires an administrator portal session or the management API
+key. Supported policy fields are `team_alias`, `models`, `max_budget`,
+`budget_duration`, `tpm_limit`, `rpm_limit`, and `blocked`; `team_id` can be set
+only while creating a team. An empty `models` list means all models.
+
+Deleting a team also deletes its LiteLLM team-scoped API keys. LiteGate refuses
+to delete teams referenced by `oidc_group_team_mapping` or `KEY_TEAM_ID`; remove
+the reference first and restart LiteGate with the new configuration.
+
 ## Local users (admin only)
 
 List local users:

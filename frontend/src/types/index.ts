@@ -64,3 +64,49 @@ export interface KeyCreateResponse {
   user_id: string;
   expires?: string | null;
 }
+
+export interface TeamInfo {
+  team_id: string;
+  team_alias?: string | null;
+  organization_id?: string | null;
+  spend?: number | null;
+  max_budget?: number | null;
+  budget_duration?: string | null;
+  tpm_limit?: number | null;
+  rpm_limit?: number | null;
+  models: string[];
+  blocked: boolean;
+  members_count?: number;
+  keys_count?: number;
+  mapped_groups: string[];
+  default_key_team: boolean;
+}
+
+export interface TeamPage {
+  teams: TeamInfo[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface TeamCreatePayload {
+  team_alias: string;
+  team_id?: string;
+  models: string[];
+  max_budget?: number;
+  budget_duration?: string;
+  tpm_limit?: number;
+  rpm_limit?: number;
+  blocked: boolean;
+}
+
+export interface TeamUpdatePayload {
+  team_alias: string;
+  models: string[];
+  max_budget: number | null;
+  budget_duration: string | null;
+  tpm_limit: number | null;
+  rpm_limit: number | null;
+  blocked: boolean;
+}

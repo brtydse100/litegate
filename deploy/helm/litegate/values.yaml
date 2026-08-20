@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/brtydse100/litegate
-  tag: "2.1.0"  # always pin to a specific tag; never use 'latest' in production
+  tag: "2.2.0"  # always pin to a specific tag; never use 'latest' in production
   pullPolicy: IfNotPresent
 
 service:
