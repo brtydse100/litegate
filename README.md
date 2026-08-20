@@ -12,6 +12,7 @@ roles, budgets, limits, models, and key policy.
 - Give each user a personal LiteLLM key without exposing the master key.
 - Support generic OpenID Connect SSO and persistent local accounts.
 - Assign administrators by SSO email or group membership.
+- Map SSO groups to existing LiteLLM teams for team budgets and model policy.
 - Let administrators bulk-edit key policy from the portal or API.
 - Give trusted automation agents admin access through a management API key.
 - Run the React frontend and FastAPI backend as a single Docker image.
@@ -79,7 +80,7 @@ docker compose -f docker-compose.image.yml up -d
 ```
 
 This pulls `ghcr.io/brtydse100/litegate:latest` for `linux/amd64`. To pin a
-release, set `LITEGATE_VERSION`, for example `LITEGATE_VERSION=2.0.0`. Other
+release, set `LITEGATE_VERSION`, for example `LITEGATE_VERSION=2.1.0`. Other
 architectures can build locally from source:
 
 ```bash

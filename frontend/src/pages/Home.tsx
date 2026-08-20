@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, ExternalLink, Gauge, KeyRound, LogOut, RefreshCw, Shield, Ticket, Users, Zap } from "lucide-react";
+import { Building2, Check, Copy, ExternalLink, Gauge, KeyRound, LogOut, RefreshCw, Shield, Ticket, Users, Zap } from "lucide-react";
 import AdminUsers from "../components/AdminUsers";
 import BulkKeyEditor from "../components/BulkKeyEditor";
 import { api } from "../api/client";
@@ -47,6 +47,7 @@ function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
         {keyInfo.max_budget != null && <span>Budget <b className="font-medium text-gray-300">${keyInfo.max_budget}</b></span>}
         {keyInfo.expires && <span>Expires <b className="font-medium text-gray-300">{new Date(keyInfo.expires).toLocaleDateString()}</b></span>}
         <span>Models <b className="font-medium text-gray-300">{keyInfo.models?.length ? keyInfo.models.length : "All"}</b></span>
+        {keyInfo.team_id && <span className="flex min-w-0 items-center gap-1"><Building2 size={12} /><span>Team</span> <b className="max-w-48 truncate font-medium text-gray-300" title={keyInfo.team_id}>{keyInfo.team_id}</b></span>}
       </div>
     </article>
   );
@@ -102,6 +103,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-3">
             {config?.api_docs_url && <a href={config.api_docs_url} target="_blank" rel="noreferrer" className="hidden text-xs text-gray-400 hover:text-white sm:block">API docs</a>}
+            {user?.team_ids?.length ? <span className="hidden max-w-56 items-center gap-1 rounded-full bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-300 lg:flex" title={user.team_ids.join(", ")}><Building2 size={10} /><span className="truncate">{user.team_ids[0]}{user.team_ids.length > 1 ? ` +${user.team_ids.length - 1}` : ""}</span></span> : null}
             {isAdmin && <span className="hidden items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-1 text-[10px] text-indigo-300 sm:flex"><Shield size={10} /> Admin</span>}
             <span className="hidden max-w-52 truncate text-xs text-gray-500 md:block">{user?.email}</span>
             <button onClick={logout} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white"><LogOut size={14} /> Sign out</button>

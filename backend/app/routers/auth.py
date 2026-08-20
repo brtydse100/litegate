@@ -21,6 +21,7 @@ def _make_jwt(
     email: str,
     role: str = "user",
     auth_source: str = "sso",
+    team_ids: list[str] | None = None,
 ) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
     return jwt.encode(
@@ -29,6 +30,7 @@ def _make_jwt(
             "email": email,
             "role": role,
             "auth_source": auth_source,
+            "team_ids": team_ids or [],
             "exp": expire,
         },
         settings.jwt_secret,
@@ -55,8 +57,19 @@ async def callback(code: str = Query(...), state: str = Query(...)):
     claims = await oidc_svc.verify_id_token(id_token)
     user_id, email = claims["sub"], claims.get("email", "")
     role = "admin" if settings.is_admin_identity(email, claims) else "user"
-    await llm.ensure_user_exists(user_id, email)
-    token = _make_jwt(user_id, email, role, "sso")
+    team_ids = settings.mapped_team_ids(claims)
+    if settings.oidc_require_team_mapping and not team_ids:
+        raise HTTPException(status_code=403, detail="Your SSO groups are not mapped to a LiteLLM team")
+
+    provisioned_user = await llm.ensure_user_exists(user_id, email)
+    if provisioned_user is None and (
+        settings.oidc_group_team_mapping or settings.oidc_require_team_mapping
+    ):
+        raise HTTPException(status_code=502, detail="Could not provision the LiteLLM user")
+    if team_ids:
+        await llm.sync_user_team_memberships(user_id, email, team_ids)
+
+    token = _make_jwt(user_id, email, role, "sso", team_ids)
     # A URL fragment is not sent to nginx or stored in server access logs.
     return RedirectResponse(f"{settings.root_url}/auth/callback#token={token}")
 

@@ -85,3 +85,127 @@ async def test_generate_key_sets_alias_from_email():
         await generate_key("user-1", "alice@example.com")
 
     assert captured.get("key_alias") == "alice's key"
+
+
+@pytest.mark.asyncio
+async def test_generate_key_explicit_team_overrides_default(monkeypatch):
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(return_value={"key": "sk-abc"})
+    captured: dict = {}
+
+    async def fake_post(url, json, headers, timeout):
+        captured.update(json)
+        return mock_response
+
+    from app.services import litellm
+    monkeypatch.setattr(litellm.settings, "key_team_id", "team-default")
+    with patch("httpx.AsyncClient") as mock_client_class:
+        instance = AsyncMock()
+        instance.post = fake_post
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=instance)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await litellm.generate_key("user-1", "alice@example.com", "team-sso")
+
+    assert captured["team_id"] == "team-sso"
+
+
+@pytest.mark.asyncio
+async def test_list_user_team_ids_parses_and_deduplicates_response():
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(
+        return_value=[
+            {"team_id": "team-existing"},
+            {"team_id": "team-existing"},
+            {"team_id": "team-other"},
+        ]
+    )
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        instance = AsyncMock()
+        instance.get = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=instance)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        from app.services.litellm import list_user_team_ids
+        result = await list_user_team_ids("user-1")
+
+    assert result == ["team-existing", "team-other"]
+    instance.get.assert_awaited_once()
+    assert instance.get.await_args.kwargs["params"] == {"user_id": "user-1"}
+
+
+@pytest.mark.asyncio
+async def test_add_user_to_team_uses_member_add_payload():
+    mock_response = MagicMock(status_code=200)
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(return_value={"team_id": "team-1"})
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        instance = AsyncMock()
+        instance.post = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=instance)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        from app.services.litellm import add_user_to_team
+        await add_user_to_team("user-1", "user@example.com", "team-1")
+
+    assert instance.post.await_args.kwargs["json"] == {
+        "team_id": "team-1",
+        "member": {"role": "user", "user_id": "user-1"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_add_user_to_team_treats_only_duplicate_400_as_success():
+    duplicate = MagicMock(status_code=400, text="")
+    duplicate.json = MagicMock(return_value={"error_code": "team_member_already_in_team"})
+    duplicate.raise_for_status = MagicMock(side_effect=AssertionError("must not raise"))
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        instance = AsyncMock()
+        instance.post = AsyncMock(return_value=duplicate)
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=instance)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        from app.services.litellm import add_user_to_team
+        result = await add_user_to_team("user-1", "", "team-1")
+
+    assert result == {"already_member": True, "team_id": "team-1"}
+
+
+@pytest.mark.asyncio
+async def test_add_user_to_team_rejects_other_400_errors():
+    request = httpx.Request("POST", "http://litellm/team/member_add")
+    response = httpx.Response(400, json={"detail": "team does not exist"}, request=request)
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        instance = AsyncMock()
+        instance.post = AsyncMock(return_value=response)
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=instance)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        from app.services.litellm import add_user_to_team
+        with pytest.raises(HTTPException) as exc:
+            await add_user_to_team("user-1", "user@example.com", "missing")
+
+    assert exc.value.status_code == 502
+
+
+@pytest.mark.asyncio
+async def test_sync_user_team_memberships_only_adds_missing_teams():
+    with (
+        patch(
+            "app.services.litellm.list_user_team_ids",
+            new=AsyncMock(return_value=["team-existing"]),
+        ),
+        patch("app.services.litellm.add_user_to_team", new=AsyncMock()) as add,
+    ):
+        from app.services.litellm import sync_user_team_memberships
+        await sync_user_team_memberships(
+            "user-1", "user@example.com", ["team-existing", "team-new"]
+        )
+
+    add.assert_awaited_once_with("user-1", "user@example.com", "team-new")

@@ -3,6 +3,7 @@ export interface User {
   email: string;
   role: "user" | "admin";
   auth_source: string;
+  team_ids: string[];
 }
 
 export interface LocalUser {
@@ -47,6 +48,7 @@ export interface KeyInfo {
   user_email?: string;
   api_key?: string;
   key?: string;
+  team_id?: string | null;
 }
 
 export interface AdminKeyPage {

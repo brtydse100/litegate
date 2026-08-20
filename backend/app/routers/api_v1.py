@@ -85,6 +85,7 @@ async def api_me(actor: ApiActor = Depends(get_api_actor)):
         "email": actor.user.email,
         "role": actor.user.role,
         "auth_source": actor.user.auth_source,
+        "team_ids": actor.user.team_ids,
     }
 
 
@@ -124,7 +125,9 @@ async def api_create_key(
     check_key_rate_limit(actor.user.user_id)
     if await llm.list_user_keys(user_id):
         raise HTTPException(status_code=409, detail="This user already has a key")
-    result = await llm.generate_key(user_id, email)
+    is_self_service = not requested_user_id or requested_user_id == actor.user.user_id
+    team_id = actor.user.team_ids[0] if is_self_service and actor.user.team_ids else None
+    result = await llm.generate_key(user_id, email, team_id)
     return KeyCreateResponse(
         key=result["key"], user_id=result.get("user_id", user_id), expires=result.get("expires")
     )

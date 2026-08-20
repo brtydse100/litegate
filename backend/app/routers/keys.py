@@ -18,7 +18,8 @@ async def create_key(current_user: CurrentUser = Depends(get_current_user)):
     existing = await llm.list_user_keys(current_user.user_id)
     if existing:
         raise HTTPException(status_code=409, detail="You already have a key. Delete it before creating a new one.")
-    result = await llm.generate_key(current_user.user_id, current_user.email)
+    team_id = current_user.team_ids[0] if current_user.team_ids else None
+    result = await llm.generate_key(current_user.user_id, current_user.email, team_id)
     return KeyCreateResponse(
         key=result["key"],
         user_id=result.get("user_id", current_user.user_id),
@@ -35,7 +36,8 @@ async def regenerate_key(current_user: CurrentUser = Depends(get_current_user)):
         token = k.get("token") or k.get("api_key") or k.get("key")
         if token:
             await llm.delete_key(token)
-    result = await llm.generate_key(current_user.user_id, current_user.email)
+    team_id = current_user.team_ids[0] if current_user.team_ids else None
+    result = await llm.generate_key(current_user.user_id, current_user.email, team_id)
     return KeyCreateResponse(
         key=result["key"],
         user_id=result.get("user_id", current_user.user_id),

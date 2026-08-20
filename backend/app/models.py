@@ -9,6 +9,7 @@ class CurrentUser(BaseModel):
     email: str
     role: str = "user"
     auth_source: str = "sso"
+    team_ids: List[str] = Field(default_factory=list)
 
     @property
     def is_admin(self) -> bool:

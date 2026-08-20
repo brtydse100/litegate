@@ -47,6 +47,12 @@ oidc_client_id: ""
 oidc_client_secret: ""
 oidc_redirect_uri: "http://localhost/api/auth/callback"
 
+# Optional: map ID-token groups to existing LiteLLM team IDs
+oidc_groups_claim: "groups"
+oidc_group_team_mapping:
+  Engineering: "team-engineering"
+oidc_require_team_mapping: false
+
 root_url: "http://localhost"
 ```
 
@@ -168,6 +174,30 @@ Provider issuer URLs:
 | Okta | `https://<domain>.okta.com/oauth2/default` |
 | Keycloak | `https://<host>/realms/<realm>` |
 
+#### Map SSO groups to LiteLLM teams
+
+Use `oidc_group_team_mapping` to add users to existing LiteLLM teams when they
+sign in. Values can be a single team ID or a list:
+
+```yaml
+oidc_groups_claim: "groups" # dotted paths such as realm_access.roles also work
+oidc_group_team_mapping:
+  Engineering: "team-engineering"
+  AI-Platform:
+    - "team-platform"
+    - "team-shared-services"
+oidc_require_team_mapping: false
+```
+
+Group matching is case-insensitive. Sync is additive: LiteGate adds all matched
+memberships but does not automatically remove old ones, because LiteLLM member
+removal can delete that member's team keys. The first matched team in
+configuration order is applied to newly created or regenerated keys, enabling
+LiteLLM's team model and budget policy. Existing keys need regeneration or an
+administrator update. All mapped teams must already exist, and a mapping or
+membership error fails login. Set `oidc_require_team_mapping: true` to also deny
+users who have no mapped group.
+
 ### Local admin account
 
 Set `local_auth_username` and `local_auth_password` in `config.yaml`. Both the SSO button and the local login form are shown simultaneously when both are configured.
@@ -233,6 +263,8 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `oidc_client_id` | `OIDC_CLIENT_ID` | `""` | OIDC client ID |
 | `oidc_client_secret` | `OIDC_CLIENT_SECRET` | `""` | OIDC client secret |
 | `oidc_redirect_uri` | `OIDC_REDIRECT_URI` | `""` | Callback URI registered with IdP |
+| `oidc_group_team_mapping` | `OIDC_GROUP_TEAM_MAPPING` | `{}` | SSO group to existing LiteLLM team ID or team-ID list; environment form is JSON |
+| `oidc_require_team_mapping` | `OIDC_REQUIRE_TEAM_MAPPING` | `false` | Deny SSO login when no team mapping matches |
 | `local_auth_username` | `LOCAL_AUTH_USERNAME` | `""` | Admin username (blank = disabled) |
 | `local_auth_password` | `LOCAL_AUTH_PASSWORD` | `""` | Admin password |
 | `logo_url` | `LOGO_URL` | `""` | Logo image URL or path |
@@ -244,7 +276,7 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `key_tpm_limit` | `KEY_TPM_LIMIT` | `null` | Tokens per minute |
 | `key_rpm_limit` | `KEY_RPM_LIMIT` | `null` | Requests per minute |
 | `key_duration` | `KEY_DURATION` | `null` | Key TTL |
-| `key_team_id` | `KEY_TEAM_ID` | `""` | LiteLLM team ID to assign keys to |
+| `key_team_id` | `KEY_TEAM_ID` | `""` | Fallback team for keys without an SSO-mapped primary team |
 | `local_users_enabled` | `LOCAL_USERS_ENABLED` | `true` | Enable admin-created local accounts |
 | `local_users_db_path` | `LOCAL_USERS_DB_PATH` | `data/litegate.db` | SQLite account database path |
 | `admin_emails` | `ADMIN_EMAILS` | `""` | Comma-separated SSO administrator emails |

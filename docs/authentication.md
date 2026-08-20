@@ -72,6 +72,45 @@ when the token emits group IDs. Group-overage references are not resolved by
 LiteGate, so configure the provider to include the required group. Add a
 provider-specific scope such as `groups` to `oidc_scopes` when necessary.
 
+## Mapping SSO groups to LiteLLM teams
+
+LiteGate can add an SSO user to existing LiteLLM teams at login and apply a
+primary team to keys the user creates. This lets LiteLLM enforce the team's
+models and budget without giving users access to the LiteLLM administrator UI.
+
+Map each identity-provider group to one team ID or a list of team IDs:
+
+```yaml
+oidc_groups_claim: "groups"
+oidc_group_team_mapping:
+  Engineering: "team-engineering"
+  AI-Platform:
+    - "team-platform"
+    - "team-shared-services"
+oidc_require_team_mapping: false
+```
+
+Group matching is case-insensitive. `oidc_groups_claim` also accepts a dotted
+path such as `realm_access.roles`. The mapped LiteLLM teams must already exist;
+LiteGate does not create teams or define their budgets.
+
+At each successful SSO login, LiteGate additively syncs membership for every
+matched team. If more than one group matches, the first team in configuration
+order becomes the user's primary team. That team is applied to newly created or
+regenerated keys so LiteLLM can enforce its model and budget policy. Existing
+keys are not silently reassigned: regenerate the key or have an administrator
+update it.
+
+LiteGate does not automatically remove team memberships when an SSO group is
+removed, because removing a LiteLLM team member can also delete that member's
+team keys. Remove stale membership deliberately in LiteLLM after reviewing its
+keys. A mapping or membership error fails the login instead of allowing a user
+to continue without the intended team controls.
+
+Set `oidc_require_team_mapping: true` to deny SSO login when none of the user's
+groups has a configured team. Leave it `false` while rolling the feature out or
+when unmapped SSO users should retain the global key defaults.
+
 ## API credentials
 
 | Credential | Header | Authorization |

@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional, List
 import json
@@ -21,7 +22,7 @@ def _load_yaml_config() -> None:
             for k, v in data.items():
                 env_key = k.upper()
                 if env_key not in os.environ and v is not None and str(v).strip() != "":
-                    os.environ[env_key] = _json.dumps(v) if isinstance(v, list) else str(v)
+                    os.environ[env_key] = _json.dumps(v) if isinstance(v, (list, dict)) else str(v)
             break
 
 
@@ -39,6 +40,8 @@ class Settings(BaseSettings):
     oidc_redirect_uri: str = ""
     oidc_scopes: str = "openid email profile"
     oidc_groups_claim: str = "groups"
+    oidc_group_team_mapping: dict[str, str | list[str]] = Field(default_factory=dict)
+    oidc_require_team_mapping: bool = False
 
     jwt_secret: str
     jwt_algorithm: str = "HS256"
@@ -82,21 +85,50 @@ class Settings(BaseSettings):
     def admin_groups_set(self) -> set[str]:
         return {group.strip().casefold() for group in self.admin_groups.split(",") if group.strip()}
 
-    def is_admin_identity(self, email: str, claims: dict) -> bool:
-        if self.is_admin_email(email):
-            return True
+    def oidc_groups(self, claims: dict) -> list[str]:
+        """Read the configured (optionally dotted) OIDC groups claim."""
         value: object = claims
         for segment in self.oidc_groups_claim.split("."):
             if not isinstance(value, dict):
                 value = None
                 break
             value = value.get(segment)
-        if isinstance(value, str):
-            groups = {value.casefold()}
-        elif isinstance(value, list):
-            groups = {str(group).strip().casefold() for group in value if str(group).strip()}
-        else:
-            groups = set()
+
+        raw_groups = [value] if isinstance(value, str) else value if isinstance(value, list) else []
+        groups: list[str] = []
+        seen: set[str] = set()
+        for raw_group in raw_groups:
+            group = str(raw_group).strip()
+            normalized = group.casefold()
+            if group and normalized not in seen:
+                seen.add(normalized)
+                groups.append(group)
+        return groups
+
+    def mapped_team_ids(self, claims: dict) -> list[str]:
+        """Resolve SSO groups to team IDs in mapping declaration order."""
+        claimed_groups = {group.casefold() for group in self.oidc_groups(claims)}
+        team_ids: list[str] = []
+        seen: set[str] = set()
+        for configured_group, configured_team_ids in self.oidc_group_team_mapping.items():
+            if configured_group.strip().casefold() not in claimed_groups:
+                continue
+            values = (
+                [configured_team_ids]
+                if isinstance(configured_team_ids, str)
+                else configured_team_ids
+            )
+            for raw_team_id in values:
+                team_id = raw_team_id.strip()
+                if team_id and team_id not in seen:
+                    seen.add(team_id)
+                    team_ids.append(team_id)
+        return team_ids
+
+    def is_admin_identity(self, email: str, claims: dict) -> bool:
+        if self.is_admin_email(email):
+            return True
+        groups = {group.casefold() for group in self.oidc_groups(claims)}
         return bool(groups & self.admin_groups_set)
 
     @property

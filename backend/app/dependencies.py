@@ -24,6 +24,7 @@ def decode_portal_token(token: str) -> CurrentUser:
         email=email,
         role=payload.get("role", "user"),
         auth_source=payload.get("auth_source", "sso"),
+        team_ids=payload.get("team_ids", []),
     )
 
 

@@ -23,6 +23,8 @@ data:
   OIDC_REDIRECT_URI: {{ .Values.config.oidcRedirectUri | quote }}
   OIDC_SCOPES: {{ .Values.config.oidcScopes | quote }}
   OIDC_GROUPS_CLAIM: {{ .Values.config.oidcGroupsClaim | quote }}
+  OIDC_GROUP_TEAM_MAPPING: {{ .Values.config.oidcGroupTeamMapping | toJson | quote }}
+  OIDC_REQUIRE_TEAM_MAPPING: {{ .Values.config.oidcRequireTeamMapping | quote }}
   {{- end }}
   {{- if .Values.config.keyMaxBudget }}
   KEY_MAX_BUDGET: {{ .Values.config.keyMaxBudget | quote }}

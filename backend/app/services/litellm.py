@@ -1,3 +1,5 @@
+import json
+
 import httpx
 from typing import Optional, List, Any
 from fastapi import HTTPException
@@ -59,7 +61,87 @@ async def ensure_user_exists(user_id: str, email: str) -> Optional[dict]:
         return None
 
 
-async def generate_key(user_id: str, email: str = "") -> dict:
+async def list_user_team_ids(user_id: str) -> List[str]:
+    """Return LiteLLM teams the user already belongs to."""
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                f"{settings.litellm_url}/team/list",
+                params={"user_id": user_id},
+                headers=_headers(),
+                timeout=10,
+            )
+            r.raise_for_status()
+            data = r.json()
+            if isinstance(data, dict):
+                teams = data.get("teams") or data.get("data") or []
+            else:
+                teams = data
+            if not isinstance(teams, list):
+                return []
+            result: List[str] = []
+            seen: set[str] = set()
+            for team in teams:
+                team_id = team.get("team_id") if isinstance(team, dict) else None
+                if team_id is not None:
+                    normalized = str(team_id).strip()
+                    if normalized and normalized not in seen:
+                        seen.add(normalized)
+                        result.append(normalized)
+            return result
+    except httpx.TransportError as e:
+        _transport_error(e)
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
+
+
+def _is_duplicate_team_member_response(response: httpx.Response) -> bool:
+    if response.status_code != 400:
+        return False
+    try:
+        detail = json.dumps(response.json()).casefold()
+    except (ValueError, TypeError):
+        detail = response.text.casefold()
+    normalized = " ".join(detail.replace("_", " ").split())
+    return (
+        "team member already in team" in normalized
+        or "already in team" in normalized
+        or "already exists in team" in normalized
+        or "already a member of" in normalized
+    )
+
+
+async def add_user_to_team(user_id: str, email: str, team_id: str) -> dict:
+    # Match by the stable LiteLLM user ID only. Supplying both ID and email can
+    # make LiteLLM resolve the same member twice on some versions.
+    member: dict[str, str] = {"role": "user", "user_id": user_id}
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{settings.litellm_url}/team/member_add",
+                json={"team_id": team_id, "member": member},
+                headers=_headers(),
+                timeout=10,
+            )
+            if _is_duplicate_team_member_response(r):
+                return {"already_member": True, "team_id": team_id}
+            r.raise_for_status()
+            return r.json()
+    except httpx.TransportError as e:
+        _transport_error(e)
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
+
+
+async def sync_user_team_memberships(user_id: str, email: str, team_ids: List[str]) -> None:
+    """Add missing mapped memberships without deleting manually managed memberships."""
+    existing = set(await list_user_team_ids(user_id))
+    for team_id in team_ids:
+        if team_id not in existing:
+            await add_user_to_team(user_id, email, team_id)
+
+
+async def generate_key(user_id: str, email: str = "", team_id: Optional[str] = None) -> dict:
     name = email.split("@")[0] if email else user_id.split(":")[-1]
     payload: dict[str, Any] = {"user_id": user_id, "key_alias": f"{name}'s key"}
     if settings.key_max_budget is not None:
@@ -74,8 +156,9 @@ async def generate_key(user_id: str, email: str = "") -> dict:
         payload["rpm_limit"] = settings.key_rpm_limit
     if settings.key_duration:
         payload["duration"] = settings.key_duration
-    if settings.key_team_id:
-        payload["team_id"] = settings.key_team_id
+    effective_team_id = team_id or settings.key_team_id
+    if effective_team_id:
+        payload["team_id"] = effective_team_id
 
     try:
         async with httpx.AsyncClient() as client:

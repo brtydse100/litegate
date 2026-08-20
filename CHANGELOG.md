@@ -7,6 +7,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-20
+
+### Added
+
+- Configuration-driven, case-insensitive SSO group mapping to existing LiteLLM teams, including one-to-many mappings and nested group claim paths.
+- Optional fail-closed SSO access that requires users to match a configured LiteLLM team.
+
+### Changed
+
+- SSO login now additively synchronizes mapped team memberships and applies the first matched team to newly created or regenerated keys for LiteLLM team budget and model enforcement.
+- Existing keys remain unchanged until regeneration or administrator update, and team membership removal remains an explicit LiteLLM administration action.
+
 ## [2.0.0] - 2026-08-20
 
 ### Added
@@ -41,5 +53,6 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/brtydse100/litegate/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/brtydse100/litegate/releases/tag/v2.0.0

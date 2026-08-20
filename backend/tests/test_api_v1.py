@@ -3,13 +3,24 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.models import BulkKeyUpdateRequest, CurrentUser
+from app.models import ApiKeyCreateRequest, BulkKeyUpdateRequest, CurrentUser
 from app.rate_limit import _key_ops
-from app.routers.api_v1 import ApiActor, bulk_update_keys
+from app.routers.api_v1 import ApiActor, api_create_key, api_me, bulk_update_keys
 
 
 def setup_function():
     _key_ops.clear()
+
+
+@pytest.mark.asyncio
+async def test_api_me_includes_mapped_teams():
+    actor = ApiActor(
+        CurrentUser(user_id="user-1", email="u@example.com", team_ids=["team-primary"])
+    )
+
+    result = await api_me(actor)
+
+    assert result["team_ids"] == ["team-primary"]
 
 
 @pytest.mark.asyncio
@@ -43,3 +54,48 @@ async def test_admin_can_update_multiple_keys():
         result = await bulk_update_keys(payload, actor)
     assert result["updated"] == 2
     assert update.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_portal_user_api_key_uses_primary_sso_team():
+    actor = ApiActor(
+        CurrentUser(
+            user_id="user-1",
+            email="u@example.com",
+            team_ids=["team-primary", "team-secondary"],
+        )
+    )
+    with (
+        patch("app.routers.api_v1.llm.list_user_keys", new=AsyncMock(return_value=[])),
+        patch(
+            "app.routers.api_v1.llm.generate_key",
+            new=AsyncMock(return_value={"key": "sk-new", "user_id": "user-1"}),
+        ) as generate,
+    ):
+        result = await api_create_key(None, actor)
+
+    assert result.key == "sk-new"
+    generate.assert_awaited_once_with("user-1", "u@example.com", "team-primary")
+
+
+@pytest.mark.asyncio
+async def test_admin_api_does_not_apply_own_team_to_another_user():
+    actor = ApiActor(
+        CurrentUser(
+            user_id="admin",
+            email="admin@example.com",
+            role="admin",
+            team_ids=["team-admin"],
+        )
+    )
+    payload = ApiKeyCreateRequest(user_id="other-user", email="other@example.com")
+    with (
+        patch("app.routers.api_v1.llm.list_user_keys", new=AsyncMock(return_value=[])),
+        patch(
+            "app.routers.api_v1.llm.generate_key",
+            new=AsyncMock(return_value={"key": "sk-new", "user_id": "other-user"}),
+        ) as generate,
+    ):
+        await api_create_key(payload, actor)
+
+    generate.assert_awaited_once_with("other-user", "other@example.com", None)

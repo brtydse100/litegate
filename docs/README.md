@@ -29,5 +29,6 @@ secret.
 - The Docker Compose example is in [`deploy/docker-compose`](../deploy/docker-compose/).
 - The Helm chart is in [`deploy/helm/litegate`](../deploy/helm/litegate/).
 - A ready-to-copy environment template is in [`.env.example`](../.env.example).
+- Release notes are in [`docs/releases`](releases/), including [LiteGate 2.1.0](releases/v2.1.0.md).
 - A deployed instance serves Swagger UI at `/api/docs`, ReDoc at `/api/redoc`,
   and OpenAPI JSON at `/api/openapi.json`.

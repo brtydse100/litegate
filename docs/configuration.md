@@ -24,6 +24,8 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `oidc_redirect_uri` | empty | Registered callback URI |
 | `oidc_scopes` | `openid email profile` | Space-separated requested scopes |
 | `oidc_groups_claim` | `groups` | ID-token group path; dot notation supported |
+| `oidc_group_team_mapping` | `{}` | SSO group to existing LiteLLM team ID or team-ID list |
+| `oidc_require_team_mapping` | `false` | Deny SSO login when no configured team matches |
 | `admin_emails` | empty | Comma-separated SSO administrator emails |
 | `admin_groups` | empty | Comma-separated SSO administrator groups |
 | `local_auth_username` | empty | Bootstrap administrator username |
@@ -34,6 +36,37 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 
 The management key grants administrator access, including administrator-only
 bulk key editing. It is not a user credential or a scoped token.
+
+### SSO team mapping
+
+Use a YAML object in `config.yaml`. A group may map to one existing LiteLLM team
+or several:
+
+```yaml
+oidc_groups_claim: "realm_access.roles"
+oidc_group_team_mapping:
+  Engineering: "team-engineering"
+  AI-Platform:
+    - "team-platform"
+    - "team-shared-services"
+oidc_require_team_mapping: false
+```
+
+The equivalent environment variable is a JSON object on one line:
+
+```bash
+OIDC_GROUP_TEAM_MAPPING={"Engineering":"team-engineering","AI-Platform":["team-platform","team-shared-services"]}
+OIDC_REQUIRE_TEAM_MAPPING=false
+```
+
+Group names match case-insensitively. Membership sync is additive on login, and
+the first matched team in configuration order becomes the primary team for new
+or regenerated keys. Existing keys require regeneration or an administrator
+update. Teams and their budget/model policy must already exist in LiteLLM. A
+mapping error fails login; enabling `oidc_require_team_mapping` also rejects an
+SSO user whose groups have no mapping. See
+[Authentication and security](authentication.md#mapping-sso-groups-to-litellm-teams)
+for lifecycle and removal behavior.
 
 ## Key defaults
 
@@ -59,7 +92,7 @@ key_team_id: "team-id"
 | `key_duration` | unset | Generated key lifetime, such as `90d` |
 | `key_tpm_limit` | unset | Tokens-per-minute limit |
 | `key_rpm_limit` | unset | Requests-per-minute limit |
-| `key_team_id` | unset | LiteLLM team assigned to generated keys |
+| `key_team_id` | unset | Fallback LiteLLM team for generated keys without an SSO-mapped primary team |
 
 Administrators can override supported settings later with the portal bulk editor
 or `PATCH /api/v1/keys/bulk`. Normal users cannot bulk-edit keys. See
@@ -94,6 +127,9 @@ oidc_client_secret: "replace-me"
 oidc_redirect_uri: "https://litegate.example.com/api/auth/callback"
 
 admin_groups: "litegate-admins"
+oidc_group_team_mapping:
+  Engineering: "team-engineering"
+oidc_require_team_mapping: true
 management_api_key: "replace-with-a-separate-long-random-secret"
 ```
 

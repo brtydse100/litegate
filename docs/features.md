@@ -17,7 +17,11 @@ Signed-in users can:
 - follow configured links to a support system or LiteLLM model hub.
 
 New keys inherit the installation defaults for models, budget, reset interval,
-duration, TPM, RPM, and team. See the [configuration guide](configuration.md#key-defaults).
+duration, TPM, RPM, and team. For SSO users, an administrator can map identity
+provider groups to existing LiteLLM teams so new or regenerated keys use the
+matched team's model and budget policy. See
+[SSO team mapping](authentication.md#mapping-sso-groups-to-litellm-teams) and
+the [configuration guide](configuration.md#key-defaults).
 
 ## User and administrator roles
 

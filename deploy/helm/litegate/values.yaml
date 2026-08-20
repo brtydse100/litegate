@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/brtydse100/litegate
-  tag: "2.0.0"  # always pin to a specific tag; never use 'latest' in production
+  tag: "2.1.0"  # always pin to a specific tag; never use 'latest' in production
   pullPolicy: IfNotPresent
 
 service:
@@ -38,6 +38,16 @@ config:
   oidcRedirectUri: ""
   oidcScopes: "openid email profile"
   oidcGroupsClaim: "groups"
+  # Map SSO group names to existing LiteLLM team IDs. A group can map to a
+  # string or list; the first matched team is applied to new/regenerated keys.
+  oidcGroupTeamMapping: {}
+  # Example:
+  # oidcGroupTeamMapping:
+  #   Engineering: "team-engineering"
+  #   AI-Platform:
+  #     - "team-platform"
+  #     - "team-shared-services"
+  oidcRequireTeamMapping: false
 
   # Local admin login (remove in production by leaving both blank)
   localAuthUsername: "admin"
@@ -68,7 +78,8 @@ config:
   # keyDuration: "90d"
   # keyTpmLimit: "100000"
   # keyRpmLimit: "1000"
-  # keyTeamId: ""
+  # Fallback for local or unmapped users; an SSO-mapped primary team takes precedence.
+  # keyTeamId: "team-default"
 
 resources: {}
 

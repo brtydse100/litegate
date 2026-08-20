@@ -18,6 +18,17 @@ oidc_redirect_uri: "http://localhost/api/auth/callback"
 oidc_scopes: "openid email profile"
 # ID-token claim containing group names; dot notation supports nested claims.
 oidc_groups_claim: "groups"
+# Add matched SSO users to existing LiteLLM teams. A group may map to one team
+# ID or a list. The first matched team is used for newly created/regenerated keys.
+oidc_group_team_mapping: {}
+# Example:
+# oidc_group_team_mapping:
+#   Engineering: "team-engineering"
+#   AI-Platform:
+#     - "team-platform"
+#     - "team-shared-services"
+# Deny SSO login when none of the user's groups has a configured team.
+oidc_require_team_mapping: false
 
 # Local admin login - remove in production
 local_auth_username: "admin"
@@ -55,6 +66,8 @@ litellm_ui_url: "http://localhost:4000"
 # key_duration: "90d"
 # key_tpm_limit: 100000
 # key_rpm_limit: 1000
+# Fallback for local or unmapped users; an SSO-mapped primary team takes precedence.
+# key_team_id: "team-default"
 
 # URL for the Open Support Ticket button (leave blank to hide)
 support_ticket_url: ""
