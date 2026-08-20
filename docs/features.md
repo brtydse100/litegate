@@ -72,14 +72,17 @@ LiteLLM virtual key; that key can identify and inspect only itself.
 
 The bulk editor lets an administrator:
 
-- select individual keys or the current 25-key page;
+- select individual keys, the current filtered page, or every key in the installation;
 - enter a key ID that is not visible on the current page;
 - change aliases, models, budgets, reset intervals, TPM/RPM, duration, or blocked
   status; and
 - submit only changed fields so untouched settings remain unchanged.
 
-The API accepts up to 100 keys in a request, updates them with bounded
+The API accepts up to 5,000 keys in a request, updates them with bounded
 concurrency, and returns a result for each key so partial failures remain visible.
+The select-all action is explicit: normal dashboard loads remain lightweight,
+and the browser receives the full identifier list only when an administrator
+requests it.
 See the [API guide](../API.md#keys) for an example.
 
 ## Automation API

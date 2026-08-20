@@ -141,7 +141,7 @@ class KeySettingsUpdate(BaseModel):
 
 
 class BulkKeyUpdateRequest(BaseModel):
-    keys: List[str] = Field(min_length=1, max_length=100)
+    keys: List[str] = Field(min_length=1, max_length=5000)
     settings: KeySettingsUpdate
 
     @field_validator("keys")

@@ -59,6 +59,11 @@ export interface AdminKeyPage {
   total_pages: number;
 }
 
+export interface AdminKeyIdentifiers {
+  keys: string[];
+  total: number;
+}
+
 export interface KeyCreateResponse {
   key: string;
   user_id: string;

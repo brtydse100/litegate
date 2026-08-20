@@ -42,11 +42,20 @@ export default function BulkKeyEditor() {
     placeholderData: previous => previous,
   });
 
+  const selectAll = useMutation({
+    mutationFn: api.listAllKeyIdentifiers,
+    onSuccess: data => {
+      setSelected(data.keys);
+      setLocalError("");
+    },
+  });
+
   const update = useMutation({
     mutationFn: ({ targetKeys, settings }: { targetKeys: string[]; settings: KeySettingsUpdate }) => api.bulkUpdateKeys(targetKeys, settings),
     onSuccess: () => {
       setSelected([]);
       setTargets("");
+      selectAll.reset();
       void queryClient.invalidateQueries({ queryKey: ["keys"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-keys"] });
     },
@@ -61,6 +70,10 @@ export default function BulkKeyEditor() {
   });
   const visibleTokens = visibleKeys.map(keyToken).filter(Boolean);
   const allVisibleSelected = visibleTokens.length > 0 && visibleTokens.every(token => selected.includes(token));
+  const allFetchedTokens = selectAll.data?.keys ?? [];
+  const allKeysSelected = allFetchedTokens.length > 0
+    && selectAll.data?.total === adminKeys.data?.total
+    && allFetchedTokens.every(token => selected.includes(token));
   const pastedTokens = targets.split(/[\n,]/).map(value => value.trim()).filter(Boolean);
   const targetCount = new Set([...selected, ...pastedTokens]).size;
 
@@ -95,7 +108,19 @@ export default function BulkKeyEditor() {
       : Array.from(new Set([...current, ...visibleTokens])));
   }
 
-  const error = localError || (update.error as Error | null)?.message;
+  function toggleAllKeys() {
+    if (allKeysSelected) {
+      const allTokenSet = new Set(allFetchedTokens);
+      setSelected(current => current.filter(token => !allTokenSet.has(token)));
+      return;
+    }
+    setLocalError("");
+    selectAll.mutate();
+  }
+
+  const error = localError
+    || (selectAll.error as Error | null)?.message
+    || (update.error as Error | null)?.message;
 
   return (
     <details onToggle={event => setEditorOpen(event.currentTarget.open)} className="w-full max-w-2xl rounded-xl border border-[#2A2E42] bg-[#1A1D27]">
@@ -121,6 +146,7 @@ export default function BulkKeyEditor() {
                 <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${selected.length ? "bg-indigo-500/15 text-indigo-300" : "bg-[#22263A] text-gray-500"}`}>{selected.length} selected</span>
                 <div className="flex items-center gap-2">
                   {selected.length > 0 && <button type="button" onClick={() => setSelected([])} className="rounded-lg px-2.5 py-1.5 text-[11px] text-gray-400 hover:bg-[#22263A] hover:text-white">Clear all</button>}
+                  <button type="button" onClick={toggleAllKeys} disabled={!adminKeys.data?.total || selectAll.isPending} className="rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1.5 text-[11px] font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-35">{selectAll.isPending ? "Selecting all..." : allKeysSelected ? `Deselect all (${allFetchedTokens.length})` : `Select all keys (${adminKeys.data?.total ?? 0})`}</button>
                   <button type="button" onClick={toggleVisible} disabled={!visibleTokens.length} className="rounded-lg border border-indigo-500/25 bg-indigo-500/10 px-2.5 py-1.5 text-[11px] font-medium text-indigo-300 hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-35">{allVisibleSelected ? "Deselect visible" : `Select visible (${visibleTokens.length})`}</button>
                 </div>
               </div>

@@ -129,6 +129,14 @@ async def api_list_keys(
     return {"keys": await llm.list_user_keys(actor.user.user_id)}
 
 
+@router.get("/keys/identifiers")
+async def api_list_key_identifiers(actor: ApiActor = Depends(get_api_actor)):
+    """List every key identifier for the administrator select-all control."""
+    _require_api_admin(actor)
+    keys = await llm.list_key_identifiers()
+    return {"keys": keys, "total": len(keys)}
+
+
 @router.post("/keys", response_model=KeyCreateResponse, status_code=status.HTTP_201_CREATED)
 async def api_create_key(
     payload: Optional[ApiKeyCreateRequest] = None,
@@ -165,7 +173,7 @@ async def bulk_update_keys(
     check_key_rate_limit(actor.user.user_id)
 
     changes = payload.settings.model_dump(exclude_unset=True)
-    semaphore = asyncio.Semaphore(5)
+    semaphore = asyncio.Semaphore(10)
 
     async def update_one(key: str) -> dict:
         async with semaphore:

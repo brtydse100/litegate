@@ -458,6 +458,38 @@ async def list_keys(page: int = 1, size: int = 50, user_id: Optional[str] = None
         raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
 
 
+async def list_key_identifiers(max_keys: int = 5000) -> list[str]:
+    """Return every key identifier through bounded, explicit pagination."""
+    identifiers: list[str] = []
+    seen: set[str] = set()
+    page = 1
+    while True:
+        result = await list_keys(page=page, size=100)
+        total = int(result.get("total", 0))
+        if total > max_keys:
+            raise HTTPException(
+                status_code=409,
+                detail=f"This installation has more than the select-all safety limit of {max_keys} keys",
+            )
+        for key in result.get("keys", []):
+            if not isinstance(key, dict):
+                continue
+            identifier = key.get("token") or key.get("api_key") or key.get("key")
+            if identifier and str(identifier) not in seen:
+                seen.add(str(identifier))
+                identifiers.append(str(identifier))
+        total_pages = max(1, int(result.get("total_pages", 1)))
+        if len(identifiers) > max_keys or total_pages > (max_keys + 99) // 100:
+            raise HTTPException(
+                status_code=409,
+                detail=f"This installation has more than the select-all safety limit of {max_keys} keys",
+            )
+        if page >= total_pages:
+            break
+        page += 1
+    return identifiers
+
+
 async def get_key_info(key: str) -> Optional[dict]:
     """Validate a virtual key and return its metadata."""
     try:

@@ -40,6 +40,9 @@ export const api = {
   listAllKeys: (page = 1, size = 25) =>
     request<import("../types").AdminKeyPage>(`/v1/keys?all=true&page=${page}&size=${size}`),
 
+  listAllKeyIdentifiers: () =>
+    request<import("../types").AdminKeyIdentifiers>("/v1/keys/identifiers"),
+
   createKey: () =>
     request<import("../types").KeyCreateResponse>("/keys", { method: "POST" }),
 

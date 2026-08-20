@@ -5,7 +5,13 @@ from fastapi import HTTPException
 
 from app.models import ApiKeyCreateRequest, BulkKeyUpdateRequest, CurrentUser
 from app.rate_limit import _key_ops
-from app.routers.api_v1 import ApiActor, api_create_key, api_me, bulk_update_keys
+from app.routers.api_v1 import (
+    ApiActor,
+    api_create_key,
+    api_list_key_identifiers,
+    api_me,
+    bulk_update_keys,
+)
 
 
 def setup_function():
@@ -54,6 +60,33 @@ async def test_admin_can_update_multiple_keys():
         result = await bulk_update_keys(payload, actor)
     assert result["updated"] == 2
     assert update.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_admin_can_list_all_key_identifiers():
+    actor = ApiActor(CurrentUser(user_id="admin", email="a@example.com", role="admin"))
+    with patch(
+        "app.routers.api_v1.llm.list_key_identifiers",
+        new=AsyncMock(return_value=["key-1", "key-2"]),
+    ):
+        result = await api_list_key_identifiers(actor)
+    assert result == {"keys": ["key-1", "key-2"], "total": 2}
+
+
+@pytest.mark.asyncio
+async def test_user_cannot_list_all_key_identifiers():
+    actor = ApiActor(CurrentUser(user_id="user-1", email="u@example.com"))
+    with pytest.raises(HTTPException) as exc:
+        await api_list_key_identifiers(actor)
+    assert exc.value.status_code == 403
+
+
+def test_bulk_update_accepts_more_than_one_page_of_keys():
+    payload = BulkKeyUpdateRequest(
+        keys=[f"key-{index}" for index in range(125)],
+        settings={"rpm_limit": 25},
+    )
+    assert len(payload.keys) == 125
 
 
 @pytest.mark.asyncio

@@ -33,6 +33,15 @@ curl "https://litegate.example.com/api/v1/keys?all=true&page=1&size=50" \
   -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
 ```
 
+The bulk editor's explicit **Select all keys** action uses the identifier-only
+administrator endpoint. It follows LiteLLM pagination server-side and returns at
+most 5,000 identifiers:
+
+```bash
+curl https://litegate.example.com/api/v1/keys/identifiers \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
+```
+
 Create a key for the authenticated user:
 
 ```bash
@@ -68,7 +77,7 @@ curl -X PATCH https://litegate.example.com/api/v1/keys/bulk \
   }'
 ```
 
-Supported bulk fields are `key_alias`, `models`, `max_budget`, `budget_duration`, `tpm_limit`, `rpm_limit`, `duration`, and `blocked`. Updates run with bounded concurrency and return a result for every key, so partial failures are visible.
+Supported bulk fields are `key_alias`, `models`, `max_budget`, `budget_duration`, `tpm_limit`, `rpm_limit`, `duration`, and `blocked`. A request can contain up to 5,000 unique keys. Updates run with bounded concurrency and return a result for every key, so partial failures are visible.
 
 ## Teams (admin only)
 

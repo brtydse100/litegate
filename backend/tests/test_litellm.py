@@ -176,6 +176,46 @@ async def test_list_user_team_ids_parses_and_deduplicates_response():
 
 
 @pytest.mark.asyncio
+async def test_list_key_identifiers_reads_every_page_and_deduplicates():
+    pages = [
+        {
+            "keys": [{"token": "key-1"}, {"api_key": "key-2"}],
+            "total": 3,
+            "total_pages": 2,
+        },
+        {
+            "keys": [{"key": "key-2"}, {"key": "key-3"}],
+            "total": 3,
+            "total_pages": 2,
+        },
+    ]
+    with patch("app.services.litellm.list_keys", new=AsyncMock(side_effect=pages)) as listing:
+        result = await litellm.list_key_identifiers()
+
+    assert result == ["key-1", "key-2", "key-3"]
+    assert [call.kwargs for call in listing.await_args_list] == [
+        {"page": 1, "size": 100},
+        {"page": 2, "size": 100},
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "page",
+    [
+        {"keys": [], "total": 5001, "total_pages": 1},
+        {"keys": [], "total": 1, "total_pages": 51},
+    ],
+)
+async def test_list_key_identifiers_stops_above_safety_limit(page):
+    with patch("app.services.litellm.list_keys", new=AsyncMock(return_value=page)):
+        with pytest.raises(HTTPException) as exc:
+            await litellm.list_key_identifiers()
+
+    assert exc.value.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_add_user_to_team_uses_member_add_payload():
     mock_response = MagicMock(status_code=200)
     mock_response.raise_for_status = MagicMock()
