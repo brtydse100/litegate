@@ -52,8 +52,9 @@ root_url: "http://localhost"
 
 ### Step 2 — Pull the package and start
 
-The release image is published to GitHub Container Registry. The image Compose
-file defaults to `latest`; set `LITEGATE_VERSION` to pin a release.
+The `linux/amd64` release image is published to GitHub Container Registry. The
+image Compose file defaults to `latest`; set `LITEGATE_VERSION` to pin a release.
+Other architectures can use the local build path below.
 
 ```bash
 docker compose -f docker-compose.image.yml up -d

@@ -78,9 +78,9 @@ Start LiteGate from the prebuilt GitHub package:
 docker compose -f docker-compose.image.yml up -d
 ```
 
-This pulls `ghcr.io/brtydse100/litegate:latest`. To pin a release, set
-`LITEGATE_VERSION`, for example `LITEGATE_VERSION=2.0.0`. To build from source
-instead:
+This pulls `ghcr.io/brtydse100/litegate:latest` for `linux/amd64`. To pin a
+release, set `LITEGATE_VERSION`, for example `LITEGATE_VERSION=2.0.0`. Other
+architectures can build locally from source:
 
 ```bash
 docker compose up --build
