@@ -19,6 +19,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - SSO login now additively synchronizes mapped team memberships and applies the first matched team to newly created or regenerated keys for LiteLLM team budget and model enforcement.
 - Existing keys remain unchanged until regeneration or administrator update, and team membership removal remains an explicit LiteLLM administration action.
 
+### Deployment
+
+- The public `linux/amd64` container is available as `ghcr.io/brtydse100/litegate:2.1.0` and `:latest` with provenance metadata.
+
 ## [2.0.0] - 2026-08-20
 
 ### Added
