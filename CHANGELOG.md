@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Redesigned the administrator bulk-key picker with searchable key cards, persistent cross-page selection, select-visible and clear-all actions, clearer key ownership and spend details, exact target counts, and a responsive mobile layout.
+- Manual key-ID entry now lives under an advanced option, and successful bulk updates clear their targets to reduce accidental repeat operations.
+
 ## [2.4.0] - 2026-08-20
 
 ### Added
