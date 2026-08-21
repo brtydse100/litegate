@@ -3,6 +3,8 @@ frontend/node_modules/
 
 # Build output
 frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
 
 # Python bytecode
 **/__pycache__/

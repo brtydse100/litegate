@@ -58,7 +58,7 @@ root_url: "http://localhost"
 
 ### Step 2 — Pull the package and start
 
-The `linux/amd64` release image is published to GitHub Container Registry. The
+The `linux/amd64` and `linux/arm64` release image is published to GitHub Container Registry. The
 image Compose file defaults to `latest`; set `LITEGATE_VERSION` to pin a release.
 Other architectures can use the local build path below.
 
@@ -98,6 +98,10 @@ docker compose -f docker-compose.image.yml up -d
 
 The container listens on port `8080`; the supplied Compose mapping keeps the
 browser URL on host port `80`.
+
+Use `/api/health/live` for liveness and `/api/health/ready` for traffic
+readiness. The readiness endpoint checks that LiteLLM accepts the configured
+master key and that the local SQLite database is writable.
 
 ### Offline usage
 
@@ -207,6 +211,12 @@ case-insensitive group-name matching, and support dotted claim paths.
 The chart's default pod and container security contexts enforce the image's
 non-root UID/GID, drop all capabilities, prevent privilege escalation, apply the
 runtime-default seccomp profile, and use `fsGroup: 10001` for the data volume.
+
+LiteGate currently supports exactly one application replica because local users
+and audit events use SQLite and operation cooldowns are held in process. The
+chart enforces `replicaCount: 1`, uses a `Recreate` deployment strategy, and
+routes readiness to the dependency-aware endpoint. Keep one replica until those
+stores are moved to shared PostgreSQL/Redis services.
 
 ---
 

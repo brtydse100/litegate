@@ -1,84 +1,33 @@
 """Stable automation API for users and virtual-key management."""
 
 import asyncio
-import hmac
-from dataclasses import dataclass
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, status
-from fastapi.security import HTTPAuthorizationCredentials
-from jwt import InvalidTokenError
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from app.config import settings
-from app.dependencies import bearer, decode_portal_token, enforce_account_state
 from app.models import (
     ApiKeyCreateRequest,
     BulkKeyUpdateRequest,
-    CurrentUser,
     KeyCreateResponse,
-    LocalUserCreate,
-    LocalUserInfo,
-    LocalUserUpdate,
     TeamCreateRequest,
     TeamMemberMoveRequest,
     TeamUpdateRequest,
 )
 from app.rate_limit import check_key_rate_limit
+from app.routers.api_actor import (
+    ApiActor,
+    get_api_actor,
+    record_audit as _record_audit,
+    require_api_admin as _require_api_admin,
+)
+from app.routers.api_v1_system import api_audit_events, api_status, router as system_router
+from app.routers.api_v1_users import api_create_user, api_list_users, api_update_user, router as users_router
 from app.services import litellm as llm
-from app.services import local_users
 
 router = APIRouter(prefix="/v1", tags=["api-v1"])
-
-
-@dataclass
-class ApiActor:
-    user: CurrentUser
-    proof_key: Optional[str] = None
-
-    @property
-    def is_admin(self) -> bool:
-        return self.user.is_admin
-
-
-async def get_api_actor(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
-) -> ApiActor:
-    if (
-        x_api_key
-        and settings.management_api_key
-        and hmac.compare_digest(x_api_key, settings.management_api_key)
-    ):
-        return ApiActor(
-            CurrentUser(
-                user_id="api:management",
-                email="management-api@local",
-                role="admin",
-                auth_source="management_api_key",
-            )
-        )
-    if credentials:
-        token = credentials.credentials
-        try:
-            return ApiActor(enforce_account_state(decode_portal_token(token)))
-        except InvalidTokenError:
-            info = await llm.get_key_info(token)
-            if info is not None:
-                return ApiActor(
-                    CurrentUser(
-                        user_id=info.get("user_id") or "key-holder",
-                        email="",
-                        role="user",
-                        auth_source="litellm_key",
-                    ),
-                    proof_key=token,
-                )
-    raise HTTPException(status_code=401, detail="Valid portal token, management key, or LiteLLM key required")
-
-
-def _require_api_admin(actor: ApiActor) -> None:
-    if not actor.is_admin:
-        raise HTTPException(status_code=403, detail="Administrator access required")
+router.include_router(system_router)
+router.include_router(users_router)
 
 
 def _team_config_references(team_id: str) -> tuple[list[str], bool]:
@@ -99,7 +48,6 @@ def _decorate_team(team: dict) -> dict:
         "default_key_team": default_key_team,
     }
 
-
 @router.get("/me")
 async def api_me(actor: ApiActor = Depends(get_api_actor)):
     return {
@@ -116,11 +64,20 @@ async def api_list_keys(
     all_keys: bool = Query(default=False, alias="all"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=100),
+    search: str = Query(default="", max_length=128),
+    team_id: str = Query(default="", max_length=128),
+    blocked: Optional[bool] = Query(default=None),
     actor: ApiActor = Depends(get_api_actor),
 ):
     if all_keys:
         _require_api_admin(actor)
-        return await llm.list_keys(page=page, size=size)
+        return await llm.list_keys_filtered(
+            page=page,
+            size=size,
+            search=search,
+            team_id=team_id,
+            blocked=blocked,
+        )
     if actor.proof_key:
         info = await llm.get_key_info(actor.proof_key)
         return {"keys": [info] if info else []}
@@ -130,10 +87,15 @@ async def api_list_keys(
 
 
 @router.get("/keys/identifiers")
-async def api_list_key_identifiers(actor: ApiActor = Depends(get_api_actor)):
+async def api_list_key_identifiers(
+    actor: ApiActor = Depends(get_api_actor),
+    search: str = Query(default="", max_length=128),
+    team_id: str = Query(default="", max_length=128),
+    blocked: Optional[bool] = Query(default=None),
+):
     """List every key identifier for the administrator select-all control."""
     _require_api_admin(actor)
-    keys = await llm.list_key_identifiers()
+    keys = await llm.list_key_identifiers(search=search, team_id=team_id, blocked=blocked)
     return {"keys": keys, "total": len(keys)}
 
 
@@ -158,6 +120,13 @@ async def api_create_key(
     is_self_service = not requested_user_id or requested_user_id == actor.user.user_id
     team_id = actor.user.team_ids[0] if is_self_service and actor.user.team_ids else None
     result = await llm.generate_key(user_id, email, team_id)
+    if actor.is_admin:
+        await _record_audit(
+            actor,
+            "key.create",
+            user_id,
+            details={"for_another_user": bool(requested_user_id and requested_user_id != actor.user.user_id)},
+        )
     return KeyCreateResponse(
         key=result["key"], user_id=result.get("user_id", user_id), expires=result.get("expires")
     )
@@ -187,7 +156,20 @@ async def bulk_update_keys(
 
     results = await asyncio.gather(*(update_one(key) for key in payload.keys))
     updated = sum(1 for result in results if result["updated"])
-    return {"updated": updated, "failed": len(results) - updated, "results": results}
+    failed = len(results) - updated
+    await _record_audit(
+        actor,
+        "keys.bulk_update",
+        "installation-keys",
+        outcome="failure" if failed else "success",
+        details={
+            "keys": payload.keys,
+            "setting_fields": sorted(changes),
+            "updated": updated,
+            "failed": failed,
+        },
+    )
+    return {"updated": updated, "failed": failed, "results": results}
 
 
 @router.get("/teams")
@@ -210,6 +192,7 @@ async def api_create_team(payload: TeamCreateRequest, actor: ApiActor = Depends(
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
     created = await llm.create_team(payload.model_dump(exclude_none=True))
+    await _record_audit(actor, "team.create", str(created.get("team_id") or payload.team_id or payload.team_alias), details={"setting_fields": sorted(payload.model_fields_set)})
     return _decorate_team(created)
 
 
@@ -223,6 +206,7 @@ async def api_update_team(
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
     updated = await llm.update_team(team_id, payload.model_dump(exclude_unset=True))
+    await _record_audit(actor, "team.update", team_id, details={"setting_fields": sorted(payload.model_fields_set)})
     return _decorate_team(updated)
 
 
@@ -246,6 +230,7 @@ async def api_delete_team(
         )
     check_key_rate_limit(actor.user.user_id)
     await llm.delete_team(team_id)
+    await _record_audit(actor, "team.delete", team_id)
     return {"deleted": True, "team_id": team_id}
 
 
@@ -322,6 +307,16 @@ async def api_move_team_member(
             status_code=exc.status_code,
             detail="Keys and destination membership moved, but source membership removal failed. Retry the move or remove the source membership in LiteLLM.",
         ) from exc
+    await _record_audit(
+        actor,
+        "team.member_move",
+        payload.user_id,
+        details={
+            "source_team_id": source_team_id,
+            "destination_team_id": payload.destination_team_id,
+            "keys_moved": moved_keys,
+        },
+    )
     return {
         "moved": True,
         "user_id": payload.user_id,
@@ -330,43 +325,3 @@ async def api_move_team_member(
         "keys_moved": moved_keys,
         "destination_membership_existed": already_in_destination,
     }
-
-
-@router.get("/users", response_model=list[LocalUserInfo])
-async def api_list_users(actor: ApiActor = Depends(get_api_actor)):
-    _require_api_admin(actor)
-    return await asyncio.to_thread(local_users.list_users)
-
-
-@router.post("/users", response_model=LocalUserInfo, status_code=status.HTTP_201_CREATED)
-async def api_create_user(payload: LocalUserCreate, actor: ApiActor = Depends(get_api_actor)):
-    _require_api_admin(actor)
-    check_key_rate_limit(actor.user.user_id)
-    try:
-        user = await asyncio.to_thread(
-            local_users.create_user, payload.username, payload.email, payload.password, payload.role
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    await llm.ensure_user_exists(user["user_id"], user["email"])
-    return user
-
-
-@router.patch("/users/{username}", response_model=LocalUserInfo)
-async def api_update_user(
-    username: str,
-    payload: LocalUserUpdate,
-    actor: ApiActor = Depends(get_api_actor),
-):
-    _require_api_admin(actor)
-    check_key_rate_limit(actor.user.user_id)
-    existing = local_users.get_user(username)
-    if not existing:
-        raise HTTPException(status_code=404, detail="Local user not found")
-    if existing["user_id"] == actor.user.user_id and payload.active is False:
-        raise HTTPException(status_code=400, detail="You cannot disable your own account")
-    if existing["user_id"] == actor.user.user_id and payload.role == "user":
-        raise HTTPException(status_code=400, detail="You cannot remove your own admin role")
-    return await asyncio.to_thread(
-        local_users.update_user, username, **payload.model_dump(exclude_unset=True)
-    )

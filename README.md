@@ -82,9 +82,9 @@ Start LiteGate from the prebuilt GitHub package:
 docker compose -f docker-compose.image.yml up -d
 ```
 
-This pulls `ghcr.io/brtydse100/litegate:latest` for `linux/amd64`. To pin a
-release, set `LITEGATE_VERSION`, for example `LITEGATE_VERSION=2.4.0`. Other
-architectures can build locally from source:
+This pulls the multi-architecture `ghcr.io/brtydse100/litegate:latest` package.
+To pin a release, set `LITEGATE_VERSION`, for example
+`LITEGATE_VERSION=2.4.0`. You can also build locally from source:
 
 ```bash
 docker compose up --build
@@ -128,7 +128,7 @@ the complete behavior and trust boundaries.
 
 ```bash
 cd backend && python -m pytest
-cd ../frontend && npm run build && npm audit --omit=dev
+cd ../frontend && npm test && npm run test:e2e && npm run build
 ```
 
 See the [development guide](docs/development.md) for environment setup and local

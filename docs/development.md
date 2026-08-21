@@ -39,9 +39,17 @@ Build and audit the production frontend:
 
 ```bash
 cd frontend
+npm test
+npm run test:e2e
 npm run build
 npm audit --omit=dev
 ```
+
+The Playwright command installs no browser automatically. On a new workstation,
+run `npx playwright install chromium` once. GitHub Actions runs backend tests,
+frontend unit/browser tests, the production build, dependency audit, Helm lint,
+documentation/version checks, and an all-in-one container build on every pull
+request and push to `main`.
 
 Authorization tests should preserve the core boundary: normal portal users and
 LiteLLM-key identities cannot bulk-edit keys, while administrators and the
@@ -59,9 +67,16 @@ litegate/
 |   |-- docker-compose/    Single-server deployment
 |   `-- helm/litegate/     Kubernetes Helm chart
 |-- docs/                  Focused project guides and images
+|-- scripts/               Version, release, and documentation checks
 |-- API.md                 API examples and authorization
 `-- DEPLOYMENT.md          Docker and Kubernetes operations
 ```
+
+`VERSION` is the release version source of truth. Run
+`python scripts/version.py --check` before publishing, or
+`python scripts/version.py --set X.Y.Z` to update the package and Helm
+references together. The only supported production image is defined by
+`deploy/docker-compose/Dockerfile`; local development uses Uvicorn and Vite.
 
 ## Technology
 
@@ -78,5 +93,8 @@ litegate/
 - New key secrets are displayed only when created.
 - Bulk updates report per-key success or failure and use bounded concurrency.
 - Local account role and active state are rechecked for authenticated requests.
+- SQLite stores local users and audit events, while operation cooldown state is
+  in process. Production therefore runs exactly one replica; the Helm chart
+  rejects larger replica counts until shared stores are implemented.
 
 For endpoint contracts, use the deployed OpenAPI document or [API.md](../API.md).

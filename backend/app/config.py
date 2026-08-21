@@ -1,36 +1,46 @@
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic.fields import FieldInfo
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 from typing import Optional, List
 import json
-import os
 from pathlib import Path
 
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent  # …/backend/
 
-def _load_yaml_config() -> None:
-    """Load config.yaml if present. Priority: os.environ (Docker -e flags) > config.yaml > defaults."""
+def _load_yaml_config() -> dict:
+    """Read the first project config file without mutating process state."""
     try:
         import yaml
-        import json as _json
     except ImportError:
-        return
+        return {}
 
     for candidate in [_BACKEND_DIR / "config.yaml", _BACKEND_DIR.parent / "config.yaml"]:
         if candidate.exists():
             data = yaml.safe_load(candidate.read_text()) or {}
-            for k, v in data.items():
-                env_key = k.upper()
-                if env_key not in os.environ and v is not None and str(v).strip() != "":
-                    os.environ[env_key] = _json.dumps(v) if isinstance(v, (list, dict)) else str(v)
-            break
+            if not isinstance(data, dict):
+                raise ValueError(f"Configuration root must be a mapping: {candidate}")
+            return {key: value for key, value in data.items() if value is not None}
+    return {}
 
 
-_load_yaml_config()
+class YamlConfigSettingsSource(PydanticBaseSettingsSource):
+    """Pydantic settings source with environment variables taking precedence."""
+
+    def get_field_value(self, field: FieldInfo, field_name: str):
+        data = _load_yaml_config()
+        value = data.get(field_name)
+        return value, field_name, False
+
+    def __call__(self) -> dict:
+        data = _load_yaml_config()
+        if isinstance(data.get("key_models"), list):
+            data["key_models"] = json.dumps(data["key_models"])
+        return data
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict()
+    model_config = SettingsConfigDict(extra="ignore")
     litellm_url: str = "http://localhost:4000"
     litellm_master_key: str
 
@@ -69,6 +79,22 @@ class Settings(BaseSettings):
     support_ticket_url: str = ""
     logo_url: str = ""
     litellm_ui_url: str = ""
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls,
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        return (
+            init_settings,
+            env_settings,
+            YamlConfigSettingsSource(settings_cls),
+            file_secret_settings,
+        )
 
     @property
     def local_auth_enabled(self) -> bool:

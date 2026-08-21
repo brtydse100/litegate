@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Info, Shield, UserPlus } from "lucide-react";
 import { api } from "../api/client";
@@ -12,6 +12,8 @@ export default function AdminUsers() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"user" | "admin">("user");
+  const [resetUsername, setResetUsername] = useState<string | null>(null);
+  const [replacementPassword, setReplacementPassword] = useState("");
   const { operationsBlocked, retryAfter, refreshOperationLimit } = useOperationLimit();
 
   const users = useQuery({ queryKey: ["local-users"], queryFn: api.listUsers });
@@ -36,11 +38,26 @@ export default function AdminUsers() {
     create.mutate({ username, email, password, role });
   }
 
-  function resetPassword(name: string) {
-    if (operationsBlocked || update.isPending) return;
-    const next = window.prompt(`New password for ${name} (at least 10 characters)`);
-    if (next) update.mutate({ name, payload: { password: next } });
+  function submitPasswordReset(event: React.FormEvent) {
+    event.preventDefault();
+    if (!resetUsername || replacementPassword.length < 10 || operationsBlocked || update.isPending) return;
+    update.mutate(
+      { name: resetUsername, payload: { password: replacementPassword } },
+      { onSuccess: () => { setResetUsername(null); setReplacementPassword(""); } },
+    );
   }
+
+  useEffect(() => {
+    if (!resetUsername) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !update.isPending) {
+        setResetUsername(null);
+        setReplacementPassword("");
+      }
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [resetUsername, update.isPending]);
 
   const error = create.error ?? update.error ?? users.error;
 
@@ -75,12 +92,12 @@ export default function AdminUsers() {
           <div className="flex items-center gap-2 text-sm font-medium text-gray-200"><UserPlus size={16} /> Add local user</div>
           <p className="mt-1 text-xs text-gray-500">Creates a separate username and password for this portal.</p>
         </div>
-        <input className={inputClass} value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" minLength={3} required />
-        <input className={inputClass} value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" required />
-        <input className={inputClass} value={password} onChange={e => setPassword(e.target.value)} placeholder="Temporary password (10+ characters)" type="password" minLength={10} required />
-        <select aria-label="Role" className={inputClass} value={role} onChange={e => setRole(e.target.value as "user" | "admin")}>
+        <label className="space-y-1 text-xs text-gray-400"><span>Username</span><input className={`${inputClass} w-full`} value={username} onChange={e => setUsername(e.target.value)} autoComplete="off" minLength={3} required /></label>
+        <label className="space-y-1 text-xs text-gray-400"><span>Email</span><input className={`${inputClass} w-full`} value={email} onChange={e => setEmail(e.target.value)} type="email" required /></label>
+        <label className="space-y-1 text-xs text-gray-400"><span>Temporary password</span><input className={`${inputClass} w-full`} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 10 characters" type="password" autoComplete="new-password" minLength={10} required /></label>
+        <label className="space-y-1 text-xs text-gray-400"><span>Portal role</span><select className={`${inputClass} w-full`} value={role} onChange={e => setRole(e.target.value as "user" | "admin")}>
           <option value="user">User — own API access only</option><option value="admin">Admin — full management access</option>
-        </select>
+        </select></label>
         <button disabled={create.isPending || update.isPending || operationsBlocked} className="md:col-span-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
           {create.isPending ? "Adding..." : operationsBlocked ? "Account actions paused" : "Add user"}
         </button>
@@ -104,7 +121,7 @@ export default function AdminUsers() {
                   <p className="truncate text-xs text-gray-500">{account.email}</p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <button onClick={() => resetPassword(account.username)} disabled={update.isPending || operationsBlocked} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40">Reset password</button>
+                  <button onClick={() => { setResetUsername(account.username); setReplacementPassword(""); }} disabled={update.isPending || operationsBlocked} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40">Reset password</button>
                   <button onClick={() => update.mutate({ name: account.username, payload: { role: account.role === "admin" ? "user" : "admin" } })} disabled={update.isPending || operationsBlocked} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40">Make {account.role === "admin" ? "user" : "admin"}</button>
                   <button onClick={() => update.mutate({ name: account.username, payload: { active: !account.active } })} disabled={update.isPending || operationsBlocked} className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40">{account.active ? "Disable" : "Enable"}</button>
                 </div>
@@ -113,6 +130,14 @@ export default function AdminUsers() {
           </div>
         ) : <p className="p-6 text-center text-sm text-gray-500">No local users yet.</p>}
       </div>
+
+      {resetUsername && <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !update.isPending) setResetUsername(null); }}>
+        <form onSubmit={submitPasswordReset} role="dialog" aria-modal="true" aria-labelledby="reset-password-title" className="w-full max-w-md space-y-4 rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-5 shadow-2xl">
+          <div><h3 id="reset-password-title" className="text-lg font-semibold text-white">Reset {resetUsername}&apos;s password</h3><p className="mt-1 text-xs text-gray-500">Their current password stops working as soon as this change succeeds.</p></div>
+          <label className="block space-y-1 text-xs text-gray-400"><span>New password</span><input autoFocus className={`${inputClass} w-full`} type="password" autoComplete="new-password" minLength={10} required value={replacementPassword} onChange={event => setReplacementPassword(event.target.value)} /></label>
+          <div className="flex justify-end gap-2"><button type="button" disabled={update.isPending} onClick={() => { setResetUsername(null); setReplacementPassword(""); }} className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 disabled:opacity-40">Cancel</button><button disabled={update.isPending || operationsBlocked || replacementPassword.length < 10} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{update.isPending ? "Saving..." : "Reset password"}</button></div>
+        </form>
+      </div>}
     </section>
   );
 }

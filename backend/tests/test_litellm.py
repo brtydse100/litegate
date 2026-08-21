@@ -216,6 +216,38 @@ async def test_list_key_identifiers_stops_above_safety_limit(page):
 
 
 @pytest.mark.asyncio
+async def test_global_key_search_filters_before_paginating():
+    keys = [
+        {"token": "key-1", "key_alias": "Research", "user_email": "alice@example.com", "team_id": "team-a", "blocked": False},
+        {"token": "key-2", "key_alias": "Production", "user_email": "bob@example.com", "team_id": "team-b", "blocked": True},
+        {"token": "key-3", "key_alias": "Research backup", "user_email": "carol@example.com", "team_id": "team-a", "blocked": True},
+    ]
+    with patch("app.services.litellm.list_all_keys", new=AsyncMock(return_value=keys)):
+        result = await litellm.list_keys_filtered(
+            page=1,
+            size=25,
+            search="research",
+            team_id="team-a",
+            blocked=True,
+        )
+
+    assert result["total"] == 1
+    assert [key["token"] for key in result["keys"]] == ["key-3"]
+
+
+@pytest.mark.asyncio
+async def test_filtered_identifier_selection_matches_search_scope():
+    keys = [
+        {"token": "key-1", "user_id": "alice", "team_id": "team-a"},
+        {"token": "key-2", "user_id": "bob", "team_id": "team-b"},
+    ]
+    with patch("app.services.litellm.list_all_keys", new=AsyncMock(return_value=keys)):
+        result = await litellm.list_key_identifiers(search="bob")
+
+    assert result == ["key-2"]
+
+
+@pytest.mark.asyncio
 async def test_add_user_to_team_uses_member_add_payload():
     mock_response = MagicMock(status_code=200)
     mock_response.raise_for_status = MagicMock()

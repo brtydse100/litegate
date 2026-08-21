@@ -23,7 +23,7 @@ def _db_path() -> Path:
     return path
 
 
-def _connect() -> sqlite3.Connection:
+def connect() -> sqlite3.Connection:
     path = _db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path, timeout=5)
@@ -34,7 +34,7 @@ def _connect() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    with _connect() as db:
+    with connect() as db:
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS local_users (
@@ -49,6 +49,36 @@ def init_db() -> None:
             )
             """
         )
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS audit_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                occurred_at TEXT NOT NULL,
+                actor_id TEXT NOT NULL,
+                actor_email TEXT NOT NULL,
+                action TEXT NOT NULL,
+                target TEXT NOT NULL,
+                outcome TEXT NOT NULL CHECK(outcome IN ('success', 'failure')),
+                details_json TEXT NOT NULL DEFAULT '{}'
+            )
+            """
+        )
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_events_occurred_at ON audit_events(occurred_at DESC)"
+        )
+
+
+def healthcheck() -> dict:
+    """Verify that the local SQLite store is reachable and writable."""
+    try:
+        init_db()
+        with connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("SELECT 1")
+            db.rollback()
+        return {"ok": True, "detail": "Writable"}
+    except sqlite3.Error:
+        return {"ok": False, "detail": "Local account database is not writable"}
 
 
 def _password_hash(password: str) -> str:
@@ -90,13 +120,13 @@ def _public(row: sqlite3.Row) -> dict:
 
 def has_users() -> bool:
     init_db()
-    with _connect() as db:
+    with connect() as db:
         return bool(db.execute("SELECT 1 FROM local_users LIMIT 1").fetchone())
 
 
 def list_users() -> list[dict]:
     init_db()
-    with _connect() as db:
+    with connect() as db:
         rows = db.execute(
             "SELECT * FROM local_users ORDER BY active DESC, username COLLATE NOCASE"
         ).fetchall()
@@ -105,14 +135,14 @@ def list_users() -> list[dict]:
 
 def get_user(username: str) -> Optional[dict]:
     init_db()
-    with _connect() as db:
+    with connect() as db:
         row = db.execute("SELECT * FROM local_users WHERE username = ?", (username,)).fetchone()
     return _public(row) if row else None
 
 
 def authenticate(username: str, password: str) -> Optional[dict]:
     init_db()
-    with _connect() as db:
+    with connect() as db:
         row = db.execute("SELECT * FROM local_users WHERE username = ?", (username,)).fetchone()
     password_matches = _password_matches(
         password, row["password_hash"] if row else _DUMMY_PASSWORD_HASH
@@ -127,7 +157,7 @@ def create_user(username: str, email: str, password: str, role: str = "user") ->
     now = datetime.now(timezone.utc).isoformat()
     user_id = f"local:{username.lower()}"
     try:
-        with _connect() as db:
+        with connect() as db:
             db.execute(
                 """INSERT INTO local_users
                    (username, user_id, email, password_hash, role, active, created_at, updated_at)
@@ -166,7 +196,7 @@ def update_user(
         return get_user(username)
     changes.append("updated_at = ?")
     values.extend([datetime.now(timezone.utc).isoformat(), username])
-    with _connect() as db:
+    with connect() as db:
         result = db.execute(
             f"UPDATE local_users SET {', '.join(changes)} WHERE username = ?",
             values,

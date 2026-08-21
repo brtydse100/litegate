@@ -72,14 +72,16 @@ LiteLLM virtual key; that key can identify and inspect only itself.
 
 The bulk editor lets an administrator:
 
-- select individual keys, the current filtered page, or every key in the installation;
+- search globally by owner, alias, team, or key ID and filter by team or blocked state;
+- select individual keys, the current page, every key, or every matching result;
 - enter a key ID that is not visible on the current page;
 - change aliases, models, budgets, reset intervals, TPM/RPM, duration, or blocked
   status; and
 - submit only changed fields so untouched settings remain unchanged.
 
 The API accepts up to 5,000 keys in a request, updates them with bounded
-concurrency, and returns a result for each key so partial failures remain visible.
+concurrency, and returns a result for each key so partial failures remain visible,
+selected, retryable, and downloadable as a failure report.
 The select-all action is explicit: normal dashboard loads remain lightweight,
 and the browser receives the full identifier list only when an administrator
 requests it.
@@ -115,7 +117,10 @@ paginated to avoid loading every key at once.
 - The frontend and backend ship together in one non-root Docker image behind Nginx.
 - Docker Compose persists local accounts in a named volume.
 - The included Helm chart supports a persistent volume claim.
-- A health endpoint is available at `/api/health`.
+- Separate liveness and dependency-aware readiness endpoints are available at
+  `/api/health/live` and `/api/health/ready`.
+- The administrator **Status** tab shows LiteLLM/database readiness and a
+  secret-safe audit history of management changes.
 - Administrators can configure a logo, LiteLLM model-hub link, and support link.
 
 Continue with the [deployment guide](../DEPLOYMENT.md) or

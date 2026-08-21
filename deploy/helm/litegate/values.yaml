@@ -1,3 +1,5 @@
+# LiteGate currently uses SQLite plus an in-process operation limiter. The chart
+# deliberately supports one replica until those stores are externalized.
 replicaCount: 1
 
 podSecurityContext:

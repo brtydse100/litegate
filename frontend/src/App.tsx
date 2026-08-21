@@ -16,8 +16,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/" element={<PrivateRoute><Home /></PrivateRoute>} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/*" element={<PrivateRoute><Home /></PrivateRoute>} />
     </Routes>
   );
 }

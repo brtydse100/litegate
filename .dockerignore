@@ -13,6 +13,8 @@ backend/tests
 backend/requirements-dev.txt
 frontend/node_modules
 frontend/dist
+frontend/test-results
+frontend/playwright-report
 deploy/docker-compose/config.yaml
 deploy/helm
 docs

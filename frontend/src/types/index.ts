@@ -64,6 +64,37 @@ export interface AdminKeyIdentifiers {
   total: number;
 }
 
+export interface AdminKeyFilters {
+  search?: string;
+  team_id?: string;
+  blocked?: boolean;
+}
+
+export interface DependencyStatus {
+  ok: boolean;
+  detail: string;
+}
+
+export interface SystemStatus {
+  ready: boolean;
+  dependencies: {
+    litellm: DependencyStatus;
+    database: DependencyStatus;
+  };
+  storage_mode: string;
+}
+
+export interface AuditEvent {
+  id: number;
+  occurred_at: string;
+  actor_id: string;
+  actor_email: string;
+  action: string;
+  target: string;
+  outcome: "success" | "failure";
+  details: Record<string, unknown>;
+}
+
 export interface KeyCreateResponse {
   key: string;
   user_id: string;

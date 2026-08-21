@@ -33,6 +33,16 @@ curl "https://litegate.example.com/api/v1/keys?all=true&page=1&size=50" \
   -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
 ```
 
+Add `search`, `team_id`, or `blocked=true|false` to scope the installation
+before pagination. The same filters work on the identifier endpoint, so an
+administrator can select every matching result without selecting unrelated
+keys:
+
+```bash
+curl "https://litegate.example.com/api/v1/keys/identifiers?search=alice&blocked=false" \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
+```
+
 The bulk editor's explicit **Select all keys** action uses the identifier-only
 administrator endpoint. It follows LiteLLM pagination server-side and returns at
 most 5,000 identifiers:
@@ -182,3 +192,24 @@ curl -X PATCH https://litegate.example.com/api/v1/users/alice \
 ```
 
 Local-user passwords use salted PBKDF2-SHA256 hashes. Disabling a local user invalidates existing portal sessions on their next request.
+
+## Operations and audit (admin only)
+
+Check LiteLLM connectivity and the writable local database:
+
+```bash
+curl https://litegate.example.com/api/v1/status \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
+```
+
+Read the latest secret-safe management events:
+
+```bash
+curl "https://litegate.example.com/api/v1/audit-events?limit=100" \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
+```
+
+Audit details redact credential-shaped fields and store only counts for bulk key
+targets. Public probes are `GET /api/health/live` for process liveness and
+`GET /api/health/ready` for LiteLLM plus database readiness; readiness returns
+HTTP 503 when either dependency is unavailable.

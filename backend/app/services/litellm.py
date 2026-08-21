@@ -5,14 +5,14 @@ import httpx
 from typing import Optional, List, Any, NoReturn
 from fastapi import HTTPException
 from app.config import settings
-
-
-def _headers() -> dict:
-    return {"Authorization": f"Bearer {settings.litellm_master_key}"}
-
-
-def _transport_error(e: httpx.TransportError) -> None:
-    raise HTTPException(status_code=503, detail=f"Cannot reach LiteLLM at {settings.litellm_url}")
+from app.services.litellm_client import (
+    client as _client,
+    close_client,
+    headers as _headers,
+    healthcheck,
+    start_client,
+    transport_error as _transport_error,
+)
 
 
 def _team_operation_error(e: httpx.HTTPStatusError) -> NoReturn:
@@ -38,7 +38,7 @@ def _team_operation_error(e: httpx.HTTPStatusError) -> NoReturn:
 
 async def get_user(user_id: str) -> Optional[dict]:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.get(
                 f"{settings.litellm_url}/user/info",
                 params={"user_id": user_id},
@@ -57,7 +57,7 @@ async def get_user(user_id: str) -> Optional[dict]:
 
 async def create_user(user_id: str, email: str) -> dict:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/user/new",
                 json={"user_id": user_id, "user_email": email},
@@ -86,7 +86,7 @@ async def ensure_user_exists(user_id: str, email: str) -> Optional[dict]:
 async def list_user_team_ids(user_id: str) -> List[str]:
     """Return LiteLLM teams the user already belongs to."""
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.get(
                 f"{settings.litellm_url}/team/list",
                 params={"user_id": user_id},
@@ -141,7 +141,7 @@ async def add_team_member(team_id: str, user_id: str, role: str = "user") -> dic
     """Add one stable user ID to a team, tolerating an exact duplicate."""
     member: dict[str, str] = {"role": role, "user_id": user_id}
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/team/member_add",
                 json={"team_id": team_id, "member": member},
@@ -185,7 +185,7 @@ async def list_teams(
     if exact_team_id:
         params["team_id"] = exact_team_id
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.get(
                 f"{settings.litellm_url}/v2/team/list",
                 params=params,
@@ -219,7 +219,7 @@ async def get_team(team_id: str) -> Optional[dict]:
 
 async def create_team(team: dict) -> dict:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/team/new",
                 json=team,
@@ -236,7 +236,7 @@ async def create_team(team: dict) -> dict:
 
 async def update_team(team_id: str, changes: dict) -> dict:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/team/update",
                 json={"team_id": team_id, **changes},
@@ -253,7 +253,7 @@ async def update_team(team_id: str, changes: dict) -> dict:
 
 async def delete_team(team_id: str) -> dict:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/team/delete",
                 json={"team_ids": [team_id]},
@@ -270,7 +270,7 @@ async def delete_team(team_id: str) -> dict:
 
 async def remove_team_member(team_id: str, user_id: str) -> dict:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/team/member_delete",
                 json={"team_id": team_id, "user_id": user_id},
@@ -315,7 +315,7 @@ async def move_user_team_keys(
     for offset in range(0, len(source_keys), 100):
         batch = source_keys[offset : offset + 100]
         try:
-            async with httpx.AsyncClient() as client:
+            async with _client() as client:
                 r = await client.post(
                     f"{settings.litellm_url}/key/bulk_update",
                     json={"keys": [{"key": key, "team_id": destination_team_id} for key in batch]},
@@ -379,7 +379,7 @@ async def generate_key(
         payload["team_id"] = effective_team_id
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/key/generate",
                 json=payload,
@@ -396,7 +396,7 @@ async def generate_key(
 
 async def delete_key(key: str) -> dict:
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/key/delete",
                 json={"keys": [key]},
@@ -428,7 +428,7 @@ async def list_keys(page: int = 1, size: int = 50, user_id: Optional[str] = None
     if user_id:
         params["user_id"] = user_id
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.get(
                 f"{settings.litellm_url}/key/list",
                 params=params,
@@ -458,42 +458,118 @@ async def list_keys(page: int = 1, size: int = 50, user_id: Optional[str] = None
         raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
 
 
-async def list_key_identifiers(max_keys: int = 5000) -> list[str]:
-    """Return every key identifier through bounded, explicit pagination."""
-    identifiers: list[str] = []
-    seen: set[str] = set()
+async def list_all_keys(max_keys: int = 5000) -> list[dict]:
+    """Read an explicitly requested, safety-bounded installation key set."""
+    records: list[dict] = []
     page = 1
     while True:
         result = await list_keys(page=page, size=100)
         total = int(result.get("total", 0))
-        if total > max_keys:
-            raise HTTPException(
-                status_code=409,
-                detail=f"This installation has more than the select-all safety limit of {max_keys} keys",
-            )
-        for key in result.get("keys", []):
-            if not isinstance(key, dict):
-                continue
-            identifier = key.get("token") or key.get("api_key") or key.get("key")
-            if identifier and str(identifier) not in seen:
-                seen.add(str(identifier))
-                identifiers.append(str(identifier))
         total_pages = max(1, int(result.get("total_pages", 1)))
-        if len(identifiers) > max_keys or total_pages > (max_keys + 99) // 100:
+        if total > max_keys or total_pages > (max_keys + 99) // 100:
             raise HTTPException(
                 status_code=409,
-                detail=f"This installation has more than the select-all safety limit of {max_keys} keys",
+                detail=f"This installation has more than the administrative safety limit of {max_keys} keys",
+            )
+        records.extend(key for key in result.get("keys", []) if isinstance(key, dict))
+        if len(records) > max_keys:
+            raise HTTPException(
+                status_code=409,
+                detail=f"This installation has more than the administrative safety limit of {max_keys} keys",
             )
         if page >= total_pages:
-            break
+            return records
         page += 1
+
+
+def _filter_keys(
+    keys: list[dict],
+    *,
+    search: str = "",
+    team_id: str = "",
+    blocked: Optional[bool] = None,
+) -> list[dict]:
+    normalized_search = search.strip().casefold()
+    normalized_team = team_id.strip().casefold()
+    filtered: list[dict] = []
+    for key in keys:
+        if normalized_search:
+            values = (
+                key.get("key_alias"),
+                key.get("user_email"),
+                key.get("user_id"),
+                key.get("team_id"),
+                key.get("token"),
+                key.get("api_key"),
+                key.get("key"),
+            )
+            if not any(normalized_search in str(value).casefold() for value in values if value):
+                continue
+        if normalized_team and str(key.get("team_id") or "").casefold() != normalized_team:
+            continue
+        if blocked is not None and bool(key.get("blocked")) is not blocked:
+            continue
+        filtered.append(key)
+    return filtered
+
+
+async def list_keys_filtered(
+    *,
+    page: int = 1,
+    size: int = 50,
+    search: str = "",
+    team_id: str = "",
+    blocked: Optional[bool] = None,
+    max_keys: int = 5000,
+) -> dict:
+    """Return a global filtered page; unfiltered requests stay natively paginated."""
+    if not search.strip() and not team_id.strip() and blocked is None:
+        return await list_keys(page=page, size=size)
+    filtered = _filter_keys(
+        await list_all_keys(max_keys=max_keys),
+        search=search,
+        team_id=team_id,
+        blocked=blocked,
+    )
+    start = (page - 1) * size
+    total = len(filtered)
+    return {
+        "keys": filtered[start : start + size],
+        "page": page,
+        "size": size,
+        "total": total,
+        "total_pages": max(1, (total + size - 1) // size),
+    }
+
+
+async def list_key_identifiers(
+    max_keys: int = 5000,
+    *,
+    search: str = "",
+    team_id: str = "",
+    blocked: Optional[bool] = None,
+) -> list[str]:
+    """Return every key identifier through bounded, explicit pagination."""
+    identifiers: list[str] = []
+    seen: set[str] = set()
+    keys = _filter_keys(
+        await list_all_keys(max_keys=max_keys),
+        search=search,
+        team_id=team_id,
+        blocked=blocked,
+    )
+    for key in keys:
+        identifier = key.get("token") or key.get("api_key") or key.get("key")
+        if identifier and str(identifier) not in seen:
+            seen.add(str(identifier))
+            identifiers.append(str(identifier))
     return identifiers
 
 
 async def get_key_info(key: str) -> Optional[dict]:
     """Validate a virtual key and return its metadata."""
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.get(
                 f"{settings.litellm_url}/key/info",
                 params={"key": key},
@@ -514,7 +590,7 @@ async def get_key_info(key: str) -> Optional[dict]:
 async def update_key(key: str, settings_update: dict) -> dict:
     """Update one virtual key through LiteLLM's management API."""
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/key/update",
                 json={"key": key, **settings_update},
@@ -542,7 +618,7 @@ async def get_spend_logs(
         params["end_date"] = end_date
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with _client() as client:
             r = await client.get(
                 f"{settings.litellm_url}/spend/logs",
                 params=params,

@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Check, Copy, ExternalLink, Gauge, KeyRound, LogOut, RefreshCw, Shield, Ticket, Users, Zap } from "lucide-react";
+import { NavLink, Navigate, useLocation } from "react-router-dom";
+import { Activity, Building2, Check, Copy, ExternalLink, Gauge, KeyRound, LogOut, RefreshCw, Shield, Ticket, Users, Zap } from "lucide-react";
+import AdminKeys from "../components/AdminKeys";
+import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
 import AdminTeams from "../components/AdminTeams";
-import BulkKeyEditor from "../components/BulkKeyEditor";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { useOperationLimit } from "../hooks/useOperationLimit";
@@ -71,7 +73,7 @@ function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
 export default function Home() {
   const { user, logout } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<"keys" | "users" | "teams">("keys");
+  const location = useLocation();
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
@@ -95,6 +97,13 @@ export default function Home() {
 
   const config = portal.data;
   const isAdmin = user?.role === "admin";
+  const section = location.pathname === "/" ? "/my-key" : location.pathname;
+  const adminSections = new Set(["/keys", "/users", "/teams", "/status"]);
+  if (location.pathname === "/") return <Navigate to="/my-key" replace />;
+  if ((!isAdmin && section !== "/my-key") || (isAdmin && section !== "/my-key" && !adminSections.has(section))) {
+    return <Navigate to="/my-key" replace />;
+  }
+  const navClass = ({ isActive }: { isActive: boolean }) => `flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${isActive ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#1A1D27]"}`;
 
   return (
     <div className="min-h-screen bg-[#0F1117]">
@@ -114,14 +123,16 @@ export default function Home() {
         </div>
       </header>
 
-      {isAdmin && <nav className="mx-auto flex max-w-6xl gap-1 px-4 pt-5 sm:px-6">
-        <button onClick={() => setTab("keys")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${tab === "keys" ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#1A1D27]"}`}><KeyRound size={15} /> Keys</button>
-        <button onClick={() => setTab("users")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${tab === "users" ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#1A1D27]"}`}><Users size={15} /> Users</button>
-        <button onClick={() => setTab("teams")} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${tab === "teams" ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#1A1D27]"}`}><Building2 size={15} /> Teams</button>
+      {isAdmin && <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pt-5 sm:px-6" aria-label="Administrator navigation">
+        <NavLink to="/my-key" className={navClass}><KeyRound size={15} /> My key</NavLink>
+        <NavLink to="/keys" className={navClass}><Shield size={15} /> Key policies</NavLink>
+        <NavLink to="/users" className={navClass}><Users size={15} /> Local users</NavLink>
+        <NavLink to="/teams" className={navClass}><Building2 size={15} /> Teams</NavLink>
+        <NavLink to="/status" className={navClass}><Activity size={15} /> Status</NavLink>
       </nav>}
 
       <main className={`mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 pb-16 ${isAdmin ? "pt-8" : "pt-12"} sm:px-6`}>
-        {tab === "users" && isAdmin ? <AdminUsers /> : tab === "teams" && isAdmin ? <AdminTeams /> : <>
+        {section === "/users" && isAdmin ? <AdminUsers /> : section === "/teams" && isAdmin ? <AdminTeams /> : section === "/keys" && isAdmin ? <AdminKeys /> : section === "/status" && isAdmin ? <AdminStatus /> : <>
           <div className="max-w-xl text-center">
             <h1 className="text-3xl font-bold text-white">Your API access</h1>
             <p className="mt-2 text-sm text-gray-500">Create and manage a LiteLLM key without loading expensive usage logs.</p>
@@ -147,8 +158,6 @@ export default function Home() {
           {!keys.isLoading && !confirmRegenerate && (!hasKey ? <button onClick={() => create.mutate()} disabled={create.isPending || operationsBlocked} className="w-full max-w-lg rounded-2xl bg-indigo-600 px-8 py-5 text-lg font-bold text-white shadow-xl shadow-indigo-600/25 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"><span className="flex items-center justify-center gap-2"><Zap size={23} />{create.isPending ? "Creating..." : operationsBlocked ? "Key actions paused" : "Create API key"}</span></button> : <button onClick={() => setConfirmRegenerate(true)} disabled={operationsBlocked} className="flex w-full max-w-lg items-center justify-center gap-2 rounded-xl border border-[#2A2E42] px-5 py-3 text-sm text-gray-300 hover:bg-[#1A1D27] disabled:cursor-not-allowed disabled:opacity-40"><RefreshCw size={15} /> {operationsBlocked ? "Regeneration paused" : "Regenerate key"}</button>)}
 
           {hasKey && <AccessSnapshot keys={keyList} />}
-          {isAdmin && <BulkKeyEditor />}
-
           {(config?.litellm_ui_url || config?.support_ticket_url) && <div className="flex w-full max-w-lg flex-col gap-3 sm:flex-row">
             {config.litellm_ui_url && <a href={config.litellm_ui_url} target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-indigo-500/30 bg-indigo-600/10 px-5 py-3 text-sm text-indigo-300 hover:bg-indigo-600/20"><ExternalLink size={15} /> Model hub</a>}
             {config.support_ticket_url && <a href={config.support_ticket_url} target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#2A2E42] bg-[#1A1D27] px-5 py-3 text-sm text-gray-300 hover:bg-[#22263A]"><Ticket size={15} /> Support</a>}

@@ -37,11 +37,27 @@ export const api = {
   getOperationLimit: () =>
     request<import("../types").OperationLimit>("/keys/operation-limit"),
 
-  listAllKeys: (page = 1, size = 25) =>
-    request<import("../types").AdminKeyPage>(`/v1/keys?all=true&page=${page}&size=${size}`),
+  listAllKeys: (page = 1, size = 25, filters: import("../types").AdminKeyFilters = {}) => {
+    const params = new URLSearchParams({ all: "true", page: String(page), size: String(size) });
+    if (filters.search) params.set("search", filters.search);
+    if (filters.team_id) params.set("team_id", filters.team_id);
+    if (filters.blocked !== undefined) params.set("blocked", String(filters.blocked));
+    return request<import("../types").AdminKeyPage>(`/v1/keys?${params}`);
+  },
 
-  listAllKeyIdentifiers: () =>
-    request<import("../types").AdminKeyIdentifiers>("/v1/keys/identifiers"),
+  listAllKeyIdentifiers: (filters: import("../types").AdminKeyFilters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.search) params.set("search", filters.search);
+    if (filters.team_id) params.set("team_id", filters.team_id);
+    if (filters.blocked !== undefined) params.set("blocked", String(filters.blocked));
+    const query = params.toString();
+    return request<import("../types").AdminKeyIdentifiers>(`/v1/keys/identifiers${query ? `?${query}` : ""}`);
+  },
+
+  getSystemStatus: () => request<import("../types").SystemStatus>("/v1/status"),
+
+  listAuditEvents: (limit = 100) =>
+    request<{ events: import("../types").AuditEvent[] }>(`/v1/audit-events?limit=${limit}`),
 
   createKey: () =>
     request<import("../types").KeyCreateResponse>("/keys", { method: "POST" }),

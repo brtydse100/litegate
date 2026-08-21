@@ -95,16 +95,16 @@ export default function Login() {
         {/* Local login — always visible when enabled, no toggle */}
         {showLocal && (
           <form onSubmit={handleLocal} className="w-full space-y-3">
-            <input
+            <label className="block space-y-1 text-xs text-gray-400"><span>Username</span><input
               type="text" placeholder="Username" value={username}
-              onChange={e => setUsername(e.target.value)} required autoFocus={!showSso}
+              onChange={e => setUsername(e.target.value)} required autoFocus={!showSso} autoComplete="username"
               className="w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
-            />
-            <input
+            /></label>
+            <label className="block space-y-1 text-xs text-gray-400"><span>Password</span><input
               type="password" placeholder="Password" value={password}
-              onChange={e => setPassword(e.target.value)} required
+              onChange={e => setPassword(e.target.value)} required autoComplete="current-password"
               className="w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
-            />
+            /></label>
             {error && <p className="text-xs text-red-400">{error}</p>}
             <button type="submit" disabled={submitting}
               className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors">

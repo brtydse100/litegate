@@ -1,9 +1,8 @@
 import os
-import json
 import pytest
 
 
-def test_yaml_list_converted_to_json(tmp_path, monkeypatch):
+def test_yaml_list_is_loaded_without_mutating_environment(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text(
         "key_models:\n  - gpt-4\n  - gpt-3.5-turbo\n"
     )
@@ -13,13 +12,16 @@ def test_yaml_list_converted_to_json(tmp_path, monkeypatch):
 
     import app.config as cfg_module
     monkeypatch.setattr(cfg_module, "_BACKEND_DIR", tmp_path)
-    cfg_module._load_yaml_config()
+    configured = cfg_module.Settings(
+        litellm_master_key="sk-test",
+        jwt_secret="x" * 32,
+    )
 
-    parsed = json.loads(os.environ["KEY_MODELS"])
-    assert parsed == ["gpt-4", "gpt-3.5-turbo"]
+    assert configured.key_models_list == ["gpt-4", "gpt-3.5-turbo"]
+    assert "KEY_MODELS" not in os.environ
 
 
-def test_yaml_mapping_converted_to_json(tmp_path, monkeypatch):
+def test_yaml_mapping_is_loaded_as_structured_data(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text(
         "oidc_group_team_mapping:\n"
         "  Engineering: team-engineering\n"
@@ -31,25 +33,27 @@ def test_yaml_mapping_converted_to_json(tmp_path, monkeypatch):
 
     import app.config as cfg_module
     monkeypatch.setattr(cfg_module, "_BACKEND_DIR", tmp_path)
-    cfg_module._load_yaml_config()
+    configured = cfg_module.Settings(
+        litellm_master_key="sk-test",
+        jwt_secret="x" * 32,
+    )
 
-    assert json.loads(os.environ["OIDC_GROUP_TEAM_MAPPING"]) == {
+    assert configured.oidc_group_team_mapping == {
         "Engineering": "team-engineering",
         "Platform": ["team-platform", "team-shared"],
     }
-    os.environ.pop("OIDC_GROUP_TEAM_MAPPING", None)
 
 
-def test_yaml_skips_keys_already_in_env(tmp_path, monkeypatch):
+def test_environment_takes_precedence_over_yaml(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text('litellm_master_key: "from-yaml"\n')
     monkeypatch.setenv("LITELLM_MASTER_KEY", "from-env")
     monkeypatch.setenv("JWT_SECRET", "x" * 32)
 
     import app.config as cfg_module
     monkeypatch.setattr(cfg_module, "_BACKEND_DIR", tmp_path)
-    cfg_module._load_yaml_config()
+    configured = cfg_module.Settings(jwt_secret="x" * 32)
 
-    assert os.environ["LITELLM_MASTER_KEY"] == "from-env"
+    assert configured.litellm_master_key == "from-env"
 
 
 def test_key_models_list_parses_json(monkeypatch):
