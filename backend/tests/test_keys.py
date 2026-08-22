@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models import CurrentUser
+from app.models import CurrentUser, KeyDeleteRequest
 from app.rate_limit import _key_ops
-from app.routers.keys import create_key, regenerate_key
+from app.routers.keys import create_key, delete_key, regenerate_key
 
 
 def setup_function():
@@ -83,3 +83,19 @@ async def test_regenerate_rolls_back_new_key_when_old_key_delete_fails():
         await regenerate_key(user)
 
     assert [call.args[0] for call in delete.await_args_list] == ["sk-old", "sk-new"]
+
+
+@pytest.mark.asyncio
+async def test_delete_key_accepts_secret_in_request_body():
+    user = CurrentUser(user_id="user-1", email="user@example.com")
+    with (
+        patch(
+            "app.routers.keys.llm.list_user_keys",
+            new=AsyncMock(return_value=[{"token": "sk-owned"}]),
+        ),
+        patch("app.routers.keys.llm.delete_key", new=AsyncMock()) as delete,
+    ):
+        result = await delete_key(KeyDeleteRequest(key="sk-owned"), user)
+
+    assert result == {"deleted": True}
+    delete.assert_awaited_once_with("sk-owned")

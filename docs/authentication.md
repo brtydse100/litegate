@@ -115,7 +115,8 @@ when unmapped SSO users should retain the global key defaults.
 
 | Credential | Header | Authorization |
 | --- | --- | --- |
-| Portal JWT | `Authorization: Bearer <portal-token>` | Personal operations for users; admin operations only when the session role is `admin` |
+| Browser session | HttpOnly `litegate_session` cookie (automatic) | Personal operations for users; admin operations only when the session role is `admin` |
+| Portal JWT (compatibility) | `Authorization: Bearer <portal-token>` | Existing API clients may continue sending a portal token as a bearer credential |
 | LiteLLM key | `Authorization: Bearer <litellm-key>` | Identify and inspect that exact key; no bulk editing |
 | Management key | `X-API-Key: <management-key>` | Administrator access for trusted automation |
 
@@ -135,10 +136,15 @@ virtual key cannot authorize `PATCH /api/v1/keys/bulk`.
 
 ## Security behavior
 
-- Signed OIDC state values expire after ten minutes.
-- OIDC ID tokens are verified for signing key, issuer, audience, and expiration.
-- The portal token is returned in a URL fragment, keeping it out of Nginx access
-  logs.
+- Signed OIDC state values expire after ten minutes and are bound to the browser
+  with an HttpOnly, SameSite cookie.
+- OIDC ID tokens are verified for signing key, issuer, audience, expiration, and
+  the per-login nonce. Discovery and signing keys are cached, with an automatic
+  refresh when an identity provider rotates its signing key.
+- Repeated failed password sign-ins from one client are temporarily throttled.
+- New portal sessions stay in an HttpOnly, SameSite cookie. The JWT is not placed
+  in a redirect URL or browser-readable storage; explicit sign-out clears it.
+  Cookie-authenticated mutations also reject unapproved cross-site origins.
 - Secret comparisons use constant-time comparison where applicable.
 - Local authentication performs a dummy hash for unknown users.
 - Local role and active state are checked on every authenticated request.

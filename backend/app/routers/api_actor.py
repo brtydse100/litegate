@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from fastapi import Depends, Header, HTTPException
+from fastapi import Cookie
 from fastapi.security import HTTPAuthorizationCredentials
 from jwt import InvalidTokenError
 
@@ -28,6 +29,7 @@ class ApiActor:
 async def get_api_actor(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+    session_cookie: Optional[str] = Cookie(default=None, alias="litegate_session"),
 ) -> ApiActor:
     if x_api_key and settings.management_api_key and hmac.compare_digest(x_api_key, settings.management_api_key):
         return ApiActor(CurrentUser(user_id="api:management", email="management-api@local", role="admin", auth_source="management_api_key"))
@@ -39,6 +41,11 @@ async def get_api_actor(
             info = await llm.get_key_info(token)
             if info is not None:
                 return ApiActor(CurrentUser(user_id=info.get("user_id") or "key-holder", email="", role="user", auth_source="litellm_key"), proof_key=token)
+    if session_cookie:
+        try:
+            return ApiActor(enforce_account_state(decode_portal_token(session_cookie)))
+        except InvalidTokenError:
+            pass
     raise HTTPException(status_code=401, detail="Valid portal token, management key, or LiteLLM key required")
 
 

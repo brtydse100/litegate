@@ -111,8 +111,9 @@ ReDoc at `/api/redoc` and the OpenAPI document at `/api/openapi.json`.
 
 ## Security
 
-LiteGate verifies OIDC token signatures and claims, uses short-lived signed OIDC
-state, and stores local passwords as salted PBKDF2-SHA256 hashes. Account status
+LiteGate verifies OIDC token signatures and claims, uses browser-bound signed OIDC
+state, keeps portal sessions in HttpOnly cookies, and stores local passwords as
+salted PBKDF2-SHA256 hashes. Account status
 and local roles are rechecked on authenticated requests. Key-changing operations
 and administrative mutations are rate limited with disabled controls during
 cooldowns, credential regeneration carries prior key spend, bulk updates use

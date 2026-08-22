@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 from typing import Optional, List
 import json
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent  # …/backend/
@@ -168,6 +169,24 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.cors_origins.split(",")]
+
+    @property
+    def security_warnings(self) -> List[str]:
+        """Return actionable deployment warnings without making local development fail."""
+        warnings: List[str] = []
+        normalized_secret = self.jwt_secret.strip().casefold()
+        if len(self.jwt_secret) < 32 or "change-me" in normalized_secret or normalized_secret == "changeme":
+            warnings.append("JWT_SECRET should be a unique random value of at least 32 characters.")
+        if self.local_auth_enabled:
+            normalized_password = (self.local_auth_password or "").strip().casefold()
+            if len(self.local_auth_password or "") < 12 or normalized_password in {"changeme", "change-me", "password"}:
+                warnings.append("The bootstrap local administrator password is weak or still uses a placeholder.")
+        if self.management_api_key and len(self.management_api_key) < 32:
+            warnings.append("MANAGEMENT_API_KEY should contain at least 32 random characters.")
+        hostname = (urlparse(self.root_url).hostname or "").casefold()
+        if not self.root_url.casefold().startswith("https://") and hostname not in {"localhost", "127.0.0.1", "::1"}:
+            warnings.append("ROOT_URL should use HTTPS outside local development.")
+        return warnings
 
 
 settings = Settings()

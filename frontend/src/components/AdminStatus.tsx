@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, CheckCircle2, Database, RefreshCw, Server, XCircle } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Database, RefreshCw, Server, XCircle } from "lucide-react";
 import { api } from "../api/client";
 
 function StatusCard({ name, detail, ok, icon }: { name: string; detail: string; ok: boolean; icon: React.ReactNode }) {
@@ -28,6 +28,7 @@ export default function AdminStatus() {
       <StatusCard name="Local account database" ok={status.data?.dependencies.database.ok ?? false} detail={status.isLoading ? "Checking storage..." : status.data?.dependencies.database.detail ?? "Status unavailable"} icon={<Database size={17} />} />
     </div>
     {status.data && <p className={`rounded-lg border px-4 py-3 text-sm ${status.data.ready ? "border-green-500/20 bg-green-500/5 text-green-300" : "border-red-500/20 bg-red-500/5 text-red-300"}`}>{status.data.ready ? "LiteGate is ready to serve requests." : "LiteGate is running, but one or more required dependencies are unavailable."} Storage mode: {status.data.storage_mode}.</p>}
+    {(status.data?.security_warnings ?? []).length ? <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4"><h2 className="flex items-center gap-2 text-sm font-medium text-amber-200"><AlertTriangle size={16} /> Deployment security warnings</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-amber-100/70">{status.data?.security_warnings?.map(warning => <li key={warning}>{warning}</li>)}</ul></div> : null}
 
     <div className="overflow-hidden rounded-xl border border-[#2A2E42] bg-[#1A1D27]">
       <div className="border-b border-[#2A2E42] px-4 py-3"><h2 className="text-sm font-medium text-gray-200">Administrator audit history</h2><p className="mt-1 text-xs text-gray-500">Secrets are redacted; bulk operations store counts instead of key identifiers.</p></div>

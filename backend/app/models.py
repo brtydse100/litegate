@@ -37,6 +37,15 @@ class KeyCreateResponse(BaseModel):
     expires: Optional[datetime] = None
 
 
+class KeyDeleteRequest(BaseModel):
+    key: str = Field(min_length=1, max_length=512)
+
+    @field_validator("key", mode="before")
+    @classmethod
+    def clean_key(cls, value: str) -> str:
+        return value.strip()
+
+
 class SpendLog(BaseModel):
     request_id: Optional[str] = None
     call_type: Optional[str] = None

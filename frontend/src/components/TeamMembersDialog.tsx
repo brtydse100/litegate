@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, KeyRound, Search, ShieldAlert, UserRound, X } from "lucide-react";
 import { api } from "../api/client";
+import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import type { TeamInfo, TeamMember } from "../types";
 
 const fieldClass = "w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none";
@@ -14,6 +15,7 @@ export default function TeamMembersDialog({ team, pending, operationsBlocked, er
   onClose: () => void;
   onMove: (userId: string, destinationTeamId: string) => void;
 }) {
+  useDialogDismiss(onClose, pending);
   const [selected, setSelected] = useState<TeamMember | null>(null);
   const [destinationId, setDestinationId] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -38,7 +40,7 @@ export default function TeamMembersDialog({ team, pending, operationsBlocked, er
     setSearch(searchInput.trim());
   }
 
-  return <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="team-members-title">
+  return <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="team-members-title" onMouseDown={event => { if (event.target === event.currentTarget && !pending) onClose(); }}>
     <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[#2A2E42] bg-[#1A1D27] p-5 shadow-2xl">
       <div className="flex items-start justify-between gap-4">
         <div><h3 id="team-members-title" className="text-lg font-semibold text-white">Members of {team.team_alias || team.team_id}</h3><p className="mt-1 font-mono text-[11px] text-gray-600">{team.team_id}</p></div>

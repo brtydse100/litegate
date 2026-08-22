@@ -132,3 +132,36 @@ def test_group_team_mapping_supports_single_string_claim_and_team():
     )
 
     assert configured.mapped_team_ids({"groups": "research"}) == ["team-research"]
+
+
+def test_security_warnings_flag_weak_remote_deployment_settings():
+    from app.config import Settings
+
+    configured = Settings(
+        litellm_master_key="sk-test",
+        jwt_secret="change-me",
+        root_url="http://litegate.example.com",
+        local_auth_username="admin",
+        local_auth_password="changeme",
+        management_api_key="short-key",
+    )
+
+    warnings = configured.security_warnings
+    assert len(warnings) == 4
+    assert any("JWT_SECRET" in warning for warning in warnings)
+    assert any("HTTPS" in warning for warning in warnings)
+
+
+def test_security_warnings_accept_strong_local_settings():
+    from app.config import Settings
+
+    configured = Settings(
+        litellm_master_key="sk-test",
+        jwt_secret="x" * 32,
+        root_url="http://localhost:8080",
+        local_auth_username="admin",
+        local_auth_password="a-strong-local-password",
+        management_api_key="m" * 32,
+    )
+
+    assert configured.security_warnings == []

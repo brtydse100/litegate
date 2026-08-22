@@ -6,7 +6,7 @@ Interactive OpenAPI documentation is available at `/api/docs` on every LiteGate 
 
 Use one of these credentials:
 
-1. A portal session JWT as `Authorization: Bearer <portal-token>`.
+1. The HttpOnly portal session cookie automatically used by the browser. Existing clients may also send a portal JWT as `Authorization: Bearer <portal-token>`.
 2. A LiteLLM virtual key as `Authorization: Bearer <litellm-key>`. It can identify and inspect only itself; it cannot bulk-edit keys.
 3. The optional `management_api_key` as `X-API-Key: <management-key>`. It has admin access and should be stored like a password.
 
@@ -68,6 +68,17 @@ curl -X POST https://litegate.example.com/api/v1/keys \
   -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY" \
   -H "Content-Type: application/json" \
   -d '{"user_id":"automation:ci","email":"ci@example.com"}'
+```
+
+Delete a key without placing the credential in the URL (where proxy logs could
+capture it). A virtual key may delete itself; portal users may delete their own
+keys; administrators and the management API may delete any key:
+
+```bash
+curl -X DELETE https://litegate.example.com/api/v1/keys \
+  -H "Authorization: Bearer $TOKEN_OR_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"key":"sk-key-to-delete"}'
 ```
 
 Bulk-edit key settings as an administrator. This endpoint requires an admin portal session or the management API key:

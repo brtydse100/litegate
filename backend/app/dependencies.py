@@ -1,4 +1,5 @@
 ﻿from fastapi import Depends, HTTPException, status
+from fastapi import Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 from jwt import InvalidTokenError
@@ -7,6 +8,7 @@ from app.models import CurrentUser
 from app.services import local_users
 
 bearer = HTTPBearer(auto_error=False)
+_SESSION_COOKIE = "litegate_session"
 
 
 def decode_portal_token(token: str) -> CurrentUser:
@@ -50,11 +52,13 @@ def enforce_account_state(current_user: CurrentUser) -> CurrentUser:
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    session_cookie: str | None = Cookie(default=None, alias=_SESSION_COOKIE),
 ) -> CurrentUser:
-    if credentials is None:
+    token = credentials.credentials if credentials is not None else session_cookie
+    if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     try:
-        return enforce_account_state(decode_portal_token(credentials.credentials))
+        return enforce_account_state(decode_portal_token(token))
     except InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 

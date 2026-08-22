@@ -22,7 +22,7 @@ async function mockApi(page: Page, role: "admin" | "user") {
     else if (url.pathname === "/api/keys") body = { keys: [] };
     else if (url.pathname === "/api/v1/keys/identifiers") body = { keys: ["key-1", "key-2"], total: 2 };
     else if (url.pathname === "/api/v1/keys") body = keyPage;
-    else if (url.pathname === "/api/v1/status") body = { ready: true, dependencies: { litellm: { ok: true, detail: "Connected" }, database: { ok: true, detail: "Writable" } }, storage_mode: "sqlite-single-replica" };
+    else if (url.pathname === "/api/v1/status") body = { ready: true, dependencies: { litellm: { ok: true, detail: "Connected" }, database: { ok: true, detail: "Writable" } }, storage_mode: "sqlite-single-replica", security_warnings: [] };
     else if (url.pathname === "/api/v1/audit-events") body = { events: [] };
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });

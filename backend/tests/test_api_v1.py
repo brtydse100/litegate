@@ -3,11 +3,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.models import ApiKeyCreateRequest, BulkKeyUpdateRequest, CurrentUser
+from app.models import ApiKeyCreateRequest, BulkKeyUpdateRequest, CurrentUser, KeyDeleteRequest
 from app.rate_limit import _key_ops
 from app.routers.api_v1 import (
     ApiActor,
     api_create_key,
+    api_delete_key,
     api_list_key_identifiers,
     api_me,
     bulk_update_keys,
@@ -132,3 +133,19 @@ async def test_admin_api_does_not_apply_own_team_to_another_user():
         await api_create_key(payload, actor)
 
     generate.assert_awaited_once_with("other-user", "other@example.com", None)
+
+
+@pytest.mark.asyncio
+async def test_litellm_key_can_delete_itself_but_not_another_key():
+    actor = ApiActor(
+        CurrentUser(user_id="user-1", email="", auth_source="litellm_key"),
+        proof_key="sk-self",
+    )
+    with patch("app.routers.api_v1.llm.delete_key", new=AsyncMock()) as delete:
+        result = await api_delete_key(KeyDeleteRequest(key="sk-self"), actor)
+        with pytest.raises(HTTPException) as exc:
+            await api_delete_key(KeyDeleteRequest(key="sk-other"), actor)
+
+    assert result == {"deleted": True}
+    assert exc.value.status_code == 403
+    delete.assert_awaited_once_with("sk-self")

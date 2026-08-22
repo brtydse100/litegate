@@ -2,6 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
@@ -32,10 +33,32 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
+
+
+@app.middleware("http")
+async def protect_cookie_sessions_from_csrf(request: Request, call_next):
+    """Reject cross-site mutations authenticated only by the portal cookie."""
+    if (
+        request.method in {"POST", "PUT", "PATCH", "DELETE"}
+        and request.cookies.get("litegate_session")
+        and not request.headers.get("authorization")
+        and not request.headers.get("x-api-key")
+    ):
+        origin = request.headers.get("origin", "").rstrip("/")
+        request_host = request.headers.get("host", "").casefold()
+        origin_host = ""
+        if "://" in origin:
+            origin_host = origin.split("://", 1)[1].split("/", 1)[0].casefold()
+        configured_origins = {value.rstrip("/") for value in settings.cors_origins_list}
+        if origin and origin_host != request_host and origin not in configured_origins:
+            return JSONResponse({"detail": "Cross-site mutation rejected"}, status_code=403)
+        if not origin and request.headers.get("sec-fetch-site", "").casefold() == "cross-site":
+            return JSONResponse({"detail": "Cross-site mutation rejected"}, status_code=403)
+    return await call_next(request)
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(keys.router, prefix="/api")

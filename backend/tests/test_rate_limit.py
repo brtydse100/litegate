@@ -1,10 +1,21 @@
 import pytest
 from fastapi import HTTPException
-from app.rate_limit import check_key_rate_limit, key_rate_limit_status, _key_ops, _MAX_KEY_OPS
+from app.rate_limit import (
+    _login_failures,
+    _MAX_KEY_OPS,
+    _MAX_LOGIN_FAILURES,
+    _key_ops,
+    check_key_rate_limit,
+    check_login_rate_limit,
+    clear_login_failures,
+    key_rate_limit_status,
+    record_login_failure,
+)
 
 
 def setup_function():
     _key_ops.clear()
+    _login_failures.clear()
 
 
 def test_allows_ops_under_limit():
@@ -39,3 +50,19 @@ def test_window_expiry(monkeypatch):
 
     fake_now[0] = rl._KEY_WINDOW + 1.0
     rl.check_key_rate_limit("user-e")  # old entries expired — must not raise
+
+
+def test_failed_logins_are_throttled_and_success_clears_them():
+    client_id = "192.0.2.10"
+    for _ in range(_MAX_LOGIN_FAILURES):
+        check_login_rate_limit(client_id)
+        record_login_failure(client_id)
+
+    with pytest.raises(HTTPException) as exc:
+        check_login_rate_limit(client_id)
+
+    assert exc.value.status_code == 429
+    assert int(exc.value.headers["Retry-After"]) > 0
+
+    clear_login_failures(client_id)
+    check_login_rate_limit(client_id)

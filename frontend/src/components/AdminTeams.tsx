@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Edit3, Plus, Search, ShieldAlert, Trash2, Users, X } from "lucide-react";
 import { api } from "../api/client";
+import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import type { TeamCreatePayload, TeamInfo, TeamUpdatePayload } from "../types";
 import TeamMembersDialog from "./TeamMembersDialog";
@@ -27,6 +28,7 @@ function TeamEditor({ state, pending, operationsBlocked, error, onClose, onCreat
   onCreate: (payload: TeamCreatePayload) => void;
   onUpdate: (teamId: string, payload: TeamUpdatePayload) => void;
 }) {
+  useDialogDismiss(onClose, pending);
   const existing = state.mode === "edit" ? state.team : null;
   const [alias, setAlias] = useState(existing?.team_alias ?? "");
   const [teamId, setTeamId] = useState(existing?.team_id ?? "");
@@ -65,7 +67,7 @@ function TeamEditor({ state, pending, operationsBlocked, error, onClose, onCreat
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="team-editor-title">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="team-editor-title" onMouseDown={event => { if (event.target === event.currentTarget && !pending) onClose(); }}>
       <form onSubmit={submit} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#2A2E42] bg-[#1A1D27] p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div><h3 id="team-editor-title" className="text-lg font-semibold text-white">{state.mode === "create" ? "Create team" : "Edit team"}</h3><p className="mt-1 text-xs text-gray-500">Models left empty means all models. Blank numeric limits remove the limit when editing.</p></div>
@@ -90,7 +92,8 @@ function TeamEditor({ state, pending, operationsBlocked, error, onClose, onCreat
 
 function DeleteTeamDialog({ team, pending, operationsBlocked, error, onClose, onDelete }: { team: TeamInfo; pending: boolean; operationsBlocked: boolean; error?: string; onClose: () => void; onDelete: () => void }) {
   const [confirmation, setConfirmation] = useState("");
-  return <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-team-title">
+  useDialogDismiss(onClose, pending);
+  return <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-team-title" onMouseDown={event => { if (event.target === event.currentTarget && !pending) onClose(); }}>
     <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-[#1A1D27] p-5 shadow-2xl">
       <div className="flex items-start gap-3"><div className="rounded-lg bg-red-500/10 p-2 text-red-400"><ShieldAlert size={20} /></div><div className="min-w-0 flex-1"><h3 id="delete-team-title" className="font-semibold text-white">Delete {team.team_alias || team.team_id}?</h3><p className="mt-1 text-xs leading-5 text-gray-400">LiteLLM deletes this team and its team-scoped API keys. This cannot be undone by LiteGate.</p></div><button onClick={onClose} aria-label="Close delete dialog" className="text-gray-500 hover:text-white"><X size={18} /></button></div>
       <label className="mt-4 block space-y-1 text-xs text-gray-400"><span>Type <code className="text-red-300">{team.team_id}</code> to confirm</span><input autoFocus className={inputClass} value={confirmation} onChange={event => setConfirmation(event.target.value)} /></label>

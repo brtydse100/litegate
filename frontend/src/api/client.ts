@@ -4,7 +4,7 @@ function getToken(): string | null {
   return localStorage.getItem("token");
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, redirectOnUnauthorized = true): Promise<T> {
   const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -14,7 +14,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...(init.headers ?? {}),
     },
   });
-  if (res.status === 401) {
+  if (res.status === 401 && redirectOnUnauthorized) {
     localStorage.removeItem("token");
     window.location.href = "/login";
     throw new Error("Unauthorized");
@@ -30,7 +30,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  me: () => request<import("../types").User>("/auth/me"),
+  me: () => request<import("../types").User>("/auth/me", {}, false),
+
+  logout: () => request<{ signed_out: boolean }>("/auth/logout", { method: "POST" }, false),
 
   listKeys: () => request<{ keys: import("../types").KeyInfo[] }>("/keys"),
 
@@ -66,8 +68,9 @@ export const api = {
     request<import("../types").KeyCreateResponse>("/keys/regenerate", { method: "POST" }),
 
   deleteKey: (key: string) =>
-    request<{ deleted: boolean }>(`/keys/${encodeURIComponent(key)}`, {
+    request<{ deleted: boolean }>("/keys", {
       method: "DELETE",
+      body: JSON.stringify({ key }),
     }),
 
   bulkUpdateKeys: (keys: string[], settings: import("../types").KeySettingsUpdate) =>
@@ -76,16 +79,16 @@ export const api = {
       body: JSON.stringify({ keys, settings }),
     }),
 
-  listUsers: () => request<import("../types").LocalUser[]>("/users"),
+  listUsers: () => request<import("../types").LocalUser[]>("/v1/users"),
 
   createUser: (payload: { username: string; email: string; password: string; role: "user" | "admin" }) =>
-    request<import("../types").LocalUser>("/users", {
+    request<import("../types").LocalUser>("/v1/users", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
 
   updateUser: (username: string, payload: { email?: string; password?: string; role?: "user" | "admin"; active?: boolean }) =>
-    request<import("../types").LocalUser>(`/users/${encodeURIComponent(username)}`, {
+    request<import("../types").LocalUser>(`/v1/users/${encodeURIComponent(username)}`, {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),

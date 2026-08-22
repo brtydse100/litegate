@@ -5,8 +5,8 @@ import type { User } from "../types";
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (token: string) => Promise<void>;
-  logout: () => void;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -16,12 +16,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
       setUser(await api.me());
@@ -37,14 +31,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void loadUser();
   }, [loadUser]);
 
-  const login = useCallback(async (token: string) => {
-    localStorage.setItem("token", token);
+  const login = useCallback(async () => {
+    localStorage.removeItem("token");
     await loadUser();
   }, [loadUser]);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem("token");
-    setUser(null);
+  const logout = useCallback(async () => {
+    try {
+      await api.logout();
+    } finally {
+      localStorage.removeItem("token");
+      setUser(null);
+    }
   }, []);
 
   const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout]);

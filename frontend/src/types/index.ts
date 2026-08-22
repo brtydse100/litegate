@@ -82,6 +82,7 @@ export interface SystemStatus {
     database: DependencyStatus;
   };
   storage_mode: string;
+  security_warnings?: string[];
 }
 
 export interface AuditEvent {

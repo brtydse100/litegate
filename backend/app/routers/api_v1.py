@@ -10,6 +10,7 @@ from app.models import (
     ApiKeyCreateRequest,
     BulkKeyUpdateRequest,
     KeyCreateResponse,
+    KeyDeleteRequest,
     TeamCreateRequest,
     TeamMemberMoveRequest,
     TeamUpdateRequest,
@@ -130,6 +131,26 @@ async def api_create_key(
     return KeyCreateResponse(
         key=result["key"], user_id=result.get("user_id", user_id), expires=result.get("expires")
     )
+
+
+@router.delete("/keys")
+async def api_delete_key(payload: KeyDeleteRequest, actor: ApiActor = Depends(get_api_actor)):
+    """Delete a key while keeping the credential out of URLs and access logs."""
+    if actor.proof_key:
+        if payload.key != actor.proof_key:
+            raise HTTPException(status_code=403, detail="A LiteLLM key can only delete itself")
+    elif not actor.is_admin:
+        owned = {
+            key.get("token") or key.get("api_key") or key.get("key")
+            for key in await llm.list_user_keys(actor.user.user_id)
+        }
+        if payload.key not in owned:
+            raise HTTPException(status_code=403, detail="Key not owned by user")
+    check_key_rate_limit(actor.user.user_id)
+    await llm.delete_key(payload.key)
+    if actor.is_admin:
+        await _record_audit(actor, "key.delete", "installation-key")
+    return {"deleted": True}
 
 
 @router.patch("/keys/bulk")

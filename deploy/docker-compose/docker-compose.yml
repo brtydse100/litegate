@@ -1,5 +1,6 @@
 services:
   litegate:
+    restart: unless-stopped
     build:
       context: ../..
       dockerfile: deploy/docker-compose/Dockerfile

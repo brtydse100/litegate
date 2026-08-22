@@ -4,6 +4,7 @@ import asyncio
 
 from fastapi import APIRouter, Depends, Query
 
+from app.config import settings
 from app.routers.api_actor import ApiActor, get_api_actor, require_api_admin
 from app.services import audit, litellm as llm, local_users
 
@@ -20,6 +21,7 @@ async def api_status(actor: ApiActor = Depends(get_api_actor)):
         "ready": bool(litellm_status["ok"] and database_status["ok"]),
         "dependencies": {"litellm": litellm_status, "database": database_status},
         "storage_mode": "sqlite-single-replica",
+        "security_warnings": settings.security_warnings,
     }
 
 

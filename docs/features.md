@@ -119,7 +119,8 @@ paginated to avoid loading every key at once.
 - The included Helm chart supports a persistent volume claim.
 - Separate liveness and dependency-aware readiness endpoints are available at
   `/api/health/live` and `/api/health/ready`.
-- The administrator **Status** tab shows LiteLLM/database readiness and a
+- The administrator **Status** tab shows LiteLLM/database readiness, actionable
+  deployment-security warnings, and a
   secret-safe audit history of management changes.
 - Administrators can configure a logo, LiteLLM model-hub link, and support link.
 

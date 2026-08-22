@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -11,7 +11,7 @@ async function fetchAuthConfig(): Promise<AuthConfig> {
   return r.json();
 }
 
-async function localLogin(username: string, password: string): Promise<string> {
+async function localLogin(username: string, password: string): Promise<void> {
   const body = new FormData();
   body.append("username", username);
   body.append("password", password);
@@ -20,13 +20,12 @@ async function localLogin(username: string, password: string): Promise<string> {
     const err = await r.json().catch(() => ({ detail: "Login failed" }));
     throw new Error(err.detail ?? "Login failed");
   }
-  const { token } = await r.json();
-  return token;
+  await r.json();
 }
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -42,13 +41,17 @@ export default function Login() {
   const showLocal = !isLoading && cfg?.local_enabled;
   const showDivider = showSso && showLocal;
 
+  useEffect(() => {
+    if (user) navigate("/", { replace: true });
+  }, [navigate, user]);
+
   async function handleLocal(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSubmitting(true);
     try {
-      const token = await localLogin(username, password);
-      await login(token);
+      await localLogin(username, password);
+      await login();
       navigate("/", { replace: true });
     } catch (err) {
       setError((err as Error).message);

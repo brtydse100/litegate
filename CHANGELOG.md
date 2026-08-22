@@ -14,6 +14,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Administrator status and audit views expose dependency readiness and secret-safe management history.
 - Dedicated liveness/readiness probes, frontend unit/browser tests, and pull-request CI cover backend, frontend, Helm, documentation, version alignment, and container builds.
 - Tag-driven GitHub release automation publishes the matching checked-in release note.
+- Password login now throttles repeated failures per client, and OIDC login binds state to an HttpOnly browser cookie and verifies the ID-token nonce.
 
 ### Changed
 
@@ -22,6 +23,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Standardized the release-note pages and repaired the malformed published 2.4.0 release body.
 - Reused a pooled LiteLLM HTTP client, made YAML configuration side-effect free, replaced the password-reset browser prompt with an accessible dialog, and consolidated production packaging on the all-in-one non-root image.
 - Helm now enforces the supported single-replica SQLite/in-process state model and uses separate liveness/readiness probes.
+- Local source-build Compose deployments now restart automatically after a host reboot, and the frontend clears SSO credentials from the URL immediately after reading them.
+- Team dialogs now close consistently with Escape or a backdrop click and prevent background-page scrolling while open; the Status tab also flags weak deployment secrets or non-local HTTP configuration.
+- Key deletion now sends credentials in the request body instead of the URL, preventing reverse-proxy access logs from capturing full virtual keys; cross-origin methods and headers are explicitly limited.
+- A top-level recovery screen prevents an unexpected frontend render error from leaving administrators on a blank page.
+- New SSO and password sessions use SameSite, HttpOnly cookies instead of browser-readable local storage; bearer authentication remains available for API clients and existing sessions.
+- Cookie-authenticated mutations reject unapproved cross-site origins to retain CSRF protection after the session-storage change.
+- The bundled Nginx proxy preserves the original host port, keeping origin checks correct on non-default development and production ports.
 
 ## [2.4.0] - 2026-08-20
 

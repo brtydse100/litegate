@@ -118,7 +118,7 @@ export default function Home() {
             {user?.team_ids?.length ? <span className="hidden max-w-56 items-center gap-1 rounded-full bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-300 lg:flex" title={user.team_ids.join(", ")}><Building2 size={10} /><span className="truncate">{user.team_ids[0]}{user.team_ids.length > 1 ? ` +${user.team_ids.length - 1}` : ""}</span></span> : null}
             {isAdmin && <span className="hidden items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-1 text-[10px] text-indigo-300 sm:flex"><Shield size={10} /> Admin</span>}
             <span className="hidden max-w-52 truncate text-xs text-gray-500 md:block">{user?.email}</span>
-            <button onClick={logout} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white"><LogOut size={14} /> Sign out</button>
+            <button onClick={() => { void logout(); }} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white"><LogOut size={14} /> Sign out</button>
           </div>
         </div>
       </header>

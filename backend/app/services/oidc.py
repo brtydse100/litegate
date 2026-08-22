@@ -11,6 +11,8 @@ from app.config import settings
 
 _discovery_cache: Optional[dict] = None
 _discovery_cache_time: float = 0.0
+_jwks_cache: Optional[dict] = None
+_jwks_cache_time: float = 0.0
 _DISCOVERY_TTL = 3600.0  # re-fetch OIDC config at most once per hour
 _signer = None
 
@@ -50,6 +52,15 @@ def validate_state(state: str) -> bool:
         return False
 
 
+def state_nonce(state: str) -> str:
+    try:
+        payload = _get_signer().loads(state, max_age=600)
+        nonce = payload.get("nonce", "") if isinstance(payload, dict) else ""
+        return nonce if isinstance(nonce, str) else ""
+    except (BadSignature, SignatureExpired):
+        return ""
+
+
 async def get_authorization_url(state: str) -> str:
     discovery = await get_discovery()
     params = {
@@ -58,6 +69,7 @@ async def get_authorization_url(state: str) -> str:
         "redirect_uri": settings.oidc_redirect_uri,
         "scope": settings.oidc_scopes,
         "state": state,
+        "nonce": state_nonce(state),
     }
     return f"{discovery['authorization_endpoint']}?{urlencode(params)}"
 
@@ -80,15 +92,21 @@ async def exchange_code(code: str) -> dict:
         return r.json()
 
 
-async def get_jwks() -> dict:
+async def get_jwks(force_refresh: bool = False) -> dict:
+    global _jwks_cache, _jwks_cache_time
+    now = time.monotonic()
+    if not force_refresh and _jwks_cache is not None and now - _jwks_cache_time < _DISCOVERY_TTL:
+        return _jwks_cache
     discovery = await get_discovery()
     async with httpx.AsyncClient() as client:
         r = await client.get(discovery["jwks_uri"], timeout=10)
         r.raise_for_status()
-        return r.json()
+        _jwks_cache = r.json()
+        _jwks_cache_time = now
+        return _jwks_cache
 
 
-async def verify_id_token(id_token: str) -> dict:
+async def verify_id_token(id_token: str, expected_nonce: str = "") -> dict:
     jwks = await get_jwks()
     discovery = await get_discovery()
 
@@ -96,11 +114,27 @@ async def verify_id_token(id_token: str) -> dict:
     header = jwt.get_unverified_header(id_token)
     kid = header.get("kid")
     keys = jwks.get("keys", [jwks])
-    key = next((k for k in keys if k.get("kid") == kid), None) if kid else None
-    if key is None:
+    if not isinstance(keys, list) or not keys or not all(isinstance(key, dict) for key in keys):
+        raise jwt.InvalidTokenError("OIDC provider returned no usable signing keys")
+    if kid:
+        key = next((key for key in keys if key.get("kid") == kid), None)
+        if key is None:
+            # Providers rotate keys. Retry once without the cache before rejecting
+            # a token whose key ID is not present in the cached key set.
+            refreshed = await get_jwks(force_refresh=True)
+            refreshed_keys = refreshed.get("keys", [refreshed])
+            key = next(
+                (candidate for candidate in refreshed_keys if isinstance(candidate, dict) and candidate.get("kid") == kid),
+                None,
+            )
+            if key is None:
+                raise jwt.InvalidTokenError("OIDC signing key not found")
+    elif len(keys) == 1:
         key = keys[0]
+    else:
+        raise jwt.InvalidTokenError("OIDC token did not identify a signing key")
 
-    return jwt.decode(
+    claims = jwt.decode(
         id_token,
         jwt.PyJWK.from_dict(key),
         algorithms=["RS256"],
@@ -108,3 +142,6 @@ async def verify_id_token(id_token: str) -> dict:
         issuer=discovery.get("issuer", settings.oidc_issuer_url),
         options={"verify_exp": True},
     )
+    if expected_nonce and not secrets.compare_digest(str(claims.get("nonce", "")), expected_nonce):
+        raise jwt.InvalidTokenError("OIDC nonce mismatch")
+    return claims
