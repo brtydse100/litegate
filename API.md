@@ -220,6 +220,21 @@ curl "https://litegate.example.com/api/v1/audit-events?limit=100" \
   -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
 ```
 
+Scrape low-cardinality Prometheus metrics. This endpoint is administrator-only;
+configure the monitor to send the management key rather than putting it in the
+URL. Metrics never include request headers, query strings, bodies, user IDs, or
+key values.
+
+```bash
+curl https://litegate.example.com/api/v1/metrics \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY"
+```
+
+All API responses include `X-Request-ID`. A caller may supply a safe identifier
+using the same header; LiteGate replaces malformed or overlong values. The
+structured request log records that identifier, route template, method, status,
+duration, and client address without logging credentials or request payloads.
+
 Audit details redact credential-shaped fields and store only counts for bulk key
 targets. Public probes are `GET /api/health/live` for process liveness and
 `GET /api/health/ready` for LiteLLM plus database readiness; readiness returns

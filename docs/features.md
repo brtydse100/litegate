@@ -119,6 +119,11 @@ paginated to avoid loading every key at once.
 - The included Helm chart supports a persistent volume claim.
 - Separate liveness and dependency-aware readiness endpoints are available at
   `/api/health/live` and `/api/health/ready`.
+- Every response carries an `X-Request-ID`; secret-free structured request logs
+  use the same ID, and authenticated Prometheus metrics are available at
+  `/api/v1/metrics`.
+- The included maintenance command creates consistent SQLite backups, verifies
+  integrity, and preserves a safety copy before an explicitly confirmed restore.
 - The administrator **Status** tab shows LiteLLM/database readiness, actionable
   deployment-security warnings, and a
   secret-safe audit history of management changes.

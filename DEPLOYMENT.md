@@ -103,6 +103,40 @@ Use `/api/health/live` for liveness and `/api/health/ready` for traffic
 readiness. The readiness endpoint checks that LiteLLM accepts the configured
 master key and that the local SQLite database is writable.
 
+### Backup and restore the LiteGate database
+
+Do not copy the active SQLite file directly. Create a transactionally consistent
+and integrity-checked backup inside the running container:
+
+```bash
+docker compose exec litegate python -m app.maintenance backup \
+  /app/backend/data/litegate-backup.db
+docker compose exec litegate python -m app.maintenance verify \
+  /app/backend/data/litegate-backup.db
+```
+
+Copy the verified file to storage outside the container or volume. Test restores
+periodically. A restore must be performed while LiteGate is stopped; the command
+requires `--confirm` and saves the current database before replacing it:
+
+```bash
+docker compose stop litegate
+docker compose run --rm litegate python -m app.maintenance restore \
+  /app/backend/data/litegate-backup.db --confirm
+docker compose up -d
+```
+
+For Kubernetes, run the same module in a maintenance pod mounting the PVC, with
+the LiteGate deployment scaled down. Keep the generated `pre-restore` database
+until the restored service passes readiness and sign-in checks.
+
+### Rotate the session signing key
+
+Set the old `JWT_SECRET` as `JWT_PREVIOUS_SECRETS`, generate a new
+`JWT_SECRET`, and restart. After one full `JWT_EXPIRE_MINUTES` window, remove
+the previous value. Helm exposes these as `config.jwtSecret` and
+`config.jwtPreviousSecrets`.
+
 ### Offline usage
 
 Once built, the image contains everything it needs:
@@ -328,6 +362,7 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `litellm_master_key` | `LITELLM_MASTER_KEY` | *(required)* | LiteLLM master key |
 | `litellm_url` | `LITELLM_URL` | `http://localhost:4000` | LiteLLM proxy URL |
 | `jwt_secret` | `JWT_SECRET` | *(required)* | Session token secret (≥32 chars) |
+| `jwt_previous_secrets` | `JWT_PREVIOUS_SECRETS` | `""` | Comma-separated prior secrets accepted temporarily during rotation |
 | `root_url` | `ROOT_URL` | `http://localhost` | Portal public URL (used for SSO redirect) |
 | `oidc_issuer_url` | `OIDC_ISSUER_URL` | `""` | OIDC provider URL (blank = SSO disabled) |
 | `oidc_client_id` | `OIDC_CLIENT_ID` | `""` | OIDC client ID |

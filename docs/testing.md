@@ -24,7 +24,7 @@ passes. Refactoring private functions should not require contract changes.
 
 ```bash
 cd backend
-python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=75
 
 cd ../frontend
 npm test
@@ -34,4 +34,4 @@ npm run build
 
 CI also validates dependency audits, Markdown links, version alignment,
 Compose/Helm configuration, and the production Docker build. Backend line
-coverage may increase over time, but CI prevents it from falling below 70%.
+coverage may increase over time, but CI prevents it from falling below 75%.

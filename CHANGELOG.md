@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Authenticated Prometheus metrics, safe `X-Request-ID` propagation, and
+  secret-free structured request logs improve production observability.
+- Session secrets can be rotated without immediately invalidating existing
+  sessions by configuring verification-only prior secrets.
+- A maintenance command creates verified SQLite backups and requires an
+  explicit confirmation while preserving a safety copy before restoration.
+- Browser contracts now cover team creation/editing/deletion, safe member and
+  key movement, and local-account administration.
+- The backend CI coverage floor increased from 70% to 75% after public-route
+  coverage expanded.
 - Black-box HTTP contract tests now define session-cookie, logout, OIDC state/nonce, password-throttling, key-deletion, and administrator-boundary behavior through public routes.
 - A testing-strategy guide records that behavior changes start with a failing contract, while implementation refactors must not rewrite those contracts.
 - CI now measures backend coverage and rejects regressions below the initial 70% floor.

@@ -15,13 +15,27 @@ _jwks_cache: Optional[dict] = None
 _jwks_cache_time: float = 0.0
 _DISCOVERY_TTL = 3600.0  # re-fetch OIDC config at most once per hour
 _signer = None
+_signer_secret: Optional[str] = None
 
 
 def _get_signer() -> URLSafeTimedSerializer:
-    global _signer
-    if _signer is None:
+    global _signer, _signer_secret
+    if _signer is None or _signer_secret != settings.jwt_secret:
         _signer = URLSafeTimedSerializer(settings.jwt_secret)
+        _signer_secret = settings.jwt_secret
     return _signer
+
+
+def _load_state(state: str) -> dict:
+    last_error: BadSignature | SignatureExpired | None = None
+    for secret in settings.jwt_verification_secrets:
+        signer = _get_signer() if secret == settings.jwt_secret else URLSafeTimedSerializer(secret)
+        try:
+            payload = signer.loads(state, max_age=600)
+            return payload if isinstance(payload, dict) else {}
+        except (BadSignature, SignatureExpired) as exc:
+            last_error = exc
+    raise last_error or BadSignature("No state verification secret configured")
 
 
 async def get_discovery() -> dict:
@@ -46,7 +60,7 @@ def generate_state() -> str:
 
 def validate_state(state: str) -> bool:
     try:
-        _get_signer().loads(state, max_age=600)
+        _load_state(state)
         return True
     except (BadSignature, SignatureExpired):
         return False
@@ -54,8 +68,8 @@ def validate_state(state: str) -> bool:
 
 def state_nonce(state: str) -> str:
     try:
-        payload = _get_signer().loads(state, max_age=600)
-        nonce = payload.get("nonce", "") if isinstance(payload, dict) else ""
+        payload = _load_state(state)
+        nonce = payload.get("nonce", "")
         return nonce if isinstance(nonce, str) else ""
     except (BadSignature, SignatureExpired):
         return ""

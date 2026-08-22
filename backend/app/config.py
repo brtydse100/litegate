@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     oidc_require_team_mapping: bool = False
 
     jwt_secret: str
+    jwt_previous_secrets: str = ""
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440
 
@@ -107,6 +108,17 @@ class Settings(BaseSettings):
 
     def is_admin_email(self, email: str) -> bool:
         return bool(email) and email.strip().lower() in self.admin_emails_set
+
+    @property
+    def jwt_verification_secrets(self) -> List[str]:
+        """Current signing secret followed by prior verification-only secrets."""
+        values = [self.jwt_secret, *self.jwt_previous_secrets.split(",")]
+        secrets: List[str] = []
+        for value in values:
+            secret = value.strip()
+            if secret and secret not in secrets:
+                secrets.append(secret)
+        return secrets
 
     @property
     def admin_groups_set(self) -> set[str]:
@@ -177,6 +189,12 @@ class Settings(BaseSettings):
         normalized_secret = self.jwt_secret.strip().casefold()
         if len(self.jwt_secret) < 32 or "change-me" in normalized_secret or normalized_secret == "changeme":
             warnings.append("JWT_SECRET should be a unique random value of at least 32 characters.")
+        previous_secrets = [value.strip() for value in self.jwt_previous_secrets.split(",") if value.strip()]
+        if any(
+            len(secret) < 32 or "change-me" in secret.casefold() or secret.casefold() == "changeme"
+            for secret in previous_secrets
+        ):
+            warnings.append("JWT_PREVIOUS_SECRETS contains a weak or placeholder session secret.")
         if self.local_auth_enabled:
             normalized_password = (self.local_auth_password or "").strip().casefold()
             if len(self.local_auth_password or "") < 12 or normalized_password in {"changeme", "change-me", "password"}:

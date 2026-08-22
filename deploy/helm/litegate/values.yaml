@@ -41,6 +41,8 @@ config:
   # Required
   litellmMasterKey: "sk-your-litellm-master-key"
   jwtSecret: "change-me-min-32-chars-random-string"
+  # Verification-only prior secrets, comma-separated, for zero-downtime rotation.
+  jwtPreviousSecrets: ""
 
   # LiteLLM backend URL (reachable from inside the pod)
   litellmUrl: "http://litellm:4000"

@@ -5,13 +5,16 @@ calling router functions directly so refactors can change private helpers while
 the observable product behavior stays fixed.
 """
 
+import logging
 from unittest.mock import AsyncMock, patch
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
+import jwt
 import pytest
 
 from app.main import app
+from app.dependencies import decode_portal_token
 from app.rate_limit import _key_ops, _login_failures
 from app.routers import auth
 
@@ -145,6 +148,36 @@ async def test_oidc_contract_binds_browser_state_and_keeps_session_out_of_url(mo
 
 
 @pytest.mark.asyncio
+async def test_oidc_team_sync_failure_fails_login_without_issuing_a_session(monkeypatch):
+    state = auth.oidc_svc.generate_state()
+    monkeypatch.setattr(auth.settings, "oidc_group_team_mapping", {"Engineering": "team-eng"})
+    with (
+        patch.object(auth.oidc_svc, "exchange_code", new=AsyncMock(return_value={"id_token": "id-token"})),
+        patch.object(
+            auth.oidc_svc,
+            "verify_id_token",
+            new=AsyncMock(return_value={"sub": "user", "email": "user@example.com", "groups": ["Engineering"]}),
+        ),
+        patch.object(auth.llm, "ensure_user_exists", new=AsyncMock(return_value={"user_id": "user"})),
+        patch.object(
+            auth.llm,
+            "sync_user_team_memberships",
+            new=AsyncMock(side_effect=auth.HTTPException(status_code=503, detail="LiteLLM unavailable")),
+        ),
+    ):
+        async with _client() as client:
+            client.cookies.set("litegate_oidc_state", state, path="/api/auth")
+            response = await client.get(
+                "/api/auth/callback",
+                params={"code": "authorization-code", "state": state},
+            )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "LiteLLM unavailable"}
+    assert "litegate_session=" not in response.headers.get("set-cookie", "")
+
+
+@pytest.mark.asyncio
 async def test_key_deletion_contract_keeps_secret_in_json_body():
     token = auth._make_jwt("user-1", "user@example.com")
     headers = {"Authorization": f"Bearer {token}"}
@@ -193,3 +226,110 @@ async def test_non_admin_team_management_is_denied_before_litellm_is_called():
 
     assert response.status_code == 403
     list_teams.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_every_http_response_has_a_safe_correlation_id():
+    async with _client() as client:
+        generated = await client.get("/api/health/live")
+        propagated = await client.get(
+            "/api/health/live",
+            headers={"X-Request-ID": "deployment-check-42"},
+        )
+        rejected = await client.get(
+            "/api/health/live",
+            headers={"X-Request-ID": "unsafe id with spaces"},
+        )
+
+    assert generated.headers["x-request-id"]
+    assert propagated.headers["x-request-id"] == "deployment-check-42"
+    assert rejected.headers["x-request-id"] != "unsafe id with spaces"
+
+
+@pytest.mark.asyncio
+async def test_metrics_are_admin_only_and_do_not_expose_credentials(monkeypatch):
+    monkeypatch.setattr(auth.settings, "management_api_key", "management-secret-value")
+    async with _client() as client:
+        await client.get("/api/health/live")
+        unauthenticated = await client.get("/api/v1/metrics")
+        metrics = await client.get(
+            "/api/v1/metrics",
+            headers={"X-API-Key": "management-secret-value"},
+        )
+
+    assert unauthenticated.status_code == 401
+    assert metrics.status_code == 200
+    assert metrics.headers["content-type"].startswith("text/plain")
+    assert 'litegate_http_requests_total{method="GET",path="/api/health/live",status="200"}' in metrics.text
+    assert "management-secret-value" not in metrics.text
+
+
+@pytest.mark.asyncio
+async def test_structured_request_log_excludes_headers_queries_and_bodies(caplog):
+    caplog.set_level(logging.INFO, logger="litegate.request")
+    async with _client() as client:
+        response = await client.post(
+            "/api/auth/local?token=query-secret",
+            headers={"Authorization": "Bearer header-secret", "X-Request-ID": "log-contract"},
+            data={"username": "body-user", "password": "body-secret"},
+        )
+
+    assert response.status_code in {401, 422, 429}
+    entry = next(record.message for record in caplog.records if "log-contract" in record.message)
+    assert '"path":"/api/auth/local"' in entry
+    assert "query-secret" not in entry
+    assert "header-secret" not in entry
+    assert "body-secret" not in entry
+
+
+def test_sessions_signed_before_a_secret_rotation_remain_valid(monkeypatch):
+    old_secret = "old-session-secret-that-is-long-enough"
+    new_secret = "new-session-secret-that-is-long-enough"
+    monkeypatch.setattr(auth.settings, "jwt_secret", new_secret)
+    monkeypatch.setattr(auth.settings, "jwt_previous_secrets", old_secret)
+    old_token = jwt.encode(
+        {"sub": "existing-user", "email": "existing@example.com"},
+        old_secret,
+        algorithm=auth.settings.jwt_algorithm,
+    )
+
+    existing = decode_portal_token(old_token)
+    new_token = auth._make_jwt("new-user", "new@example.com")
+
+    assert existing.user_id == "existing-user"
+    assert jwt.decode(
+        new_token,
+        new_secret,
+        algorithms=[auth.settings.jwt_algorithm],
+    )["sub"] == "new-user"
+
+
+@pytest.mark.asyncio
+async def test_admin_local_user_lifecycle_works_through_public_api(monkeypatch, tmp_path):
+    monkeypatch.setattr(auth.settings, "local_users_db_path", str(tmp_path / "users.db"))
+    token = auth._make_jwt("admin-1", "admin@example.com", role="admin")
+    headers = {"Authorization": f"Bearer {token}"}
+    async with _client() as client:
+        created = await client.post(
+            "/api/v1/users",
+            headers=headers,
+            json={
+                "username": "contractor",
+                "email": "contractor@example.com",
+                "password": "temporary-password",
+                "role": "user",
+            },
+        )
+        disabled = await client.patch(
+            "/api/v1/users/contractor",
+            headers=headers,
+            json={"active": False, "role": "admin"},
+        )
+        listed = await client.get("/api/v1/users", headers=headers)
+
+    assert created.status_code == 201
+    assert "password" not in created.text
+    assert disabled.status_code == 200
+    assert disabled.json()["active"] is False
+    assert disabled.json()["role"] == "admin"
+    assert [user["username"] for user in listed.json()] == ["contractor"]

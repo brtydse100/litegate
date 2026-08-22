@@ -5,6 +5,8 @@
 # Required
 litellm_master_key: "sk-your-litellm-master-key"
 jwt_secret: "change-me-min-32-chars-random-string"
+# Verification-only secrets retained temporarily during a session-key rotation.
+jwt_previous_secrets: ""
 
 # LiteLLM location
 litellm_url: "http://host.docker.internal:4000"

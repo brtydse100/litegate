@@ -12,11 +12,16 @@ _SESSION_COOKIE = "litegate_session"
 
 
 def decode_portal_token(token: str) -> CurrentUser:
-    payload = jwt.decode(
-        token,
-        settings.jwt_secret,
-        algorithms=[settings.jwt_algorithm],
-    )
+    last_error: InvalidTokenError | None = None
+    payload = None
+    for secret in settings.jwt_verification_secrets:
+        try:
+            payload = jwt.decode(token, secret, algorithms=[settings.jwt_algorithm])
+            break
+        except InvalidTokenError as exc:
+            last_error = exc
+    if payload is None:
+        raise last_error or InvalidTokenError("No session verification secret configured")
     user_id: str = payload.get("sub")
     email: str = payload.get("email", "")
     if not user_id:

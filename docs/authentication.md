@@ -145,6 +145,9 @@ virtual key cannot authorize `PATCH /api/v1/keys/bulk`.
 - New portal sessions stay in an HttpOnly, SameSite cookie. The JWT is not placed
   in a redirect URL or browser-readable storage; explicit sign-out clears it.
   Cookie-authenticated mutations also reject unapproved cross-site origins.
+- Session signing keys support zero-downtime rotation: `jwt_secret` signs new
+  sessions and `jwt_previous_secrets` temporarily verifies sessions created
+  before the rotation.
 - Secret comparisons use constant-time comparison where applicable.
 - Local authentication performs a dummy hash for unknown users.
 - Local role and active state are checked on every authenticated request.
@@ -158,5 +161,6 @@ virtual key cannot authorize `PATCH /api/v1/keys/bulk`.
   referrer headers.
 
 For production, replace all examples, use HTTPS, restrict configuration access,
-rotate secrets regularly, and back up the account database or persistent volume.
+rotate secrets regularly, and use the verified database backup procedure rather
+than copying an active SQLite file.
 See the [deployment guide](../DEPLOYMENT.md) for production topology.

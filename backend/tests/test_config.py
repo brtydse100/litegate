@@ -165,3 +165,16 @@ def test_security_warnings_accept_strong_local_settings():
     )
 
     assert configured.security_warnings == []
+
+
+def test_security_warnings_reject_a_weak_previous_session_secret():
+    from app.config import Settings
+
+    configured = Settings(
+        litellm_master_key="sk-test",
+        jwt_secret="x" * 32,
+        jwt_previous_secrets="short-old-secret",
+        root_url="http://localhost:8080",
+    )
+
+    assert any("JWT_PREVIOUS_SECRETS" in warning for warning in configured.security_warnings)

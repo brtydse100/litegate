@@ -14,6 +14,7 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `litellm_url` | `http://localhost:4000` | LiteLLM proxy and management URL |
 | `litellm_master_key` | required | LiteLLM administrator key |
 | `jwt_secret` | required | Portal-session signing secret |
+| `jwt_previous_secrets` | empty | Comma-separated prior session secrets accepted only for verification during rotation |
 | `jwt_algorithm` | `HS256` | Portal-session signing algorithm |
 | `jwt_expire_minutes` | `1440` | Portal-session lifetime |
 | `root_url` | `http://localhost` | Public LiteGate URL |
@@ -142,3 +143,11 @@ Do not commit real credentials. Store configuration and secrets using the
 controls appropriate to the deployment platform. Continue with
 [Authentication and security](authentication.md) or the
 [deployment guide](../DEPLOYMENT.md).
+
+### Rotate the session secret without signing everyone out
+
+Move the current value to `jwt_previous_secrets`, install a new random
+`jwt_secret`, and restart LiteGate. New sessions use only the new secret while
+existing sessions continue to verify with the prior value. After the configured
+`jwt_expire_minutes` has elapsed, remove the prior value and restart again.
+Never reuse a previous secret for signing new sessions.

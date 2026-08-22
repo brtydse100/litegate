@@ -3,12 +3,24 @@
 import asyncio
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import PlainTextResponse
 
+from app import observability
 from app.config import settings
 from app.routers.api_actor import ApiActor, get_api_actor, require_api_admin
 from app.services import audit, litellm as llm, local_users
 
 router = APIRouter()
+
+
+@router.get("/metrics", response_class=PlainTextResponse)
+async def api_metrics(actor: ApiActor = Depends(get_api_actor)):
+    """Expose secret-free Prometheus metrics to administrators and monitors."""
+    require_api_admin(actor)
+    return PlainTextResponse(
+        observability.render_metrics(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 @router.get("/status")

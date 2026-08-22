@@ -1,11 +1,13 @@
 import asyncio
 from contextlib import asynccontextmanager
+from time import perf_counter
 
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
+from app import observability
 from app.routers import api_v1, auth, keys, logs, users
 from app.services import litellm, local_users
 from app.version import VERSION
@@ -36,7 +38,22 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+    expose_headers=["X-Request-ID"],
 )
+
+
+@app.middleware("http")
+async def add_request_observability(request: Request, call_next):
+    correlation_id = observability.request_id(request.headers.get("x-request-id"))
+    started = perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        response.headers["X-Request-ID"] = correlation_id
+        return response
+    finally:
+        observability.observe(request, status_code, started, correlation_id)
 
 
 @app.middleware("http")
