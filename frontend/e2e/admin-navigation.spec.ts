@@ -12,7 +12,6 @@ const keyPage = {
 };
 
 async function mockApi(page: Page, role: "admin" | "user") {
-  await page.addInitScript(() => localStorage.setItem("token", "test-token"));
   await page.route(/^https?:\/\/[^/]+\/api\//, async route => {
     const url = new URL(route.request().url());
     let body: unknown = {};
@@ -20,9 +19,12 @@ async function mockApi(page: Page, role: "admin" | "user") {
     else if (url.pathname === "/api/portal-config") body = { support_ticket_url: "", logo_url: "", litellm_ui_url: "", api_docs_url: "/api/docs" };
     else if (url.pathname === "/api/keys/operation-limit") body = { limit: 5, remaining: 5, retry_after: 0 };
     else if (url.pathname === "/api/keys") body = { keys: [] };
+    else if (url.pathname === "/api/v1/users") body = [];
     else if (url.pathname === "/api/v1/keys/identifiers") body = { keys: ["key-1", "key-2"], total: 2 };
     else if (url.pathname === "/api/v1/keys") body = keyPage;
-    else if (url.pathname === "/api/v1/status") body = { ready: true, dependencies: { litellm: { ok: true, detail: "Connected" }, database: { ok: true, detail: "Writable" } }, storage_mode: "sqlite-single-replica", security_warnings: [] };
+    // Keep the older response shape: optional fields added by a newer backend
+    // must not crash the frontend during a rolling upgrade.
+    else if (url.pathname === "/api/v1/status") body = { ready: true, dependencies: { litellm: { ok: true, detail: "Connected" }, database: { ok: true, detail: "Writable" } }, storage_mode: "sqlite-single-replica" };
     else if (url.pathname === "/api/v1/audit-events") body = { events: [] };
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
@@ -31,6 +33,7 @@ async function mockApi(page: Page, role: "admin" | "user") {
 test("administrator navigation has stable routes and global selection", async ({ page }) => {
   await mockApi(page, "admin");
   await page.goto("/keys");
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("token"))).toBeNull();
   await expect(page).toHaveURL(/\/keys$/);
   await expect(page.getByRole("heading", { name: "Key policies" })).toBeVisible();
   await page.getByRole("button", { name: "Select all keys (2)" }).click();
@@ -38,6 +41,11 @@ test("administrator navigation has stable routes and global selection", async ({
   await page.getByRole("link", { name: "Status" }).click();
   await expect(page).toHaveURL(/\/status$/);
   await expect(page.getByText("LiteGate is ready to serve requests.")).toBeVisible();
+
+  const usersRequest = page.waitForRequest(request => new URL(request.url()).pathname === "/api/v1/users");
+  await page.getByRole("link", { name: "Local users" }).click();
+  await usersRequest;
+  await expect(page.getByRole("heading", { name: "Local user access" })).toBeVisible();
 });
 
 test("normal users cannot open administrator routes", async ({ page }) => {

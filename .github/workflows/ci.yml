@@ -24,7 +24,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements*.txt
       - run: python -m pip install -r backend/requirements-dev.txt
-      - run: python -m pytest
+      - run: python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=70
         working-directory: backend
 
   frontend:

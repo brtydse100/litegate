@@ -12,6 +12,7 @@ Use this page as the entry point for detailed LiteGate documentation.
 | [Deployment guide](../DEPLOYMENT.md) | Run LiteGate with Docker Compose or Kubernetes/Helm |
 | [API v1 guide](../API.md) | Integrate an automation agent or call an endpoint |
 | [Development guide](development.md) | Run, test, or understand the source tree |
+| [Testing strategy](testing.md) | Understand behavior contracts and test-layer boundaries |
 
 ## Important authorization boundary
 

@@ -9,6 +9,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Black-box HTTP contract tests now define session-cookie, logout, OIDC state/nonce, password-throttling, key-deletion, and administrator-boundary behavior through public routes.
+- A testing-strategy guide records that behavior changes start with a failing contract, while implementation refactors must not rewrite those contracts.
+- CI now measures backend coverage and rejects regressions below the initial 70% floor.
 - Administrators can select every key in the installation from the bulk editor, not only keys visible on the current page. The explicit action fetches identifiers through bounded pagination and supports up to 5,000 keys.
 - Global key search and team/blocked filters can scope both paginated results and the select-all operation.
 - Administrator status and audit views expose dependency readiness and secret-safe management history.
