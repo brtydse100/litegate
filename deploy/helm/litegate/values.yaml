@@ -19,7 +19,7 @@ securityContext:
 
 image:
   repository: ghcr.io/brtydse100/litegate
-  tag: "2.4.0"  # always pin to a specific tag; never use 'latest' in production
+  tag: "2.5.0"  # always pin to a specific tag; never use 'latest' in production
   pullPolicy: IfNotPresent
 
 service:

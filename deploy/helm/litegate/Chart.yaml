@@ -3,4 +3,4 @@ name: litegate
 description: Self-hosted LiteLLM key portal (frontend + backend in one pod)
 type: application
 version: 0.6.0
-appVersion: "2.4.0"
+appVersion: "2.5.0"

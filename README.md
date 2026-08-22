@@ -2,23 +2,31 @@
 
 ![LiteGate - secure, managed access to AI API keys](docs/litegate-hero.png)
 
-LiteGate is a lightweight, self-hosted portal and automation API for managing
-[LiteLLM](https://github.com/BerriAI/litellm) virtual keys. It gives people a
-simple self-service experience while administrators retain control of accounts,
-roles, budgets, limits, models, and key policy.
+LiteGate gives people one simple page to create and manage their own governed
+[LiteLLM](https://github.com/BerriAI/litellm) API key. Users do not need the
+LiteLLM administrator dashboard, and administrators do not need to hand out the
+master key.
 
-## Why LiteGate?
+## The user experience
 
-- Give each user a personal LiteLLM key without exposing the master key.
-- Preserve accumulated per-key spend when a user regenerates a credential.
-- Support generic OpenID Connect SSO and persistent local accounts.
-- Assign administrators by SSO email or group membership.
-- Map SSO groups to existing LiteLLM teams for team budgets and model policy.
-- Create, search, edit, block, safely delete, and move members between LiteLLM teams from an admin tab.
-- Let administrators bulk-edit key policy from the portal or API.
-- Give trusted automation agents admin access through a management API key.
-- Run the React frontend and FastAPI backend as a non-root single Docker image.
-- Keep the dashboard responsive by avoiding raw spend-log downloads on page load.
+- Sign in with SSO or a local account.
+- Click once to create a personal key and copy it.
+- See the models, budget, spend and rate limits that apply.
+- Regenerate a credential without resetting accumulated spend.
+- Leave without loading the full LiteLLM administration or raw usage-log UI.
+
+SSO groups can map users to existing LiteLLM teams automatically, so the key
+inherits the intended team budget and model policy.
+
+<details>
+<summary><strong>Optional administrator and operations tools</strong></summary>
+
+LiteGate also includes local-user management, team policy and member movement,
+administrator-only bulk key editing, an automation API, audit history,
+readiness checks, metrics, and verified backup/restore tooling. These controls
+are kept out of the normal user's key page.
+
+</details>
 
 ## Access model
 
@@ -84,7 +92,7 @@ docker compose -f docker-compose.image.yml up -d
 
 This pulls the multi-architecture `ghcr.io/brtydse100/litegate:latest` package.
 To pin a release, set `LITEGATE_VERSION`, for example
-`LITEGATE_VERSION=2.4.0`. You can also build locally from source:
+`LITEGATE_VERSION=2.5.0`. You can also build locally from source:
 
 ```bash
 docker compose up --build
@@ -137,5 +145,4 @@ development commands.
 
 ## License
 
-No open-source license has been selected yet. The repository is public, but
-normal copyright restrictions apply until a license is added.
+[MIT](LICENSE)
