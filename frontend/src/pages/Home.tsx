@@ -542,7 +542,7 @@ export default function Home() {
                   ))
                 )}
                 {!keys.isLoading && !confirmRegenerate && (
-                  <div className="flex justify-end">
+                  <div className="w-full">
                     {!hasKey ? (
                       <button
                         onClick={() => create.mutate()}
@@ -560,9 +560,9 @@ export default function Home() {
                       <button
                         onClick={() => setConfirmRegenerate(true)}
                         disabled={operationsBlocked}
-                        className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-6 py-3 text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                        className="flex min-h-16 w-full items-center justify-center gap-3 rounded-lg bg-indigo-600 px-8 py-5 text-lg font-semibold text-white shadow-lg shadow-indigo-200/60 transition-colors hover:bg-indigo-700 disabled:opacity-50"
                       >
-                        <RefreshCw size={15} />{" "}
+                        <RefreshCw size={21} />{" "}
                         {operationsBlocked
                           ? "Regeneration paused"
                           : "Regenerate key"}
@@ -572,13 +572,13 @@ export default function Home() {
                 )}
                 {hasKey && <AccessSnapshot keys={keyList} />}
                 {(config?.litellm_ui_url || config?.support_ticket_url) && (
-                  <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-5">
+                  <div className="grid w-full gap-3 border-t border-slate-200 pt-5">
                     {config.litellm_ui_url && (
                       <a
                         href={config.litellm_ui_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                        className="flex min-h-14 w-full items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-6 py-4 text-base font-semibold text-indigo-600 hover:bg-indigo-100 hover:text-indigo-800"
                       >
                         <ExternalLink size={15} /> Open LiteLLM model hub
                       </a>
@@ -588,9 +588,9 @@ export default function Home() {
                         href={config.support_ticket_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-6 py-3 text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-950"
+                        className="flex min-h-16 w-full items-center justify-center gap-3 rounded-lg border-2 border-slate-300 bg-white px-8 py-5 text-lg font-semibold text-slate-800 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
                       >
-                        <Ticket size={15} /> Support
+                        <Ticket size={21} /> Support
                       </a>
                     )}
                   </div>
