@@ -64,10 +64,11 @@ export default function Login() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center bg-[#0F1117]">
-      <div className="w-full max-w-sm rounded-2xl border border-[#2A2E42] bg-[#1A1D27] p-10 flex flex-col items-center gap-6">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-indigo-50 to-transparent" />
+      <div className="relative flex w-full max-w-sm flex-col items-center gap-6 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-10">
         {/* Logo */}
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 shadow-lg shadow-indigo-600/30">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-lg shadow-indigo-200">
           <svg
             width="22"
             height="22"
@@ -83,23 +84,23 @@ export default function Login() {
         </div>
 
         <div className="text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-white">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
             LiteGate
           </h1>
-          <p className="mt-1.5 text-sm text-gray-400">
-            Your LiteLLM key portal
+          <p className="mt-1.5 text-sm text-slate-500">
+            Sign in to your LiteLLM access portal
           </p>
         </div>
 
         {isLoading && (
-          <div className="h-10 w-full rounded-lg bg-[#22263A] animate-pulse" />
+          <div className="h-10 w-full animate-pulse rounded-md bg-slate-100" />
         )}
 
         {/* SSO button */}
         {showSso && (
           <a
             href="/api/auth/login"
-            className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-600/20"
+            className="w-full rounded-md bg-indigo-600 px-4 py-2.5 text-center text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
           >
             Sign in with SSO
           </a>
@@ -107,16 +108,16 @@ export default function Login() {
 
         {showDivider && (
           <div className="flex w-full items-center gap-3">
-            <div className="flex-1 h-px bg-[#2A2E42]" />
-            <span className="text-xs text-gray-600">or</span>
-            <div className="flex-1 h-px bg-[#2A2E42]" />
+            <div className="h-px flex-1 bg-slate-200" />
+            <span className="text-xs text-slate-400">or</span>
+            <div className="h-px flex-1 bg-slate-200" />
           </div>
         )}
 
         {/* Local login — always visible when enabled, no toggle */}
         {showLocal && (
           <form onSubmit={handleLocal} className="w-full space-y-3">
-            <label className="block space-y-1 text-xs text-gray-400">
+            <label className="block space-y-1.5 text-xs font-medium text-slate-700">
               <span>Username</span>
               <input
                 type="text"
@@ -126,10 +127,10 @@ export default function Login() {
                 required
                 autoFocus={!showSso}
                 autoComplete="username"
-                className="w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               />
             </label>
-            <label className="block space-y-1 text-xs text-gray-400">
+            <label className="block space-y-1.5 text-xs font-medium text-slate-700">
               <span>Password</span>
               <input
                 type="password"
@@ -138,22 +139,22 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               />
             </label>
-            {error && <p className="text-xs text-red-400">{error}</p>}
+            {error && <p className="text-xs text-red-700">{error}</p>}
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+              className="w-full rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-50"
             >
               {submitting ? "Signing in…" : "Sign in"}
             </button>
           </form>
         )}
 
-        <p className="text-xs text-gray-600">
-          Access is granted after your organisation login
+        <p className="text-center text-xs leading-5 text-slate-400">
+          Access is granted through your organization
         </p>
       </div>
     </div>

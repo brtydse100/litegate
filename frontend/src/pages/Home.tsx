@@ -3,8 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { NavLink, Navigate, useLocation } from "react-router-dom";
 import {
   Activity,
+  BookOpen,
   Building2,
   Check,
+  ChevronRight,
   Copy,
   ExternalLink,
   Gauge,
@@ -38,6 +40,32 @@ async function fetchPortalConfig(): Promise<PortalConfig> {
   return response.json();
 }
 
+function Brand({ logoUrl }: { logoUrl?: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt="LiteGate"
+          className="h-7 w-auto object-contain"
+        />
+      ) : (
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm">
+          <Zap size={14} fill="currentColor" />
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold tracking-tight text-slate-950">
+          LiteGate
+        </p>
+        <p className="truncate text-[10px] text-slate-500">
+          LiteLLM access portal
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
   const [copied, setCopied] = useState(false);
   const token = keyInfo.token ?? "";
@@ -53,106 +81,124 @@ function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
   }
 
   return (
-    <article className="w-full max-w-lg space-y-4 rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-5">
-      <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-300">
-          <KeyRound size={17} />
+    <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
+            <KeyRound size={17} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-slate-950">
+              {keyInfo.key_alias || "API key"}
+            </p>
+            <p className="text-xs text-slate-500">Virtual key</p>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-gray-500">
-            {keyInfo.key_alias || "API key"}
-          </p>
-          <code className="block truncate font-mono text-sm text-gray-200">
+        <div className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+          <code className="min-w-0 flex-1 truncate font-mono text-xs text-slate-700">
             {display}
           </code>
-        </div>
-        {token && (
-          <button
-            onClick={copy}
-            title="Copy key identifier"
-            className="text-gray-500 hover:text-white"
-          >
-            {copied ? (
-              <Check size={16} className="text-green-400" />
-            ) : (
-              <Copy size={16} />
-            )}
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500">
-        <span>
-          Spend{" "}
-          <b className="font-medium text-gray-300">
-            ${keyInfo.spend.toFixed(4)}
-          </b>
-        </span>
-        {keyInfo.max_budget != null && (
-          <span>
-            Budget{" "}
-            <b className="font-medium text-gray-300">${keyInfo.max_budget}</b>
-          </span>
-        )}
-        {keyInfo.expires && (
-          <span>
-            Expires{" "}
-            <b className="font-medium text-gray-300">
-              {new Date(keyInfo.expires).toLocaleDateString()}
-            </b>
-          </span>
-        )}
-        <span>
-          Models{" "}
-          <b className="font-medium text-gray-300">
-            {keyInfo.models?.length ? keyInfo.models.length : "All"}
-          </b>
-        </span>
-        {keyInfo.team_id && (
-          <span className="flex min-w-0 items-center gap-1">
-            <Building2 size={12} />
-            <span>Team</span>{" "}
-            <b
-              className="max-w-48 truncate font-medium text-gray-300"
-              title={keyInfo.team_id}
+          {token && (
+            <button
+              onClick={copy}
+              title="Copy key identifier"
+              className="text-slate-400 hover:text-slate-900"
             >
-              {keyInfo.team_id}
-            </b>
-          </span>
-        )}
+              {copied ? (
+                <Check size={15} className="text-emerald-600" />
+              ) : (
+                <Copy size={15} />
+              )}
+            </button>
+          )}
+        </div>
       </div>
+      <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+        <div className="px-5 py-4">
+          <dt className="text-xs text-slate-500">Spend</dt>
+          <dd className="mt-1 font-semibold text-slate-950">
+            ${keyInfo.spend.toFixed(4)}
+          </dd>
+        </div>
+        <div className="px-5 py-4">
+          <dt className="text-xs text-slate-500">Budget</dt>
+          <dd className="mt-1 font-semibold text-slate-950">
+            {keyInfo.max_budget != null
+              ? `$${keyInfo.max_budget}`
+              : "Unlimited"}
+          </dd>
+        </div>
+        <div className="px-5 py-4">
+          <dt className="text-xs text-slate-500">Models</dt>
+          <dd className="mt-1 font-semibold text-slate-950">
+            {keyInfo.models?.length ? keyInfo.models.length : "All"}
+          </dd>
+        </div>
+        <div className="px-5 py-4">
+          <dt className="text-xs text-slate-500">Expires</dt>
+          <dd className="mt-1 font-semibold text-slate-950">
+            {keyInfo.expires
+              ? new Date(keyInfo.expires).toLocaleDateString()
+              : "Never"}
+          </dd>
+        </div>
+      </dl>
+      {keyInfo.team_id && (
+        <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
+          <Building2 size={13} />
+          Assigned through{" "}
+          <span className="font-medium text-slate-800">{keyInfo.team_id}</span>
+        </div>
+      )}
     </article>
   );
 }
 
 function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
   const first = keys[0];
-  const limit =
-    first?.rpm_limit != null
-      ? `${first.rpm_limit.toLocaleString()} RPM`
-      : "Default limits";
-  const models = first?.models?.length
-    ? `${first.models.length} models`
-    : "All allowed models";
+  const items = [
+    {
+      label: "Gateway status",
+      value: "Ready",
+      icon: Check,
+      tone: "text-emerald-600 bg-emerald-50",
+    },
+    {
+      label: "Model access",
+      value: first?.models?.length
+        ? `${first.models.length} models`
+        : "All models",
+      icon: Zap,
+      tone: "text-indigo-600 bg-indigo-50",
+    },
+    {
+      label: "Rate limit",
+      value:
+        first?.rpm_limit != null
+          ? `${first.rpm_limit.toLocaleString()} RPM`
+          : "Default limits",
+      icon: Gauge,
+      tone: "text-amber-600 bg-amber-50",
+    },
+  ];
   return (
-    <section
-      className="grid w-full max-w-lg grid-cols-3 gap-3"
-      aria-label="Access snapshot"
-    >
-      <div className="rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-3 text-center">
-        <Check size={16} className="mx-auto text-green-400" />
-        <p className="mt-1 text-sm font-medium text-white">Ready</p>
-        <p className="text-[11px] text-gray-500">Status</p>
-      </div>
-      <div className="rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-3 text-center">
-        <Zap size={16} className="mx-auto text-indigo-400" />
-        <p className="mt-1 truncate text-sm font-medium text-white">{models}</p>
-        <p className="text-[11px] text-gray-500">Access</p>
-      </div>
-      <div className="rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-3 text-center">
-        <Gauge size={16} className="mx-auto text-amber-400" />
-        <p className="mt-1 truncate text-sm font-medium text-white">{limit}</p>
-        <p className="text-[11px] text-gray-500">Rate</p>
-      </div>
+    <section className="grid gap-3 sm:grid-cols-3" aria-label="Access snapshot">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+        >
+          <span className={`rounded-md p-2 ${item.tone}`}>
+            <item.icon size={16} />
+          </span>
+          <div>
+            <p className="text-xs text-slate-500">{item.label}</p>
+            <p className="mt-0.5 text-sm font-semibold text-slate-950">
+              {item.value}
+            </p>
+          </div>
+        </div>
+      ))}
     </section>
   );
 }
@@ -213,249 +259,303 @@ export default function Home() {
   ) {
     return <Navigate to="/my-key" replace />;
   }
+
+  const titles: Record<string, string> = {
+    "/my-key": "My API access",
+    "/keys": "Key policies",
+    "/users": "Local users",
+    "/teams": "Teams",
+    "/status": "System status",
+  };
   const navClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${isActive ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#1A1D27]"}`;
+    `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
+      isActive
+        ? "bg-slate-100 font-medium text-slate-950"
+        : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+    }`;
+  const navItems = [
+    { to: "/my-key", label: "My key", icon: KeyRound },
+    ...(isAdmin
+      ? [
+          { to: "/keys", label: "Key policies", icon: Shield },
+          { to: "/users", label: "Local users", icon: Users },
+          { to: "/teams", label: "Teams", icon: Building2 },
+          { to: "/status", label: "Status", icon: Activity },
+        ]
+      : []),
+  ];
 
   return (
-    <div className="min-h-screen bg-[#0F1117]">
-      <header className="sticky top-0 z-10 border-b border-[#2A2E42] bg-[#1A1D27]/95 px-4 py-3 backdrop-blur sm:px-6">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {config?.logo_url ? (
-              <img
-                src={config.logo_url}
-                alt="Logo"
-                className="h-8 w-auto object-contain"
-              />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
-                <Zap size={15} />
-              </div>
-            )}
-            <span className="text-sm font-bold tracking-wide text-white">
-              LiteGate
-            </span>
+    <div className="min-h-screen bg-slate-50 text-slate-900 md:flex md:h-screen md:overflow-hidden">
+      <aside className="hidden w-60 flex-none flex-col border-r border-slate-200 bg-white md:flex">
+        <div className="flex h-14 items-center border-b border-slate-200 px-4">
+          <Brand logoUrl={config?.logo_url} />
+        </div>
+        <nav
+          className="flex-1 space-y-5 overflow-y-auto px-3 py-4"
+          aria-label="Primary navigation"
+        >
+          <div>
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Workspace
+            </p>
+            <NavLink to="/my-key" className={navClass}>
+              <KeyRound size={16} /> My key
+            </NavLink>
           </div>
-          <div className="flex items-center gap-3">
-            {config?.api_docs_url && (
-              <a
-                href={config.api_docs_url}
-                target="_blank"
-                rel="noreferrer"
-                className="hidden text-xs text-gray-400 hover:text-white sm:block"
-              >
-                API docs
-              </a>
-            )}
-            {user?.team_ids?.length ? (
-              <span
-                className="hidden max-w-56 items-center gap-1 rounded-full bg-cyan-500/10 px-2 py-1 text-[10px] text-cyan-300 lg:flex"
-                title={user.team_ids.join(", ")}
-              >
-                <Building2 size={10} />
-                <span className="truncate">
-                  {user.team_ids[0]}
-                  {user.team_ids.length > 1
-                    ? ` +${user.team_ids.length - 1}`
-                    : ""}
-                </span>
-              </span>
-            ) : null}
-            {isAdmin && (
-              <span className="hidden items-center gap-1 rounded-full bg-indigo-500/10 px-2 py-1 text-[10px] text-indigo-300 sm:flex">
-                <Shield size={10} /> Admin
-              </span>
-            )}
-            <span className="hidden max-w-52 truncate text-xs text-gray-500 md:block">
-              {user?.email}
-            </span>
+          {isAdmin && (
+            <>
+              <div>
+                <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Access control
+                </p>
+                <div className="space-y-0.5">
+                  <NavLink to="/keys" className={navClass}>
+                    <Shield size={16} /> Key policies
+                  </NavLink>
+                  <NavLink to="/users" className={navClass}>
+                    <Users size={16} /> Local users
+                  </NavLink>
+                  <NavLink to="/teams" className={navClass}>
+                    <Building2 size={16} /> Teams
+                  </NavLink>
+                </div>
+              </div>
+              <div>
+                <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Operations
+                </p>
+                <NavLink to="/status" className={navClass}>
+                  <Activity size={16} /> Status
+                </NavLink>
+              </div>
+            </>
+          )}
+        </nav>
+        <div className="border-t border-slate-200 p-3">
+          <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700">
+              {user?.email?.slice(0, 2).toUpperCase() || "LG"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-slate-800">
+                {user?.email}
+              </p>
+              <p className="text-[10px] capitalize text-slate-500">
+                {user?.role || "user"}
+              </p>
+            </div>
             <button
-              onClick={() => {
-                void logout();
-              }}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white"
+              onClick={() => void logout()}
+              aria-label="Sign out"
+              title="Sign out"
+              className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-800"
             >
-              <LogOut size={14} /> Sign out
+              <LogOut size={15} />
             </button>
           </div>
         </div>
-      </header>
+      </aside>
 
-      {isAdmin && (
-        <nav
-          className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pt-5 sm:px-6"
-          aria-label="Administrator navigation"
-        >
-          <NavLink to="/my-key" className={navClass}>
-            <KeyRound size={15} /> My key
-          </NavLink>
-          <NavLink to="/keys" className={navClass}>
-            <Shield size={15} /> Key policies
-          </NavLink>
-          <NavLink to="/users" className={navClass}>
-            <Users size={15} /> Local users
-          </NavLink>
-          <NavLink to="/teams" className={navClass}>
-            <Building2 size={15} /> Teams
-          </NavLink>
-          <NavLink to="/status" className={navClass}>
-            <Activity size={15} /> Status
-          </NavLink>
-        </nav>
-      )}
-
-      <main
-        className={`mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 pb-16 ${isAdmin ? "pt-8" : "pt-12"} sm:px-6`}
-      >
-        {section === "/users" && isAdmin ? (
-          <AdminUsers />
-        ) : section === "/teams" && isAdmin ? (
-          <AdminTeams />
-        ) : section === "/keys" && isAdmin ? (
-          <AdminKeys />
-        ) : section === "/status" && isAdmin ? (
-          <AdminStatus />
-        ) : (
-          <>
-            <div className="max-w-xl text-center">
-              <h1 className="text-3xl font-bold text-white">Your API access</h1>
-              <p className="mt-2 text-sm text-gray-500">
-                Create and manage a LiteLLM key without loading expensive usage
-                logs.
-              </p>
+      <div className="min-w-0 flex-1 md:flex md:flex-col md:overflow-hidden">
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white md:static md:flex-none">
+          <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
+            <div className="md:hidden">
+              <Brand logoUrl={config?.logo_url} />
             </div>
-
-            {mutationError && (
-              <p className="w-full max-w-lg rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-center text-sm text-red-300">
-                {(mutationError as Error).message}
-              </p>
-            )}
-
-            {operationsBlocked && (
-              <p className="w-full max-w-lg rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-200">
-                Key actions are paused. Try again in {retryAfter || 1} seconds.
-              </p>
-            )}
-
-            {newKey && (
-              <div className="w-full max-w-lg space-y-3 rounded-xl border border-green-500/30 bg-green-500/10 p-5">
-                <p className="text-center text-sm font-medium text-green-300">
-                  Copy this key now — it will not be shown in full again.
-                </p>
-                <div className="flex gap-2">
-                  <code className="min-w-0 flex-1 truncate rounded bg-[#0F1117] px-3 py-2 text-sm text-green-200">
-                    {newKey}
-                  </code>
-                  <button
-                    onClick={copyNewKey}
-                    className="rounded bg-green-500/15 px-3 text-green-300"
-                  >
-                    {copied ? <Check size={15} /> : <Copy size={15} />}
-                  </button>
-                </div>
-                <button
-                  onClick={() => setNewKey(null)}
-                  className="w-full text-xs text-gray-500 hover:text-white"
+            <div className="hidden min-w-0 items-center gap-2 text-sm md:flex">
+              <span className="text-slate-400">LiteGate</span>
+              <ChevronRight size={14} className="text-slate-300" />
+              <span className="truncate font-medium text-slate-700">
+                {titles[section]}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              {config?.api_docs_url && (
+                <a
+                  href={config.api_docs_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 sm:flex"
                 >
-                  Dismiss
-                </button>
-              </div>
-            )}
+                  <BookOpen size={14} /> Docs
+                </a>
+              )}
+              <button
+                onClick={() => void logout()}
+                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 md:hidden"
+              >
+                <LogOut size={14} /> Sign out
+              </button>
+            </div>
+          </div>
+          <nav
+            className="flex gap-1 overflow-x-auto border-t border-slate-100 px-3 py-2 md:hidden"
+            aria-label="Mobile navigation"
+          >
+            {navItems.map((item) => (
+              <NavLink key={item.to} to={item.to} className={navClass}>
+                <item.icon size={15} /> {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        </header>
 
-            {confirmRegenerate && (
-              <div className="w-full max-w-lg space-y-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-5">
-                <p className="text-sm font-medium text-amber-200">
-                  Replace the current key?
-                </p>
-                <p className="text-xs text-gray-400">
-                  The old key stops working immediately.
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => regenerate.mutate()}
-                    disabled={regenerate.isPending || operationsBlocked}
-                    className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {regenerate.isPending
-                      ? "Replacing..."
-                      : operationsBlocked
-                        ? "Temporarily paused"
-                        : "Replace key"}
-                  </button>
-                  <button
-                    onClick={() => setConfirmRegenerate(false)}
-                    className="rounded-lg border border-[#2A2E42] px-4 py-2 text-xs text-gray-300"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {keys.isLoading ? (
-              <div className="h-28 w-full max-w-lg animate-pulse rounded-xl bg-[#1A1D27]" />
+        <main className="min-w-0 flex-1 overflow-y-auto px-4 py-7 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-6xl">
+            {section === "/users" && isAdmin ? (
+              <AdminUsers />
+            ) : section === "/teams" && isAdmin ? (
+              <AdminTeams />
+            ) : section === "/keys" && isAdmin ? (
+              <AdminKeys />
+            ) : section === "/status" && isAdmin ? (
+              <AdminStatus />
             ) : (
-              keyList.map((keyInfo, index) => (
-                <KeyCard key={keyInfo.token ?? index} keyInfo={keyInfo} />
-              ))
-            )}
+              <section className="w-full space-y-6">
+                <div>
+                  <p className="text-xs font-medium text-indigo-600">
+                    Virtual keys
+                  </p>
+                  <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
+                    Your API access
+                  </h1>
+                  <p className="mt-1 max-w-2xl text-sm text-slate-500">
+                    Create and manage your governed LiteLLM key. Secrets are
+                    only shown once when created or regenerated.
+                  </p>
+                </div>
 
-            {!keys.isLoading &&
-              !confirmRegenerate &&
-              (!hasKey ? (
-                <button
-                  onClick={() => create.mutate()}
-                  disabled={create.isPending || operationsBlocked}
-                  className="w-full max-w-lg rounded-2xl bg-indigo-600 px-8 py-5 text-lg font-bold text-white shadow-xl shadow-indigo-600/25 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <Zap size={23} />
-                    {create.isPending
-                      ? "Creating..."
-                      : operationsBlocked
-                        ? "Key actions paused"
-                        : "Create API key"}
-                  </span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setConfirmRegenerate(true)}
-                  disabled={operationsBlocked}
-                  className="flex w-full max-w-lg items-center justify-center gap-2 rounded-xl border border-[#2A2E42] px-5 py-3 text-sm text-gray-300 hover:bg-[#1A1D27] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <RefreshCw size={15} />{" "}
-                  {operationsBlocked ? "Regeneration paused" : "Regenerate key"}
-                </button>
-              ))}
-
-            {hasKey && <AccessSnapshot keys={keyList} />}
-            {(config?.litellm_ui_url || config?.support_ticket_url) && (
-              <div className="flex w-full max-w-lg flex-col gap-3 sm:flex-row">
-                {config.litellm_ui_url && (
-                  <a
-                    href={config.litellm_ui_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-indigo-500/30 bg-indigo-600/10 px-5 py-3 text-sm text-indigo-300 hover:bg-indigo-600/20"
-                  >
-                    <ExternalLink size={15} /> Model hub
-                  </a>
+                {mutationError && (
+                  <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {(mutationError as Error).message}
+                  </p>
                 )}
-                {config.support_ticket_url && (
-                  <a
-                    href={config.support_ticket_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[#2A2E42] bg-[#1A1D27] px-5 py-3 text-sm text-gray-300 hover:bg-[#22263A]"
-                  >
-                    <Ticket size={15} /> Support
-                  </a>
+                {operationsBlocked && (
+                  <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Key actions are paused. Try again in {retryAfter || 1}{" "}
+                    seconds.
+                  </p>
                 )}
-              </div>
+                {newKey && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
+                    <p className="text-sm font-medium text-emerald-900">
+                      Copy this key now — it will not be shown in full again.
+                    </p>
+                    <div className="mt-3 flex max-w-2xl gap-2">
+                      <code className="min-w-0 flex-1 truncate rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-800">
+                        {newKey}
+                      </code>
+                      <button
+                        onClick={copyNewKey}
+                        className="rounded-md border border-emerald-200 bg-white px-3 text-emerald-700 hover:bg-emerald-100"
+                      >
+                        {copied ? <Check size={15} /> : <Copy size={15} />}
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => setNewKey(null)}
+                      className="mt-3 text-xs font-medium text-emerald-700 hover:text-emerald-900"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+                {confirmRegenerate && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-5">
+                    <p className="text-sm font-semibold text-amber-950">
+                      Replace the current key?
+                    </p>
+                    <p className="mt-1 text-sm text-amber-800">
+                      The old key stops working immediately.
+                    </p>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={() => regenerate.mutate()}
+                        disabled={regenerate.isPending || operationsBlocked}
+                        className="rounded-md bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        {regenerate.isPending
+                          ? "Replacing..."
+                          : operationsBlocked
+                            ? "Temporarily paused"
+                            : "Replace key"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmRegenerate(false)}
+                        className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {keys.isLoading ? (
+                  <div className="h-44 animate-pulse rounded-lg border border-slate-200 bg-white" />
+                ) : (
+                  keyList.map((keyInfo, index) => (
+                    <KeyCard key={keyInfo.token ?? index} keyInfo={keyInfo} />
+                  ))
+                )}
+                {!keys.isLoading && !confirmRegenerate && (
+                  <div className="flex justify-end">
+                    {!hasKey ? (
+                      <button
+                        onClick={() => create.mutate()}
+                        disabled={create.isPending || operationsBlocked}
+                        className="flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        <Zap size={16} />{" "}
+                        {create.isPending
+                          ? "Creating..."
+                          : operationsBlocked
+                            ? "Key actions paused"
+                            : "Create API key"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmRegenerate(true)}
+                        disabled={operationsBlocked}
+                        className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <RefreshCw size={15} />{" "}
+                        {operationsBlocked
+                          ? "Regeneration paused"
+                          : "Regenerate key"}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {hasKey && <AccessSnapshot keys={keyList} />}
+                {(config?.litellm_ui_url || config?.support_ticket_url) && (
+                  <div className="flex flex-wrap gap-3 border-t border-slate-200 pt-5">
+                    {config.litellm_ui_url && (
+                      <a
+                        href={config.litellm_ui_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                      >
+                        <ExternalLink size={15} /> Open LiteLLM model hub
+                      </a>
+                    )}
+                    {config.support_ticket_url && (
+                      <a
+                        href={config.support_ticket_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+                      >
+                        <Ticket size={15} /> Support
+                      </a>
+                    )}
+                  </div>
+                )}
+              </section>
             )}
-          </>
-        )}
-      </main>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

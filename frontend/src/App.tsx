@@ -8,7 +8,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading)
     return (
-      <div className="flex h-screen items-center justify-center text-gray-500">
+      <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-500">
         Loading…
       </div>
     );

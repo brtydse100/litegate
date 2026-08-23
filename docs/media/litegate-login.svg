@@ -1,26 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
-  <defs><filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="12" stdDeviation="22" flood-color="#000000" flood-opacity=".32"/></filter></defs>
-  <rect width="1600" height="900" fill="#0F1117"/>
-  <g font-family="Inter, Segoe UI, Arial, sans-serif" transform="translate(575 95)">
-    <rect width="450" height="710" rx="24" fill="#1A1D27" stroke="#2A2E42" filter="url(#shadow)"/>
-    <rect x="193" y="42" width="64" height="64" rx="16" fill="#4F46E5"/>
-    <path d="M229 54l-16 23h12l-2 17 16-23h-12l2-17z" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="225" y="151" text-anchor="middle" fill="#FFFFFF" font-size="32" font-weight="750">LiteGate</text>
-    <text x="225" y="183" text-anchor="middle" fill="#9CA3AF" font-size="17">Your LiteLLM key portal</text>
-
-    <rect x="48" y="222" width="354" height="52" rx="11" fill="#4F46E5"/>
-    <text x="225" y="255" text-anchor="middle" fill="#FFFFFF" font-size="16" font-weight="650">Sign in with SSO</text>
-    <path d="M48 309h150M252 309h150" stroke="#2A2E42"/>
-    <text x="225" y="314" text-anchor="middle" fill="#4B5563" font-size="13">or</text>
-
-    <text x="48" y="354" fill="#9CA3AF" font-size="14">Username</text>
-    <rect x="48" y="369" width="354" height="52" rx="10" fill="#0F1117" stroke="#2A2E42"/>
-    <text x="64" y="402" fill="#E5E7EB" font-size="16">developer</text>
-    <text x="48" y="454" fill="#9CA3AF" font-size="14">Password</text>
-    <rect x="48" y="469" width="354" height="52" rx="10" fill="#0F1117" stroke="#6366F1" stroke-width="2"/>
-    <text x="64" y="502" fill="#E5E7EB" font-size="20" letter-spacing="4">••••••••••••</text>
-    <rect x="48" y="549" width="354" height="52" rx="10" fill="#4F46E5"/>
-    <text x="225" y="582" text-anchor="middle" fill="#FFFFFF" font-size="16" font-weight="650">Sign in</text>
-    <text x="225" y="650" text-anchor="middle" fill="#4B5563" font-size="13">Access is granted after your organisation login</text>
+  <defs>
+    <linearGradient id="wash" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#EEF2FF"/><stop offset="1" stop-color="#F8FAFC"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#94A3B8" flood-opacity=".22"/></filter>
+  </defs>
+  <rect width="1600" height="900" fill="#F8FAFC"/>
+  <rect width="1600" height="300" fill="url(#wash)"/>
+  <g font-family="Inter, Segoe UI, Arial, sans-serif" transform="translate(575 88)">
+    <rect width="450" height="724" rx="18" fill="#FFFFFF" stroke="#E2E8F0" filter="url(#shadow)"/>
+    <rect x="199" y="48" width="52" height="52" rx="11" fill="#4F46E5"/>
+    <path d="M229 58l-14 20h10l-2 14 14-20h-10l2-14z" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="225" y="147" text-anchor="middle" fill="#0F172A" font-size="31" font-weight="650">LiteGate</text>
+    <text x="225" y="179" text-anchor="middle" fill="#64748B" font-size="16">Sign in to your LiteLLM access portal</text>
+    <rect x="48" y="221" width="354" height="50" rx="7" fill="#4F46E5"/>
+    <text x="225" y="253" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="600">Sign in with SSO</text>
+    <path d="M48 307h150M252 307h150" stroke="#E2E8F0"/>
+    <text x="225" y="312" text-anchor="middle" fill="#94A3B8" font-size="13">or</text>
+    <text x="48" y="353" fill="#334155" font-size="13" font-weight="600">Username</text>
+    <rect x="48" y="368" width="354" height="50" rx="7" fill="#FFFFFF" stroke="#CBD5E1"/>
+    <text x="64" y="399" fill="#0F172A" font-size="15">developer</text>
+    <text x="48" y="453" fill="#334155" font-size="13" font-weight="600">Password</text>
+    <rect x="48" y="468" width="354" height="50" rx="7" fill="#FFFFFF" stroke="#6366F1" stroke-width="2"/>
+    <text x="64" y="500" fill="#64748B" font-size="19" letter-spacing="4">••••••••••••</text>
+    <rect x="48" y="548" width="354" height="50" rx="7" fill="#4F46E5"/>
+    <text x="225" y="580" text-anchor="middle" fill="#FFFFFF" font-size="15" font-weight="600">Sign in</text>
+    <text x="225" y="654" text-anchor="middle" fill="#94A3B8" font-size="13">Access is granted through your organization</text>
   </g>
 </svg>

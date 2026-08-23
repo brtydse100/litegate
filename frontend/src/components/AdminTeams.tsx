@@ -17,7 +17,7 @@ import type { TeamCreatePayload, TeamInfo, TeamUpdatePayload } from "../types";
 import TeamMembersDialog from "./TeamMembersDialog";
 
 const inputClass =
-  "w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none";
+  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
 
 type EditorState = { mode: "create" } | { mode: "edit"; team: TeamInfo };
 
@@ -440,15 +440,13 @@ export default function AdminTeams() {
   ) as Error | null;
 
   return (
-    <section className="w-full max-w-5xl space-y-5">
+    <section className="w-full space-y-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-cyan-400">
-            Teams
-          </p>
-          <h2 className="mt-1 text-xl font-semibold text-white">
+          <p className="text-xs font-medium text-indigo-600">Teams</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
             LiteLLM team policy
-          </h2>
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
             Manage team budgets, model access, rate limits, and availability
             without opening the LiteLLM admin UI.

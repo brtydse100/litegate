@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 
 const inputClass =
-  "rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none";
+  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
 
 export default function AdminUsers() {
   const queryClient = useQueryClient();
@@ -84,14 +84,12 @@ export default function AdminUsers() {
   const error = create.error ?? update.error ?? users.error;
 
   return (
-    <section className="w-full max-w-4xl space-y-5">
+    <section className="w-full space-y-5">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wider text-indigo-400">
-          Users
-        </p>
-        <h2 className="mt-1 text-xl font-semibold text-white">
+        <p className="text-xs font-medium text-indigo-600">Users</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
           Local user access
-        </h2>
+        </h1>
         <p className="mt-1 text-sm text-gray-500">
           Manage password-based accounts for people who cannot sign in with your
           organization&apos;s SSO.

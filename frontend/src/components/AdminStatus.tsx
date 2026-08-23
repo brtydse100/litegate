@@ -55,14 +55,12 @@ export default function AdminStatus() {
   });
 
   return (
-    <section className="w-full max-w-5xl space-y-6">
+    <section className="w-full space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-indigo-400">
-            Operations
-          </p>
-          <h1 className="mt-1 flex items-center gap-2 text-xl font-semibold text-white">
-            <Activity size={20} /> System status
+          <p className="text-xs font-medium text-indigo-600">Operations</p>
+          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-slate-950">
+            <Activity size={21} /> System status
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Dependency readiness and recent administrator activity.

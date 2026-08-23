@@ -19,7 +19,7 @@ import type {
 } from "../types";
 
 const inputClass =
-  "rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none";
+  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
 const fieldClass = "space-y-1 text-xs text-gray-400";
 
 export function keyToken(key: KeyInfo): string {
@@ -238,7 +238,7 @@ export default function BulkKeyEditor({
     <details
       open={expanded ? true : undefined}
       onToggle={(event) => setEditorOpen(event.currentTarget.open)}
-      className="w-full rounded-xl border border-[#2A2E42] bg-[#1A1D27]"
+      className="w-full rounded-lg border border-slate-200 bg-white shadow-sm"
     >
       <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-medium text-gray-200">
         <SlidersHorizontal size={16} /> Bulk edit key settings
