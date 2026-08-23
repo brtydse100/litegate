@@ -4,12 +4,15 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import AppErrorBoundary from "./components/AppErrorBoundary";
+import { applyStoredTheme } from "./components/ThemeToggle";
 import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
+
+applyStoredTheme();
 
 async function start() {
   if (import.meta.env.VITE_DEMO_MODE === "true") {

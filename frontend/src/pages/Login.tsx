@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import ThemeToggle from "../components/ThemeToggle";
 import { useAuth } from "../hooks/useAuth";
 
 interface AuthConfig {
@@ -65,6 +66,9 @@ export default function Login() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10">
+      <div className="absolute right-4 top-4 z-10 rounded-md border border-slate-200 bg-white shadow-sm">
+        <ThemeToggle />
+      </div>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-indigo-50 to-transparent" />
       <div className="relative flex w-full max-w-sm flex-col items-center gap-6 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-10">
         {/* Logo */}

@@ -22,6 +22,7 @@ import AdminKeys from "../components/AdminKeys";
 import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
 import AdminTeams from "../components/AdminTeams";
+import ThemeToggle from "../components/ThemeToggle";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { useOperationLimit } from "../hooks/useOperationLimit";
@@ -204,12 +205,13 @@ function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
 }
 
 export default function Home() {
-  const { user, logout } = useAuth();
+  const { user, login, logout } = useAuth();
   const queryClient = useQueryClient();
   const location = useLocation();
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [demoRolePending, setDemoRolePending] = useState(false);
 
   const portal = useQuery({
     queryKey: ["portal-config"],
@@ -246,6 +248,23 @@ export default function Home() {
     await navigator.clipboard.writeText(newKey);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function switchDemoRole(role: "admin" | "user") {
+    if (import.meta.env.VITE_DEMO_MODE !== "true" || user?.role === role)
+      return;
+    setDemoRolePending(true);
+    try {
+      const response = await fetch("/api/demo/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!response.ok) throw new Error("Could not switch the demo role");
+      await login();
+    } finally {
+      setDemoRolePending(false);
+    }
   }
 
   const config = portal.data;
@@ -371,6 +390,29 @@ export default function Home() {
               </span>
             </div>
             <div className="flex items-center gap-1">
+              {import.meta.env.VITE_DEMO_MODE === "true" && (
+                <div
+                  className="mr-1 flex items-center rounded-md border border-slate-200 bg-slate-50 p-0.5"
+                  aria-label="Demo role"
+                >
+                  {(["user", "admin"] as const).map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => void switchDemoRole(role)}
+                      disabled={demoRolePending}
+                      aria-label={`View demo as ${role}`}
+                      className={`rounded px-2.5 py-1 text-[11px] font-medium capitalize transition-colors disabled:opacity-50 ${
+                        user?.role === role
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              )}
               {config?.api_docs_url && (
                 <a
                   href={config.api_docs_url}
@@ -381,11 +423,13 @@ export default function Home() {
                   <BookOpen size={14} /> Docs
                 </a>
               )}
+              <ThemeToggle />
               <button
                 onClick={() => void logout()}
                 className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 md:hidden"
               >
-                <LogOut size={14} /> Sign out
+                <LogOut size={14} />{" "}
+                <span className="hidden sm:inline">Sign out</span>
               </button>
             </div>
           </div>
@@ -516,7 +560,7 @@ export default function Home() {
                       <button
                         onClick={() => setConfirmRegenerate(true)}
                         disabled={operationsBlocked}
-                        className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                        className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-6 py-3 text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
                       >
                         <RefreshCw size={15} />{" "}
                         {operationsBlocked
@@ -544,7 +588,7 @@ export default function Home() {
                         href={config.support_ticket_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+                        className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-6 py-3 text-base font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-950"
                       >
                         <Ticket size={15} /> Support
                       </a>

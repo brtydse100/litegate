@@ -5,6 +5,8 @@
   </defs>
   <rect width="1600" height="900" fill="#F8FAFC"/>
   <rect width="1600" height="300" fill="url(#wash)"/>
+  <rect x="1536" y="24" width="40" height="40" rx="7" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <path d="M1559 34a11 11 0 1 0 7 18 12 12 0 0 1-7-18z" fill="none" stroke="#64748B" stroke-width="2"/>
   <g font-family="Inter, Segoe UI, Arial, sans-serif" transform="translate(575 88)">
     <rect width="450" height="724" rx="18" fill="#FFFFFF" stroke="#E2E8F0" filter="url(#shadow)"/>
     <rect x="199" y="48" width="52" height="52" rx="11" fill="#4F46E5"/>

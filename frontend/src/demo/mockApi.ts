@@ -1,6 +1,6 @@
 import type { AuditEvent, KeyInfo, LocalUser, TeamInfo, User } from "../types";
 
-const demoUser: User = {
+let demoUser: User = {
   user_id: "demo-admin",
   email: "alex@example.com",
   role: "admin",
@@ -217,6 +217,13 @@ async function mockResponse(request: Request): Promise<Response> {
 
   if (path === "/api/auth/config")
     return json({ sso_enabled: false, local_enabled: true });
+  if (path === "/api/demo/role" && method === "POST") {
+    const payload = await body(request);
+    if (payload.role !== "admin" && payload.role !== "user")
+      return json({ detail: "Role must be admin or user" }, 400);
+    demoUser = { ...demoUser, role: payload.role };
+    return json(demoUser);
+  }
   if (path === "/api/auth/local" && method === "POST") {
     signedIn = true;
     return json({ authenticated: true });

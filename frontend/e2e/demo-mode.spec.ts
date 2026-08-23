@@ -8,6 +8,14 @@ test("interactive demo keeps its key views consistent and supports local sign-in
     page.getByRole("heading", { name: "Your API access" }),
   ).toBeVisible();
 
+  await page.getByRole("button", { name: "Use dark theme" }).click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Use light theme" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Use light theme" }).click();
+
   await page.getByRole("button", { name: "Regenerate key" }).click();
   await page.getByRole("button", { name: "Replace key" }).click();
   await expect(page.getByText("sk-litegate-demo-rotated-4d8e")).toBeVisible();
@@ -19,6 +27,12 @@ test("interactive demo keeps its key views consistent and supports local sign-in
   ).toBeVisible();
   await expect(page.getByText("sk-litega....4d8e")).toBeVisible();
   await expect(page.getByText("sk-litega....7f3a")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "View demo as user" }).click();
+  await expect(page).toHaveURL(/\/litegate\/my-key$/);
+  await expect(page.getByRole("link", { name: "Key policies" })).toHaveCount(0);
+  await page.getByRole("button", { name: "View demo as admin" }).click();
+  await expect(page.getByRole("link", { name: "Key policies" })).toBeVisible();
 
   await page.getByRole("link", { name: "Teams" }).click();
   await expect(
