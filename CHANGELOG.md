@@ -41,6 +41,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Fixed
 
 - The public demo no longer advertises unsupported SSO login.
+- User provisioning now explicitly disables LiteLLM's automatic key creation,
+  preventing an unrevealed initial secret from blocking self-service key setup.
+- Team updates normalize LiteLLM's nested response shape so the API and portal
+  receive the complete updated team record.
 
 ## [2.5.0] - 2026-08-22
 

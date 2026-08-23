@@ -57,6 +57,27 @@ async def test_get_user_raises_502_on_http_status_error():
 
 
 @pytest.mark.asyncio
+async def test_create_user_does_not_discard_an_automatically_created_key():
+    response = MagicMock(status_code=200)
+    response.raise_for_status = MagicMock()
+    response.json = MagicMock(return_value={"user_id": "user-1"})
+
+    with patch("httpx.AsyncClient") as client_class:
+        client = AsyncMock()
+        client.post = AsyncMock(return_value=response)
+        client_class.return_value.__aenter__ = AsyncMock(return_value=client)
+        client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        await litellm.create_user("user-1", "user@example.com")
+
+    assert client.post.await_args.kwargs["json"] == {
+        "user_id": "user-1",
+        "user_email": "user@example.com",
+        "auto_create_key": False,
+    }
+
+
+@pytest.mark.asyncio
 async def test_ensure_user_exists_returns_none_on_error():
     with patch("app.services.litellm.get_user", side_effect=HTTPException(status_code=503, detail="down")):
         from app.services.litellm import ensure_user_exists

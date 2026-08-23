@@ -66,6 +66,9 @@ services for compatibility testing:
 docker compose -f deploy/docker-compose/docker-compose.integration.yml up -d --wait
 ```
 
+If port `4000` is already in use, set `LITELLM_INTEGRATION_PORT` and use the
+matching port in `LITELLM_URL` when running the tests.
+
 The images are pinned by immutable multi-architecture digest. With the backend
 development dependencies and frontend packages installed, run both live layers:
 

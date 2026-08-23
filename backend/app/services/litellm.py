@@ -60,7 +60,11 @@ async def create_user(user_id: str, email: str) -> dict:
         async with _client() as client:
             r = await client.post(
                 f"{settings.litellm_url}/user/new",
-                json={"user_id": user_id, "user_email": email},
+                json={
+                    "user_id": user_id,
+                    "user_email": email,
+                    "auto_create_key": False,
+                },
                 headers=_headers(),
                 timeout=10,
             )
@@ -244,7 +248,14 @@ async def update_team(team_id: str, changes: dict) -> dict:
                 timeout=15,
             )
             r.raise_for_status()
-            return r.json()
+            result = r.json()
+            data = result.get("data") if isinstance(result, dict) else None
+            if isinstance(data, dict):
+                return {
+                    **data,
+                    "team_id": data.get("team_id") or result.get("team_id") or team_id,
+                }
+            return result
     except httpx.TransportError as e:
         _transport_error(e)
     except httpx.HTTPStatusError as e:

@@ -288,10 +288,20 @@ async def test_litellm_team_crud_payloads():
         assert client.post.await_args.args[0].endswith("/team/new")
         assert client.post.await_args.kwargs["json"] == {"team_alias": "Engineering"}
 
-        await litellm.update_team("team-eng", {"max_budget": 10})
+        response.json.return_value = {
+            "team_id": "team-eng",
+            "data": {"team_alias": "Updated Engineering", "max_budget": 10},
+        }
+        updated = await litellm.update_team("team-eng", {"max_budget": 10})
+        assert updated == {
+            "team_id": "team-eng",
+            "team_alias": "Updated Engineering",
+            "max_budget": 10,
+        }
         assert client.post.await_args.args[0].endswith("/team/update")
         assert client.post.await_args.kwargs["json"] == {"team_id": "team-eng", "max_budget": 10}
 
+        response.json.return_value = {"team_id": "team-eng"}
         await litellm.delete_team("team-eng")
         assert client.post.await_args.args[0].endswith("/team/delete")
         assert client.post.await_args.kwargs["json"] == {"team_ids": ["team-eng"]}

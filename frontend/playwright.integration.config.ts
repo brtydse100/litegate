@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const integrationEnvironment = {
   ...process.env,
-  LITELLM_URL: "http://127.0.0.1:4000",
+  LITELLM_URL: process.env.LITELLM_URL ?? "http://127.0.0.1:4000",
   LITELLM_MASTER_KEY: "sk-litegate-integration-master",
   JWT_SECRET: "litegate-integration-jwt-secret-at-least-32-characters",
   MANAGEMENT_API_KEY: "litegate-integration-management-key",
