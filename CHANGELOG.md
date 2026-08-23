@@ -7,6 +7,41 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-08-23
+
+### Added
+
+- A persisted light/dark theme toggle is available on both the sign-in screen
+  and authenticated portal.
+- The public browser-only demo can switch between administrator and ordinary
+  user roles without credentials or a live LiteLLM deployment.
+- Pull requests now run frontend linting, formatting, type checking, focused
+  browser smoke coverage, and backend formatting alongside the existing test,
+  audit, packaging, documentation, and version checks.
+- A scheduled workflow runs the complete Playwright suite nightly, while the
+  interactive GitHub Pages demo has its own deployment-time behavior test.
+- An opt-in integration stack uses pinned LiteLLM and PostgreSQL images to
+  verify live user, team, and virtual-key contracts through both the backend
+  service layer and the browser-facing LiteGate API.
+
+### Changed
+
+- Redesigned the portal with the light, compact information hierarchy of the
+  LiteLLM administrator interface, including a desktop sidebar, responsive
+  mobile navigation, clearer key summaries, and consistent administration
+  pages.
+- Replaced the static public demonstration with the real frontend backed by a
+  browser-only synthetic API, so key regeneration, teams, users, policies, and
+  status views can be explored safely.
+- Refreshed and compressed screenshots, SVGs, and the demonstration video for
+  sharper documentation with substantially smaller downloads.
+- Split fast browser smoke coverage from the complete nightly suite to keep
+  pull-request feedback focused without losing broader regression coverage.
+
+### Fixed
+
+- The public demo no longer advertises unsupported SSO login.
+
 ## [2.5.0] - 2026-08-22
 
 ### Added
@@ -151,7 +186,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/brtydse100/litegate/compare/v2.5.0...v2.6.0
+[2.5.0]: https://github.com/brtydse100/litegate/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/brtydse100/litegate/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/brtydse100/litegate/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/brtydse100/litegate/compare/v2.1.0...v2.2.0

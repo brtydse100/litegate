@@ -5,6 +5,7 @@ behavior. For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.6.0](v2.6.0.md) | LiteLLM-inspired UI, persisted themes, interactive demo, and expanded quality gates |
 | [2.5.0](v2.5.0.md) | Hardened sessions, behavior-first testing, observability, and recovery tooling |
 | [2.4.0](v2.4.0.md) | Spend-preserving key rotation, operation cooldowns, and a non-root image |
 | [2.3.0](v2.3.0.md) | Safe movement of users and scoped keys between teams |
