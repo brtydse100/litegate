@@ -33,11 +33,15 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
-      - name: Build interactive demo
+      - name: Typecheck interactive demo
         working-directory: frontend
-        env:
-          VITE_DEMO_MODE: "true"
-        run: npx tsc --noEmit && npx vite build --base=/litegate/
+        run: npx tsc --noEmit
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Test interactive demo
+        working-directory: frontend
+        run: npx playwright test --config=playwright.demo.config.ts
       - name: Add SPA fallback
         run: cp frontend/dist/index.html frontend/dist/404.html
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5

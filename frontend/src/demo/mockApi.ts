@@ -259,7 +259,15 @@ async function mockResponse(request: Request): Promise<Response> {
   }
   if (path === "/api/keys/regenerate" && method === "POST") {
     const key = "sk-litegate-demo-rotated-4d8e";
+    const previousTokens = new Set(
+      personalKeys.map((item) => item.token ?? item.key ?? ""),
+    );
     personalKeys = personalKeys.map((item) => ({ ...item, token: key }));
+    installationKeys = installationKeys.map((item) =>
+      previousTokens.has(item.token ?? item.key ?? "")
+        ? { ...item, token: key }
+        : item,
+    );
     return json({
       key,
       user_id: demoUser.user_id,
