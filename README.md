@@ -7,6 +7,8 @@ LiteGate gives people one simple page to create and manage their own governed
 LiteLLM administrator dashboard, and administrators do not need to hand out the
 master key.
 
+**[Watch the live demo](https://brtydse100.github.io/litegate/)**
+
 ## The user experience
 
 - Sign in with SSO or a local account.

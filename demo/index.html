@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="See LiteGate's secure, self-service LiteLLM key workflow." />
+    <title>LiteGate Demo</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #070b14; color: #eef2ff; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 50% -10%, #243d78 0, #111a32 30%, #070b14 65%); }
+      a { color: inherit; }
+      main { width: min(1100px, calc(100% - 40px)); margin: 0 auto; padding: 28px 0 72px; }
+      nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; letter-spacing: -.02em; text-decoration: none; }
+      .mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(145deg, #65a8ff, #6856e8); box-shadow: 0 8px 28px #496de866; }
+      .github { color: #bac4dc; font-size: 14px; text-underline-offset: 4px; }
+      header { max-width: 820px; margin: 90px auto 46px; text-align: center; }
+      .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid #5872b055; border-radius: 99px; background: #142140aa; color: #b9cbff; font-size: 13px; }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: #58d7a2; box-shadow: 0 0 12px #58d7a2; }
+      h1 { margin: 22px 0 16px; font-size: clamp(42px, 7vw, 72px); line-height: 1.02; letter-spacing: -.055em; }
+      .lead { max-width: 680px; margin: auto; color: #aeb9d2; font-size: clamp(17px, 2vw, 20px); line-height: 1.65; }
+      .screen { padding: 10px; border: 1px solid #6f86bd44; border-radius: 20px; background: linear-gradient(145deg, #1b2948bb, #0c1222cc); box-shadow: 0 35px 90px #000a, 0 0 70px #3658b32b; }
+      video { display: block; width: 100%; border-radius: 12px; background: #0b1020; }
+      .caption { margin: 14px 8px 4px; color: #8f9bb6; font-size: 13px; text-align: center; }
+      section { margin-top: 66px; }
+      h2 { margin-bottom: 10px; font-size: 30px; letter-spacing: -.035em; text-align: center; }
+      .section-copy { margin: 0 auto 30px; max-width: 620px; color: #929eb8; line-height: 1.6; text-align: center; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      article { padding: 24px; border: 1px solid #5c6e9638; border-radius: 16px; background: #11192ba8; }
+      article span { color: #75a8ff; font-size: 13px; font-weight: 700; }
+      article h3 { margin: 12px 0 8px; font-size: 18px; }
+      article p { margin: 0; color: #98a4bd; font-size: 14px; line-height: 1.6; }
+      .cta { margin-top: 64px; padding: 38px; border: 1px solid #6c86bf50; border-radius: 20px; background: linear-gradient(120deg, #182a51, #211b45); text-align: center; }
+      .cta h2 { margin-top: 0; }
+      .button { display: inline-block; margin-top: 10px; padding: 11px 18px; border-radius: 10px; background: #edf2ff; color: #111827; font-weight: 750; text-decoration: none; }
+      footer { margin-top: 44px; color: #69758e; font-size: 13px; text-align: center; }
+      @media (max-width: 760px) { header { margin-top: 64px; } .grid { grid-template-columns: 1fr; } .cta { padding: 28px 20px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav>
+        <a class="brand" href="https://github.com/brtydse100/litegate"><span class="mark">L</span> LiteGate</a>
+        <a class="github" href="https://github.com/brtydse100/litegate">View on GitHub →</a>
+      </nav>
+      <header>
+        <div class="eyebrow"><span class="dot"></span> Interactive product walkthrough</div>
+        <h1>AI access without sharing the master key.</h1>
+        <p class="lead">See how LiteGate gives every user one safe place to create, inspect, and rotate a governed LiteLLM key.</p>
+      </header>
+      <div class="screen">
+        <video controls autoplay muted loop playsinline poster="media/litegate-my-key-hd.png">
+          <source src="media/litegate-self-service-demo-hd.mp4" type="video/mp4" />
+          Your browser does not support embedded video.
+        </video>
+        <p class="caption">Recorded with demonstration data. No live credentials or backend are used on this page.</p>
+      </div>
+      <section>
+        <h2>One focused workflow</h2>
+        <p class="section-copy">LiteGate stays between your users and LiteLLM's administrator surface, exposing only the controls each person needs.</p>
+        <div class="grid">
+          <article><span>01</span><h3>Sign in</h3><p>Use your OIDC provider or a locally managed account with rechecked roles and account status.</p></article>
+          <article><span>02</span><h3>Create a key</h3><p>Generate a personal virtual key that inherits the configured models, budget, and rate limits.</p></article>
+          <article><span>03</span><h3>Manage access</h3><p>Inspect policy and spend, then rotate the credential without resetting accumulated usage.</p></article>
+        </div>
+      </section>
+      <div class="cta">
+        <h2>Run LiteGate yourself</h2>
+        <p class="section-copy">Deploy the prebuilt container with Docker Compose, or build the project locally.</p>
+        <a class="button" href="https://github.com/brtydse100/litegate#quick-start-with-docker-compose">Open the quick start</a>
+      </div>
+      <footer>LiteGate is open source under the MIT license.</footer>
+    </main>
+  </body>
+</html>
