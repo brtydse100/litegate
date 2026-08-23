@@ -216,7 +216,7 @@ async function mockResponse(request: Request): Promise<Response> {
   const method = request.method.toUpperCase();
 
   if (path === "/api/auth/config")
-    return json({ sso_enabled: true, local_enabled: true });
+    return json({ sso_enabled: false, local_enabled: true });
   if (path === "/api/auth/local" && method === "POST") {
     signedIn = true;
     return json({ authenticated: true });
