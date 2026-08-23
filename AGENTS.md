@@ -28,8 +28,8 @@ source of truth for models, budgets, spend, and request routing.
 - `frontend/src/`: React and TypeScript application.
 - `deploy/docker-compose/`: Single-server image and Compose deployment.
 - `deploy/helm/litegate/`: Kubernetes Helm chart.
-- `demo/`: Static GitHub Pages demo; it must not require credentials or a live
-  backend.
+- `frontend/src/demo/`: Browser-only mock API for the interactive GitHub Pages
+  demo; it must not require credentials or a live backend.
 - `docs/`: User and operator documentation plus demo media.
 - `scripts/`: Release and documentation consistency checks.
 
@@ -93,6 +93,5 @@ is available.
 - Update the focused guide under `docs/` when configuration, authentication,
   deployment, testing, or visible behavior changes.
 - Keep root `README.md` concise and route detail into the focused guides.
-- The public demo is intentionally static and read-only. Use synthetic content
-  only, and keep its links and media paths compatible with the `/litegate/`
-  GitHub Pages base path.
+- The public demo builds the real frontend with `VITE_DEMO_MODE=true` and uses
+  synthetic content only. Never connect it to a real backend or embed secrets.
