@@ -1,4 +1,4 @@
-﻿from secrets import token_hex
+from secrets import token_hex
 
 from fastapi import APIRouter, Depends, HTTPException
 from app.dependencies import get_current_user
@@ -68,8 +68,7 @@ async def regenerate_key(current_user: CurrentUser = Depends(get_current_user)):
 
 async def _delete_owned_key(key: str, current_user: CurrentUser) -> dict:
     check_key_rate_limit(current_user.user_id)
-    owned = {k.get("token") or k.get("api_key") or k.get("key")
-             for k in await llm.list_user_keys(current_user.user_id)}
+    owned = {k.get("token") or k.get("api_key") or k.get("key") for k in await llm.list_user_keys(current_user.user_id)}
     if key not in owned:
         raise HTTPException(status_code=403, detail="Key not owned by user")
     await llm.delete_key(key)

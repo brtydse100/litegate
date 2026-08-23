@@ -1,4 +1,4 @@
-﻿from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi import Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
@@ -40,10 +40,7 @@ def enforce_account_state(current_user: CurrentUser) -> CurrentUser:
     if current_user.auth_source != "local":
         return current_user
     username = current_user.user_id.removeprefix("local:")
-    is_bootstrap = bool(
-        settings.local_auth_enabled
-        and username.lower() == (settings.local_auth_username or "").lower()
-    )
+    is_bootstrap = bool(settings.local_auth_enabled and username.lower() == (settings.local_auth_username or "").lower())
     if is_bootstrap:
         current_user.role = "admin"
         return current_user

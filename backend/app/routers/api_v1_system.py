@@ -26,9 +26,7 @@ async def api_metrics(actor: ApiActor = Depends(get_api_actor)):
 @router.get("/status")
 async def api_status(actor: ApiActor = Depends(get_api_actor)):
     require_api_admin(actor)
-    litellm_status, database_status = await asyncio.gather(
-        llm.healthcheck(), asyncio.to_thread(local_users.healthcheck)
-    )
+    litellm_status, database_status = await asyncio.gather(llm.healthcheck(), asyncio.to_thread(local_users.healthcheck))
     return {
         "ready": bool(litellm_status["ok"] and database_status["ok"]),
         "dependencies": {"litellm": litellm_status, "database": database_status},

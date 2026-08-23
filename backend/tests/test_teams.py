@@ -94,9 +94,7 @@ async def test_team_update_preserves_explicit_null_and_empty_models():
     ) as update:
         await api_update_team("team-eng", payload, admin_actor())
 
-    update.assert_awaited_once_with(
-        "team-eng", {"models": [], "max_budget": None, "blocked": True}
-    )
+    update.assert_awaited_once_with("team-eng", {"models": [], "max_budget": None, "blocked": True})
 
 
 @pytest.mark.asyncio
@@ -255,9 +253,7 @@ async def test_move_user_team_keys_uses_bulk_key_reassignment():
 
     assert moved == 1
     assert client.post.await_args.args[0].endswith("/key/bulk_update")
-    assert client.post.await_args.kwargs["json"] == {
-        "keys": [{"key": "key-source", "team_id": "team-destination"}]
-    }
+    assert client.post.await_args.kwargs["json"] == {"keys": [{"key": "key-source", "team_id": "team-destination"}]}
 
 
 @pytest.mark.asyncio

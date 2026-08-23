@@ -40,7 +40,9 @@ async def get_api_actor(
         except InvalidTokenError:
             info = await llm.get_key_info(token)
             if info is not None:
-                return ApiActor(CurrentUser(user_id=info.get("user_id") or "key-holder", email="", role="user", auth_source="litellm_key"), proof_key=token)
+                return ApiActor(
+                    CurrentUser(user_id=info.get("user_id") or "key-holder", email="", role="user", auth_source="litellm_key"), proof_key=token
+                )
     if session_cookie:
         try:
             return ApiActor(enforce_account_state(decode_portal_token(session_cookie)))
@@ -55,4 +57,6 @@ def require_api_admin(actor: ApiActor) -> None:
 
 
 async def record_audit(actor: ApiActor, action: str, target: str, *, outcome: str = "success", details: Optional[dict] = None) -> None:
-    await asyncio.to_thread(audit.record, actor_id=actor.user.user_id, actor_email=actor.user.email, action=action, target=target, outcome=outcome, details=details)
+    await asyncio.to_thread(
+        audit.record, actor_id=actor.user.user_id, actor_email=actor.user.email, action=action, target=target, outcome=outcome, details=details
+    )

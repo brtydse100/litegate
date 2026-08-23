@@ -7,7 +7,11 @@ import Home from "./pages/Home";
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading)
-    return <div className="flex h-screen items-center justify-center text-gray-500">Loading…</div>;
+    return (
+      <div className="flex h-screen items-center justify-center text-gray-500">
+        Loading…
+      </div>
+    );
   return user ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
@@ -16,7 +20,14 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/*" element={<PrivateRoute><Home /></PrivateRoute>} />
+      <Route
+        path="/*"
+        element={
+          <PrivateRoute>
+            <Home />
+          </PrivateRoute>
+        }
+      />
     </Routes>
   );
 }

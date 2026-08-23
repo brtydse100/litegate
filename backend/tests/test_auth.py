@@ -82,9 +82,7 @@ async def test_sso_callback_syncs_mapped_teams_and_embeds_them_in_token(monkeypa
     ):
         response = await auth.callback("code", state, state_cookie=state)
 
-    sync.assert_awaited_once_with(
-        "oidc-user", "user@example.com", ["team-primary", "team-shared"]
-    )
+    sync.assert_awaited_once_with("oidc-user", "user@example.com", ["team-primary", "team-shared"])
     assert "#token=" not in response.headers["location"]
     token = _response_cookie(response, "litegate_session")
     user = decode_portal_token(token)
@@ -174,9 +172,7 @@ async def test_local_login_uses_httponly_session_cookie(monkeypatch):
     assert response.body == b'{"authenticated":true}'
     assert _response_cookie(response, "litegate_session")
     session_header = next(
-        value.decode("latin-1")
-        for name, value in response.raw_headers
-        if name == b"set-cookie" and value.startswith(b"litegate_session=")
+        value.decode("latin-1") for name, value in response.raw_headers if name == b"set-cookie" and value.startswith(b"litegate_session=")
     )
     assert "HttpOnly" in session_header
     assert "SameSite=lax" in session_header

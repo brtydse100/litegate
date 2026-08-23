@@ -112,12 +112,6 @@ def render_metrics() -> str:
     )
     for method, path in sorted(duration_count):
         labels = _labels(method, path)
-        lines.append(
-            f"litegate_http_request_duration_seconds_sum{labels} "
-            f"{duration_sum[(method, path)]:.6f}"
-        )
-        lines.append(
-            f"litegate_http_request_duration_seconds_count{labels} "
-            f"{duration_count[(method, path)]}"
-        )
+        lines.append(f"litegate_http_request_duration_seconds_sum{labels} {duration_sum[(method, path)]:.6f}")
+        lines.append(f"litegate_http_request_duration_seconds_count{labels} {duration_count[(method, path)]}")
     return "\n".join(lines) + "\n"

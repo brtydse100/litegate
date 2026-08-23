@@ -10,9 +10,9 @@ frontend/playwright-report/
 **/__pycache__/
 **/*.pyc
 **/*.pyo
-.pytest_cache/
 .coverage
 htmlcov/
+.pytest_cache/
 
 # Runtime data
 backend/data/*.db

@@ -28,32 +28,32 @@ through the environment before starting the backend.
 
 ## Checks
 
-Run backend tests:
+Check backend formatting and run its regression suite:
 
 ```bash
+ruff format --check --diff backend
 cd backend
-python -m pytest
+python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=75
 ```
 
-Build and audit the production frontend:
+Lint, format-check, type-check, build, and audit the production frontend:
 
 ```bash
 cd frontend
+npm run lint
+npm run format:check
+npm run typecheck
 npm test
-npm run test:e2e
+npm run test:e2e:smoke
 npm run build
 npm audit --omit=dev
 ```
 
-The Playwright command installs no browser automatically. On a new workstation,
-run `npx playwright install chromium` once. GitHub Actions runs backend tests,
-frontend unit/browser tests, the production build, dependency audit, Helm lint,
-documentation/version checks, and an all-in-one container build on every pull
-request and push to `main`.
-
-Authorization tests should preserve the core boundary: normal portal users and
-LiteLLM-key identities cannot bulk-edit keys, while administrators and the
-management API identity can.
+GitHub Actions runs pytest with the established coverage floor, the frontend
+unit suite, a short Playwright smoke flow, static checks, the production build,
+dependency audit, Helm lint, documentation/version checks, and an all-in-one
+container build on every pull request and push to `main`. The complete browser
+suite runs nightly and can also be started manually.
 
 ## Project layout
 

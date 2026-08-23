@@ -138,8 +138,8 @@ the complete behavior and trust boundaries.
 ## Development and checks
 
 ```bash
-cd backend && python -m pytest
-cd ../frontend && npm test && npm run test:e2e && npm run build
+cd backend && ruff format --check --diff . && python -m pytest
+cd ../frontend && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build
 ```
 
 See the [development guide](docs/development.md) for environment setup and local

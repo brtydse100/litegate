@@ -77,6 +77,7 @@ async def protect_cookie_sessions_from_csrf(request: Request, call_next):
             return JSONResponse({"detail": "Cross-site mutation rejected"}, status_code=403)
     return await call_next(request)
 
+
 app.include_router(auth.router, prefix="/api")
 app.include_router(keys.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")

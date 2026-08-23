@@ -20,9 +20,7 @@ async def list_local_users(_: CurrentUser = Depends(require_admin)):
 async def create_local_user(payload: LocalUserCreate, current_user: CurrentUser = Depends(require_admin)):
     check_key_rate_limit(current_user.user_id)
     try:
-        user = await asyncio.to_thread(
-            local_users.create_user, payload.username, payload.email, payload.password, payload.role
-        )
+        user = await asyncio.to_thread(local_users.create_user, payload.username, payload.email, payload.password, payload.role)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     await llm.ensure_user_exists(user["user_id"], user["email"])
@@ -43,6 +41,4 @@ async def update_local_user(
         raise HTTPException(status_code=400, detail="You cannot disable your own account")
     if existing["user_id"] == current_user.user_id and payload.role == "user":
         raise HTTPException(status_code=400, detail="You cannot remove your own admin role")
-    return await asyncio.to_thread(
-        local_users.update_user, username, **payload.model_dump(exclude_unset=True)
-    )
+    return await asyncio.to_thread(local_users.update_user, username, **payload.model_dump(exclude_unset=True))

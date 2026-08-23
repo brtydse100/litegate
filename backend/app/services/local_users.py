@@ -63,9 +63,7 @@ def init_db() -> None:
             )
             """
         )
-        db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_audit_events_occurred_at ON audit_events(occurred_at DESC)"
-        )
+        db.execute("CREATE INDEX IF NOT EXISTS idx_audit_events_occurred_at ON audit_events(occurred_at DESC)")
 
 
 def healthcheck() -> dict:
@@ -127,9 +125,7 @@ def has_users() -> bool:
 def list_users() -> list[dict]:
     init_db()
     with connect() as db:
-        rows = db.execute(
-            "SELECT * FROM local_users ORDER BY active DESC, username COLLATE NOCASE"
-        ).fetchall()
+        rows = db.execute("SELECT * FROM local_users ORDER BY active DESC, username COLLATE NOCASE").fetchall()
     return [_public(row) for row in rows]
 
 
@@ -144,9 +140,7 @@ def authenticate(username: str, password: str) -> Optional[dict]:
     init_db()
     with connect() as db:
         row = db.execute("SELECT * FROM local_users WHERE username = ?", (username,)).fetchone()
-    password_matches = _password_matches(
-        password, row["password_hash"] if row else _DUMMY_PASSWORD_HASH
-    )
+    password_matches = _password_matches(password, row["password_hash"] if row else _DUMMY_PASSWORD_HASH)
     if not row or not row["active"] or not password_matches:
         return None
     return _public(row)

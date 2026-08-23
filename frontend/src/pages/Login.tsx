@@ -3,7 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
-interface AuthConfig { sso_enabled: boolean; local_enabled: boolean; }
+interface AuthConfig {
+  sso_enabled: boolean;
+  local_enabled: boolean;
+}
 
 async function fetchAuthConfig(): Promise<AuthConfig> {
   const r = await fetch("/api/auth/config");
@@ -65,14 +68,27 @@ export default function Login() {
       <div className="w-full max-w-sm rounded-2xl border border-[#2A2E42] bg-[#1A1D27] p-10 flex flex-col items-center gap-6">
         {/* Logo */}
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 shadow-lg shadow-indigo-600/30">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
           </svg>
         </div>
 
         <div className="text-center">
-          <h1 className="text-2xl font-bold tracking-tight text-white">LiteGate</h1>
-          <p className="mt-1.5 text-sm text-gray-400">Your LiteLLM key portal</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            LiteGate
+          </h1>
+          <p className="mt-1.5 text-sm text-gray-400">
+            Your LiteLLM key portal
+          </p>
         </div>
 
         {isLoading && (
@@ -81,8 +97,10 @@ export default function Login() {
 
         {/* SSO button */}
         {showSso && (
-          <a href="/api/auth/login"
-            className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-600/20">
+          <a
+            href="/api/auth/login"
+            className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-indigo-500 transition-colors shadow-md shadow-indigo-600/20"
+          >
             Sign in with SSO
           </a>
         )}
@@ -98,25 +116,45 @@ export default function Login() {
         {/* Local login — always visible when enabled, no toggle */}
         {showLocal && (
           <form onSubmit={handleLocal} className="w-full space-y-3">
-            <label className="block space-y-1 text-xs text-gray-400"><span>Username</span><input
-              type="text" placeholder="Username" value={username}
-              onChange={e => setUsername(e.target.value)} required autoFocus={!showSso} autoComplete="username"
-              className="w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
-            /></label>
-            <label className="block space-y-1 text-xs text-gray-400"><span>Password</span><input
-              type="password" placeholder="Password" value={password}
-              onChange={e => setPassword(e.target.value)} required autoComplete="current-password"
-              className="w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
-            /></label>
+            <label className="block space-y-1 text-xs text-gray-400">
+              <span>Username</span>
+              <input
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                autoFocus={!showSso}
+                autoComplete="username"
+                className="w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+              />
+            </label>
+            <label className="block space-y-1 text-xs text-gray-400">
+              <span>Password</span>
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                className="w-full rounded-lg border border-[#2A2E42] bg-[#0F1117] px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:border-indigo-500 focus:outline-none"
+              />
+            </label>
             {error && <p className="text-xs text-red-400">{error}</p>}
-            <button type="submit" disabled={submitting}
-              className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+            >
               {submitting ? "Signing in…" : "Sign in"}
             </button>
           </form>
         )}
 
-        <p className="text-xs text-gray-600">Access is granted after your organisation login</p>
+        <p className="text-xs text-gray-600">
+          Access is granted after your organisation login
+        </p>
       </div>
     </div>
   );

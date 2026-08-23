@@ -9,12 +9,16 @@ change is written.
 ```bash
 cd backend
 python -m pip install -r requirements-dev.txt
+ruff format --check --diff .
 python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=75
 
 cd ../frontend
 npm install
+npm run lint
+npm run format:check
+npm run typecheck
 npm test
-npm run test:e2e
+npm run test:e2e:smoke
 npm run build
 ```
 

@@ -28,9 +28,12 @@ python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=75
 
 cd ../frontend
 npm test
-npm run test:e2e
+npm run test:e2e:smoke
 npm run build
 ```
+
+The short Playwright smoke flow runs for pull requests. The complete browser
+suite runs nightly and remains available locally with `npm run test:e2e`.
 
 CI also validates dependency audits, Markdown links, version alignment,
 Compose/Helm configuration, and the production Docker build. Backend line

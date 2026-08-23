@@ -49,6 +49,7 @@ def _decorate_team(team: dict) -> dict:
         "default_key_team": default_key_team,
     }
 
+
 @router.get("/me")
 async def api_me(actor: ApiActor = Depends(get_api_actor)):
     return {
@@ -128,9 +129,7 @@ async def api_create_key(
             user_id,
             details={"for_another_user": bool(requested_user_id and requested_user_id != actor.user.user_id)},
         )
-    return KeyCreateResponse(
-        key=result["key"], user_id=result.get("user_id", user_id), expires=result.get("expires")
-    )
+    return KeyCreateResponse(key=result["key"], user_id=result.get("user_id", user_id), expires=result.get("expires"))
 
 
 @router.delete("/keys")
@@ -140,10 +139,7 @@ async def api_delete_key(payload: KeyDeleteRequest, actor: ApiActor = Depends(ge
         if payload.key != actor.proof_key:
             raise HTTPException(status_code=403, detail="A LiteLLM key can only delete itself")
     elif not actor.is_admin:
-        owned = {
-            key.get("token") or key.get("api_key") or key.get("key")
-            for key in await llm.list_user_keys(actor.user.user_id)
-        }
+        owned = {key.get("token") or key.get("api_key") or key.get("key") for key in await llm.list_user_keys(actor.user.user_id)}
         if payload.key not in owned:
             raise HTTPException(status_code=403, detail="Key not owned by user")
     check_key_rate_limit(actor.user.user_id)
@@ -213,7 +209,12 @@ async def api_create_team(payload: TeamCreateRequest, actor: ApiActor = Depends(
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
     created = await llm.create_team(payload.model_dump(exclude_none=True))
-    await _record_audit(actor, "team.create", str(created.get("team_id") or payload.team_id or payload.team_alias), details={"setting_fields": sorted(payload.model_fields_set)})
+    await _record_audit(
+        actor,
+        "team.create",
+        str(created.get("team_id") or payload.team_id or payload.team_alias),
+        details={"setting_fields": sorted(payload.model_fields_set)},
+    )
     return _decorate_team(created)
 
 
@@ -286,11 +287,7 @@ async def api_move_team_member(
         raise HTTPException(status_code=404, detail="Destination team not found")
 
     source_member = next(
-        (
-            member
-            for member in source_team.get("members_with_roles", [])
-            if isinstance(member, dict) and member.get("user_id") == payload.user_id
-        ),
+        (member for member in source_team.get("members_with_roles", []) if isinstance(member, dict) and member.get("user_id") == payload.user_id),
         None,
     )
     if source_member is None:
@@ -298,10 +295,7 @@ async def api_move_team_member(
 
     check_key_rate_limit(actor.user.user_id)
     destination_members = destination_team.get("members_with_roles", [])
-    already_in_destination = any(
-        isinstance(member, dict) and member.get("user_id") == payload.user_id
-        for member in destination_members
-    )
+    already_in_destination = any(isinstance(member, dict) and member.get("user_id") == payload.user_id for member in destination_members)
     if not already_in_destination:
         await llm.add_team_member(
             team_id=payload.destination_team_id,

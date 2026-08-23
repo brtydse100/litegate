@@ -103,9 +103,7 @@ async def callback(
         raise HTTPException(status_code=403, detail="Your SSO groups are not mapped to a LiteLLM team")
 
     provisioned_user = await llm.ensure_user_exists(user_id, email)
-    if provisioned_user is None and (
-        settings.oidc_group_team_mapping or settings.oidc_require_team_mapping
-    ):
+    if provisioned_user is None and (settings.oidc_group_team_mapping or settings.oidc_require_team_mapping):
         raise HTTPException(status_code=502, detail="Could not provision the LiteLLM user")
     if team_ids:
         await llm.sync_user_team_memberships(user_id, email, team_ids)

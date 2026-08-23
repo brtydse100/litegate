@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query
 from typing import Optional
 from app.dependencies import get_current_user
 from app.models import CurrentUser, SpendSummary

@@ -297,11 +297,14 @@ def test_sessions_signed_before_a_secret_rotation_remain_valid(monkeypatch):
     new_token = auth._make_jwt("new-user", "new@example.com")
 
     assert existing.user_id == "existing-user"
-    assert jwt.decode(
-        new_token,
-        new_secret,
-        algorithms=[auth.settings.jwt_algorithm],
-    )["sub"] == "new-user"
+    assert (
+        jwt.decode(
+            new_token,
+            new_secret,
+            algorithms=[auth.settings.jwt_algorithm],
+        )["sub"]
+        == "new-user"
+    )
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent  # …/backend/
 
+
 def _load_yaml_config() -> dict:
     """Read the first project config file without mutating process state."""
     try:
@@ -152,11 +153,7 @@ class Settings(BaseSettings):
         for configured_group, configured_team_ids in self.oidc_group_team_mapping.items():
             if configured_group.strip().casefold() not in claimed_groups:
                 continue
-            values = (
-                [configured_team_ids]
-                if isinstance(configured_team_ids, str)
-                else configured_team_ids
-            )
+            values = [configured_team_ids] if isinstance(configured_team_ids, str) else configured_team_ids
             for raw_team_id in values:
                 team_id = raw_team_id.strip()
                 if team_id and team_id not in seen:
@@ -190,10 +187,7 @@ class Settings(BaseSettings):
         if len(self.jwt_secret) < 32 or "change-me" in normalized_secret or normalized_secret == "changeme":
             warnings.append("JWT_SECRET should be a unique random value of at least 32 characters.")
         previous_secrets = [value.strip() for value in self.jwt_previous_secrets.split(",") if value.strip()]
-        if any(
-            len(secret) < 32 or "change-me" in secret.casefold() or secret.casefold() == "changeme"
-            for secret in previous_secrets
-        ):
+        if any(len(secret) < 32 or "change-me" in secret.casefold() or secret.casefold() == "changeme" for secret in previous_secrets):
             warnings.append("JWT_PREVIOUS_SECRETS contains a weak or placeholder session secret.")
         if self.local_auth_enabled:
             normalized_password = (self.local_auth_password or "").strip().casefold()

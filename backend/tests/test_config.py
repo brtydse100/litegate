@@ -3,14 +3,13 @@ import pytest
 
 
 def test_yaml_list_is_loaded_without_mutating_environment(tmp_path, monkeypatch):
-    (tmp_path / "config.yaml").write_text(
-        "key_models:\n  - gpt-4\n  - gpt-3.5-turbo\n"
-    )
+    (tmp_path / "config.yaml").write_text("key_models:\n  - gpt-4\n  - gpt-3.5-turbo\n")
     monkeypatch.setenv("LITELLM_MASTER_KEY", "sk-test")
     monkeypatch.setenv("JWT_SECRET", "x" * 32)
     monkeypatch.delenv("KEY_MODELS", raising=False)
 
     import app.config as cfg_module
+
     monkeypatch.setattr(cfg_module, "_BACKEND_DIR", tmp_path)
     configured = cfg_module.Settings(
         litellm_master_key="sk-test",
@@ -23,15 +22,12 @@ def test_yaml_list_is_loaded_without_mutating_environment(tmp_path, monkeypatch)
 
 def test_yaml_mapping_is_loaded_as_structured_data(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text(
-        "oidc_group_team_mapping:\n"
-        "  Engineering: team-engineering\n"
-        "  Platform:\n"
-        "    - team-platform\n"
-        "    - team-shared\n"
+        "oidc_group_team_mapping:\n  Engineering: team-engineering\n  Platform:\n    - team-platform\n    - team-shared\n"
     )
     monkeypatch.delenv("OIDC_GROUP_TEAM_MAPPING", raising=False)
 
     import app.config as cfg_module
+
     monkeypatch.setattr(cfg_module, "_BACKEND_DIR", tmp_path)
     configured = cfg_module.Settings(
         litellm_master_key="sk-test",
@@ -50,6 +46,7 @@ def test_environment_takes_precedence_over_yaml(tmp_path, monkeypatch):
     monkeypatch.setenv("JWT_SECRET", "x" * 32)
 
     import app.config as cfg_module
+
     monkeypatch.setattr(cfg_module, "_BACKEND_DIR", tmp_path)
     configured = cfg_module.Settings(jwt_secret="x" * 32)
 
@@ -64,6 +61,7 @@ def test_key_models_list_parses_json(monkeypatch):
     # Re-import to pick up patched env
     import importlib
     import app.config as cfg_module
+
     importlib.reload(cfg_module)
 
     assert cfg_module.settings.key_models_list == ["gpt-4", "gpt-3.5-turbo"]
@@ -76,6 +74,7 @@ def test_key_models_list_empty_default(monkeypatch):
 
     import importlib
     import app.config as cfg_module
+
     importlib.reload(cfg_module)
 
     assert cfg_module.settings.key_models_list == []
@@ -89,14 +88,11 @@ def test_admin_identity_supports_nested_group_claim(monkeypatch):
 
     import importlib
     import app.config as cfg_module
+
     importlib.reload(cfg_module)
 
-    assert cfg_module.settings.is_admin_identity(
-        "user@example.com", {"realm_access": {"roles": ["viewer", "llm operators"]}}
-    )
-    assert not cfg_module.settings.is_admin_identity(
-        "user@example.com", {"realm_access": {"roles": ["viewer"]}}
-    )
+    assert cfg_module.settings.is_admin_identity("user@example.com", {"realm_access": {"roles": ["viewer", "llm operators"]}})
+    assert not cfg_module.settings.is_admin_identity("user@example.com", {"realm_access": {"roles": ["viewer"]}})
 
 
 def test_group_team_mapping_is_case_insensitive_ordered_and_deduplicated():

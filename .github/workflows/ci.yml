@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -13,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  backend:
+  backend-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,6 +28,18 @@ jobs:
       - run: python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=75
         working-directory: backend
 
+  python-format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Check backend formatting
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89 # v4.1.0
+        with:
+          version: "0.16.0"
+          args: format --check --diff
+          src: backend
+
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -39,15 +52,34 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+      - run: npm run format:check
+        working-directory: frontend
+      - run: npm run typecheck
+        working-directory: frontend
       - run: npm test
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
       - run: npm audit --omit=dev
         working-directory: frontend
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - run: npm run test:e2e
+      - run: npm run test:e2e:smoke
         working-directory: frontend
 
   package:

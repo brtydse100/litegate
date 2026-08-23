@@ -39,8 +39,14 @@ describe("administrator status contract", () => {
 
     renderStatus();
 
-    expect(await screen.findByText("LiteGate is ready to serve requests.", { exact: false })).toBeVisible();
-    expect(screen.queryByText("Deployment security warnings")).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("LiteGate is ready to serve requests.", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    expect(
+      screen.queryByText("Deployment security warnings"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows every actionable security warning returned by the backend", async () => {
@@ -56,7 +62,9 @@ describe("administrator status contract", () => {
 
     renderStatus();
 
-    expect(await screen.findByText("Deployment security warnings")).toBeVisible();
+    expect(
+      await screen.findByText("Deployment security warnings"),
+    ).toBeVisible();
     expect(screen.getByText("Use HTTPS.")).toBeVisible();
     expect(screen.getByText("Rotate the bootstrap password.")).toBeVisible();
   });

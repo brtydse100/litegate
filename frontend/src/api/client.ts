@@ -4,7 +4,11 @@ function getToken(): string | null {
   return localStorage.getItem("token");
 }
 
-async function request<T>(path: string, init: RequestInit = {}, redirectOnUnauthorized = true): Promise<T> {
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  redirectOnUnauthorized = true,
+): Promise<T> {
   const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
     ...init,
@@ -22,7 +26,9 @@ async function request<T>(path: string, init: RequestInit = {}, redirectOnUnauth
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     const detail = Array.isArray(err.detail)
-      ? err.detail.map((item: { msg?: string }) => item.msg ?? "Invalid value").join("; ")
+      ? err.detail
+          .map((item: { msg?: string }) => item.msg ?? "Invalid value")
+          .join("; ")
       : err.detail;
     throw new Error(typeof detail === "string" ? detail : "Request failed");
   }
@@ -32,18 +38,28 @@ async function request<T>(path: string, init: RequestInit = {}, redirectOnUnauth
 export const api = {
   me: () => request<import("../types").User>("/auth/me", {}, false),
 
-  logout: () => request<{ signed_out: boolean }>("/auth/logout", { method: "POST" }, false),
+  logout: () =>
+    request<{ signed_out: boolean }>("/auth/logout", { method: "POST" }, false),
 
   listKeys: () => request<{ keys: import("../types").KeyInfo[] }>("/keys"),
 
   getOperationLimit: () =>
     request<import("../types").OperationLimit>("/keys/operation-limit"),
 
-  listAllKeys: (page = 1, size = 25, filters: import("../types").AdminKeyFilters = {}) => {
-    const params = new URLSearchParams({ all: "true", page: String(page), size: String(size) });
+  listAllKeys: (
+    page = 1,
+    size = 25,
+    filters: import("../types").AdminKeyFilters = {},
+  ) => {
+    const params = new URLSearchParams({
+      all: "true",
+      page: String(page),
+      size: String(size),
+    });
     if (filters.search) params.set("search", filters.search);
     if (filters.team_id) params.set("team_id", filters.team_id);
-    if (filters.blocked !== undefined) params.set("blocked", String(filters.blocked));
+    if (filters.blocked !== undefined)
+      params.set("blocked", String(filters.blocked));
     return request<import("../types").AdminKeyPage>(`/v1/keys?${params}`);
   },
 
@@ -51,21 +67,28 @@ export const api = {
     const params = new URLSearchParams();
     if (filters.search) params.set("search", filters.search);
     if (filters.team_id) params.set("team_id", filters.team_id);
-    if (filters.blocked !== undefined) params.set("blocked", String(filters.blocked));
+    if (filters.blocked !== undefined)
+      params.set("blocked", String(filters.blocked));
     const query = params.toString();
-    return request<import("../types").AdminKeyIdentifiers>(`/v1/keys/identifiers${query ? `?${query}` : ""}`);
+    return request<import("../types").AdminKeyIdentifiers>(
+      `/v1/keys/identifiers${query ? `?${query}` : ""}`,
+    );
   },
 
   getSystemStatus: () => request<import("../types").SystemStatus>("/v1/status"),
 
   listAuditEvents: (limit = 100) =>
-    request<{ events: import("../types").AuditEvent[] }>(`/v1/audit-events?limit=${limit}`),
+    request<{ events: import("../types").AuditEvent[] }>(
+      `/v1/audit-events?limit=${limit}`,
+    ),
 
   createKey: () =>
     request<import("../types").KeyCreateResponse>("/keys", { method: "POST" }),
 
   regenerateKey: () =>
-    request<import("../types").KeyCreateResponse>("/keys/regenerate", { method: "POST" }),
+    request<import("../types").KeyCreateResponse>("/keys/regenerate", {
+      method: "POST",
+    }),
 
   deleteKey: (key: string) =>
     request<{ deleted: boolean }>("/keys", {
@@ -73,7 +96,10 @@ export const api = {
       body: JSON.stringify({ key }),
     }),
 
-  bulkUpdateKeys: (keys: string[], settings: import("../types").KeySettingsUpdate) =>
+  bulkUpdateKeys: (
+    keys: string[],
+    settings: import("../types").KeySettingsUpdate,
+  ) =>
     request<import("../types").BulkKeyUpdateResponse>("/v1/keys/bulk", {
       method: "PATCH",
       body: JSON.stringify({ keys, settings }),
@@ -81,20 +107,38 @@ export const api = {
 
   listUsers: () => request<import("../types").LocalUser[]>("/v1/users"),
 
-  createUser: (payload: { username: string; email: string; password: string; role: "user" | "admin" }) =>
+  createUser: (payload: {
+    username: string;
+    email: string;
+    password: string;
+    role: "user" | "admin";
+  }) =>
     request<import("../types").LocalUser>("/v1/users", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
 
-  updateUser: (username: string, payload: { email?: string; password?: string; role?: "user" | "admin"; active?: boolean }) =>
-    request<import("../types").LocalUser>(`/v1/users/${encodeURIComponent(username)}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload),
-    }),
+  updateUser: (
+    username: string,
+    payload: {
+      email?: string;
+      password?: string;
+      role?: "user" | "admin";
+      active?: boolean;
+    },
+  ) =>
+    request<import("../types").LocalUser>(
+      `/v1/users/${encodeURIComponent(username)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    ),
 
   listTeams: (page = 1, size = 25, search = "") =>
-    request<import("../types").TeamPage>(`/v1/teams?page=${page}&size=${size}&search=${encodeURIComponent(search)}`),
+    request<import("../types").TeamPage>(
+      `/v1/teams?page=${page}&size=${size}&search=${encodeURIComponent(search)}`,
+    ),
 
   createTeam: (payload: import("../types").TeamCreatePayload) =>
     request<import("../types").TeamInfo>("/v1/teams", {
@@ -103,19 +147,31 @@ export const api = {
     }),
 
   updateTeam: (teamId: string, payload: import("../types").TeamUpdatePayload) =>
-    request<import("../types").TeamInfo>(`/v1/teams/${encodeURIComponent(teamId)}`, {
-      method: "PATCH",
-      body: JSON.stringify(payload),
-    }),
+    request<import("../types").TeamInfo>(
+      `/v1/teams/${encodeURIComponent(teamId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+    ),
 
   deleteTeam: (teamId: string) =>
-    request<{ deleted: boolean; team_id: string }>(`/v1/teams/${encodeURIComponent(teamId)}`, {
-      method: "DELETE",
-    }),
+    request<{ deleted: boolean; team_id: string }>(
+      `/v1/teams/${encodeURIComponent(teamId)}`,
+      {
+        method: "DELETE",
+      },
+    ),
 
-  moveTeamMember: (sourceTeamId: string, payload: import("../types").TeamMemberMovePayload) =>
-    request<import("../types").TeamMemberMoveResult>(`/v1/teams/${encodeURIComponent(sourceTeamId)}/members/move`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  moveTeamMember: (
+    sourceTeamId: string,
+    payload: import("../types").TeamMemberMovePayload,
+  ) =>
+    request<import("../types").TeamMemberMoveResult>(
+      `/v1/teams/${encodeURIComponent(sourceTeamId)}/members/move`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
 };

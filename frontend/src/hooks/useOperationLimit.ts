@@ -6,12 +6,14 @@ export function useOperationLimit() {
   const query = useQuery({
     queryKey: ["key-operation-limit"],
     queryFn: api.getOperationLimit,
-    refetchInterval: current => current.state.data?.remaining === 0 ? 1000 : false,
+    refetchInterval: (current) =>
+      current.state.data?.remaining === 0 ? 1000 : false,
   });
 
   return {
     operationsBlocked: query.data?.remaining === 0,
     retryAfter: query.data?.retry_after ?? 0,
-    refreshOperationLimit: () => queryClient.invalidateQueries({ queryKey: ["key-operation-limit"] }),
+    refreshOperationLimit: () =>
+      queryClient.invalidateQueries({ queryKey: ["key-operation-limit"] }),
   };
 }

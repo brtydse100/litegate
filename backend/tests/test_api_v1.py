@@ -21,9 +21,7 @@ def setup_function():
 
 @pytest.mark.asyncio
 async def test_api_me_includes_mapped_teams():
-    actor = ApiActor(
-        CurrentUser(user_id="user-1", email="u@example.com", team_ids=["team-primary"])
-    )
+    actor = ApiActor(CurrentUser(user_id="user-1", email="u@example.com", team_ids=["team-primary"]))
 
     result = await api_me(actor)
 
