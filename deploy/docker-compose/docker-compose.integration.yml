@@ -1,0 +1,33 @@
+services:
+  litellm:
+    image: docker.litellm.ai/berriai/litellm@sha256:20b5044b619055374061a6d5b7b08754cad75aeabbf82ddf4f69cc0cf80ddaf4
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgresql://litegate:litegate-integration@postgres:5432/litellm
+      LITELLM_MASTER_KEY: sk-litegate-integration-master
+      LITELLM_SALT_KEY: sk-litegate-integration-salt-key
+      STORE_MODEL_IN_DB: "True"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 30s
+
+  postgres:
+    image: postgres@sha256:e17e86066e5ef83e0952a9347f5c792b7ece00972e2aa787a6986f471b3dd3d5
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litegate
+      POSTGRES_PASSWORD: litegate-integration
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d litellm -U litegate"]
+      interval: 2s
+      timeout: 5s
+      retries: 15

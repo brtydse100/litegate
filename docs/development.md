@@ -50,10 +50,42 @@ npm audit --omit=dev
 ```
 
 GitHub Actions runs pytest with the established coverage floor, the frontend
-unit suite, a short Playwright smoke flow, static checks, the production build,
-dependency audit, Helm lint, documentation/version checks, and an all-in-one
-container build on every pull request and push to `main`. The complete browser
-suite runs nightly and can also be started manually.
+unit suite, a short Playwright smoke flow, a real LiteLLM compatibility suite,
+static checks, the production build, dependency audit, Helm lint,
+documentation/version checks, and an all-in-one container build on every pull
+request and push to `main`. The complete browser suite runs nightly and can also
+be started manually.
+
+## LiteLLM integration environment
+
+The production Compose file intentionally connects to an existing LiteLLM
+deployment. A separate opt-in stack provides disposable LiteLLM and PostgreSQL
+services for compatibility testing:
+
+```bash
+docker compose -f deploy/docker-compose/docker-compose.integration.yml up -d --wait
+```
+
+The images are pinned by immutable multi-architecture digest. With the backend
+development dependencies and frontend packages installed, run both live layers:
+
+```bash
+cd backend
+RUN_LITELLM_INTEGRATION=1 \
+LITELLM_URL=http://127.0.0.1:4000 \
+LITELLM_MASTER_KEY=sk-litegate-integration-master \
+JWT_SECRET=litegate-integration-jwt-secret-at-least-32-characters \
+python -m pytest tests/integration/test_litellm_live.py -v
+
+cd ../frontend
+npx playwright test --config playwright.integration.config.ts
+```
+
+Stop the disposable services and remove their database afterward:
+
+```bash
+docker compose -f deploy/docker-compose/docker-compose.integration.yml down --volumes
+```
 
 ## Project layout
 
