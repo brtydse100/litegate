@@ -35,6 +35,9 @@ interface PortalConfig {
   api_docs_url: string;
 }
 
+const primaryKeyActionClassName =
+  "flex min-h-16 w-full items-center justify-center gap-3 rounded-lg bg-indigo-600 px-8 py-5 text-lg font-semibold text-white shadow-lg shadow-indigo-200/60 transition-colors hover:bg-indigo-700 disabled:opacity-50 [html.dark_&]:shadow-indigo-950/50";
+
 async function fetchPortalConfig(): Promise<PortalConfig> {
   const response = await fetch("/api/portal-config");
   if (!response.ok) throw new Error("Could not load portal configuration");
@@ -547,9 +550,9 @@ export default function Home() {
                       <button
                         onClick={() => create.mutate()}
                         disabled={create.isPending || operationsBlocked}
-                        className="flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+                        className={primaryKeyActionClassName}
                       >
-                        <Zap size={16} />{" "}
+                        <Zap size={21} />{" "}
                         {create.isPending
                           ? "Creating..."
                           : operationsBlocked
@@ -560,7 +563,7 @@ export default function Home() {
                       <button
                         onClick={() => setConfirmRegenerate(true)}
                         disabled={operationsBlocked}
-                        className="flex min-h-16 w-full items-center justify-center gap-3 rounded-lg bg-indigo-600 px-8 py-5 text-lg font-semibold text-white shadow-lg shadow-indigo-200/60 transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                        className={primaryKeyActionClassName}
                       >
                         <RefreshCw size={21} />{" "}
                         {operationsBlocked
