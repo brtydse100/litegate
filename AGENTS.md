@@ -2,6 +2,28 @@
 
 This file provides guidance to coding agents working in this repository.
 
+## Before any work
+
+- **Never start coding immediately.** First ask the user clarifying questions, then present a plan and get their approval. Only implement after the plan is agreed.
+- If the task seems trivial and you think planning is overkill, say so and propose a one-line plan, but still wait for the user's go-ahead.
+
+## Bugs
+
+- **Never just apply a fix.** Explain the root cause first and let the user decide how to proceed. Diagnosis before surgery.
+
+## Before presenting work
+
+- Run `format`, `lint`, and `typecheck` (see **Commands**; the backend has formatting only); fix all violations before showing the user anything. Never fix a violation by disabling a rule.
+
+
+## Scope & Code Change Policy
+
+- Don't refactor, rename, or "improve" code the user didn't ask you to touch. Never change behavior that was not explicitly requested.
+- Keep all changes as minimal as possible unless explicitly asked for more. Prefer the simplest solution that works.
+- **Never add a dependency without asking the user first**: present what it does, why hand-rolling is worse, and its cost. Read [ARCHITECTURE_OVERVIEW.md](ARCHITECTURE_OVERVIEW.md) before proposing new dependencies, services, or persistent state: weigh every such change against its pillars.
+- Apply DRY principles where possible.
+- Python files must not exceed 400 lines.
+
 ## Project overview
 
 LiteGate is a small, security-focused access layer for LiteLLM. It gives users a
