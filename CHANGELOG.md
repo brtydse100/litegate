@@ -7,6 +7,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-08-24
+
+### Changed
+
+- Made key regeneration and support actions full-width, higher-contrast
+  controls so the portal's primary next steps are easier to identify and use
+  across desktop and mobile layouts.
+- Refreshed the public screenshots, SVG source, and demonstration video to
+  match the updated action hierarchy.
+
 ## [2.6.0] - 2026-08-23
 
 ### Added
@@ -190,7 +200,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.6.1...HEAD
+[2.6.1]: https://github.com/brtydse100/litegate/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/brtydse100/litegate/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/brtydse100/litegate/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/brtydse100/litegate/compare/v2.3.0...v2.4.0

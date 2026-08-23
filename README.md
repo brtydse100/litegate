@@ -94,7 +94,7 @@ docker compose -f docker-compose.image.yml up -d
 
 This pulls the multi-architecture `ghcr.io/brtydse100/litegate:latest` package.
 To pin a release, set `LITEGATE_VERSION`, for example
-`LITEGATE_VERSION=2.6.0`. You can also build locally from source:
+`LITEGATE_VERSION=2.6.1`. You can also build locally from source:
 
 ```bash
 docker compose up --build
