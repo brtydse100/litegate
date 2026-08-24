@@ -118,7 +118,6 @@ export default function BulkKeyEditor({
         .filter((result) => !result.reset)
         .map((result) => result.key);
       setSelected(failedKeys);
-      setTargets("");
       if (!failedKeys.length) selectAll.reset();
       setResetTarget(null);
       void queryClient.invalidateQueries({ queryKey: ["keys"] });
