@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     local_auth_password: Optional[str] = None
     local_users_enabled: bool = True
     local_users_db_path: str = "data/litegate.db"
+    audit_retention_days: int = Field(default=90, ge=1)
+    audit_cleanup_batch_size: int = Field(default=1000, ge=1, le=10_000)
     admin_emails: str = ""
     admin_groups: str = ""
     management_api_key: Optional[str] = None

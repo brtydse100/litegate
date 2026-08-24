@@ -384,6 +384,8 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `key_team_id` | `KEY_TEAM_ID` | `""` | Fallback team for keys without an SSO-mapped primary team |
 | `local_users_enabled` | `LOCAL_USERS_ENABLED` | `true` | Enable admin-created local accounts and their administration page |
 | `local_users_db_path` | `LOCAL_USERS_DB_PATH` | `data/litegate.db` | SQLite account database path |
+| `audit_retention_days` | `AUDIT_RETENTION_DAYS` | `90` | Days to retain audit events before automatic cleanup |
+| `audit_cleanup_batch_size` | `AUDIT_CLEANUP_BATCH_SIZE` | `1000` | Maximum expired audit rows removed per new audit event |
 | `admin_emails` | `ADMIN_EMAILS` | `""` | Comma-separated SSO administrator emails |
 | `management_api_key` | `MANAGEMENT_API_KEY` | `null` | Optional admin credential for `/api/v1` via `X-API-Key` |
 | `admin_groups` | `ADMIN_GROUPS` | `""` | Comma-separated SSO groups that receive admin access |

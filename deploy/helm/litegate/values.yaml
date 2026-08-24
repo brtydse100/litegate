@@ -77,6 +77,9 @@ config:
   # Admin-created local accounts and their administration page
   localUsersEnabled: "true"
   localUsersDbPath: "/app/backend/data/litegate.db"
+  # Expired audit rows are pruned in bounded batches when new audit events are written.
+  auditRetentionDays: "90"
+  auditCleanupBatchSize: "1000"
   adminEmails: ""
   # Comma-separated SSO groups that receive the LiteGate administrator role.
   # Matching is case-insensitive; this does not make users LiteLLM team admins.

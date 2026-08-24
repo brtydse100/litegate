@@ -1,5 +1,7 @@
 import os
+
 import pytest
+from pydantic import ValidationError
 
 
 def test_yaml_list_is_loaded_without_mutating_environment(tmp_path, monkeypatch):
@@ -174,3 +176,19 @@ def test_security_warnings_reject_a_weak_previous_session_secret():
     )
 
     assert any("JWT_PREVIOUS_SECRETS" in warning for warning in configured.security_warnings)
+
+
+def test_audit_retention_settings_require_positive_values():
+    from app.config import Settings
+
+    configured = Settings(
+        litellm_master_key="sk-test",
+        jwt_secret="x" * 32,
+        audit_retention_days=1,
+        audit_cleanup_batch_size=1,
+    )
+    assert configured.audit_retention_days == 1
+    assert configured.audit_cleanup_batch_size == 1
+
+    with pytest.raises(ValidationError):
+        Settings(litellm_master_key="sk-test", jwt_secret="x" * 32, audit_retention_days=0)

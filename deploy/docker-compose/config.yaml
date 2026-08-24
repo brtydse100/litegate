@@ -39,6 +39,9 @@ local_auth_password: "changeme"
 # Admin-created local accounts and their administration page
 # (accounts are stored in /app/backend/data/litegate.db)
 local_users_enabled: true
+# Retain audit history for this many days; expired rows are pruned in bounded batches on audit writes.
+audit_retention_days: 90
+audit_cleanup_batch_size: 1000
 
 # Comma-separated SSO email addresses that receive LiteGate admin access
 admin_emails: ""

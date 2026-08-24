@@ -12,6 +12,8 @@ data:
   SUPPORT_TICKET_URL: {{ .Values.config.supportTicketUrl | quote }}
   LOCAL_USERS_ENABLED: {{ .Values.config.localUsersEnabled | quote }}
   LOCAL_USERS_DB_PATH: {{ .Values.config.localUsersDbPath | quote }}
+  AUDIT_RETENTION_DAYS: {{ .Values.config.auditRetentionDays | quote }}
+  AUDIT_CLEANUP_BATCH_SIZE: {{ .Values.config.auditCleanupBatchSize | quote }}
   ADMIN_EMAILS: {{ .Values.config.adminEmails | quote }}
   ADMIN_GROUPS: {{ .Values.config.adminGroups | quote }}
   {{- if .Values.config.localAuthUsername }}

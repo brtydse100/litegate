@@ -33,10 +33,22 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `local_auth_password` | empty | Bootstrap administrator password |
 | `local_users_enabled` | `true` | Allow administrator-created local accounts and show their administration page |
 | `local_users_db_path` | `data/litegate.db` | SQLite account database path |
+| `audit_retention_days` | `90` | Days to retain audit events before automatic cleanup |
+| `audit_cleanup_batch_size` | `1000` | Maximum expired audit rows removed per new audit event |
 | `management_api_key` | empty | Trusted-agent administrator credential for `/api/v1` |
 
 The management key grants administrator access, including administrator-only
 bulk key editing. It is not a user credential or a scoped token.
+
+### Audit-history retention
+
+Audit events are retained for 90 days by default. When LiteGate records a new
+audit event, it removes up to `audit_cleanup_batch_size` events older than
+`audit_retention_days` in the same SQLite transaction. This bounds cleanup work
+while eventually removing expired history; if no audit events are written,
+cleanup resumes on the next audit write. Use the verified SQLite backup
+procedure in the [deployment guide](../DEPLOYMENT.md#backup-and-restore) before
+the retention period when longer-term archival is required.
 
 ### SSO team mapping
 
