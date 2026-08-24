@@ -55,7 +55,6 @@ export default function BulkKeyEditor({
   const [teamFilter, setTeamFilter] = useState("");
   const [blockedFilter, setBlockedFilter] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
-  const [targets, setTargets] = useState("");
   const [alias, setAlias] = useState("");
   const [models, setModels] = useState("");
   const [budget, setBudget] = useState("");
@@ -105,7 +104,6 @@ export default function BulkKeyEditor({
         .filter((result) => !result.updated)
         .map((result) => result.key);
       setSelected(failedKeys);
-      setTargets("");
       if (!failedKeys.length) selectAll.reset();
       void queryClient.invalidateQueries({ queryKey: ["keys"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-keys"] });
@@ -135,11 +133,7 @@ export default function BulkKeyEditor({
     allFetchedTokens.length > 0 &&
     selectAll.data?.total === adminKeys.data?.total &&
     allFetchedTokens.every((token) => selected.includes(token));
-  const pastedTokens = targets
-    .split(/[\n,]/)
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const targetKeys = Array.from(new Set([...selected, ...pastedTokens]));
+  const targetKeys = selected;
   const targetCount = targetKeys.length;
   const resetSelection =
     targetCount === 1
@@ -519,20 +513,6 @@ export default function BulkKeyEditor({
               </p>
             )}
           </div>
-
-          <details className="rounded-lg border border-dashed border-[#2A2E42] px-3 py-2.5">
-            <summary className="cursor-pointer text-[11px] text-gray-500 hover:text-gray-300">
-              Advanced: paste key IDs manually
-            </summary>
-            <label className={`${fieldClass} mt-3 block`}>
-              <span>Key IDs, one per line</span>
-              <textarea
-                className={`${inputClass} mt-1 min-h-20 w-full`}
-                value={targets}
-                onChange={(event) => setTargets(event.target.value)}
-              />
-            </label>
-          </details>
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
             <div>
