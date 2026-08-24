@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test && npm run test:e2e:demo",
+    "test:e2e:demo": "playwright test --config playwright.demo.config.ts",
     "test:e2e:smoke": "playwright test --grep @smoke"
   },
   "dependencies": {
