@@ -36,7 +36,8 @@ oidc_require_team_mapping: false
 local_auth_username: "admin"
 local_auth_password: "changeme"
 
-# Admin-created local accounts (stored in /app/backend/data/litegate.db)
+# Admin-created local accounts and their administration page
+# (accounts are stored in /app/backend/data/litegate.db)
 local_users_enabled: true
 
 # Comma-separated SSO email addresses that receive LiteGate admin access

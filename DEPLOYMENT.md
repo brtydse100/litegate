@@ -382,7 +382,7 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `key_rpm_limit` | `KEY_RPM_LIMIT` | `null` | Requests per minute |
 | `key_duration` | `KEY_DURATION` | `null` | Key TTL |
 | `key_team_id` | `KEY_TEAM_ID` | `""` | Fallback team for keys without an SSO-mapped primary team |
-| `local_users_enabled` | `LOCAL_USERS_ENABLED` | `true` | Enable admin-created local accounts |
+| `local_users_enabled` | `LOCAL_USERS_ENABLED` | `true` | Enable admin-created local accounts and their administration page |
 | `local_users_db_path` | `LOCAL_USERS_DB_PATH` | `data/litegate.db` | SQLite account database path |
 | `admin_emails` | `ADMIN_EMAILS` | `""` | Comma-separated SSO administrator emails |
 | `management_api_key` | `MANAGEMENT_API_KEY` | `null` | Optional admin credential for `/api/v1` via `X-API-Key` |
