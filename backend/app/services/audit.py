@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from app.services import local_users
 
@@ -19,8 +19,16 @@ def _safe_details(details: dict | None) -> dict:
         elif name == "keys" and isinstance(value, list):
             safe["key_count"] = len(value)
         else:
-            safe[name] = value
+            safe[name] = _safe_value(value)
     return safe
+
+
+def _safe_value(value: object) -> object:
+    if isinstance(value, dict):
+        return _safe_details(value)
+    if isinstance(value, (list, tuple, set)):
+        return [_safe_value(item) for item in value]
+    return value
 
 
 def record(
@@ -40,7 +48,7 @@ def record(
                (occurred_at, actor_id, actor_email, action, target, outcome, details_json)
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 actor_id,
                 actor_email,
                 action,
