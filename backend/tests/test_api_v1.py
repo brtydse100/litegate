@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.models import ApiKeyCreateRequest, BulkKeyUpdateRequest, CurrentUser, KeyDeleteRequest
+from app.models import ApiKeyCreateRequest, BulkKeyUpdateRequest, CurrentUser, KeyDeleteRequest, KeyResetSpendRequest
 from app.rate_limit import _key_ops
 from app.routers.api_v1 import (
     ApiActor,
@@ -11,6 +11,7 @@ from app.routers.api_v1 import (
     api_delete_key,
     api_list_key_identifiers,
     api_me,
+    api_reset_key_spend,
     bulk_update_keys,
 )
 
@@ -49,6 +50,38 @@ async def test_key_proof_cannot_bulk_update_keys():
     with pytest.raises(HTTPException) as exc:
         await bulk_update_keys(payload, actor)
     assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_user_cannot_reset_key_spend():
+    actor = ApiActor(CurrentUser(user_id="user-1", email="u@example.com"))
+    with patch("app.routers.api_v1.llm.reset_key_spend", new=AsyncMock()) as reset:
+        with pytest.raises(HTTPException) as exc:
+            await api_reset_key_spend(KeyResetSpendRequest(key="key-1"), actor)
+    assert exc.value.status_code == 403
+    reset.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_admin_can_reset_one_key_spend():
+    actor = ApiActor(CurrentUser(user_id="admin", email="a@example.com", role="admin"))
+    with (
+        patch(
+            "app.routers.api_v1.llm.reset_key_spend",
+            new=AsyncMock(return_value={"spend": 0.0, "previous_spend": 12.5}),
+        ) as reset,
+        patch("app.routers.api_v1._record_audit", new=AsyncMock()) as audit,
+    ):
+        result = await api_reset_key_spend(KeyResetSpendRequest(key="key-1"), actor)
+
+    assert result == {"reset": True, "spend": 0.0, "previous_spend": 12.5}
+    reset.assert_awaited_once_with("key-1")
+    audit.assert_awaited_once_with(
+        actor,
+        "key.spend_reset",
+        "installation-key",
+        details={"previous_spend": 12.5},
+    )
 
 
 @pytest.mark.asyncio

@@ -4,12 +4,14 @@ import {
   Check,
   Download,
   KeyRound,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   UserRound,
   X,
 } from "lucide-react";
 import { api } from "../api/client";
+import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import type {
   AdminKeyFilters,
@@ -21,6 +23,12 @@ import type {
 const inputClass =
   "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
 const fieldClass = "space-y-1 text-xs text-gray-400";
+
+interface ResetTarget {
+  token: string;
+  label: string;
+  spend?: number;
+}
 
 export function keyToken(key: KeyInfo): string {
   return key.token ?? key.api_key ?? key.key ?? "";
@@ -57,6 +65,7 @@ export default function BulkKeyEditor({
   const [duration, setDuration] = useState("");
   const [blockedSetting, setBlockedSetting] = useState("");
   const [localError, setLocalError] = useState("");
+  const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const [lastSettings, setLastSettings] = useState<KeySettingsUpdate | null>(
     null,
   );
@@ -105,6 +114,17 @@ export default function BulkKeyEditor({
     onSettled: refreshOperationLimit,
   });
 
+  const resetSpend = useMutation({
+    mutationFn: (key: string) => api.resetKeySpend(key),
+    onSuccess: () => {
+      setResetTarget(null);
+      void queryClient.invalidateQueries({ queryKey: ["keys"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-keys"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-events"] });
+    },
+    onSettled: refreshOperationLimit,
+  });
+
   const visibleKeys = adminKeys.data?.keys ?? [];
   const visibleTokens = visibleKeys.map(keyToken).filter(Boolean);
   const allVisibleSelected =
@@ -119,7 +139,20 @@ export default function BulkKeyEditor({
     .split(/[\n,]/)
     .map((value) => value.trim())
     .filter(Boolean);
-  const targetCount = new Set([...selected, ...pastedTokens]).size;
+  const targetKeys = Array.from(new Set([...selected, ...pastedTokens]));
+  const targetCount = targetKeys.length;
+  const resetSelection =
+    targetCount === 1
+      ? (() => {
+          const token = targetKeys[0];
+          const key = visibleKeys.find((item) => keyToken(item) === token);
+          return {
+            token,
+            label: key?.key_alias || maskedToken(token),
+            spend: key?.spend,
+          };
+        })()
+      : null;
   const failedResults =
     update.data?.results.filter((result) => !result.updated) ?? [];
 
@@ -144,7 +177,6 @@ export default function BulkKeyEditor({
     event.preventDefault();
     if (operationsBlocked || update.isPending) return;
     setLocalError("");
-    const targetKeys = Array.from(new Set([...selected, ...pastedTokens]));
     if (!targetKeys.length) {
       setLocalError("Select at least one key to update.");
       return;
@@ -501,6 +533,29 @@ export default function BulkKeyEditor({
               />
             </label>
           </details>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+            <div>
+              <p className="text-xs font-medium text-amber-200">
+                Reset accumulated spend
+              </p>
+              <p className="mt-0.5 text-[11px] text-gray-500">
+                Select exactly one key. Its budget, limits, and spend history
+                are kept.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => resetSelection && setResetTarget(resetSelection)}
+              disabled={!resetSelection || operationsBlocked}
+              className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <RotateCcw size={13} /> Reset selected key spend
+            </button>
+          </div>
+          {resetSpend.data && (
+            <p className="text-xs text-green-300">Spend reset to $0.00.</p>
+          )}
         </div>
 
         <div className="sm:col-span-2">
@@ -658,6 +713,102 @@ export default function BulkKeyEditor({
                 : "Select keys to continue"}
         </button>
       </form>
+      {resetTarget && (
+        <ResetSpendDialog
+          target={resetTarget}
+          pending={resetSpend.isPending}
+          operationsBlocked={operationsBlocked}
+          error={(resetSpend.error as Error | null)?.message}
+          onClose={() => {
+            if (!resetSpend.isPending) {
+              setResetTarget(null);
+              resetSpend.reset();
+            }
+          }}
+          onReset={() => resetSpend.mutate(resetTarget.token)}
+        />
+      )}
     </details>
+  );
+}
+
+function ResetSpendDialog({
+  target,
+  pending,
+  operationsBlocked,
+  error,
+  onClose,
+  onReset,
+}: {
+  target: ResetTarget;
+  pending: boolean;
+  operationsBlocked: boolean;
+  error?: string;
+  onClose: () => void;
+  onReset: () => void;
+}) {
+  useDialogDismiss(onClose, pending);
+  return (
+    <div
+      className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reset-spend-title"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !pending) onClose();
+      }}
+    >
+      <div className="w-full max-w-md rounded-2xl border border-amber-500/30 bg-[#1A1D27] p-5 shadow-2xl">
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-amber-500/10 p-2 text-amber-300">
+            <RotateCcw size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 id="reset-spend-title" className="font-semibold text-white">
+              Reset key spend?
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-gray-400">
+              {target.label} will be reset{" "}
+              {target.spend === undefined
+                ? ""
+                : `from $${target.spend.toFixed(2)} `}
+              to $0.00. LiteLLM keeps its spend logs, budget, and limits.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            aria-label="Close reset spend dialog"
+            className="text-gray-500 hover:text-white disabled:opacity-40"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            disabled={pending || operationsBlocked}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {pending
+              ? "Resetting..."
+              : operationsBlocked
+                ? "Key actions paused"
+                : "Reset spend to zero"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

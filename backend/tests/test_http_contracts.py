@@ -227,6 +227,22 @@ async def test_non_admin_bulk_edit_is_denied_before_litellm_is_called():
 
 
 @pytest.mark.asyncio
+async def test_non_admin_spend_reset_is_denied_before_litellm_is_called():
+    token = auth._make_jwt("user-1", "user@example.com")
+    with patch("app.routers.api_v1.llm.reset_key_spend", new=AsyncMock()) as reset:
+        async with _client() as client:
+            response = await client.post(
+                "/api/v1/keys/reset-spend",
+                json={"key": "sk-owned"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+    assert response.status_code == 403
+    assert "sk-owned" not in str(response.request.url)
+    reset.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_non_admin_team_management_is_denied_before_litellm_is_called():
     token = auth._make_jwt("user-1", "user@example.com")
     with patch("app.routers.api_v1.llm.list_teams", new=AsyncMock()) as list_teams:

@@ -46,6 +46,10 @@ class KeyDeleteRequest(BaseModel):
         return value.strip()
 
 
+class KeyResetSpendRequest(KeyDeleteRequest):
+    pass
+
+
 class SpendLog(BaseModel):
     request_id: Optional[str] = None
     call_type: Optional[str] = None

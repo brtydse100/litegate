@@ -9,6 +9,7 @@ vi.mock("../api/client", () => ({
     listAllKeys: vi.fn(),
     listAllKeyIdentifiers: vi.fn(),
     bulkUpdateKeys: vi.fn(),
+    resetKeySpend: vi.fn(),
     getOperationLimit: vi.fn(),
   },
 }));
@@ -100,5 +101,31 @@ describe("BulkKeyEditor", () => {
     await waitFor(() =>
       expect(screen.getAllByText("1 selected").length).toBeGreaterThan(0),
     );
+  });
+
+  it("confirms and resets spend for one selected key", async () => {
+    vi.mocked(api.resetKeySpend).mockResolvedValue({
+      reset: true,
+      spend: 0,
+      previous_spend: 1,
+    });
+    renderEditor();
+    fireEvent.click(await screen.findByLabelText("Select Alice"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset selected key spend" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Reset key spend?" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset spend to zero" }),
+    );
+
+    await waitFor(() =>
+      expect(api.resetKeySpend).toHaveBeenCalledWith("key-1"),
+    );
+    expect(
+      await screen.findByText("Spend reset to $0.00."),
+    ).toBeInTheDocument();
   });
 });
