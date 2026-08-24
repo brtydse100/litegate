@@ -380,77 +380,79 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 md:flex md:h-screen md:overflow-hidden">
-      <aside className="hidden w-60 flex-none flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="flex h-14 items-center border-b border-slate-200 px-4">
-          <Brand logoUrl={config?.logo_url} />
-        </div>
-        <nav
-          className="flex-1 space-y-5 overflow-y-auto px-3 py-4"
-          aria-label="Primary navigation"
-        >
-          <div>
-            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Workspace
-            </p>
-            <NavLink to="/my-key" className={navClass}>
-              <KeyRound size={16} /> My key
-            </NavLink>
+      {isAdmin && (
+        <aside className="hidden w-60 flex-none flex-col border-r border-slate-200 bg-white md:flex">
+          <div className="flex h-14 items-center border-b border-slate-200 px-4">
+            <Brand logoUrl={config?.logo_url} />
           </div>
-          {isAdmin && (
-            <>
-              <div>
-                <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  Access control
-                </p>
-                <div className="space-y-0.5">
-                  <NavLink to="/keys" className={navClass}>
-                    <Shield size={16} /> Key policies
-                  </NavLink>
-                  {localUsersEnabled && (
-                    <NavLink to="/users" className={navClass}>
-                      <Users size={16} /> Local users
+          <nav
+            className="flex-1 space-y-5 overflow-y-auto px-3 py-4"
+            aria-label="Primary navigation"
+          >
+            <div>
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Workspace
+              </p>
+              <NavLink to="/my-key" className={navClass}>
+                <KeyRound size={16} /> My key
+              </NavLink>
+            </div>
+            {isAdmin && (
+              <>
+                <div>
+                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Access control
+                  </p>
+                  <div className="space-y-0.5">
+                    <NavLink to="/keys" className={navClass}>
+                      <Shield size={16} /> Key policies
                     </NavLink>
-                  )}
-                  <NavLink to="/teams" className={navClass}>
-                    <Building2 size={16} /> Teams
+                    {localUsersEnabled && (
+                      <NavLink to="/users" className={navClass}>
+                        <Users size={16} /> Local users
+                      </NavLink>
+                    )}
+                    <NavLink to="/teams" className={navClass}>
+                      <Building2 size={16} /> Teams
+                    </NavLink>
+                  </div>
+                </div>
+                <div>
+                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Operations
+                  </p>
+                  <NavLink to="/status" className={navClass}>
+                    <Activity size={16} /> Status
                   </NavLink>
                 </div>
+              </>
+            )}
+          </nav>
+          <div className="border-t border-slate-200 p-3">
+            <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700">
+                {user?.email?.slice(0, 2).toUpperCase() || "LG"}
               </div>
-              <div>
-                <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                  Operations
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-slate-800">
+                  {user?.email}
                 </p>
-                <NavLink to="/status" className={navClass}>
-                  <Activity size={16} /> Status
-                </NavLink>
+                <p className="text-[10px] capitalize text-slate-500">
+                  {user?.role || "user"}
+                </p>
               </div>
-            </>
-          )}
-        </nav>
-        <div className="border-t border-slate-200 p-3">
-          <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700">
-              {user?.email?.slice(0, 2).toUpperCase() || "LG"}
+              <button
+                onClick={() => void logout()}
+                aria-label="Sign out"
+                title="Sign out"
+                className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-800"
+              >
+                <LogOut size={15} />
+              </button>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-slate-800">
-                {user?.email}
-              </p>
-              <p className="text-[10px] capitalize text-slate-500">
-                {user?.role || "user"}
-              </p>
-            </div>
-            <button
-              onClick={() => void logout()}
-              aria-label="Sign out"
-              title="Sign out"
-              className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-800"
-            >
-              <LogOut size={15} />
-            </button>
           </div>
-        </div>
-      </aside>
+        </aside>
+      )}
 
       <div className="min-w-0 flex-1 md:flex md:flex-col md:overflow-hidden">
         <header className="sticky top-0 z-20 border-b border-slate-200 bg-white md:static md:flex-none">
@@ -502,7 +504,7 @@ export default function Home() {
               <ThemeToggle />
               <button
                 onClick={() => void logout()}
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 md:hidden"
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 ${isAdmin ? "md:hidden" : ""}`}
               >
                 <LogOut size={14} />{" "}
                 <span className="hidden sm:inline">Sign out</span>

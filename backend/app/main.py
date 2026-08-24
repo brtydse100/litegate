@@ -94,6 +94,7 @@ async def portal_config():
         "logo_url": settings.logo_url,
         "litellm_ui_url": hub_url,
         "api_docs_url": "/api/docs",
+        "local_users_enabled": settings.local_users_enabled,
     }
 
 

@@ -31,7 +31,7 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `admin_groups` | empty | Comma-separated SSO administrator groups |
 | `local_auth_username` | empty | Bootstrap administrator username |
 | `local_auth_password` | empty | Bootstrap administrator password |
-| `local_users_enabled` | `true` | Allow administrator-created local accounts |
+| `local_users_enabled` | `true` | Allow administrator-created local accounts and show their administration page |
 | `local_users_db_path` | `data/litegate.db` | SQLite account database path |
 | `management_api_key` | empty | Trusted-agent administrator credential for `/api/v1` |
 

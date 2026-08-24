@@ -17,7 +17,11 @@ const keyPage = {
   total_pages: 1,
 };
 
-async function mockApi(page: Page, role: "admin" | "user") {
+async function mockApi(
+  page: Page,
+  role: "admin" | "user",
+  localUsersEnabled = true,
+) {
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const url = new URL(route.request().url());
     let body: unknown = {};
@@ -35,6 +39,7 @@ async function mockApi(page: Page, role: "admin" | "user") {
         logo_url: "",
         litellm_ui_url: "",
         api_docs_url: "/api/docs",
+        local_users_enabled: localUsersEnabled,
       };
     else if (url.pathname === "/api/keys/operation-limit")
       body = { limit: 5, remaining: 5, retry_after: 0 };
@@ -102,6 +107,19 @@ test("@smoke normal users cannot open administrator routes", async ({
   await expect(
     page.getByRole("heading", { name: "Your API access" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Primary navigation" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Local users" })).toHaveCount(0);
+});
+
+test("local-user navigation follows the deployment setting", async ({
+  page,
+}) => {
+  await mockApi(page, "admin", false);
+  await page.goto("/users");
+  await expect(page).toHaveURL(/\/my-key$/);
   await expect(page.getByRole("link", { name: "Local users" })).toHaveCount(0);
 });
 
@@ -159,6 +177,7 @@ test("administrator can create, edit, move a member, and delete a team", async (
         logo_url: "",
         litellm_ui_url: "",
         api_docs_url: "/api/docs",
+        local_users_enabled: true,
       };
     else if (url.pathname === "/api/keys/operation-limit")
       body = { limit: 5, remaining: 5, retry_after: 0 };
@@ -302,6 +321,7 @@ test("administrator can manage a local account without leaving the users page", 
         logo_url: "",
         litellm_ui_url: "",
         api_docs_url: "/api/docs",
+        local_users_enabled: true,
       };
     else if (url.pathname === "/api/keys/operation-limit")
       body = { limit: 5, remaining: 5, retry_after: 0 };

@@ -13,6 +13,7 @@ import httpx
 import jwt
 import pytest
 
+from app import main as main_module
 from app.main import app
 from app.dependencies import decode_portal_token
 from app.rate_limit import _key_ops, _login_failures
@@ -32,6 +33,17 @@ def _client(*, address: str = "192.0.2.10") -> httpx.AsyncClient:
 def clear_login_throttle():
     _login_failures.clear()
     _key_ops.clear()
+
+
+@pytest.mark.asyncio
+async def test_portal_config_exposes_local_users_setting(monkeypatch):
+    monkeypatch.setattr(main_module.settings, "local_users_enabled", False)
+
+    async with _client() as client:
+        response = await client.get("/api/portal-config")
+
+    assert response.status_code == 200
+    assert response.json()["local_users_enabled"] is False
 
 
 @pytest.mark.asyncio

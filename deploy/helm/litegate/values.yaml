@@ -74,7 +74,7 @@ config:
   localAuthUsername: "admin"
   localAuthPassword: "changeme"
 
-  # Admin-created local accounts and SSO administrators
+  # Admin-created local accounts and their administration page
   localUsersEnabled: "true"
   localUsersDbPath: "/app/backend/data/litegate.db"
   adminEmails: ""
