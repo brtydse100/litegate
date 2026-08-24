@@ -29,13 +29,14 @@ test("interactive demo keeps its key views consistent and supports local sign-in
   await expect(page.getByText("sk-litega....7f3a")).toHaveCount(0);
   await expect(page.getByText("$18.42 spent")).toBeVisible();
   await page.getByLabel("Select alex-primary").check({ force: true });
-  await page.getByRole("button", { name: "Reset selected key spend" }).click();
+  await page.getByLabel("Select product-research").check({ force: true });
+  await page.getByRole("button", { name: "Reset spend for 2 keys" }).click();
   await expect(
-    page.getByRole("dialog", { name: "Reset key spend?" }),
+    page.getByRole("dialog", { name: "Reset spend for 2 keys?" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Reset spend to zero" }).click();
-  await expect(page.getByText("Spend reset to $0.00.")).toBeVisible();
-  await expect(page.getByText("$0.00 spent")).toBeVisible();
+  await expect(page.getByText("2 reset, 0 failed.")).toBeVisible();
+  await expect(page.getByText("$0.00 spent")).toHaveCount(2);
 
   await page.getByRole("button", { name: "View demo as user" }).click();
   await expect(page).toHaveURL(/\/litegate\/my-key$/);

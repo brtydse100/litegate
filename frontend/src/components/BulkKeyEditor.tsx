@@ -15,6 +15,7 @@ import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import type {
   AdminKeyFilters,
+  BulkKeySpendResetResponse,
   BulkKeyUpdateResponse,
   KeyInfo,
   KeySettingsUpdate,
@@ -25,9 +26,7 @@ const inputClass =
 const fieldClass = "space-y-1 text-xs text-gray-400";
 
 interface ResetTarget {
-  token: string;
-  label: string;
-  spend?: number;
+  keys: string[];
 }
 
 export function keyToken(key: KeyInfo): string {
@@ -113,8 +112,13 @@ export default function BulkKeyEditor({
   });
 
   const resetSpend = useMutation({
-    mutationFn: (key: string) => api.resetKeySpend(key),
-    onSuccess: () => {
+    mutationFn: (keys: string[]) => api.resetKeySpend(keys),
+    onSuccess: (data) => {
+      const failedKeys = data.results
+        .filter((result) => !result.reset)
+        .map((result) => result.key);
+      setSelected(failedKeys);
+      if (!failedKeys.length) selectAll.reset();
       setResetTarget(null);
       void queryClient.invalidateQueries({ queryKey: ["keys"] });
       void queryClient.invalidateQueries({ queryKey: ["admin-keys"] });
@@ -135,20 +139,10 @@ export default function BulkKeyEditor({
     allFetchedTokens.every((token) => selected.includes(token));
   const targetKeys = selected;
   const targetCount = targetKeys.length;
-  const resetSelection =
-    targetCount === 1
-      ? (() => {
-          const token = targetKeys[0];
-          const key = visibleKeys.find((item) => keyToken(item) === token);
-          return {
-            token,
-            label: key?.key_alias || maskedToken(token),
-            spend: key?.spend,
-          };
-        })()
-      : null;
   const failedResults =
     update.data?.results.filter((result) => !result.updated) ?? [];
+  const failedResetResults =
+    resetSpend.data?.results.filter((result) => !result.reset) ?? [];
 
   function settingsFromForm(): KeySettingsUpdate {
     const settings: KeySettingsUpdate = {};
@@ -241,6 +235,18 @@ export default function BulkKeyEditor({
     });
   }
 
+  function openResetDialog() {
+    if (!targetKeys.length || operationsBlocked) return;
+    resetSpend.reset();
+    setResetTarget({ keys: targetKeys });
+  }
+
+  function retryResetFailures() {
+    if (!failedResetResults.length || operationsBlocked || resetSpend.isPending)
+      return;
+    resetSpend.mutate(failedResetResults.map((result) => result.key));
+  }
+
   function downloadFailures(data: BulkKeyUpdateResponse) {
     const failures = data.results.filter((result) => !result.updated);
     const url = URL.createObjectURL(
@@ -251,6 +257,20 @@ export default function BulkKeyEditor({
     const link = document.createElement("a");
     link.href = url;
     link.download = "litegate-bulk-update-failures.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadResetFailures(data: BulkKeySpendResetResponse) {
+    const failures = data.results.filter((result) => !result.reset);
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(failures, null, 2)], {
+        type: "application/json",
+      }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "litegate-spend-reset-failures.json";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -520,21 +540,66 @@ export default function BulkKeyEditor({
                 Reset accumulated spend
               </p>
               <p className="mt-0.5 text-[11px] text-gray-500">
-                Select exactly one key. Its budget, limits, and spend history
-                are kept.
+                Select one or more keys. Their budgets, limits, and spend
+                histories are kept.
               </p>
             </div>
             <button
               type="button"
-              onClick={() => resetSelection && setResetTarget(resetSelection)}
-              disabled={!resetSelection || operationsBlocked}
+              onClick={openResetDialog}
+              disabled={!targetCount || operationsBlocked}
               className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <RotateCcw size={13} /> Reset selected key spend
+              <RotateCcw size={13} />
+              {targetCount
+                ? `Reset spend for ${targetCount} ${targetCount === 1 ? "key" : "keys"}`
+                : "Reset selected key spend"}
             </button>
           </div>
           {resetSpend.data && (
-            <p className="text-xs text-green-300">Spend reset to $0.00.</p>
+            <div
+              className={`rounded-lg border p-3 text-xs ${resetSpend.data.failed ? "border-amber-500/25 bg-amber-500/5 text-amber-200" : "border-green-500/25 bg-green-500/5 text-green-300"}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {resetSpend.data.reset} reset, {resetSpend.data.failed}{" "}
+                  failed.
+                </span>
+                {resetSpend.data.failed > 0 && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={retryResetFailures}
+                      disabled={resetSpend.isPending || operationsBlocked}
+                      className="rounded border border-amber-500/30 px-2 py-1 hover:bg-amber-500/10 disabled:opacity-40"
+                    >
+                      Retry failed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadResetFailures(resetSpend.data!)}
+                      className="flex items-center gap-1 rounded border border-amber-500/30 px-2 py-1 hover:bg-amber-500/10"
+                    >
+                      <Download size={11} /> Download failures
+                    </button>
+                  </div>
+                )}
+              </div>
+              {failedResetResults.length > 0 && (
+                <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] text-amber-100/70">
+                  {failedResetResults.map((result) => (
+                    <li
+                      key={result.key}
+                      className="truncate"
+                      title={result.error}
+                    >
+                      {maskedToken(result.key)} -{" "}
+                      {result.error || "Reset failed"}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
 
@@ -705,7 +770,7 @@ export default function BulkKeyEditor({
               resetSpend.reset();
             }
           }}
-          onReset={() => resetSpend.mutate(resetTarget.token)}
+          onReset={() => resetSpend.mutate(resetTarget.keys)}
         />
       )}
     </details>
@@ -745,14 +810,12 @@ function ResetSpendDialog({
           </div>
           <div className="min-w-0 flex-1">
             <h3 id="reset-spend-title" className="font-semibold text-white">
-              Reset key spend?
+              Reset spend for {target.keys.length}{" "}
+              {target.keys.length === 1 ? "key" : "keys"}?
             </h3>
             <p className="mt-1 text-xs leading-5 text-gray-400">
-              {target.label} will be reset{" "}
-              {target.spend === undefined
-                ? ""
-                : `from $${target.spend.toFixed(2)} `}
-              to $0.00. LiteLLM keeps its spend logs, budget, and limits.
+              Accumulated spend will be reset to $0.00. LiteLLM keeps each key's
+              spend logs, budget, and limits.
             </p>
           </div>
           <button

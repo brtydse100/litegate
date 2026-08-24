@@ -105,11 +105,14 @@ export const api = {
       body: JSON.stringify({ keys, settings }),
     }),
 
-  resetKeySpend: (key: string) =>
-    request<import("../types").KeySpendResetResponse>("/v1/keys/reset-spend", {
-      method: "POST",
-      body: JSON.stringify({ key }),
-    }),
+  resetKeySpend: (keys: string[]) =>
+    request<import("../types").BulkKeySpendResetResponse>(
+      "/v1/keys/reset-spend",
+      {
+        method: "POST",
+        body: JSON.stringify({ keys }),
+      },
+    ),
 
   listUsers: () => request<import("../types").LocalUser[]>("/v1/users"),
 

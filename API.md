@@ -100,16 +100,17 @@ curl -X PATCH https://litegate.example.com/api/v1/keys/bulk \
 
 Supported bulk fields are `key_alias`, `models`, `max_budget`, `budget_duration`, `tpm_limit`, `rpm_limit`, `duration`, and `blocked`. A request can contain up to 5,000 unique keys. Updates run with bounded concurrency and return a result for every key, so partial failures are visible.
 
-Reset one key's accumulated spend to zero as an administrator. The key stays
-active, its budget and limits are unchanged, and LiteLLM retains its spend logs.
-The key identifier is sent in the request body so LiteGate does not expose it in
-its public request URL:
+Reset up to 5,000 selected keys' accumulated spend to zero as an administrator.
+The keys stay active, their budgets and limits are unchanged, and LiteLLM
+retains their spend logs. Key identifiers are sent in the request body so
+LiteGate does not expose them in its public request URL. Resets use bounded
+concurrency and return a result for every key so partial failures can be retried:
 
 ```bash
 curl -X POST https://litegate.example.com/api/v1/keys/reset-spend \
   -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"key":"key-identifier"}'
+  -d '{"keys":["key-1","key-2"]}'
 ```
 
 ## Teams (admin only)

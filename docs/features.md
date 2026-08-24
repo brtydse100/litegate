@@ -76,8 +76,8 @@ The bulk editor lets an administrator:
 - select individual keys, the current page, every key, or every matching result;
 - change aliases, models, budgets, reset intervals, TPM/RPM, duration, or blocked
   status;
-- reset one selected key's accumulated spend to zero after confirmation while
-  preserving its budget, limits, and LiteLLM spend logs; and
+- reset selected keys' accumulated spend to zero after confirmation while
+  preserving their budgets, limits, and LiteLLM spend logs; and
 - submit only changed fields so untouched settings remain unchanged.
 
 The API accepts up to 5,000 keys in a request, updates them with bounded
@@ -100,7 +100,7 @@ Automation supports:
 - checking the current API identity;
 - paginated administrator key listing;
 - creating keys for a specified user;
-- administrator-only bulk policy updates and single-key spend resets;
+- administrator-only bulk policy updates and selected-key spend resets;
 - creating, listing, disabling, and updating local users; and
 - creating, listing, updating, safely deleting LiteLLM teams, and moving their members and scoped keys.
 
