@@ -41,7 +41,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Test interactive demo
         working-directory: frontend
-        run: npx playwright test --config=playwright.demo.config.ts
+        run: npm run test:e2e:demo
       - name: Add SPA fallback
         run: cp frontend/dist/index.html frontend/dist/404.html
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5

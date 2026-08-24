@@ -81,6 +81,8 @@ jobs:
         working-directory: frontend
       - run: npm run test:e2e:smoke
         working-directory: frontend
+      - run: npm run test:e2e:demo
+        working-directory: frontend
 
   litellm-integration:
     runs-on: ubuntu-latest
