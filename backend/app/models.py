@@ -166,7 +166,27 @@ class BulkKeyUpdateRequest(KeyListRequest):
 
 
 class BulkKeyResetSpendRequest(KeyListRequest):
-    pass
+    keys: List[str] = Field(default_factory=list, max_length=5000)
+    key: Optional[str] = Field(
+        default=None,
+        deprecated=True,
+        description="Deprecated single-key form; use keys instead",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_legacy_single_key(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        if "key" in value and "keys" in value:
+            raise ValueError("Supply either key or keys, not both")
+        if "key" not in value:
+            if "keys" not in value:
+                raise ValueError("Either key or keys is required")
+            return value
+        normalized = dict(value)
+        normalized["keys"] = [normalized.pop("key")]
+        return normalized
 
 
 class ApiKeyCreateRequest(BaseModel):

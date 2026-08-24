@@ -106,6 +106,16 @@ def test_bulk_spend_reset_deduplicates_keys():
     assert payload.keys == ["key-1", "key-2"]
 
 
+def test_bulk_spend_reset_accepts_legacy_single_key():
+    payload = BulkKeyResetSpendRequest.model_validate({"key": " key-1 "})
+    assert payload.keys == ["key-1"]
+
+
+def test_bulk_spend_reset_rejects_ambiguous_key_shapes():
+    with pytest.raises(ValueError, match="Supply either key or keys, not both"):
+        BulkKeyResetSpendRequest.model_validate({"key": "key-1", "keys": ["key-2"]})
+
+
 @pytest.mark.asyncio
 async def test_admin_can_update_multiple_keys():
     actor = ApiActor(CurrentUser(user_id="admin", email="a@example.com", role="admin"))

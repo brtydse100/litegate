@@ -273,6 +273,32 @@ async def test_admin_can_reset_multiple_keys_through_public_api():
 
 
 @pytest.mark.asyncio
+async def test_admin_can_reset_spend_with_legacy_single_key_payload():
+    token = auth._make_jwt("admin-1", "admin@example.com", role="admin")
+    with (
+        patch(
+            "app.routers.api_v1.llm.reset_key_spend",
+            new=AsyncMock(return_value={"spend": 0.0}),
+        ) as reset,
+        patch("app.routers.api_v1._record_audit", new=AsyncMock()),
+    ):
+        async with _client() as client:
+            response = await client.post(
+                "/api/v1/keys/reset-spend",
+                json={"key": "key-1"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "reset": 1,
+        "failed": 0,
+        "results": [{"key": "key-1", "reset": True}],
+    }
+    reset.assert_awaited_once_with("key-1")
+
+
+@pytest.mark.asyncio
 async def test_non_admin_team_management_is_denied_before_litellm_is_called():
     token = auth._make_jwt("user-1", "user@example.com")
     with patch("app.routers.api_v1.llm.list_teams", new=AsyncMock()) as list_teams:
