@@ -63,6 +63,48 @@ async def test_user_cannot_reset_key_spend():
 
 
 @pytest.mark.asyncio
+async def test_admin_legacy_reset_preserves_original_contract_and_audit():
+    actor = ApiActor(CurrentUser(user_id="admin", email="a@example.com", role="admin"))
+    payload = BulkKeyResetSpendRequest.model_validate({"key": "key-1"})
+    with (
+        patch(
+            "app.routers.api_v1.llm.reset_key_spend",
+            new=AsyncMock(return_value={"spend": 0.0, "previous_spend": 12.5}),
+        ) as reset,
+        patch("app.routers.api_v1._record_audit", new=AsyncMock()) as audit,
+    ):
+        result = await api_reset_key_spend(payload, actor)
+
+    assert result == {"reset": True, "spend": 0.0, "previous_spend": 12.5}
+    reset.assert_awaited_once_with("key-1")
+    audit.assert_awaited_once_with(
+        actor,
+        "key.spend_reset",
+        "installation-key",
+        details={"previous_spend": 12.5},
+    )
+
+
+@pytest.mark.asyncio
+async def test_admin_legacy_reset_propagates_downstream_failure():
+    actor = ApiActor(CurrentUser(user_id="admin", email="a@example.com", role="admin"))
+    payload = BulkKeyResetSpendRequest.model_validate({"key": "key-1"})
+    with (
+        patch(
+            "app.routers.api_v1.llm.reset_key_spend",
+            new=AsyncMock(side_effect=HTTPException(status_code=502, detail="LiteLLM returned 500")),
+        ),
+        patch("app.routers.api_v1._record_audit", new=AsyncMock()) as audit,
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await api_reset_key_spend(payload, actor)
+
+    assert exc.value.status_code == 502
+    assert exc.value.detail == "LiteLLM returned 500"
+    audit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_admin_can_reset_multiple_keys_with_partial_failures():
     actor = ApiActor(CurrentUser(user_id="admin", email="a@example.com", role="admin"))
 
@@ -109,11 +151,26 @@ def test_bulk_spend_reset_deduplicates_keys():
 def test_bulk_spend_reset_accepts_legacy_single_key():
     payload = BulkKeyResetSpendRequest.model_validate({"key": " key-1 "})
     assert payload.keys == ["key-1"]
+    assert payload.uses_legacy_single_key is True
+    assert payload.model_dump() == {"keys": ["key-1"]}
+    schema = BulkKeyResetSpendRequest.model_json_schema()
+    assert schema["properties"]["key"]["deprecated"] is True
+    assert "_legacy_single_key" not in schema["properties"]
+
+
+def test_bulk_spend_reset_marks_bulk_shape_as_non_legacy():
+    payload = BulkKeyResetSpendRequest(keys=["key-1"])
+    assert payload.uses_legacy_single_key is False
 
 
 def test_bulk_spend_reset_rejects_ambiguous_key_shapes():
     with pytest.raises(ValueError, match="Supply either key or keys, not both"):
         BulkKeyResetSpendRequest.model_validate({"key": "key-1", "keys": ["key-2"]})
+
+
+def test_bulk_spend_reset_rejects_missing_key_shape():
+    with pytest.raises(ValueError, match="Either key or keys is required"):
+        BulkKeyResetSpendRequest.model_validate({})
 
 
 @pytest.mark.asyncio

@@ -114,8 +114,10 @@ curl -X POST https://litegate.example.com/api/v1/keys/reset-spend \
 ```
 
 For compatibility with the original single-key endpoint, `{"key":"key-1"}`
-is also accepted during a deprecation period. New integrations should use the
-`keys` array. Supplying both `key` and `keys` in one request is rejected.
+is also accepted during a deprecation period and returns the original response
+shape: `{"reset":true,"spend":0.0,"previous_spend":8.75}`. New integrations
+should use the `keys` array and its bulk result response. Supplying both `key`
+and `keys` in one request is rejected.
 
 ## Teams (admin only)
 
