@@ -113,6 +113,10 @@ curl -X POST https://litegate.example.com/api/v1/keys/reset-spend \
   -d '{"keys":["key-1","key-2"]}'
 ```
 
+For compatibility with the original single-key endpoint, `{"key":"key-1"}`
+is also accepted during a deprecation period. New integrations should use the
+`keys` array. Supplying both `key` and `keys` in one request is rejected.
+
 ## Teams (admin only)
 
 List teams with server-side pagination and optional search:
