@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.models import ApiKeyCreateRequest, BulkKeyUpdateRequest, CurrentUser, KeyDeleteRequest, KeyResetSpendRequest
+from app.models import ApiKeyCreateRequest, BulkKeyResetSpendRequest, BulkKeyUpdateRequest, CurrentUser, KeyDeleteRequest
 from app.rate_limit import _key_ops
 from app.routers.api_v1 import (
     ApiActor,
@@ -57,31 +57,53 @@ async def test_user_cannot_reset_key_spend():
     actor = ApiActor(CurrentUser(user_id="user-1", email="u@example.com"))
     with patch("app.routers.api_v1.llm.reset_key_spend", new=AsyncMock()) as reset:
         with pytest.raises(HTTPException) as exc:
-            await api_reset_key_spend(KeyResetSpendRequest(key="key-1"), actor)
+            await api_reset_key_spend(BulkKeyResetSpendRequest(keys=["key-1"]), actor)
     assert exc.value.status_code == 403
     reset.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_admin_can_reset_one_key_spend():
+async def test_admin_can_reset_multiple_keys_with_partial_failures():
     actor = ApiActor(CurrentUser(user_id="admin", email="a@example.com", role="admin"))
+
+    async def reset_key(key: str):
+        if key == "key-2":
+            raise HTTPException(status_code=502, detail="LiteLLM returned 500")
+        return {"spend": 0.0}
+
     with (
         patch(
             "app.routers.api_v1.llm.reset_key_spend",
-            new=AsyncMock(return_value={"spend": 0.0, "previous_spend": 12.5}),
+            new=AsyncMock(side_effect=reset_key),
         ) as reset,
         patch("app.routers.api_v1._record_audit", new=AsyncMock()) as audit,
     ):
-        result = await api_reset_key_spend(KeyResetSpendRequest(key="key-1"), actor)
+        result = await api_reset_key_spend(
+            BulkKeyResetSpendRequest(keys=["key-1", "key-2"]),
+            actor,
+        )
 
-    assert result == {"reset": True, "spend": 0.0, "previous_spend": 12.5}
-    reset.assert_awaited_once_with("key-1")
+    assert result == {
+        "reset": 1,
+        "failed": 1,
+        "results": [
+            {"key": "key-1", "reset": True},
+            {"key": "key-2", "reset": False, "error": "LiteLLM returned 500"},
+        ],
+    }
+    assert reset.await_count == 2
     audit.assert_awaited_once_with(
         actor,
-        "key.spend_reset",
-        "installation-key",
-        details={"previous_spend": 12.5},
+        "keys.spend_reset",
+        "installation-keys",
+        outcome="failure",
+        details={"keys": ["key-1", "key-2"], "reset": 1, "failed": 1},
     )
+
+
+def test_bulk_spend_reset_deduplicates_keys():
+    payload = BulkKeyResetSpendRequest(keys=["key-1", " key-1 ", "key-2"])
+    assert payload.keys == ["key-1", "key-2"]
 
 
 @pytest.mark.asyncio

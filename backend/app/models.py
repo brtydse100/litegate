@@ -46,10 +46,6 @@ class KeyDeleteRequest(BaseModel):
         return value.strip()
 
 
-class KeyResetSpendRequest(KeyDeleteRequest):
-    pass
-
-
 class SpendLog(BaseModel):
     request_id: Optional[str] = None
     call_type: Optional[str] = None
@@ -153,9 +149,8 @@ class KeySettingsUpdate(BaseModel):
         return self
 
 
-class BulkKeyUpdateRequest(BaseModel):
+class KeyListRequest(BaseModel):
     keys: List[str] = Field(min_length=1, max_length=5000)
-    settings: KeySettingsUpdate
 
     @field_validator("keys")
     @classmethod
@@ -164,6 +159,14 @@ class BulkKeyUpdateRequest(BaseModel):
         if not cleaned:
             raise ValueError("At least one key is required")
         return cleaned
+
+
+class BulkKeyUpdateRequest(KeyListRequest):
+    settings: KeySettingsUpdate
+
+
+class BulkKeyResetSpendRequest(KeyListRequest):
+    pass
 
 
 class ApiKeyCreateRequest(BaseModel):

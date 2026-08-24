@@ -33,10 +33,10 @@ export interface BulkKeyUpdateResponse {
   results: Array<{ key: string; updated: boolean; error?: string }>;
 }
 
-export interface KeySpendResetResponse {
-  reset: boolean;
-  spend: number;
-  previous_spend?: number | null;
+export interface BulkKeySpendResetResponse {
+  reset: number;
+  failed: number;
+  results: Array<{ key: string; reset: boolean; error?: string }>;
 }
 
 export interface KeyInfo {

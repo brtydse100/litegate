@@ -103,29 +103,42 @@ describe("BulkKeyEditor", () => {
     );
   });
 
-  it("confirms and resets spend for one selected key", async () => {
+  it("resets multiple selected keys and keeps failures selected", async () => {
     vi.mocked(api.resetKeySpend).mockResolvedValue({
-      reset: true,
-      spend: 0,
-      previous_spend: 1,
+      reset: 1,
+      failed: 1,
+      results: [
+        { key: "key-1", reset: true },
+        { key: "key-2", reset: false, error: "LiteLLM rejected the reset" },
+      ],
     });
     renderEditor();
-    fireEvent.click(await screen.findByLabelText("Select Alice"));
     fireEvent.click(
-      screen.getByRole("button", { name: "Reset selected key spend" }),
+      await screen.findByRole("button", { name: "Select all keys (2)" }),
+    );
+    await screen.findByRole("button", { name: "Deselect all (2)" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset spend for 2 keys" }),
     );
     expect(
-      screen.getByRole("dialog", { name: "Reset key spend?" }),
+      screen.getByRole("dialog", { name: "Reset spend for 2 keys?" }),
     ).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Reset spend to zero" }),
     );
 
     await waitFor(() =>
-      expect(api.resetKeySpend).toHaveBeenCalledWith("key-1"),
+      expect(api.resetKeySpend).toHaveBeenCalledWith(["key-1", "key-2"]),
     );
+    expect(await screen.findByText("1 reset, 1 failed.")).toBeInTheDocument();
     expect(
-      await screen.findByText("Spend reset to $0.00."),
+      screen.getByRole("button", { name: "Retry failed" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Download failures" }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getAllByText("1 selected").length).toBeGreaterThan(0),
+    );
   });
 });

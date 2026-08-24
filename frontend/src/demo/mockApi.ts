@@ -332,33 +332,45 @@ async function mockResponse(request: Request): Promise<Response> {
     if (demoUser.role !== "admin")
       return json({ detail: "Administrator access required" }, 403);
     const payload = await body(request);
-    const target = String(payload.key ?? "");
-    const matched = installationKeys.find(
-      (key) => (key.token ?? key.api_key ?? key.key ?? "") === target,
+    const targetKeys = Array.isArray(payload.keys)
+      ? payload.keys.map((key) => String(key))
+      : [];
+    const knownKeys = new Set(
+      installationKeys
+        .map((key) => key.token ?? key.api_key ?? key.key ?? "")
+        .filter(Boolean),
     );
-    if (!matched) return json({ detail: "Key not found" }, 404);
-    const previousSpend = matched.spend ?? 0;
+    const results = targetKeys.map((key) =>
+      knownKeys.has(key)
+        ? { key, reset: true }
+        : { key, reset: false, error: "Key not found" },
+    );
+    const successfulKeys = new Set(
+      results.filter((result) => result.reset).map((result) => result.key),
+    );
     installationKeys = installationKeys.map((key) =>
-      (key.token ?? key.api_key ?? key.key ?? "") === target
+      successfulKeys.has(key.token ?? key.api_key ?? key.key ?? "")
         ? { ...key, spend: 0 }
         : key,
     );
     personalKeys = personalKeys.map((key) =>
-      (key.token ?? key.api_key ?? key.key ?? "") === target
+      successfulKeys.has(key.token ?? key.api_key ?? key.key ?? "")
         ? { ...key, spend: 0 }
         : key,
     );
+    const reset = successfulKeys.size;
+    const failed = results.length - reset;
     auditEvents.unshift({
       id: Math.max(0, ...auditEvents.map((event) => event.id)) + 1,
       occurred_at: new Date().toISOString(),
       actor_id: demoUser.user_id,
       actor_email: demoUser.email,
-      action: "key.spend_reset",
-      target: "installation-key",
-      outcome: "success",
-      details: { previous_spend: previousSpend },
+      action: "keys.spend_reset",
+      target: "installation-keys",
+      outcome: failed ? "failure" : "success",
+      details: { key_count: targetKeys.length, reset, failed },
     });
-    return json({ reset: true, spend: 0, previous_spend: previousSpend });
+    return json({ reset, failed, results });
   }
   if (path === "/api/v1/users" && method === "GET") return json(users);
   if (path === "/api/v1/users" && method === "POST") {

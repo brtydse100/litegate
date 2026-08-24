@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from app.config import settings
 from app.models import (
     ApiKeyCreateRequest,
+    BulkKeyResetSpendRequest,
     BulkKeyUpdateRequest,
     KeyCreateResponse,
     KeyDeleteRequest,
-    KeyResetSpendRequest,
     TeamCreateRequest,
     TeamMemberMoveRequest,
     TeamUpdateRequest,
@@ -152,21 +152,35 @@ async def api_delete_key(payload: KeyDeleteRequest, actor: ApiActor = Depends(ge
 
 @router.post("/keys/reset-spend")
 async def api_reset_key_spend(
-    payload: KeyResetSpendRequest,
+    payload: BulkKeyResetSpendRequest,
     actor: ApiActor = Depends(get_api_actor),
 ):
-    """Reset one key's accumulated spend. Administrator access is required."""
+    """Reset selected keys' accumulated spend. Administrator access is required."""
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
-    result = await llm.reset_key_spend(payload.key)
-    previous_spend = result.get("previous_spend") if isinstance(result, dict) else None
+    semaphore = asyncio.Semaphore(10)
+
+    async def reset_one(key: str) -> dict:
+        async with semaphore:
+            try:
+                await llm.reset_key_spend(key)
+                return {"key": key, "reset": True}
+            except HTTPException as exc:
+                return {"key": key, "reset": False, "error": str(exc.detail)}
+            except Exception:
+                return {"key": key, "reset": False, "error": "Unexpected reset failure"}
+
+    results = await asyncio.gather(*(reset_one(key) for key in payload.keys))
+    reset = sum(1 for result in results if result["reset"])
+    failed = len(results) - reset
     await _record_audit(
         actor,
-        "key.spend_reset",
-        "installation-key",
-        details={"previous_spend": previous_spend},
+        "keys.spend_reset",
+        "installation-keys",
+        outcome="failure" if failed else "success",
+        details={"keys": payload.keys, "reset": reset, "failed": failed},
     )
-    return {"reset": True, "spend": 0.0, "previous_spend": previous_spend}
+    return {"reset": reset, "failed": failed, "results": results}
 
 
 @router.patch("/keys/bulk")
