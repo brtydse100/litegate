@@ -74,7 +74,6 @@ The bulk editor lets an administrator:
 
 - search globally by owner, alias, team, or key ID and filter by team or blocked state;
 - select individual keys, the current page, every key, or every matching result;
-- enter a key ID that is not visible on the current page;
 - change aliases, models, budgets, reset intervals, TPM/RPM, duration, or blocked
   status;
 - reset one selected key's accumulated spend to zero after confirmation while
