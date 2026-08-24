@@ -7,6 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-08-24
+
+### Added
+
+- Dashboard users can view the models available to their LiteLLM key.
+- Administrators can reset spend for selected keys.
+
+### Changed
+
+- Local-user navigation can be configured, and non-administrators no longer see
+  the administrator sidebar.
+- Release notes now provide exhaustive, commit-traceable change lists.
+
 ## [2.6.1] - 2026-08-24
 
 ### Changed
@@ -200,7 +213,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.6.1...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/brtydse100/litegate/compare/v2.6.1...v2.7.0
 [2.6.1]: https://github.com/brtydse100/litegate/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/brtydse100/litegate/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/brtydse100/litegate/compare/v2.4.0...v2.5.0

@@ -44,6 +44,23 @@ source of truth for models, budgets, spend, and request routing.
 - Agents may inspect Git state and diffs, but must not commit or push unless the
   user explicitly requests it.
 
+## Releases
+
+- Every LiteGate release must also update the project/package version using
+  `scripts/version.py`, which keeps `VERSION`, frontend package metadata, and
+  Helm release references synchronized.
+- Use stable SemVer (`X.Y.Z`). For a big change, increment the minor version and
+  reset the patch version: `X.Y.Z` -> `X.(Y+1).0`. For a small change, increment
+  only the patch version: `X.Y.Z` -> `X.Y.(Z+1)`.
+- Write GitHub Release notes in the LiteLLM release style, not merely "same as
+  LiteLLM." Start with `## What's Changed`, then list each included change as a
+  concise bullet using its conventional-commit type and scope (for example,
+  `feat(auth): add OIDC group mapping` or `fix(keys): prevent duplicate key
+  names`). Each bullet must identify the contributor and link the associated PR
+  or issue when one exists. Include an exhaustive, traceable list of changes;
+  do not replace it with a high-level summary. Add release-specific operational
+  instructions only when relevant, such as image-signature verification.
+
 ## Repository layout
 
 - `backend/app/`: FastAPI application, routes, configuration, and services.
