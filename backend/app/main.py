@@ -115,8 +115,12 @@ async def readiness():
         asyncio.to_thread(local_users.healthcheck),
     )
     ready = bool(litellm_status["ok"] and database_status["ok"])
+    public_litellm_status = {
+        "ok": bool(litellm_status["ok"]),
+        "detail": litellm_status["detail"] if litellm_status["ok"] else "LiteLLM is unavailable",
+    }
     payload = {
         "status": "ready" if ready else "not_ready",
-        "dependencies": {"litellm": litellm_status, "database": database_status},
+        "dependencies": {"litellm": public_litellm_status, "database": database_status},
     }
     return JSONResponse(payload, status_code=200 if ready else 503)

@@ -259,6 +259,22 @@ async def test_every_http_response_has_a_safe_correlation_id():
 
 
 @pytest.mark.asyncio
+async def test_public_readiness_hides_litellm_connection_target(monkeypatch):
+    monkeypatch.setattr(
+        "app.main.litellm.healthcheck",
+        AsyncMock(return_value={"ok": False, "detail": "Cannot reach LiteLLM at http://litellm.internal:4000"}),
+    )
+    monkeypatch.setattr("app.main.local_users.healthcheck", lambda: {"ok": True, "detail": "Writable"})
+
+    async with _client() as client:
+        response = await client.get("/api/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["dependencies"]["litellm"] == {"ok": False, "detail": "LiteLLM is unavailable"}
+    assert "litellm.internal" not in response.text
+
+
+@pytest.mark.asyncio
 async def test_metrics_are_admin_only_and_do_not_expose_credentials(monkeypatch):
     monkeypatch.setattr(auth.settings, "management_api_key", "management-secret-value")
     async with _client() as client:
