@@ -57,6 +57,10 @@ async def test_user_team_and_key_contracts_against_litellm():
         assert info.get("user_id") == user_id
         assert info.get("team_id") == team_id
 
+        reset = await litellm.reset_key_spend(key)
+        assert reset.get("spend") == 0
+        assert reset.get("previous_spend") == 0
+
         await litellm.update_key(key, {"key_alias": f"updated-{suffix}", "blocked": True})
         updated = await litellm.get_key_info(key)
         assert updated is not None

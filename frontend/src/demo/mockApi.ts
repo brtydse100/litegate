@@ -328,6 +328,38 @@ async function mockResponse(request: Request): Promise<Response> {
       results: targetKeys.map((key) => ({ key, updated: true })),
     });
   }
+  if (path === "/api/v1/keys/reset-spend" && method === "POST") {
+    if (demoUser.role !== "admin")
+      return json({ detail: "Administrator access required" }, 403);
+    const payload = await body(request);
+    const target = String(payload.key ?? "");
+    const matched = installationKeys.find(
+      (key) => (key.token ?? key.api_key ?? key.key ?? "") === target,
+    );
+    if (!matched) return json({ detail: "Key not found" }, 404);
+    const previousSpend = matched.spend ?? 0;
+    installationKeys = installationKeys.map((key) =>
+      (key.token ?? key.api_key ?? key.key ?? "") === target
+        ? { ...key, spend: 0 }
+        : key,
+    );
+    personalKeys = personalKeys.map((key) =>
+      (key.token ?? key.api_key ?? key.key ?? "") === target
+        ? { ...key, spend: 0 }
+        : key,
+    );
+    auditEvents.unshift({
+      id: Math.max(0, ...auditEvents.map((event) => event.id)) + 1,
+      occurred_at: new Date().toISOString(),
+      actor_id: demoUser.user_id,
+      actor_email: demoUser.email,
+      action: "key.spend_reset",
+      target: "installation-key",
+      outcome: "success",
+      details: { previous_spend: previousSpend },
+    });
+    return json({ reset: true, spend: 0, previous_spend: previousSpend });
+  }
   if (path === "/api/v1/users" && method === "GET") return json(users);
   if (path === "/api/v1/users" && method === "POST") {
     const payload = await body(request);

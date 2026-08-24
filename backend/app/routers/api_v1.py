@@ -11,6 +11,7 @@ from app.models import (
     BulkKeyUpdateRequest,
     KeyCreateResponse,
     KeyDeleteRequest,
+    KeyResetSpendRequest,
     TeamCreateRequest,
     TeamMemberMoveRequest,
     TeamUpdateRequest,
@@ -147,6 +148,25 @@ async def api_delete_key(payload: KeyDeleteRequest, actor: ApiActor = Depends(ge
     if actor.is_admin:
         await _record_audit(actor, "key.delete", "installation-key")
     return {"deleted": True}
+
+
+@router.post("/keys/reset-spend")
+async def api_reset_key_spend(
+    payload: KeyResetSpendRequest,
+    actor: ApiActor = Depends(get_api_actor),
+):
+    """Reset one key's accumulated spend. Administrator access is required."""
+    _require_api_admin(actor)
+    check_key_rate_limit(actor.user.user_id)
+    result = await llm.reset_key_spend(payload.key)
+    previous_spend = result.get("previous_spend") if isinstance(result, dict) else None
+    await _record_audit(
+        actor,
+        "key.spend_reset",
+        "installation-key",
+        details={"previous_spend": previous_spend},
+    )
+    return {"reset": True, "spend": 0.0, "previous_spend": previous_spend}
 
 
 @router.patch("/keys/bulk")

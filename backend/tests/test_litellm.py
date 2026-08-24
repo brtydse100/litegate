@@ -38,6 +38,25 @@ async def test_get_user_raises_503_on_transport_error():
 
 
 @pytest.mark.asyncio
+async def test_reset_key_spend_uses_dedicated_litellm_route():
+    mock_response = MagicMock()
+    mock_response.raise_for_status = MagicMock()
+    mock_response.json = MagicMock(return_value={"spend": 0.0, "previous_spend": 8.75})
+
+    with patch("httpx.AsyncClient") as mock_client_class:
+        instance = AsyncMock()
+        instance.post = AsyncMock(return_value=mock_response)
+        mock_client_class.return_value.__aenter__ = AsyncMock(return_value=instance)
+        mock_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        result = await litellm.reset_key_spend("key/with space")
+
+    assert result == {"spend": 0.0, "previous_spend": 8.75}
+    assert instance.post.await_args.args[0].endswith("/key/key%2Fwith%20space/reset_spend")
+    assert instance.post.await_args.kwargs["json"] == {"reset_to": 0.0}
+
+
+@pytest.mark.asyncio
 async def test_get_user_raises_502_on_http_status_error():
     mock_response = MagicMock()
     mock_response.status_code = 200

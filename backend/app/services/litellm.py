@@ -1,5 +1,6 @@
 import json
 import math
+from urllib.parse import quote
 
 import httpx
 from typing import Optional, List, Any, NoReturn
@@ -605,6 +606,24 @@ async def update_key(key: str, settings_update: dict) -> dict:
             r = await client.post(
                 f"{settings.litellm_url}/key/update",
                 json={"key": key, **settings_update},
+                headers=_headers(),
+                timeout=10,
+            )
+            r.raise_for_status()
+            return r.json()
+    except httpx.TransportError as e:
+        _transport_error(e)
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
+
+
+async def reset_key_spend(key: str) -> dict:
+    """Reset one virtual key's spend while preserving its spend logs."""
+    try:
+        async with _client() as client:
+            r = await client.post(
+                f"{settings.litellm_url}/key/{quote(key, safe='')}/reset_spend",
+                json={"reset_to": 0.0},
                 headers=_headers(),
                 timeout=10,
             )
