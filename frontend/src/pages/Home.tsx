@@ -6,6 +6,7 @@ import {
   BookOpen,
   Building2,
   Check,
+  ChevronDown,
   ChevronRight,
   Copy,
   ExternalLink,
@@ -33,6 +34,7 @@ interface PortalConfig {
   logo_url: string;
   litellm_ui_url: string;
   api_docs_url: string;
+  local_users_enabled: boolean;
 }
 
 const primaryKeyActionClassName =
@@ -158,8 +160,15 @@ function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
   );
 }
 
-function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
+export function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
+  const [modelsExpanded, setModelsExpanded] = useState(false);
   const first = keys[0];
+  const hasUnrestrictedModelAccess = keys.some(
+    (keyInfo) => !keyInfo.models?.length,
+  );
+  const accessibleModels = Array.from(
+    new Set(keys.flatMap((keyInfo) => keyInfo.models ?? [])),
+  ).sort((left, right) => left.localeCompare(right));
   const items = [
     {
       label: "Gateway status",
@@ -169,9 +178,11 @@ function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
     },
     {
       label: "Model access",
-      value: first?.models?.length
-        ? `${first.models.length} models`
-        : "All models",
+      value: hasUnrestrictedModelAccess
+        ? "All models"
+        : accessibleModels.length
+          ? `${accessibleModels.length} models`
+          : "All models",
       icon: Zap,
       tone: "text-indigo-600 bg-indigo-50",
     },
@@ -186,23 +197,75 @@ function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
     },
   ];
   return (
-    <section className="grid gap-3 sm:grid-cols-3" aria-label="Access snapshot">
-      {items.map((item) => (
+    <section className="space-y-3" aria-label="Access snapshot">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {items.map((item) => {
+          const content = (
+            <>
+              <span className={`rounded-md p-2 ${item.tone}`}>
+                <item.icon size={16} />
+              </span>
+              <div className="min-w-0 flex-1 text-left">
+                <p className="text-xs text-slate-500">{item.label}</p>
+                <p className="mt-0.5 text-sm font-semibold text-slate-950">
+                  {item.value}
+                </p>
+              </div>
+            </>
+          );
+
+          return item.label === "Model access" ? (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => setModelsExpanded((expanded) => !expanded)}
+              aria-expanded={modelsExpanded}
+              aria-controls="accessible-models"
+              className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-indigo-200 hover:bg-indigo-50/30"
+            >
+              {content}
+              <ChevronDown
+                size={16}
+                className={`text-slate-400 transition-transform ${modelsExpanded ? "rotate-180" : ""}`}
+              />
+            </button>
+          ) : (
+            <div
+              key={item.label}
+              className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              {content}
+            </div>
+          );
+        })}
+      </div>
+      {modelsExpanded && (
         <div
-          key={item.label}
-          className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+          id="accessible-models"
+          className="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm"
         >
-          <span className={`rounded-md p-2 ${item.tone}`}>
-            <item.icon size={16} />
-          </span>
-          <div>
-            <p className="text-xs text-slate-500">{item.label}</p>
-            <p className="mt-0.5 text-sm font-semibold text-slate-950">
-              {item.value}
+          <h2 className="text-sm font-semibold text-slate-950">
+            Accessible models
+          </h2>
+          {hasUnrestrictedModelAccess ? (
+            <p className="mt-2 text-sm text-slate-600">
+              Your key can access all models available through this LiteLLM
+              gateway.
             </p>
-          </div>
+          ) : (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {accessibleModels.map((model) => (
+                <li
+                  key={model}
+                  className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 font-mono text-xs text-slate-700"
+                >
+                  {model}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-      ))}
+      )}
     </section>
   );
 }
@@ -272,8 +335,14 @@ export default function Home() {
 
   const config = portal.data;
   const isAdmin = user?.role === "admin";
+  const localUsersEnabled = config?.local_users_enabled ?? true;
   const section = location.pathname === "/" ? "/my-key" : location.pathname;
-  const adminSections = new Set(["/keys", "/users", "/teams", "/status"]);
+  const adminSections = new Set([
+    "/keys",
+    ...(localUsersEnabled ? ["/users"] : []),
+    "/teams",
+    "/status",
+  ]);
   if (location.pathname === "/") return <Navigate to="/my-key" replace />;
   if (
     (!isAdmin && section !== "/my-key") ||
@@ -300,7 +369,9 @@ export default function Home() {
     ...(isAdmin
       ? [
           { to: "/keys", label: "Key policies", icon: Shield },
-          { to: "/users", label: "Local users", icon: Users },
+          ...(localUsersEnabled
+            ? [{ to: "/users", label: "Local users", icon: Users }]
+            : []),
           { to: "/teams", label: "Teams", icon: Building2 },
           { to: "/status", label: "Status", icon: Activity },
         ]
@@ -335,9 +406,11 @@ export default function Home() {
                   <NavLink to="/keys" className={navClass}>
                     <Shield size={16} /> Key policies
                   </NavLink>
-                  <NavLink to="/users" className={navClass}>
-                    <Users size={16} /> Local users
-                  </NavLink>
+                  {localUsersEnabled && (
+                    <NavLink to="/users" className={navClass}>
+                      <Users size={16} /> Local users
+                    </NavLink>
+                  )}
                   <NavLink to="/teams" className={navClass}>
                     <Building2 size={16} /> Teams
                   </NavLink>

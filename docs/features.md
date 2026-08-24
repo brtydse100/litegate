@@ -32,7 +32,7 @@ authoritative protection.
 
 | Role | Capabilities |
 | --- | --- |
-| `user` | Sign in, create or regenerate a personal key, and view its access snapshot |
+| `user` | Sign in, create or regenerate a personal key, and view its access snapshot, including the accessible model list |
 | `admin` | Everything a user can do, plus manage local users, LiteLLM teams, installation keys, and bulk key policy |
 
 The administrator-only **Users** tab is useful for contractor access, SSO
