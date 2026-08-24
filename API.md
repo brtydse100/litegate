@@ -257,4 +257,6 @@ duration, and client address without logging credentials or request payloads.
 Audit details redact credential-shaped fields and store only counts for bulk key
 targets. Public probes are `GET /api/health/live` for process liveness and
 `GET /api/health/ready` for LiteLLM plus database readiness; readiness returns
-HTTP 503 when either dependency is unavailable.
+HTTP 503 when either dependency is unavailable and uses a generic LiteLLM
+failure detail. Authenticated administrators can use the status API for detailed
+dependency diagnostics.
