@@ -19,7 +19,7 @@ def _safe_details(details: dict | None) -> dict:
         elif name == "keys" and isinstance(value, list):
             safe["key_count"] = len(value)
         else:
-            safe[name] = value
+            safe[name] = _safe_value(value)
     return safe
 
 
@@ -34,6 +34,14 @@ def _purge_expired_events(db, now: datetime) -> None:
            )""",
         (cutoff_at, local_users.settings.audit_cleanup_batch_size),
     )
+
+
+def _safe_value(value: object) -> object:
+    if isinstance(value, dict):
+        return _safe_details(value)
+    if isinstance(value, (list, tuple, set)):
+        return [_safe_value(item) for item in value]
+    return value
 
 
 def record(
