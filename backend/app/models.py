@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 from pydantic import Field, field_validator, model_validator
 from typing import Optional, List, Any, Literal
 from datetime import datetime
@@ -166,9 +166,11 @@ class BulkKeyUpdateRequest(KeyListRequest):
 
 
 class BulkKeyResetSpendRequest(KeyListRequest):
+    _legacy_single_key: bool = PrivateAttr(default=False)
     keys: List[str] = Field(default_factory=list, max_length=5000)
     key: Optional[str] = Field(
         default=None,
+        exclude=True,
         deprecated=True,
         description="Deprecated single-key form; use keys instead",
     )
@@ -185,8 +187,17 @@ class BulkKeyResetSpendRequest(KeyListRequest):
                 raise ValueError("Either key or keys is required")
             return value
         normalized = dict(value)
-        normalized["keys"] = [normalized.pop("key")]
+        normalized["keys"] = [normalized["key"]]
         return normalized
+
+    @model_validator(mode="after")
+    def remember_request_shape(self):
+        self._legacy_single_key = "key" in self.model_fields_set
+        return self
+
+    @property
+    def uses_legacy_single_key(self) -> bool:
+        return self._legacy_single_key
 
 
 class ApiKeyCreateRequest(BaseModel):

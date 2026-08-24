@@ -158,6 +158,18 @@ async def api_reset_key_spend(
     """Reset selected keys' accumulated spend. Administrator access is required."""
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
+
+    if payload.uses_legacy_single_key:
+        result = await llm.reset_key_spend(payload.keys[0])
+        previous_spend = result.get("previous_spend") if isinstance(result, dict) else None
+        await _record_audit(
+            actor,
+            "key.spend_reset",
+            "installation-key",
+            details={"previous_spend": previous_spend},
+        )
+        return {"reset": True, "spend": 0.0, "previous_spend": previous_spend}
+
     semaphore = asyncio.Semaphore(10)
 
     async def reset_one(key: str) -> dict:
