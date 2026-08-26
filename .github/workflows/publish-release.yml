@@ -31,4 +31,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
-        run: gh release create "$GITHUB_REF_NAME" --verify-tag --title "LiteGate $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release.md"
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; leaving it unchanged."
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "LiteGate $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release.md"
+          fi
