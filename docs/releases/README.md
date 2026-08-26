@@ -5,6 +5,9 @@ behavior. For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.9.0](v2.9.0.md) | Configurable, bounded audit-history retention and safe readiness responses |
+| [2.8.0](v2.8.0.md) | Legacy spend-reset compatibility and recursive audit-detail redaction |
+| [2.7.0](v2.7.0.md) | Accessible-model visibility and selected-key spend resets |
 | [2.6.1](v2.6.1.md) | More prominent key regeneration and support actions |
 | [2.6.0](v2.6.0.md) | LiteLLM-inspired UI, persisted themes, interactive demo, and expanded quality gates |
 | [2.5.0](v2.5.0.md) | Hardened sessions, behavior-first testing, observability, and recovery tooling |
