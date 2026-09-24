@@ -145,6 +145,19 @@ jobs:
       - run: python scripts/version.py --check
       - run: python scripts/check_docs.py
       - run: helm lint deploy/helm/litegate
+      - name: Render externally managed data volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          helm template litegate deploy/helm/litegate \
+            --set persistence.enabled=false \
+            --set extraVolumes[0].name=external-data \
+            --set extraVolumes[0].persistentVolumeClaim.claimName=external-data \
+            --set extraVolumeMounts[0].name=external-data \
+            --set extraVolumeMounts[0].mountPath=/app/backend/data \
+            > rendered.yaml
+          grep -q 'name: external-data' rendered.yaml
+          grep -q 'mountPath: /app/backend/data' rendered.yaml
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .

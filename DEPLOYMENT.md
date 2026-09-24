@@ -148,7 +148,8 @@ Once built, the image contains everything it needs:
 
 ```bash
 # On the build machine — save the image to a tar file
-docker save litegate-litegate:latest -o litegate.tar
+docker pull ghcr.io/brtydse100/litegate:latest
+docker save ghcr.io/brtydse100/litegate:latest -o litegate.tar
 
 # Copy litegate.tar to the target machine (USB, SCP, etc.)
 
@@ -399,6 +400,27 @@ Sign in with the bootstrap local administrator or an SSO account listed in `admi
 To grant admin access by SSO group, set `admin_groups` and point `oidc_groups_claim` at the claim in your provider's ID token. Examples: `groups` for a flat group claim or `realm_access.roles` for Keycloak realm roles. If the provider requires a groups scope, add it to `oidc_scopes`. Group matching is case-insensitive. Providers that return group-overage references instead of group names must be configured to emit the required group directly in the ID token.
 
 Docker Compose persists the database in the `litegate-data` named volume. The Helm chart creates a 1 Gi persistent volume claim by default; set `persistence.existingClaim` to reuse an existing claim, or set `persistence.enabled=false` only if local-account persistence is not needed.
+
+For storage supplied outside the chart, disable the built-in claim and add the
+pod volume and matching container mount directly:
+
+```yaml
+persistence:
+  enabled: false
+
+extraVolumes:
+  - name: external-data
+    persistentVolumeClaim:
+      claimName: litegate-data
+
+extraVolumeMounts:
+  - name: external-data
+    mountPath: /app/backend/data
+```
+
+The image creates `/app/backend/data` with ownership for UID/GID `10001`. A
+mounted volume must also be writable by that identity; the default pod security
+context supplies `fsGroup: 10001` for supported volume types.
 
 ## Automation API
 

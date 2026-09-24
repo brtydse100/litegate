@@ -89,5 +89,18 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          provenance: mode=max
-          sbom: true
+          # Keep the release index compatible with ordinary docker pull/save/load
+          # workflows, including engines that do not retain attestation manifests.
+          provenance: false
+          sbom: false
+
+      - name: Verify Docker save and load
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(printf '%s\n' '${{ steps.meta.outputs.tags }}' | head -n 1)"
+          docker pull --platform linux/amd64 "$image"
+          docker save --output litegate-image.tar "$image"
+          docker image rm "$image"
+          docker load --input litegate-image.tar
+          docker image inspect "$image" >/dev/null

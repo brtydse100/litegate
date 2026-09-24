@@ -115,6 +115,16 @@ persistence:
   accessMode: ReadWriteOnce
   size: 1Gi
 
+# Additional container mounts and pod volumes, merged with the data PVC above.
+extraVolumeMounts: []
+# - name: external-data
+#   mountPath: /app/backend/data
+
+extraVolumes: []
+# - name: external-data
+#   persistentVolumeClaim:
+#     claimName: litegate-data
+
 nodeSelector: {}
 
 tolerations: []
