@@ -9,9 +9,10 @@ interface AuthConfig {
   local_enabled: boolean;
 }
 
-async function fetchAuthConfig(): Promise<AuthConfig> {
+export async function fetchAuthConfig(): Promise<AuthConfig> {
   const r = await fetch("/api/auth/config");
-  if (!r.ok) return { sso_enabled: false, local_enabled: false };
+  if (!r.ok)
+    throw new Error("Sign-in configuration is temporarily unavailable");
   return r.json();
 }
 
@@ -35,7 +36,12 @@ export default function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: cfg, isLoading } = useQuery<AuthConfig>({
+  const {
+    data: cfg,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<AuthConfig>({
     queryKey: ["auth-config"],
     queryFn: fetchAuthConfig,
     staleTime: Infinity,
@@ -98,6 +104,19 @@ export default function Login() {
 
         {isLoading && (
           <div className="h-10 w-full animate-pulse rounded-md bg-slate-100" />
+        )}
+
+        {isError && (
+          <div className="w-full rounded-md border border-red-200 bg-red-50 p-3 text-center text-sm text-red-800">
+            <p>Sign-in configuration is temporarily unavailable.</p>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="mt-2 font-medium underline underline-offset-2"
+            >
+              Try again
+            </button>
+          </div>
         )}
 
         {/* SSO button */}

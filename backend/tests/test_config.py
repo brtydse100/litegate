@@ -42,6 +42,27 @@ def test_yaml_mapping_is_loaded_as_structured_data(tmp_path, monkeypatch):
     }
 
 
+def test_legacy_yaml_oidc_settings_enable_sso(tmp_path, monkeypatch):
+    (tmp_path / "config.yaml").write_text(
+        "oidc_issuer_url: https://id.example.com\n"
+        "oidc_client_id: litegate\n"
+        "oidc_client_secret: secret\n"
+        "oidc_redirect_uri: https://litegate.example.com/api/auth/callback\n"
+    )
+    monkeypatch.delenv("OIDC_ISSUER_URL", raising=False)
+
+    import app.config as cfg_module
+
+    monkeypatch.setattr(cfg_module, "_BACKEND_DIR", tmp_path)
+    configured = cfg_module.Settings(
+        litellm_master_key="sk-test",
+        jwt_secret="x" * 32,
+    )
+
+    assert configured.oidc_issuer_url == "https://id.example.com"
+    assert configured.oidc_client_id == "litegate"
+
+
 def test_environment_takes_precedence_over_yaml(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text('litellm_master_key: "from-yaml"\n')
     monkeypatch.setenv("LITELLM_MASTER_KEY", "from-env")
