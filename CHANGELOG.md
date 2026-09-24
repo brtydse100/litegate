@@ -7,6 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-24
+
+### Added
+
+- The Helm chart now accepts additional pod volumes and container volume mounts,
+  including externally managed storage for `/app/backend/data`.
+- Container publishing verifies that the release image completes a standard
+  Docker pull, save, load, and inspection round trip.
+
+### Fixed
+
+- Release images no longer embed attestation manifests that can leave some
+  Docker content stores unable to export a pulled multi-platform image.
+- Transient authentication-configuration failures no longer silently hide the
+  SSO login button; the login page retries and presents a recoverable error.
+
 ## [2.9.0] - 2026-08-26
 
 ### Added

@@ -5,6 +5,7 @@ behavior. For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.10.0](v2.10.0.md) | Portable container exports, extensible Helm storage, and resilient SSO login |
 | [2.9.0](v2.9.0.md) | Configurable, bounded audit-history retention and safe readiness responses |
 | [2.8.0](v2.8.0.md) | Legacy spend-reset compatibility and recursive audit-detail redaction |
 | [2.7.0](v2.7.0.md) | Accessible-model visibility and selected-key spend resets |
