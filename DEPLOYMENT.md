@@ -207,6 +207,94 @@ helm install litegate ./deploy/helm/litegate \
 helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.10.0
 ```
 
+### Complete Helm environment-variable reference
+
+The chart passes `env` entries through a ConfigMap and `secretEnv` entries
+through a Secret. Specify only values that differ from the defaults; this
+expanded example is a reference, not a file to copy unchanged. Quote numeric
+and boolean values so Kubernetes stores them as strings.
+
+```yaml
+env:
+  # LiteLLM URLs. LITELLM_URL must be reachable from the LiteGate pod.
+  LITELLM_URL: "http://litellm:4000"
+  LITELLM_UI_URL: "" # Browser-facing hub link; empty hides it.
+
+  # Public LiteGate URL and allowed browser origins.
+  ROOT_URL: "http://litegate.example.com"
+  CORS_ORIGINS: "http://localhost,http://localhost:5173,http://localhost:3000"
+
+  # OIDC discovery mode. Leave OIDC_ISSUER_URL empty to disable SSO.
+  OIDC_ISSUER_URL: ""
+  OIDC_CLIENT_ID: ""
+  OIDC_REDIRECT_URI: ""
+  OIDC_SCOPES: "openid email profile"
+
+  # Manual OIDC mode for providers without usable discovery metadata.
+  # Set all three endpoints together, or omit all three to use discovery.
+  OIDC_AUTHORIZATION_ENDPOINT: ""
+  OIDC_TOKEN_ENDPOINT: ""
+  OIDC_JWKS_URI: ""
+
+  # SSO roles and LiteLLM team mapping.
+  OIDC_GROUPS_CLAIM: "groups" # Dotted paths such as realm_access.roles work.
+  ADMIN_EMAILS: "" # Comma-separated emails granted LiteGate admin access.
+  ADMIN_GROUPS: "" # Comma-separated groups granted LiteGate admin access.
+  OIDC_GROUP_TEAM_MAPPING: "{}" # JSON: SSO group to LiteLLM team ID(s).
+  # Example: '{"Engineering":"team-engineering","AI-Platform":["team-platform","team-shared"]}'
+  OIDC_REQUIRE_TEAM_MAPPING: "false"
+
+  # Bootstrap local administrator. Omit both login variables to disable it.
+  LOCAL_AUTH_USERNAME: "admin"
+
+  # Administrator-created local accounts and SQLite audit storage.
+  LOCAL_USERS_ENABLED: "true"
+  LOCAL_USERS_DB_PATH: "/app/backend/data/litegate.db"
+  AUDIT_RETENTION_DAYS: "90"
+  AUDIT_CLEANUP_BATCH_SIZE: "1000"
+
+  # Portal session behavior.
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRE_MINUTES: "1440"
+
+  # Optional defaults for keys created through LiteGate.
+  # Omit a variable to retain the corresponding LiteLLM default.
+  KEY_MAX_BUDGET: "10.0"
+  KEY_BUDGET_DURATION: "30d"
+  KEY_MODELS: '["gpt-4","gpt-3.5-turbo"]'
+  KEY_DURATION: "90d"
+  KEY_TPM_LIMIT: "100000"
+  KEY_RPM_LIMIT: "1000"
+  # Fallback for local or unmapped users; an SSO-mapped team takes precedence.
+  KEY_TEAM_ID: "team-default"
+
+  # Optional portal links and branding.
+  LOGO_URL: "" # External URL or served path such as /logo.svg.
+  SUPPORT_TICKET_URL: "" # Empty hides the support button.
+
+secretEnv:
+  # Required. Replace both chart placeholders before production use.
+  LITELLM_MASTER_KEY: "sk-your-litellm-master-key"
+  JWT_SECRET: "change-me-min-32-chars-random-string"
+
+  # Verification-only old JWT secrets for zero-downtime rotation.
+  JWT_PREVIOUS_SECRETS: ""
+
+  # Required when OIDC SSO is enabled.
+  OIDC_CLIENT_SECRET: ""
+
+  # Completes the bootstrap login when LOCAL_AUTH_USERNAME is set.
+  LOCAL_AUTH_PASSWORD: "changeme"
+
+  # Optional administrator credential for API automation (X-API-Key).
+  MANAGEMENT_API_KEY: ""
+```
+
+`SSL_CERT_FILE` is set automatically when `customCA` is configured and normally
+should not be added to `env` manually. Although `env` and `secretEnv` accept
+arbitrary names, the variables above are the complete application configuration
+defined by LiteGate.
+
 ### SSO roles and LiteLLM teams in Helm
 
 The chart accepts backend environment variables in two maps: `env` for ordinary
@@ -239,6 +327,12 @@ regenerated keys. Both settings read from `OIDC_GROUPS_CLAIM`, use
 case-insensitive group-name matching, and support dotted claim paths. Existing
 `config.*` values remain supported for upgrades, but new installations should
 use the smaller `env` and `secretEnv` maps.
+
+LiteGate does not import administrator status from LiteLLM. A LiteLLM
+administrator sees LiteGate's admin panel only when their SSO email matches
+`ADMIN_EMAILS`, their SSO group matches `ADMIN_GROUPS`, or their LiteGate local
+account has the `admin` role. `MANAGEMENT_API_KEY` grants API administrator
+access for automation but is not an interactive browser login.
 
 ### Custom CAs and additional resources
 
@@ -390,11 +484,17 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `litellm_url` | `LITELLM_URL` | `http://localhost:4000` | LiteLLM proxy URL |
 | `jwt_secret` | `JWT_SECRET` | *(required)* | Session token secret (≥32 chars) |
 | `jwt_previous_secrets` | `JWT_PREVIOUS_SECRETS` | `""` | Comma-separated prior secrets accepted temporarily during rotation |
+| `jwt_algorithm` | `JWT_ALGORITHM` | `HS256` | Portal-session signing algorithm |
+| `jwt_expire_minutes` | `JWT_EXPIRE_MINUTES` | `1440` | Portal-session lifetime in minutes |
 | `root_url` | `ROOT_URL` | `http://localhost` | Portal public URL (used for SSO redirect) |
+| `cors_origins` | `CORS_ORIGINS` | local origins | Comma-separated browser origins allowed to call LiteGate |
 | `oidc_issuer_url` | `OIDC_ISSUER_URL` | `""` | OIDC provider URL (blank = SSO disabled) |
 | `oidc_client_id` | `OIDC_CLIENT_ID` | `""` | OIDC client ID |
 | `oidc_client_secret` | `OIDC_CLIENT_SECRET` | `""` | OIDC client secret |
 | `oidc_redirect_uri` | `OIDC_REDIRECT_URI` | `""` | Callback URI registered with IdP |
+| `oidc_authorization_endpoint` | `OIDC_AUTHORIZATION_ENDPOINT` | `""` | Manual authorization endpoint; set all three manual endpoints together |
+| `oidc_token_endpoint` | `OIDC_TOKEN_ENDPOINT` | `""` | Manual token endpoint; set all three manual endpoints together |
+| `oidc_jwks_uri` | `OIDC_JWKS_URI` | `""` | Manual signing-key endpoint; set all three manual endpoints together |
 | `oidc_group_team_mapping` | `OIDC_GROUP_TEAM_MAPPING` | `{}` | SSO group to existing LiteLLM team ID or team-ID list; environment form is JSON |
 | `oidc_require_team_mapping` | `OIDC_REQUIRE_TEAM_MAPPING` | `false` | Deny SSO login when no team mapping matches |
 | `local_auth_username` | `LOCAL_AUTH_USERNAME` | `""` | Admin username (blank = disabled) |

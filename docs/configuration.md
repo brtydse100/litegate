@@ -43,6 +43,11 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 The management key grants administrator access, including administrator-only
 bulk key editing. It is not a user credential or a scoped token.
 
+LiteLLM administrator status is not used to authorize the LiteGate admin panel.
+An SSO user becomes a LiteGate administrator only through `admin_emails` or
+`admin_groups`; a local account must have LiteGate's `admin` role. Team mapping
+also does not grant administrator access.
+
 OIDC discovery is used by default. Providers that do not expose usable discovery
 metadata can instead set all three manual endpoint settings. Partial manual
 configuration is rejected at startup so login cannot silently mix modes.
