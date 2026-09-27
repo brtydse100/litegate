@@ -1,16 +1,13 @@
-# LiteGate currently uses SQLite plus an in-process operation limiter. The chart
-# deliberately supports one replica until those stores are externalized.
+# LiteGate uses SQLite and process-local operation limits, so one replica is required.
 replicaCount: 1
 
 podSecurityContext:
   fsGroup: 10001
   fsGroupChangePolicy: OnRootMismatch
-
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
-    drop:
-      - ALL
+    drop: [ALL]
   runAsNonRoot: true
   runAsUser: 10001
   runAsGroup: 10001
@@ -19,13 +16,11 @@ securityContext:
 
 image:
   repository: ghcr.io/brtydse100/litegate
-  tag: "2.10.0"  # always pin to a specific tag; never use 'latest' in production
+  tag: "2.10.0" # Pin a specific tag in production.
   pullPolicy: IfNotPresent
-
 service:
   type: ClusterIP
   port: 80
-
 ingress:
   enabled: false
   className: ""
@@ -37,96 +32,31 @@ ingress:
           pathType: Prefix
   tls: []
 
-config:
-  # Required
-  litellmMasterKey: "sk-your-litellm-master-key"
-  jwtSecret: "change-me-min-32-chars-random-string"
-  # Verification-only prior secrets, comma-separated, for zero-downtime rotation.
-  jwtPreviousSecrets: ""
-
-  # LiteLLM backend URL (reachable from inside the pod)
-  litellmUrl: "http://litellm:4000"
-
-  # Public URL of the LiteLLM web UI shown as "Open LiteLLM Hub" button
-  litellmUiUrl: ""
-
-  # SSO (OIDC) - leave all blank to disable
-  oidcIssuerUrl: ""
-  oidcClientId: ""
-  oidcClientSecret: ""
-  oidcRedirectUri: ""
-  oidcScopes: "openid email profile"
-  # adminGroups and oidcGroupTeamMapping both read group names from this claim.
-  # Dot notation is supported, for example: realm_access.roles
-  oidcGroupsClaim: "groups"
-  # Map SSO group names to existing LiteLLM team IDs. A group can map to a
-  # string or list; the first matched team is applied to new/regenerated keys.
-  oidcGroupTeamMapping: {}
-  # Example:
-  # oidcGroupTeamMapping:
-  #   Engineering: "team-engineering"
-  #   AI-Platform:
-  #     - "team-platform"
-  #     - "team-shared-services"
-  oidcRequireTeamMapping: false
-
-  # Local admin login (remove in production by leaving both blank)
-  localAuthUsername: "admin"
-  localAuthPassword: "changeme"
-
-  # Admin-created local accounts and their administration page
-  localUsersEnabled: "true"
-  localUsersDbPath: "/app/backend/data/litegate.db"
-  # Expired audit rows are pruned in bounded batches when new audit events are written.
-  auditRetentionDays: "90"
-  auditCleanupBatchSize: "1000"
-  adminEmails: ""
-  # Comma-separated SSO groups that receive the LiteGate administrator role.
-  # Matching is case-insensitive; this does not make users LiteLLM team admins.
-  adminGroups: ""
-
-  # Optional credential for the management API (send as X-API-Key)
-  managementApiKey: ""
-
-  # Root URL of the portal (used for SSO redirect)
-  rootUrl: "http://litegate.example.com"
-
-  # Logo URL shown in the header (external URL or /logo.svg)
-  logoUrl: ""
-
-  # Support ticket button URL (leave blank to hide)
-  supportTicketUrl: ""
-
-  # Key budget/limit defaults (uncomment to enable)
-  # keyMaxBudget: "10.0"
-  # keyBudgetDuration: "30d"
-  # keyModels: '["gpt-4","gpt-3.5-turbo"]'
-  # keyDuration: "90d"
-  # keyTpmLimit: "100000"
-  # keyRpmLimit: "1000"
-  # Fallback for local or unmapped users; an SSO-mapped primary team takes precedence.
-  # keyTeamId: "team-default"
+# Use backend environment-variable names. Omitted values use chart/backend
+# defaults. Override the placeholder credentials before production use.
+env: {}
+secretEnv: {}
 
 resources: {}
-
 persistence:
   enabled: true
   existingClaim: ""
   accessMode: ReadWriteOnce
   size: 1Gi
 
-# Additional container mounts and pod volumes, merged with the data PVC above.
-extraVolumeMounts: []
-# - name: external-data
-#   mountPath: /app/backend/data
+# Mount a complete CA bundle from exactly one existing ConfigMap or Secret.
+customCA: {}
+#  configMap: corporate-ca
+#  secret: corporate-ca
+#  key: ca-bundle.crt
+#  mountPath: /etc/ssl/certs/litegate-custom-ca.pem
 
+extraVolumeMounts: []
 extraVolumes: []
-# - name: external-data
-#   persistentVolumeClaim:
-#     claimName: litegate-data
+
+# Arbitrary Kubernetes objects rendered with tpl, including OpenShift Routes.
+extraObjects: []
 
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}

@@ -83,6 +83,7 @@ def test_key_models_list_parses_json(monkeypatch):
 
     # Re-import to pick up patched env
     import importlib
+
     import app.config as cfg_module
 
     importlib.reload(cfg_module)
@@ -96,6 +97,7 @@ def test_key_models_list_empty_default(monkeypatch):
     monkeypatch.setenv("KEY_MODELS", "[]")
 
     import importlib
+
     import app.config as cfg_module
 
     importlib.reload(cfg_module)
@@ -110,6 +112,7 @@ def test_admin_identity_supports_nested_group_claim(monkeypatch):
     monkeypatch.setenv("OIDC_GROUPS_CLAIM", "realm_access.roles")
 
     import importlib
+
     import app.config as cfg_module
 
     importlib.reload(cfg_module)
@@ -213,3 +216,23 @@ def test_audit_retention_settings_require_positive_values():
 
     with pytest.raises(ValidationError):
         Settings(litellm_master_key="sk-test", jwt_secret="x" * 32, audit_retention_days=0)
+
+
+def test_manual_oidc_endpoints_must_be_complete():
+    from app.config import Settings
+
+    with pytest.raises(ValidationError, match="must be configured together"):
+        Settings(
+            litellm_master_key="sk-test",
+            jwt_secret="x" * 32,
+            oidc_authorization_endpoint="https://idp.example/authorize",
+        )
+
+    configured = Settings(
+        litellm_master_key="sk-test",
+        jwt_secret="x" * 32,
+        oidc_authorization_endpoint="https://idp.example/authorize",
+        oidc_token_endpoint="https://idp.example/token",
+        oidc_jwks_uri="https://idp.example/keys",
+    )
+    assert configured.oidc_manual_endpoints_enabled is True

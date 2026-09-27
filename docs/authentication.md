@@ -49,6 +49,19 @@ Common issuer patterns:
 | Okta | `https://<domain>.okta.com/oauth2/default` |
 | Keycloak | `https://<host>/realms/<realm>` |
 
+LiteGate uses the issuer's discovery document by default. For providers that
+require manual configuration, set all three endpoints together:
+
+```yaml
+oidc_authorization_endpoint: "https://login.example.com/oauth2/authorize"
+oidc_token_endpoint: "https://login.example.com/oauth2/token"
+oidc_jwks_uri: "https://login.example.com/oauth2/keys"
+```
+
+The issuer is still required for ID-token issuer validation. Manual mode keeps
+the same authorization-code flow, signed state, nonce, and token verification;
+it only replaces discovery of the provider endpoints.
+
 ## Assigning administrators
 
 SSO users receive administrator access when their email or group matches the

@@ -1,3 +1,11 @@
+{{- $legacy := .Values.config | default dict -}}
+{{- $data := dict "LITELLM_URL" "http://litellm:4000" "ROOT_URL" "http://litegate.example.com" "LOCAL_AUTH_USERNAME" "admin" "LOCAL_USERS_ENABLED" "true" "LOCAL_USERS_DB_PATH" "/app/backend/data/litegate.db" "AUDIT_RETENTION_DAYS" "90" "AUDIT_CLEANUP_BATCH_SIZE" "1000" -}}
+{{- $legacyKeys := dict "litellmUrl" "LITELLM_URL" "litellmUiUrl" "LITELLM_UI_URL" "rootUrl" "ROOT_URL" "logoUrl" "LOGO_URL" "supportTicketUrl" "SUPPORT_TICKET_URL" "localUsersEnabled" "LOCAL_USERS_ENABLED" "localUsersDbPath" "LOCAL_USERS_DB_PATH" "auditRetentionDays" "AUDIT_RETENTION_DAYS" "auditCleanupBatchSize" "AUDIT_CLEANUP_BATCH_SIZE" "adminEmails" "ADMIN_EMAILS" "adminGroups" "ADMIN_GROUPS" "localAuthUsername" "LOCAL_AUTH_USERNAME" "oidcIssuerUrl" "OIDC_ISSUER_URL" "oidcClientId" "OIDC_CLIENT_ID" "oidcRedirectUri" "OIDC_REDIRECT_URI" "oidcScopes" "OIDC_SCOPES" "oidcAuthorizationEndpoint" "OIDC_AUTHORIZATION_ENDPOINT" "oidcTokenEndpoint" "OIDC_TOKEN_ENDPOINT" "oidcJwksUri" "OIDC_JWKS_URI" "oidcGroupsClaim" "OIDC_GROUPS_CLAIM" "oidcRequireTeamMapping" "OIDC_REQUIRE_TEAM_MAPPING" "keyMaxBudget" "KEY_MAX_BUDGET" "keyBudgetDuration" "KEY_BUDGET_DURATION" "keyModels" "KEY_MODELS" "keyDuration" "KEY_DURATION" "keyTpmLimit" "KEY_TPM_LIMIT" "keyRpmLimit" "KEY_RPM_LIMIT" "keyTeamId" "KEY_TEAM_ID" -}}
+{{- range $old, $new := $legacyKeys -}}
+  {{- if hasKey $legacy $old -}}{{- $_ := set $data $new (printf "%v" (index $legacy $old)) -}}{{- end -}}
+{{- end -}}
+{{- if hasKey $legacy "oidcGroupTeamMapping" -}}{{- $_ := set $data "OIDC_GROUP_TEAM_MAPPING" (toJson (index $legacy "oidcGroupTeamMapping")) -}}{{- end -}}
+{{- range $key, $value := (.Values.env | default dict) -}}{{- $_ := set $data $key (printf "%v" $value) -}}{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -5,47 +13,6 @@ metadata:
   labels:
     {{- include "litegate.labels" . | nindent 4 }}
 data:
-  LITELLM_URL: {{ .Values.config.litellmUrl | quote }}
-  LITELLM_UI_URL: {{ .Values.config.litellmUiUrl | quote }}
-  ROOT_URL: {{ .Values.config.rootUrl | quote }}
-  LOGO_URL: {{ .Values.config.logoUrl | quote }}
-  SUPPORT_TICKET_URL: {{ .Values.config.supportTicketUrl | quote }}
-  LOCAL_USERS_ENABLED: {{ .Values.config.localUsersEnabled | quote }}
-  LOCAL_USERS_DB_PATH: {{ .Values.config.localUsersDbPath | quote }}
-  AUDIT_RETENTION_DAYS: {{ .Values.config.auditRetentionDays | quote }}
-  AUDIT_CLEANUP_BATCH_SIZE: {{ .Values.config.auditCleanupBatchSize | quote }}
-  ADMIN_EMAILS: {{ .Values.config.adminEmails | quote }}
-  ADMIN_GROUPS: {{ .Values.config.adminGroups | quote }}
-  {{- if .Values.config.localAuthUsername }}
-  LOCAL_AUTH_USERNAME: {{ .Values.config.localAuthUsername | quote }}
-  {{- end }}
-  {{- if .Values.config.oidcIssuerUrl }}
-  OIDC_ISSUER_URL: {{ .Values.config.oidcIssuerUrl | quote }}
-  OIDC_CLIENT_ID: {{ .Values.config.oidcClientId | quote }}
-  OIDC_REDIRECT_URI: {{ .Values.config.oidcRedirectUri | quote }}
-  OIDC_SCOPES: {{ .Values.config.oidcScopes | quote }}
-  OIDC_GROUPS_CLAIM: {{ .Values.config.oidcGroupsClaim | quote }}
-  OIDC_GROUP_TEAM_MAPPING: {{ .Values.config.oidcGroupTeamMapping | toJson | quote }}
-  OIDC_REQUIRE_TEAM_MAPPING: {{ .Values.config.oidcRequireTeamMapping | quote }}
-  {{- end }}
-  {{- if .Values.config.keyMaxBudget }}
-  KEY_MAX_BUDGET: {{ .Values.config.keyMaxBudget | quote }}
-  {{- end }}
-  {{- if .Values.config.keyBudgetDuration }}
-  KEY_BUDGET_DURATION: {{ .Values.config.keyBudgetDuration | quote }}
-  {{- end }}
-  {{- if .Values.config.keyModels }}
-  KEY_MODELS: {{ .Values.config.keyModels | quote }}
-  {{- end }}
-  {{- if .Values.config.keyDuration }}
-  KEY_DURATION: {{ .Values.config.keyDuration | quote }}
-  {{- end }}
-  {{- if .Values.config.keyTpmLimit }}
-  KEY_TPM_LIMIT: {{ .Values.config.keyTpmLimit | quote }}
-  {{- end }}
-  {{- if .Values.config.keyRpmLimit }}
-  KEY_RPM_LIMIT: {{ .Values.config.keyRpmLimit | quote }}
-  {{- end }}
-  {{- if .Values.config.keyTeamId }}
-  KEY_TEAM_ID: {{ .Values.config.keyTeamId | quote }}
+  {{- range $key, $value := $data }}
+  {{ $key }}: {{ $value | quote }}
   {{- end }}

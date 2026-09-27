@@ -24,6 +24,9 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `oidc_client_secret` | empty | OIDC client secret |
 | `oidc_redirect_uri` | empty | Registered callback URI |
 | `oidc_scopes` | `openid email profile` | Space-separated requested scopes |
+| `oidc_authorization_endpoint` | empty | Manual authorization endpoint; set with the token and JWKS endpoints to bypass discovery |
+| `oidc_token_endpoint` | empty | Manual token endpoint; set with the authorization and JWKS endpoints |
+| `oidc_jwks_uri` | empty | Manual signing-key endpoint; set with the authorization and token endpoints |
 | `oidc_groups_claim` | `groups` | ID-token group path; dot notation supported |
 | `oidc_group_team_mapping` | `{}` | SSO group to existing LiteLLM team ID or team-ID list |
 | `oidc_require_team_mapping` | `false` | Deny SSO login when no configured team matches |
@@ -39,6 +42,10 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 
 The management key grants administrator access, including administrator-only
 bulk key editing. It is not a user credential or a scoped token.
+
+OIDC discovery is used by default. Providers that do not expose usable discovery
+metadata can instead set all three manual endpoint settings. Partial manual
+configuration is rejected at startup so login cannot silently mix modes.
 
 ### Audit-history retention
 

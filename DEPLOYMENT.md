@@ -134,8 +134,8 @@ until the restored service passes readiness and sign-in checks.
 
 Set the old `JWT_SECRET` as `JWT_PREVIOUS_SECRETS`, generate a new
 `JWT_SECRET`, and restart. After one full `JWT_EXPIRE_MINUTES` window, remove
-the previous value. Helm exposes these as `config.jwtSecret` and
-`config.jwtPreviousSecrets`.
+the previous value. Helm exposes these as `secretEnv.JWT_SECRET` and
+`secretEnv.JWT_PREVIOUS_SECRETS`.
 
 ### Offline usage
 
@@ -188,15 +188,15 @@ docker push your-registry.io/litegate:2.6.1
 ```bash
 helm install litegate ./deploy/helm/litegate \
   --set image.repository=your-registry.io/litegate \
-  --set image.tag=2.6.1 \
-  --set config.litellmUrl=http://litellm-svc:4000 \
-  --set config.litellmMasterKey=sk-your-key \
-  --set config.jwtSecret=$(openssl rand -base64 32) \
-  --set config.oidcIssuerUrl=https://accounts.google.com \
-  --set config.oidcClientId=YOUR_CLIENT_ID \
-  --set config.oidcClientSecret=YOUR_CLIENT_SECRET \
-  --set config.oidcRedirectUri=https://portal.example.com/api/auth/callback \
-  --set config.rootUrl=https://portal.example.com \
+  --set image.tag=2.10.0 \
+  --set env.LITELLM_URL=http://litellm-svc:4000 \
+  --set secretEnv.LITELLM_MASTER_KEY=sk-your-key \
+  --set secretEnv.JWT_SECRET=$(openssl rand -base64 32) \
+  --set env.OIDC_ISSUER_URL=https://accounts.google.com \
+  --set env.OIDC_CLIENT_ID=YOUR_CLIENT_ID \
+  --set secretEnv.OIDC_CLIENT_SECRET=YOUR_CLIENT_SECRET \
+  --set env.OIDC_REDIRECT_URI=https://portal.example.com/api/auth/callback \
+  --set env.ROOT_URL=https://portal.example.com \
   --set ingress.hosts[0].host=portal.example.com \
   --set ingress.enabled=true
 ```
@@ -204,29 +204,24 @@ helm install litegate ./deploy/helm/litegate \
 ### Step 3 — Upgrade after changes
 
 ```bash
-helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.6.1
+helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.10.0
 ```
 
 ### SSO roles and LiteLLM teams in Helm
 
-The chart exposes the SSO role and team settings under `config`. Put them in a
-private values file rather than trying to express the team map with repeated
-`--set` flags:
+The chart accepts backend environment variables in two maps: `env` for ordinary
+settings and `secretEnv` for credentials. Omitted settings keep backend defaults,
+so values files remain short. Put JSON-valued settings in a private values file:
 
 ```yaml
-config:
-  oidcGroupsClaim: "groups"
-
-  # LiteGate role mapping: these users can manage local users and bulk-edit keys.
-  adminGroups: "Platform Admins,AI Operations"
-
-  # LiteLLM membership/key mapping: values are existing team IDs, not aliases.
-  oidcGroupTeamMapping:
-    Engineering: "team-engineering"
-    AI-Platform:
-      - "team-platform"
-      - "team-shared-services"
-  oidcRequireTeamMapping: true
+env:
+  OIDC_GROUPS_CLAIM: "groups"
+  ADMIN_GROUPS: "Platform Admins,AI Operations"
+  OIDC_GROUP_TEAM_MAPPING: '{"Engineering":"team-engineering","AI-Platform":["team-platform","team-shared-services"]}'
+  OIDC_REQUIRE_TEAM_MAPPING: "true"
+secretEnv:
+  LITELLM_MASTER_KEY: "replace-me"
+  JWT_SECRET: "replace-with-at-least-32-random-characters"
 ```
 
 Apply it with:
@@ -237,11 +232,42 @@ helm upgrade --install litegate ./deploy/helm/litegate \
   --values values.production.yaml
 ```
 
-`adminGroups` controls the LiteGate `admin` role only. It does not grant the
-LiteLLM team-admin role. `oidcGroupTeamMapping` adds the user as a regular
+`ADMIN_GROUPS` controls the LiteGate `admin` role only. It does not grant the
+LiteLLM team-admin role. `OIDC_GROUP_TEAM_MAPPING` adds the user as a regular
 LiteLLM team member and assigns the first matched team to newly generated or
-regenerated keys. Both settings read from `oidcGroupsClaim`, use
-case-insensitive group-name matching, and support dotted claim paths.
+regenerated keys. Both settings read from `OIDC_GROUPS_CLAIM`, use
+case-insensitive group-name matching, and support dotted claim paths. Existing
+`config.*` values remain supported for upgrades, but new installations should
+use the smaller `env` and `secretEnv` maps.
+
+### Custom CAs and additional resources
+
+Mount a complete CA bundle from an existing ConfigMap or Secret. Choose exactly
+one source; `key` defaults to `ca-bundle.crt`:
+
+```yaml
+customCA:
+  configMap: corporate-ca
+  key: ca-bundle.crt
+```
+
+The chart sets `SSL_CERT_FILE` to the mounted bundle. Include public roots in
+that file when LiteGate also connects to public HTTPS endpoints.
+
+Use `extraObjects` for arbitrary cluster resources. For example, an OpenShift
+Route can target the chart's Service without a dedicated Route option:
+
+```yaml
+extraObjects:
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      name: '{{ include "litegate.fullname" . }}'
+    spec:
+      to:
+        kind: Service
+        name: '{{ include "litegate.fullname" . }}'
+```
 
 The chart's default pod and container security contexts enforce the image's
 non-root UID/GID, drop all capabilities, prevent privilege escalation, apply the

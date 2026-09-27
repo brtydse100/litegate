@@ -1,11 +1,13 @@
 import json
 import time
 
-from cryptography.hazmat.primitives.asymmetric import rsa
 import jwt
-from jwt.algorithms import RSAAlgorithm
 import pytest
+import respx
+from cryptography.hazmat.primitives.asymmetric import rsa
+from httpx import Response
 from itsdangerous import URLSafeTimedSerializer
+from jwt.algorithms import RSAAlgorithm
 
 from app.services import oidc
 
@@ -77,3 +79,56 @@ async def test_id_token_verification_rejects_a_nonce_from_another_login(monkeypa
 
     with pytest.raises(jwt.InvalidTokenError, match="nonce mismatch"):
         await oidc.verify_id_token(token, expected_nonce="second-browser")
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_manual_oidc_endpoints_skip_discovery(monkeypatch):
+    id_token, signing_key = _signed_id_token(kid="manual-key", nonce="manual-nonce")
+    monkeypatch.setattr(oidc.settings, "oidc_issuer_url", "https://idp.example")
+    monkeypatch.setattr(oidc.settings, "oidc_client_id", "litegate-client")
+    monkeypatch.setattr(oidc.settings, "oidc_redirect_uri", "https://litegate.example/callback")
+    monkeypatch.setattr(oidc.settings, "oidc_authorization_endpoint", "https://idp.example/authorize")
+    monkeypatch.setattr(oidc.settings, "oidc_token_endpoint", "https://idp.example/token")
+    monkeypatch.setattr(oidc.settings, "oidc_jwks_uri", "https://idp.example/keys")
+    monkeypatch.setattr(oidc, "_jwks_cache", None)
+    discovery = respx.get("https://idp.example/.well-known/openid-configuration")
+    token = respx.post("https://idp.example/token").mock(return_value=Response(200, json={"id_token": id_token}))
+    keys = respx.get("https://idp.example/keys").mock(return_value=Response(200, json={"keys": [signing_key]}))
+
+    state = oidc.generate_state()
+    authorization_url = await oidc.get_authorization_url(state)
+    exchanged = await oidc.exchange_code("code")
+    claims = await oidc.verify_id_token(exchanged["id_token"], expected_nonce="manual-nonce")
+
+    assert authorization_url.startswith("https://idp.example/authorize?")
+    assert claims["sub"] == "oidc-user"
+    assert discovery.called is False
+    assert token.calls.last.request.content
+    assert keys.called is True
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_discovery_remains_the_default(monkeypatch):
+    monkeypatch.setattr(oidc.settings, "oidc_issuer_url", "https://discovery.example")
+    monkeypatch.setattr(oidc.settings, "oidc_authorization_endpoint", "")
+    monkeypatch.setattr(oidc.settings, "oidc_token_endpoint", "")
+    monkeypatch.setattr(oidc.settings, "oidc_jwks_uri", "")
+    monkeypatch.setattr(oidc, "_discovery_cache", None)
+    discovery = respx.get("https://discovery.example/.well-known/openid-configuration").mock(
+        return_value=Response(
+            200,
+            json={
+                "issuer": "https://discovery.example",
+                "authorization_endpoint": "https://discovery.example/authorize",
+                "token_endpoint": "https://discovery.example/token",
+                "jwks_uri": "https://discovery.example/keys",
+            },
+        )
+    )
+
+    metadata = await oidc.get_provider_metadata()
+
+    assert metadata["jwks_uri"] == "https://discovery.example/keys"
+    assert discovery.called is True
