@@ -18,6 +18,10 @@ oidc_client_secret: ""
 oidc_redirect_uri: "http://localhost/api/auth/callback"
 # Add provider-specific scopes when needed, for example: "openid email profile groups"
 oidc_scopes: "openid email profile"
+# Optional manual mode. Set all three endpoints or leave all three blank.
+oidc_authorization_endpoint: ""
+oidc_token_endpoint: ""
+oidc_jwks_uri: ""
 # ID-token claim containing group names; dot notation supports nested claims.
 oidc_groups_claim: "groups"
 # Add matched SSO users to existing LiteLLM teams. A group may map to one team
@@ -31,6 +35,10 @@ oidc_group_team_mapping: {}
 #     - "team-shared-services"
 # Deny SSO login when none of the user's groups has a configured team.
 oidc_require_team_mapping: false
+# Existing team added to every SSO user in addition to mapped teams.
+sso_default_team_id: ""
+# Inherit only the matching LiteLLM proxy_admin role.
+inherit_litellm_admin: false
 
 # Local admin login - remove in production
 local_auth_username: "admin"

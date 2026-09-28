@@ -134,8 +134,8 @@ until the restored service passes readiness and sign-in checks.
 
 Set the old `JWT_SECRET` as `JWT_PREVIOUS_SECRETS`, generate a new
 `JWT_SECRET`, and restart. After one full `JWT_EXPIRE_MINUTES` window, remove
-the previous value. Helm exposes these as `secretEnv.JWT_SECRET` and
-`secretEnv.JWT_PREVIOUS_SECRETS`.
+the previous value. Helm exposes these as `config.jwtSecret` and
+`config.jwtPreviousSecrets`.
 
 ### Offline usage
 
@@ -189,14 +189,14 @@ docker push your-registry.io/litegate:2.6.1
 helm install litegate ./deploy/helm/litegate \
   --set image.repository=your-registry.io/litegate \
   --set image.tag=2.10.0 \
-  --set env.LITELLM_URL=http://litellm-svc:4000 \
-  --set secretEnv.LITELLM_MASTER_KEY=sk-your-key \
-  --set secretEnv.JWT_SECRET=$(openssl rand -base64 32) \
-  --set env.OIDC_ISSUER_URL=https://accounts.google.com \
-  --set env.OIDC_CLIENT_ID=YOUR_CLIENT_ID \
-  --set secretEnv.OIDC_CLIENT_SECRET=YOUR_CLIENT_SECRET \
-  --set env.OIDC_REDIRECT_URI=https://portal.example.com/api/auth/callback \
-  --set env.ROOT_URL=https://portal.example.com \
+  --set config.litellmUrl=http://litellm-svc:4000 \
+  --set config.litellmMasterKey=sk-your-key \
+  --set config.jwtSecret=$(openssl rand -base64 32) \
+  --set config.oidcIssuerUrl=https://accounts.google.com \
+  --set config.oidcClientId=YOUR_CLIENT_ID \
+  --set config.oidcClientSecret=YOUR_CLIENT_SECRET \
+  --set config.oidcRedirectUri=https://portal.example.com/api/auth/callback \
+  --set config.rootUrl=https://portal.example.com \
   --set ingress.hosts[0].host=portal.example.com \
   --set ingress.enabled=true
 ```
@@ -207,109 +207,28 @@ helm install litegate ./deploy/helm/litegate \
 helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.10.0
 ```
 
-### Complete Helm environment-variable reference
-
-The chart passes `env` entries through a ConfigMap and `secretEnv` entries
-through a Secret. Specify only values that differ from the defaults; this
-expanded example is a reference, not a file to copy unchanged. Quote numeric
-and boolean values so Kubernetes stores them as strings.
-
-```yaml
-env:
-  # LiteLLM URLs. LITELLM_URL must be reachable from the LiteGate pod.
-  LITELLM_URL: "http://litellm:4000"
-  LITELLM_UI_URL: "" # Browser-facing hub link; empty hides it.
-
-  # Public LiteGate URL and allowed browser origins.
-  ROOT_URL: "http://litegate.example.com"
-  CORS_ORIGINS: "http://localhost,http://localhost:5173,http://localhost:3000"
-
-  # OIDC discovery mode. Leave OIDC_ISSUER_URL empty to disable SSO.
-  OIDC_ISSUER_URL: ""
-  OIDC_CLIENT_ID: ""
-  OIDC_REDIRECT_URI: ""
-  OIDC_SCOPES: "openid email profile"
-
-  # Manual OIDC mode for providers without usable discovery metadata.
-  # Set all three endpoints together, or omit all three to use discovery.
-  OIDC_AUTHORIZATION_ENDPOINT: ""
-  OIDC_TOKEN_ENDPOINT: ""
-  OIDC_JWKS_URI: ""
-
-  # SSO roles and LiteLLM team mapping.
-  OIDC_GROUPS_CLAIM: "groups" # Dotted paths such as realm_access.roles work.
-  ADMIN_EMAILS: "" # Comma-separated emails granted LiteGate admin access.
-  ADMIN_GROUPS: "" # Comma-separated groups granted LiteGate admin access.
-  OIDC_GROUP_TEAM_MAPPING: "{}" # JSON: SSO group to LiteLLM team ID(s).
-  # Example: '{"Engineering":"team-engineering","AI-Platform":["team-platform","team-shared"]}'
-  OIDC_REQUIRE_TEAM_MAPPING: "false"
-
-  # Bootstrap local administrator. Omit both login variables to disable it.
-  LOCAL_AUTH_USERNAME: "admin"
-
-  # Administrator-created local accounts and SQLite audit storage.
-  LOCAL_USERS_ENABLED: "true"
-  LOCAL_USERS_DB_PATH: "/app/backend/data/litegate.db"
-  AUDIT_RETENTION_DAYS: "90"
-  AUDIT_CLEANUP_BATCH_SIZE: "1000"
-
-  # Portal session behavior.
-  JWT_ALGORITHM: "HS256"
-  JWT_EXPIRE_MINUTES: "1440"
-
-  # Optional defaults for keys created through LiteGate.
-  # Omit a variable to retain the corresponding LiteLLM default.
-  KEY_MAX_BUDGET: "10.0"
-  KEY_BUDGET_DURATION: "30d"
-  KEY_MODELS: '["gpt-4","gpt-3.5-turbo"]'
-  KEY_DURATION: "90d"
-  KEY_TPM_LIMIT: "100000"
-  KEY_RPM_LIMIT: "1000"
-  # Fallback for local or unmapped users; an SSO-mapped team takes precedence.
-  KEY_TEAM_ID: "team-default"
-
-  # Optional portal links and branding.
-  LOGO_URL: "" # External URL or served path such as /logo.svg.
-  SUPPORT_TICKET_URL: "" # Empty hides the support button.
-
-secretEnv:
-  # Required. Replace both chart placeholders before production use.
-  LITELLM_MASTER_KEY: "sk-your-litellm-master-key"
-  JWT_SECRET: "change-me-min-32-chars-random-string"
-
-  # Verification-only old JWT secrets for zero-downtime rotation.
-  JWT_PREVIOUS_SECRETS: ""
-
-  # Required when OIDC SSO is enabled.
-  OIDC_CLIENT_SECRET: ""
-
-  # Completes the bootstrap login when LOCAL_AUTH_USERNAME is set.
-  LOCAL_AUTH_PASSWORD: "changeme"
-
-  # Optional administrator credential for API automation (X-API-Key).
-  MANAGEMENT_API_KEY: ""
-```
-
-`SSL_CERT_FILE` is set automatically when `customCA` is configured and normally
-should not be added to `env` manually. Although `env` and `secretEnv` accept
-arbitrary names, the variables above are the complete application configuration
-defined by LiteGate.
-
 ### SSO roles and LiteLLM teams in Helm
 
-The chart accepts backend environment variables in two maps: `env` for ordinary
-settings and `secretEnv` for credentials. Omitted settings keep backend defaults,
-so values files remain short. Put JSON-valued settings in a private values file:
+The chart keeps application settings together under `config`. Discovery is the
+normal SSO mode; the three manual endpoints are only needed for providers whose
+discovery metadata cannot be used.
 
 ```yaml
-env:
-  OIDC_GROUPS_CLAIM: "groups"
-  ADMIN_GROUPS: "Platform Admins,AI Operations"
-  OIDC_GROUP_TEAM_MAPPING: '{"Engineering":"team-engineering","AI-Platform":["team-platform","team-shared-services"]}'
-  OIDC_REQUIRE_TEAM_MAPPING: "true"
-secretEnv:
-  LITELLM_MASTER_KEY: "replace-me"
-  JWT_SECRET: "replace-with-at-least-32-random-characters"
+config:
+  oidcIssuerUrl: "https://idp.example.com/realms/company"
+  oidcClientId: "litegate"
+  oidcClientSecret: "replace-me"
+  oidcRedirectUri: "https://litegate.example.com/api/auth/callback"
+  oidcGroupsClaim: "groups"
+  adminGroups: "Platform Admins,AI Operations"
+  ssoDefaultTeamId: "team-everyone"
+  oidcGroupTeamMapping:
+    Engineering: "team-engineering"
+    AI-Platform:
+      - "team-platform"
+      - "team-shared-services"
+  ssoRequireTeamMapping: false
+  inheritLitellmAdmin: false
 ```
 
 Apply it with:
@@ -320,19 +239,16 @@ helm upgrade --install litegate ./deploy/helm/litegate \
   --values values.production.yaml
 ```
 
-`ADMIN_GROUPS` controls the LiteGate `admin` role only. It does not grant the
-LiteLLM team-admin role. `OIDC_GROUP_TEAM_MAPPING` adds the user as a regular
-LiteLLM team member and assigns the first matched team to newly generated or
-regenerated keys. Both settings read from `OIDC_GROUPS_CLAIM`, use
-case-insensitive group-name matching, and support dotted claim paths. Existing
-`config.*` values remain supported for upgrades, but new installations should
-use the smaller `env` and `secretEnv` maps.
+`ssoDefaultTeamId` adds every SSO user to one existing LiteLLM team in addition
+to every group-mapped team. The first group-mapped team is primary for generated
+keys; otherwise the default team is primary. With `ssoRequireTeamMapping: false`,
+users without a group mapping may still sign in. Set it to `true` only when a
+group mapping must be required for login.
 
-LiteGate does not import administrator status from LiteLLM. A LiteLLM
-administrator sees LiteGate's admin panel only when their SSO email matches
-`ADMIN_EMAILS`, their SSO group matches `ADMIN_GROUPS`, or their LiteGate local
-account has the `admin` role. `MANAGEMENT_API_KEY` grants API administrator
-access for automation but is not an interactive browser login.
+LiteGate admin access normally comes from `adminEmails`, `adminGroups`, or a
+LiteGate local admin account. Set `inheritLitellmAdmin: true` to additionally
+promote a matching full LiteLLM `proxy_admin`; read-only, organization, and team
+administrator roles are deliberately not promoted.
 
 ### Custom CAs and additional resources
 
@@ -497,6 +413,8 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `oidc_jwks_uri` | `OIDC_JWKS_URI` | `""` | Manual signing-key endpoint; set all three manual endpoints together |
 | `oidc_group_team_mapping` | `OIDC_GROUP_TEAM_MAPPING` | `{}` | SSO group to existing LiteLLM team ID or team-ID list; environment form is JSON |
 | `oidc_require_team_mapping` | `OIDC_REQUIRE_TEAM_MAPPING` | `false` | Deny SSO login when no team mapping matches |
+| `sso_default_team_id` | `SSO_DEFAULT_TEAM_ID` | `""` | Existing LiteLLM team added to every SSO user alongside mapped teams |
+| `inherit_litellm_admin` | `INHERIT_LITELLM_ADMIN` | `false` | Inherit only the matching LiteLLM `proxy_admin` role |
 | `local_auth_username` | `LOCAL_AUTH_USERNAME` | `""` | Admin username (blank = disabled) |
 | `local_auth_password` | `LOCAL_AUTH_PASSWORD` | `""` | Admin password |
 | `logo_url` | `LOGO_URL` | `""` | Logo image URL or path |

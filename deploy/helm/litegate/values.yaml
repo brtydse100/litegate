@@ -4,10 +4,12 @@ replicaCount: 1
 podSecurityContext:
   fsGroup: 10001
   fsGroupChangePolicy: OnRootMismatch
+
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
-    drop: [ALL]
+    drop:
+      - ALL
   runAsNonRoot: true
   runAsUser: 10001
   runAsGroup: 10001
@@ -18,9 +20,11 @@ image:
   repository: ghcr.io/brtydse100/litegate
   tag: "2.10.0" # Pin a specific tag in production.
   pullPolicy: IfNotPresent
+
 service:
   type: ClusterIP
   port: 80
+
 ingress:
   enabled: false
   className: ""
@@ -32,12 +36,85 @@ ingress:
           pathType: Prefix
   tls: []
 
-# Use backend environment-variable names. Omitted values use chart/backend
-# defaults. Override the placeholder credentials before production use.
-env: {}
-secretEnv: {}
+config:
+  # -- Required credentials ---------------------------------------------------
+  litellmMasterKey: "sk-your-litellm-master-key"
+  jwtSecret: "change-me-min-32-chars-random-string"
+  # Verification-only prior secrets for zero-downtime session-secret rotation.
+  jwtPreviousSecrets: ""
+
+  # -- LiteLLM connection -----------------------------------------------------
+  # Backend URL reachable from inside the LiteGate pod.
+  litellmUrl: "http://litellm:4000"
+  # Browser-facing "Open LiteLLM Hub" link; blank hides it.
+  litellmUiUrl: ""
+
+  # -- Portal URL and appearance ---------------------------------------------
+  rootUrl: "http://litegate.example.com"
+  logoUrl: ""
+  supportTicketUrl: ""
+
+  # -- SSO: simple discovery mode --------------------------------------------
+  # Normal SSO requires these values. Leave oidcIssuerUrl blank to disable SSO.
+  oidcIssuerUrl: ""
+  oidcClientId: ""
+  oidcClientSecret: ""
+  oidcRedirectUri: ""
+  oidcScopes: "openid email profile"
+
+  # -- SSO: advanced manual mode ---------------------------------------------
+  # Leave blank for discovery. Otherwise, all three endpoints are required.
+  oidcAuthorizationEndpoint: ""
+  oidcTokenEndpoint: ""
+  oidcJwksUri: ""
+
+  # -- SSO roles and LiteLLM teams -------------------------------------------
+  # Group claim supports dotted paths such as realm_access.roles.
+  oidcGroupsClaim: "groups"
+  # Map SSO groups to existing LiteLLM team IDs. Every match is added at login.
+  oidcGroupTeamMapping: {}
+  # oidcGroupTeamMapping:
+  #   Engineering: "team-engineering"
+  #   AI-Platform:
+  #     - "team-platform"
+  #     - "team-shared-services"
+
+  # False permits valid SSO users without a group mapping. True rejects them.
+  ssoRequireTeamMapping: false
+  # Existing team added to every SSO user in addition to group-mapped teams.
+  # A group-mapped team is primary; otherwise this team is primary.
+  ssoDefaultTeamId: ""
+
+  # LiteGate admin access is separate from LiteLLM team membership.
+  adminEmails: ""
+  adminGroups: ""
+  # Inherit only LiteLLM's full proxy_admin role, never scoped/read-only roles.
+  inheritLitellmAdmin: false
+
+  # -- Local authentication ---------------------------------------------------
+  # Bootstrap administrator. Leave both blank to disable this login.
+  localAuthUsername: "admin"
+  localAuthPassword: "changeme"
+  localUsersEnabled: true
+
+  # -- Local database and audit history --------------------------------------
+  localUsersDbPath: "/app/backend/data/litegate.db"
+  auditRetentionDays: 90
+  auditCleanupBatchSize: 1000
+
+  # -- Generated-key defaults ------------------------------------------------
+  # Uncomment only the limits LiteGate should apply.
+  # keyMaxBudget: "10.0"
+  # keyBudgetDuration: "30d"
+  # keyModels: '["gpt-4","gpt-3.5-turbo"]'
+  # keyDuration: "90d"
+  # keyTpmLimit: "100000"
+  # keyRpmLimit: "1000"
+  # Fallback for local users or SSO users without a mapped/default team.
+  # keyTeamId: "team-default"
 
 resources: {}
+
 persistence:
   enabled: true
   existingClaim: ""
@@ -54,7 +131,7 @@ customCA: {}
 extraVolumeMounts: []
 extraVolumes: []
 
-# Arbitrary Kubernetes objects rendered with tpl, including OpenShift Routes.
+# Arbitrary Kubernetes resources rendered with tpl, including OpenShift Routes.
 extraObjects: []
 
 nodeSelector: {}

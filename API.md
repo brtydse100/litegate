@@ -10,6 +10,11 @@ Use one of these credentials:
 2. A LiteLLM virtual key as `Authorization: Bearer <litellm-key>`. It can identify and inspect only itself; it cannot bulk-edit keys.
 3. The optional `management_api_key` as `X-API-Key: <management-key>`. It has admin access and should be stored like a password.
 
+An SSO portal session receives LiteGate's administrator role through configured
+administrator emails/groups. When `inherit_litellm_admin` is enabled, a matching
+full LiteLLM `proxy_admin` also receives that role. Read-only, organization, and
+team administrator roles remain non-admin in LiteGate.
+
 Check the active identity:
 
 ```bash

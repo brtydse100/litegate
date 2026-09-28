@@ -236,3 +236,13 @@ def test_manual_oidc_endpoints_must_be_complete():
         oidc_jwks_uri="https://idp.example/keys",
     )
     assert configured.oidc_manual_endpoints_enabled is True
+
+
+def test_sso_team_and_admin_inheritance_defaults_are_opt_in():
+    from app.config import Settings
+
+    configured = Settings(litellm_master_key="sk-test", jwt_secret="x" * 32)
+
+    assert configured.sso_default_team_id == ""
+    assert configured.oidc_require_team_mapping is False
+    assert configured.inherit_litellm_admin is False

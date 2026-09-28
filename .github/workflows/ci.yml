@@ -158,16 +158,18 @@ jobs:
             > rendered.yaml
           grep -q 'name: external-data' rendered.yaml
           grep -q 'mountPath: /app/backend/data' rendered.yaml
-      - name: Render compact configuration, custom CA, and extra resources
+      - name: Render configuration, custom CA, and extra resources
         shell: bash
         run: |
           set -euo pipefail
           cat > /tmp/litegate-values.yaml <<'EOF'
-          env:
-            OIDC_ISSUER_URL: https://idp.example
-            OIDC_AUTHORIZATION_ENDPOINT: https://idp.example/authorize
-            OIDC_TOKEN_ENDPOINT: https://idp.example/token
-            OIDC_JWKS_URI: https://idp.example/keys
+          config:
+            oidcIssuerUrl: https://idp.example
+            oidcAuthorizationEndpoint: https://idp.example/authorize
+            oidcTokenEndpoint: https://idp.example/token
+            oidcJwksUri: https://idp.example/keys
+            ssoDefaultTeamId: team-everyone
+            inheritLitellmAdmin: true
           customCA:
             configMap: corporate-ca
           extraObjects:
@@ -178,19 +180,17 @@ jobs:
           EOF
           helm template litegate deploy/helm/litegate -f /tmp/litegate-values.yaml > rendered-features.yaml
           grep -q 'OIDC_AUTHORIZATION_ENDPOINT' rendered-features.yaml
+          grep -q 'SSO_DEFAULT_TEAM_ID: "team-everyone"' rendered-features.yaml
+          grep -q 'INHERIT_LITELLM_ADMIN: "true"' rendered-features.yaml
           grep -q 'name: "corporate-ca"' rendered-features.yaml
           grep -q 'kind: Route' rendered-features.yaml
           ! helm template litegate deploy/helm/litegate \
             --set customCA.configMap=one --set customCA.secret=two
-          helm template legacy deploy/helm/litegate \
-            --set config.litellmMasterKey=legacy-master \
-            --set config.jwtSecret=legacy-jwt > rendered-legacy.yaml
-          grep -q 'LITELLM_MASTER_KEY: "legacy-master"' rendered-legacy.yaml
-          grep -q 'JWT_SECRET: "legacy-jwt"' rendered-legacy.yaml
-          helm template precedence deploy/helm/litegate \
-            --set config.jwtSecret=legacy-jwt \
-            --set secretEnv.JWT_SECRET=modern-jwt > rendered-precedence.yaml
-          grep -q 'JWT_SECRET: "modern-jwt"' rendered-precedence.yaml
+          helm template configured deploy/helm/litegate \
+            --set config.litellmMasterKey=configured-master \
+            --set config.jwtSecret=configured-jwt > rendered-configured.yaml
+          grep -q 'LITELLM_MASTER_KEY: "configured-master"' rendered-configured.yaml
+          grep -q 'JWT_SECRET: "configured-jwt"' rendered-configured.yaml
           helm template secret-ca deploy/helm/litegate \
             --set customCA.secret=corporate-ca > rendered-secret-ca.yaml
           grep -q 'secretName: "corporate-ca"' rendered-secret-ca.yaml

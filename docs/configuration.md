@@ -30,6 +30,8 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `oidc_groups_claim` | `groups` | ID-token group path; dot notation supported |
 | `oidc_group_team_mapping` | `{}` | SSO group to existing LiteLLM team ID or team-ID list |
 | `oidc_require_team_mapping` | `false` | Deny SSO login when no configured team matches |
+| `sso_default_team_id` | empty | Existing LiteLLM team added to every SSO user in addition to group-mapped teams |
+| `inherit_litellm_admin` | `false` | Grant LiteGate admin access to a matching full LiteLLM `proxy_admin` |
 | `admin_emails` | empty | Comma-separated SSO administrator emails |
 | `admin_groups` | empty | Comma-separated SSO administrator groups |
 | `local_auth_username` | empty | Bootstrap administrator username |
@@ -43,10 +45,12 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 The management key grants administrator access, including administrator-only
 bulk key editing. It is not a user credential or a scoped token.
 
-LiteLLM administrator status is not used to authorize the LiteGate admin panel.
-An SSO user becomes a LiteGate administrator only through `admin_emails` or
-`admin_groups`; a local account must have LiteGate's `admin` role. Team mapping
-also does not grant administrator access.
+LiteLLM administrator status is used only when `inherit_litellm_admin` is
+enabled. It recognizes the full `proxy_admin` role; read-only, organization, and
+team administrator roles are not promoted to installation-wide LiteGate admin.
+Otherwise, SSO administrators come from `admin_emails` or `admin_groups`, and a
+local account must have LiteGate's `admin` role. Team mapping never grants
+administrator access.
 
 OIDC discovery is used by default. Providers that do not expose usable discovery
 metadata can instead set all three manual endpoint settings. Partial manual
@@ -83,6 +87,11 @@ The equivalent environment variable is a JSON object on one line:
 OIDC_GROUP_TEAM_MAPPING={"Engineering":"team-engineering","AI-Platform":["team-platform","team-shared-services"]}
 OIDC_REQUIRE_TEAM_MAPPING=false
 ```
+
+Set `sso_default_team_id` to add every SSO user to one existing LiteLLM team in
+addition to their group-mapped teams. Group-mapped teams remain first in the
+list and therefore take precedence as the primary team for generated keys; the
+default team becomes primary only when no group matches.
 
 Group names match case-insensitively. Membership sync is additive on login, and
 the first matched team in configuration order becomes the primary team for new
