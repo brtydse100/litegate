@@ -1,21 +1,20 @@
-import httpx
 import secrets
-import json
-import base64
 import time
-from typing import Optional
 from urllib.parse import urlencode
+
+import httpx
 import jwt
-from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+
 from app.config import settings
 
-_discovery_cache: Optional[dict] = None
+_discovery_cache: dict | None = None
 _discovery_cache_time: float = 0.0
-_jwks_cache: Optional[dict] = None
+_jwks_cache: dict | None = None
 _jwks_cache_time: float = 0.0
 _DISCOVERY_TTL = 3600.0  # re-fetch OIDC config at most once per hour
 _signer = None
-_signer_secret: Optional[str] = None
+_signer_secret: str | None = None
 
 
 def _get_signer() -> URLSafeTimedSerializer:
@@ -54,6 +53,18 @@ async def get_discovery() -> dict:
     return _discovery_cache
 
 
+async def get_provider_metadata() -> dict:
+    """Return explicit provider endpoints or OIDC discovery metadata."""
+    if settings.oidc_manual_endpoints_enabled:
+        return {
+            "issuer": settings.oidc_issuer_url,
+            "authorization_endpoint": settings.oidc_authorization_endpoint,
+            "token_endpoint": settings.oidc_token_endpoint,
+            "jwks_uri": settings.oidc_jwks_uri,
+        }
+    return await get_discovery()
+
+
 def generate_state() -> str:
     return _get_signer().dumps({"nonce": secrets.token_urlsafe(16)})
 
@@ -76,7 +87,7 @@ def state_nonce(state: str) -> str:
 
 
 async def get_authorization_url(state: str) -> str:
-    discovery = await get_discovery()
+    metadata = await get_provider_metadata()
     params = {
         "response_type": "code",
         "client_id": settings.oidc_client_id,
@@ -85,14 +96,14 @@ async def get_authorization_url(state: str) -> str:
         "state": state,
         "nonce": state_nonce(state),
     }
-    return f"{discovery['authorization_endpoint']}?{urlencode(params)}"
+    return f"{metadata['authorization_endpoint']}?{urlencode(params)}"
 
 
 async def exchange_code(code: str) -> dict:
-    discovery = await get_discovery()
+    metadata = await get_provider_metadata()
     async with httpx.AsyncClient() as client:
         r = await client.post(
-            discovery["token_endpoint"],
+            metadata["token_endpoint"],
             data={
                 "grant_type": "authorization_code",
                 "code": code,
@@ -111,9 +122,9 @@ async def get_jwks(force_refresh: bool = False) -> dict:
     now = time.monotonic()
     if not force_refresh and _jwks_cache is not None and now - _jwks_cache_time < _DISCOVERY_TTL:
         return _jwks_cache
-    discovery = await get_discovery()
+    metadata = await get_provider_metadata()
     async with httpx.AsyncClient() as client:
-        r = await client.get(discovery["jwks_uri"], timeout=10)
+        r = await client.get(metadata["jwks_uri"], timeout=10)
         r.raise_for_status()
         _jwks_cache = r.json()
         _jwks_cache_time = now
@@ -122,7 +133,7 @@ async def get_jwks(force_refresh: bool = False) -> dict:
 
 async def verify_id_token(id_token: str, expected_nonce: str = "") -> dict:
     jwks = await get_jwks()
-    discovery = await get_discovery()
+    metadata = await get_provider_metadata()
 
     # Match the token's kid to a single verified JWK.
     header = jwt.get_unverified_header(id_token)
@@ -153,7 +164,7 @@ async def verify_id_token(id_token: str, expected_nonce: str = "") -> dict:
         jwt.PyJWK.from_dict(key),
         algorithms=["RS256"],
         audience=settings.oidc_client_id,
-        issuer=discovery.get("issuer", settings.oidc_issuer_url),
+        issuer=metadata.get("issuer", settings.oidc_issuer_url),
         options={"verify_exp": True},
     )
     if expected_nonce and not secrets.compare_digest(str(claims.get("nonce", "")), expected_nonce):

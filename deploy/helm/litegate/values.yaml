@@ -1,5 +1,4 @@
-# LiteGate currently uses SQLite plus an in-process operation limiter. The chart
-# deliberately supports one replica until those stores are externalized.
+# LiteGate uses SQLite and process-local operation limits, so one replica is required.
 replicaCount: 1
 
 podSecurityContext:
@@ -19,7 +18,7 @@ securityContext:
 
 image:
   repository: ghcr.io/brtydse100/litegate
-  tag: "2.10.0"  # always pin to a specific tag; never use 'latest' in production
+  tag: "2.10.0" # Pin a specific tag in production.
   pullPolicy: IfNotPresent
 
 service:
@@ -38,73 +37,80 @@ ingress:
   tls: []
 
 config:
-  # Required
+  # -- Required credentials ---------------------------------------------------
   litellmMasterKey: "sk-your-litellm-master-key"
   jwtSecret: "change-me-min-32-chars-random-string"
-  # Verification-only prior secrets, comma-separated, for zero-downtime rotation.
+  # Verification-only prior secrets for zero-downtime session-secret rotation.
   jwtPreviousSecrets: ""
 
-  # LiteLLM backend URL (reachable from inside the pod)
+  # -- LiteLLM connection -----------------------------------------------------
+  # Backend URL reachable from inside the LiteGate pod.
   litellmUrl: "http://litellm:4000"
-
-  # Public URL of the LiteLLM web UI shown as "Open LiteLLM Hub" button
+  # Browser-facing "Open LiteLLM Hub" link; blank hides it.
   litellmUiUrl: ""
 
-  # SSO (OIDC) - leave all blank to disable
+  # -- Portal URL and appearance ---------------------------------------------
+  rootUrl: "http://litegate.example.com"
+  logoUrl: ""
+  supportTicketUrl: ""
+
+  # -- SSO: simple discovery mode --------------------------------------------
+  # Normal SSO requires these values. Leave oidcIssuerUrl blank to disable SSO.
   oidcIssuerUrl: ""
   oidcClientId: ""
   oidcClientSecret: ""
   oidcRedirectUri: ""
   oidcScopes: "openid email profile"
-  # adminGroups and oidcGroupTeamMapping both read group names from this claim.
-  # Dot notation is supported, for example: realm_access.roles
+
+  # -- SSO: advanced manual mode ---------------------------------------------
+  # Leave blank for discovery. Otherwise, all three endpoints are required.
+  oidcAuthorizationEndpoint: ""
+  oidcTokenEndpoint: ""
+  oidcJwksUri: ""
+
+  # -- SSO roles and LiteLLM teams -------------------------------------------
+  # Group claim supports dotted paths such as realm_access.roles.
   oidcGroupsClaim: "groups"
-  # Map SSO group names to existing LiteLLM team IDs. A group can map to a
-  # string or list; the first matched team is applied to new/regenerated keys.
+  # Map SSO groups to existing LiteLLM team IDs. Every match is added at login.
   oidcGroupTeamMapping: {}
-  # Example:
   # oidcGroupTeamMapping:
   #   Engineering: "team-engineering"
   #   AI-Platform:
   #     - "team-platform"
   #     - "team-shared-services"
-  oidcRequireTeamMapping: false
 
-  # Local admin login (remove in production by leaving both blank)
+  # False permits valid SSO users without a group mapping. True rejects them.
+  ssoRequireTeamMapping: false
+  # Existing team added to every SSO user in addition to group-mapped teams.
+  # A group-mapped team is primary; otherwise this team is primary.
+  ssoDefaultTeamId: ""
+
+  # LiteGate admin access is separate from LiteLLM team membership.
+  adminEmails: ""
+  adminGroups: ""
+  # Inherit only LiteLLM's full proxy_admin role, never scoped/read-only roles.
+  inheritLitellmAdmin: false
+
+  # -- Local authentication ---------------------------------------------------
+  # Bootstrap administrator. Leave both blank to disable this login.
   localAuthUsername: "admin"
   localAuthPassword: "changeme"
+  localUsersEnabled: true
 
-  # Admin-created local accounts and their administration page
-  localUsersEnabled: "true"
+  # -- Local database and audit history --------------------------------------
   localUsersDbPath: "/app/backend/data/litegate.db"
-  # Expired audit rows are pruned in bounded batches when new audit events are written.
-  auditRetentionDays: "90"
-  auditCleanupBatchSize: "1000"
-  adminEmails: ""
-  # Comma-separated SSO groups that receive the LiteGate administrator role.
-  # Matching is case-insensitive; this does not make users LiteLLM team admins.
-  adminGroups: ""
+  auditRetentionDays: 90
+  auditCleanupBatchSize: 1000
 
-  # Optional credential for the management API (send as X-API-Key)
-  managementApiKey: ""
-
-  # Root URL of the portal (used for SSO redirect)
-  rootUrl: "http://litegate.example.com"
-
-  # Logo URL shown in the header (external URL or /logo.svg)
-  logoUrl: ""
-
-  # Support ticket button URL (leave blank to hide)
-  supportTicketUrl: ""
-
-  # Key budget/limit defaults (uncomment to enable)
+  # -- Generated-key defaults ------------------------------------------------
+  # Uncomment only the limits LiteGate should apply.
   # keyMaxBudget: "10.0"
   # keyBudgetDuration: "30d"
   # keyModels: '["gpt-4","gpt-3.5-turbo"]'
   # keyDuration: "90d"
   # keyTpmLimit: "100000"
   # keyRpmLimit: "1000"
-  # Fallback for local or unmapped users; an SSO-mapped primary team takes precedence.
+  # Fallback for local users or SSO users without a mapped/default team.
   # keyTeamId: "team-default"
 
 resources: {}
@@ -115,18 +121,19 @@ persistence:
   accessMode: ReadWriteOnce
   size: 1Gi
 
-# Additional container mounts and pod volumes, merged with the data PVC above.
-extraVolumeMounts: []
-# - name: external-data
-#   mountPath: /app/backend/data
+# Mount a complete CA bundle from exactly one existing ConfigMap or Secret.
+customCA: {}
+#  configMap: corporate-ca
+#  secret: corporate-ca
+#  key: ca-bundle.crt
+#  mountPath: /etc/ssl/certs/litegate-custom-ca.pem
 
+extraVolumeMounts: []
 extraVolumes: []
-# - name: external-data
-#   persistentVolumeClaim:
-#     claimName: litegate-data
+
+# Arbitrary Kubernetes resources rendered with tpl, including OpenShift Routes.
+extraObjects: []
 
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}

@@ -62,6 +62,8 @@ async def test_sso_callback_syncs_mapped_teams_and_embeds_them_in_token(monkeypa
         {"Engineering": ["team-primary", "team-shared"]},
     )
     monkeypatch.setattr(auth.settings, "oidc_require_team_mapping", True)
+    monkeypatch.setattr(auth.settings, "sso_default_team_id", "team-everyone")
+    monkeypatch.setattr(auth.settings, "inherit_litellm_admin", False)
 
     with (
         patch.object(auth.oidc_svc, "validate_state", return_value=True),
@@ -82,12 +84,55 @@ async def test_sso_callback_syncs_mapped_teams_and_embeds_them_in_token(monkeypa
     ):
         response = await auth.callback("code", state, state_cookie=state)
 
-    sync.assert_awaited_once_with("oidc-user", "user@example.com", ["team-primary", "team-shared"])
+    sync.assert_awaited_once_with("oidc-user", "user@example.com", ["team-primary", "team-shared", "team-everyone"])
     assert "#token=" not in response.headers["location"]
     token = _response_cookie(response, "litegate_session")
     user = decode_portal_token(token)
     assert user.is_admin is True
-    assert user.team_ids == ["team-primary", "team-shared"]
+    assert user.team_ids == ["team-primary", "team-shared", "team-everyone"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("inherit_litellm_admin", "litellm_role", "is_admin"),
+    [
+        (True, "proxy_admin", True),
+        (True, "proxy_admin_viewer", False),
+        (True, "org_admin", False),
+        (True, "team_admin", False),
+        (True, "internal_user", False),
+        (False, "proxy_admin", False),
+    ],
+)
+async def test_sso_callback_optionally_inherits_only_full_litellm_admin(monkeypatch, inherit_litellm_admin, litellm_role, is_admin):
+    state = auth.oidc_svc.generate_state()
+    monkeypatch.setattr(auth.settings, "admin_emails", "")
+    monkeypatch.setattr(auth.settings, "admin_groups", "")
+    monkeypatch.setattr(auth.settings, "oidc_group_team_mapping", {})
+    monkeypatch.setattr(auth.settings, "oidc_require_team_mapping", False)
+    monkeypatch.setattr(auth.settings, "sso_default_team_id", "team-everyone")
+    monkeypatch.setattr(auth.settings, "inherit_litellm_admin", inherit_litellm_admin)
+
+    with (
+        patch.object(auth.oidc_svc, "validate_state", return_value=True),
+        patch.object(auth.oidc_svc, "exchange_code", new=AsyncMock(return_value={"id_token": "id"})),
+        patch.object(
+            auth.oidc_svc,
+            "verify_id_token",
+            new=AsyncMock(return_value={"sub": "oidc-user", "email": "user@example.com"}),
+        ),
+        patch.object(
+            auth.llm,
+            "ensure_user_exists",
+            new=AsyncMock(return_value={"user_info": {"user_role": litellm_role}}),
+        ),
+        patch.object(auth.llm, "sync_user_team_memberships", new=AsyncMock()) as sync,
+    ):
+        response = await auth.callback("code", state, state_cookie=state)
+
+    sync.assert_awaited_once_with("oidc-user", "user@example.com", ["team-everyone"])
+    user = decode_portal_token(_response_cookie(response, "litegate_session"))
+    assert user.is_admin is is_admin
 
 
 @pytest.mark.asyncio
@@ -95,6 +140,7 @@ async def test_sso_callback_rejects_user_without_required_team_mapping(monkeypat
     state = auth.oidc_svc.generate_state()
     monkeypatch.setattr(auth.settings, "oidc_group_team_mapping", {"Engineering": "team-eng"})
     monkeypatch.setattr(auth.settings, "oidc_require_team_mapping", True)
+    monkeypatch.setattr(auth.settings, "sso_default_team_id", "team-everyone")
 
     with (
         patch.object(auth.oidc_svc, "validate_state", return_value=True),
@@ -111,6 +157,60 @@ async def test_sso_callback_rejects_user_without_required_team_mapping(monkeypat
 
     assert exc.value.status_code == 403
     ensure.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sso_callback_allows_unmapped_user_without_default_team(monkeypatch):
+    state = auth.oidc_svc.generate_state()
+    monkeypatch.setattr(auth.settings, "admin_emails", "")
+    monkeypatch.setattr(auth.settings, "admin_groups", "")
+    monkeypatch.setattr(auth.settings, "oidc_group_team_mapping", {})
+    monkeypatch.setattr(auth.settings, "oidc_require_team_mapping", False)
+    monkeypatch.setattr(auth.settings, "sso_default_team_id", "")
+    monkeypatch.setattr(auth.settings, "inherit_litellm_admin", False)
+
+    with (
+        patch.object(auth.oidc_svc, "validate_state", return_value=True),
+        patch.object(auth.oidc_svc, "exchange_code", new=AsyncMock(return_value={"id_token": "id"})),
+        patch.object(
+            auth.oidc_svc,
+            "verify_id_token",
+            new=AsyncMock(return_value={"sub": "oidc-user", "email": "user@example.com"}),
+        ),
+        patch.object(auth.llm, "ensure_user_exists", new=AsyncMock(return_value={"user_id": "oidc-user"})),
+        patch.object(auth.llm, "sync_user_team_memberships", new=AsyncMock()) as sync,
+    ):
+        response = await auth.callback("code", state, state_cookie=state)
+
+    sync.assert_not_awaited()
+    user = decode_portal_token(_response_cookie(response, "litegate_session"))
+    assert user.team_ids == []
+
+
+@pytest.mark.asyncio
+async def test_sso_callback_deduplicates_default_and_mapped_team(monkeypatch):
+    state = auth.oidc_svc.generate_state()
+    monkeypatch.setattr(auth.settings, "oidc_group_team_mapping", {"Engineering": "team-engineering"})
+    monkeypatch.setattr(auth.settings, "oidc_require_team_mapping", False)
+    monkeypatch.setattr(auth.settings, "sso_default_team_id", "team-engineering")
+    monkeypatch.setattr(auth.settings, "inherit_litellm_admin", False)
+
+    with (
+        patch.object(auth.oidc_svc, "validate_state", return_value=True),
+        patch.object(auth.oidc_svc, "exchange_code", new=AsyncMock(return_value={"id_token": "id"})),
+        patch.object(
+            auth.oidc_svc,
+            "verify_id_token",
+            new=AsyncMock(return_value={"sub": "oidc-user", "email": "user@example.com", "groups": ["Engineering"]}),
+        ),
+        patch.object(auth.llm, "ensure_user_exists", new=AsyncMock(return_value={"user_id": "oidc-user"})),
+        patch.object(auth.llm, "sync_user_team_memberships", new=AsyncMock()) as sync,
+    ):
+        response = await auth.callback("code", state, state_cookie=state)
+
+    sync.assert_awaited_once_with("oidc-user", "user@example.com", ["team-engineering"])
+    user = decode_portal_token(_response_cookie(response, "litegate_session"))
+    assert user.team_ids == ["team-engineering"]
 
 
 @pytest.mark.asyncio

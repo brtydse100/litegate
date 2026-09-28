@@ -188,7 +188,7 @@ docker push your-registry.io/litegate:2.6.1
 ```bash
 helm install litegate ./deploy/helm/litegate \
   --set image.repository=your-registry.io/litegate \
-  --set image.tag=2.6.1 \
+  --set image.tag=2.10.0 \
   --set config.litellmUrl=http://litellm-svc:4000 \
   --set config.litellmMasterKey=sk-your-key \
   --set config.jwtSecret=$(openssl rand -base64 32) \
@@ -204,29 +204,31 @@ helm install litegate ./deploy/helm/litegate \
 ### Step 3 — Upgrade after changes
 
 ```bash
-helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.6.1
+helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.10.0
 ```
 
 ### SSO roles and LiteLLM teams in Helm
 
-The chart exposes the SSO role and team settings under `config`. Put them in a
-private values file rather than trying to express the team map with repeated
-`--set` flags:
+The chart keeps application settings together under `config`. Discovery is the
+normal SSO mode; the three manual endpoints are only needed for providers whose
+discovery metadata cannot be used.
 
 ```yaml
 config:
+  oidcIssuerUrl: "https://idp.example.com/realms/company"
+  oidcClientId: "litegate"
+  oidcClientSecret: "replace-me"
+  oidcRedirectUri: "https://litegate.example.com/api/auth/callback"
   oidcGroupsClaim: "groups"
-
-  # LiteGate role mapping: these users can manage local users and bulk-edit keys.
   adminGroups: "Platform Admins,AI Operations"
-
-  # LiteLLM membership/key mapping: values are existing team IDs, not aliases.
+  ssoDefaultTeamId: "team-everyone"
   oidcGroupTeamMapping:
     Engineering: "team-engineering"
     AI-Platform:
       - "team-platform"
       - "team-shared-services"
-  oidcRequireTeamMapping: true
+  ssoRequireTeamMapping: false
+  inheritLitellmAdmin: false
 ```
 
 Apply it with:
@@ -237,11 +239,52 @@ helm upgrade --install litegate ./deploy/helm/litegate \
   --values values.production.yaml
 ```
 
-`adminGroups` controls the LiteGate `admin` role only. It does not grant the
-LiteLLM team-admin role. `oidcGroupTeamMapping` adds the user as a regular
-LiteLLM team member and assigns the first matched team to newly generated or
-regenerated keys. Both settings read from `oidcGroupsClaim`, use
-case-insensitive group-name matching, and support dotted claim paths.
+`ssoDefaultTeamId` adds every SSO user to one existing LiteLLM team in addition
+to every group-mapped team. The first group-mapped team is primary for generated
+keys; otherwise the default team is primary. With `ssoRequireTeamMapping: false`,
+users without a group mapping may still sign in. Set it to `true` only when a
+group mapping must be required for login.
+
+LiteGate admin access normally comes from `adminEmails`, `adminGroups`, or a
+LiteGate local admin account. Set `inheritLitellmAdmin: true` to additionally
+promote a matching full LiteLLM `proxy_admin`; read-only, organization, and team
+administrator roles are deliberately not promoted.
+
+For upgrade compatibility, the chart still accepts the deprecated
+`config.oidcRequireTeamMapping` and `config.managementApiKey` fields even though
+they are not shown in the default values file. If either the old or new
+team-mapping field is `true`, mapping remains required so conflicting upgrade
+values cannot weaken login restrictions. Migrate to
+`config.ssoRequireTeamMapping`, then remove the old field.
+
+### Custom CAs and additional resources
+
+Mount a complete CA bundle from an existing ConfigMap or Secret. Choose exactly
+one source; `key` defaults to `ca-bundle.crt`:
+
+```yaml
+customCA:
+  configMap: corporate-ca
+  key: ca-bundle.crt
+```
+
+The chart sets `SSL_CERT_FILE` to the mounted bundle. Include public roots in
+that file when LiteGate also connects to public HTTPS endpoints.
+
+Use `extraObjects` for arbitrary cluster resources. For example, an OpenShift
+Route can target the chart's Service without a dedicated Route option:
+
+```yaml
+extraObjects:
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      name: '{{ include "litegate.fullname" . }}'
+    spec:
+      to:
+        kind: Service
+        name: '{{ include "litegate.fullname" . }}'
+```
 
 The chart's default pod and container security contexts enforce the image's
 non-root UID/GID, drop all capabilities, prevent privilege escalation, apply the
@@ -364,13 +407,21 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `litellm_url` | `LITELLM_URL` | `http://localhost:4000` | LiteLLM proxy URL |
 | `jwt_secret` | `JWT_SECRET` | *(required)* | Session token secret (≥32 chars) |
 | `jwt_previous_secrets` | `JWT_PREVIOUS_SECRETS` | `""` | Comma-separated prior secrets accepted temporarily during rotation |
+| `jwt_algorithm` | `JWT_ALGORITHM` | `HS256` | Portal-session signing algorithm |
+| `jwt_expire_minutes` | `JWT_EXPIRE_MINUTES` | `1440` | Portal-session lifetime in minutes |
 | `root_url` | `ROOT_URL` | `http://localhost` | Portal public URL (used for SSO redirect) |
+| `cors_origins` | `CORS_ORIGINS` | local origins | Comma-separated browser origins allowed to call LiteGate |
 | `oidc_issuer_url` | `OIDC_ISSUER_URL` | `""` | OIDC provider URL (blank = SSO disabled) |
 | `oidc_client_id` | `OIDC_CLIENT_ID` | `""` | OIDC client ID |
 | `oidc_client_secret` | `OIDC_CLIENT_SECRET` | `""` | OIDC client secret |
 | `oidc_redirect_uri` | `OIDC_REDIRECT_URI` | `""` | Callback URI registered with IdP |
+| `oidc_authorization_endpoint` | `OIDC_AUTHORIZATION_ENDPOINT` | `""` | Manual authorization endpoint; set all three manual endpoints together |
+| `oidc_token_endpoint` | `OIDC_TOKEN_ENDPOINT` | `""` | Manual token endpoint; set all three manual endpoints together |
+| `oidc_jwks_uri` | `OIDC_JWKS_URI` | `""` | Manual signing-key endpoint; set all three manual endpoints together |
 | `oidc_group_team_mapping` | `OIDC_GROUP_TEAM_MAPPING` | `{}` | SSO group to existing LiteLLM team ID or team-ID list; environment form is JSON |
 | `oidc_require_team_mapping` | `OIDC_REQUIRE_TEAM_MAPPING` | `false` | Deny SSO login when no team mapping matches |
+| `sso_default_team_id` | `SSO_DEFAULT_TEAM_ID` | `""` | Existing LiteLLM team added to every SSO user alongside mapped teams |
+| `inherit_litellm_admin` | `INHERIT_LITELLM_ADMIN` | `false` | Inherit only the matching LiteLLM `proxy_admin` role |
 | `local_auth_username` | `LOCAL_AUTH_USERNAME` | `""` | Admin username (blank = disabled) |
 | `local_auth_password` | `LOCAL_AUTH_PASSWORD` | `""` | Admin password |
 | `logo_url` | `LOGO_URL` | `""` | Logo image URL or path |

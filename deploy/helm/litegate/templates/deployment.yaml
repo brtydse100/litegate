@@ -3,6 +3,17 @@ kind: Deployment
 {{- if ne (int .Values.replicaCount) 1 }}
 {{- fail "LiteGate currently requires replicaCount: 1 because local users, audit events, and operation limits use single-instance state" }}
 {{- end }}
+{{- $customCA := .Values.customCA | default dict }}
+{{- if and (hasKey $customCA "configMap") (empty $customCA.configMap) }}
+{{- fail "customCA.configMap must not be empty" }}
+{{- end }}
+{{- if and (hasKey $customCA "secret") (empty $customCA.secret) }}
+{{- fail "customCA.secret must not be empty" }}
+{{- end }}
+{{- if and (hasKey $customCA "configMap") (hasKey $customCA "secret") }}
+{{- fail "customCA must specify either configMap or secret, not both" }}
+{{- end }}
+{{- $hasCustomCA := or (hasKey $customCA "configMap") (hasKey $customCA "secret") }}
 metadata:
   name: {{ include "litegate.fullname" . }}
   labels:
@@ -36,6 +47,11 @@ spec:
                 name: {{ include "litegate.fullname" . }}
             - secretRef:
                 name: {{ include "litegate.fullname" . }}
+          {{- if $hasCustomCA }}
+          env:
+            - name: SSL_CERT_FILE
+              value: {{ default "/etc/ssl/certs/litegate-custom-ca.pem" $customCA.mountPath | quote }}
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /api/health/live
@@ -50,7 +66,7 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if or .Values.persistence.enabled .Values.extraVolumeMounts }}
+          {{- if or .Values.persistence.enabled .Values.extraVolumeMounts $hasCustomCA }}
           volumeMounts:
             {{- if .Values.persistence.enabled }}
             - name: data
@@ -59,8 +75,14 @@ spec:
             {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+            {{- if $hasCustomCA }}
+            - name: custom-ca
+              mountPath: {{ default "/etc/ssl/certs/litegate-custom-ca.pem" $customCA.mountPath | quote }}
+              subPath: {{ default "ca-bundle.crt" $customCA.key | quote }}
+              readOnly: true
+            {{- end }}
           {{- end }}
-      {{- if or .Values.persistence.enabled .Values.extraVolumes }}
+      {{- if or .Values.persistence.enabled .Values.extraVolumes $hasCustomCA }}
       volumes:
         {{- if .Values.persistence.enabled }}
         - name: data
@@ -69,6 +91,15 @@ spec:
         {{- end }}
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if hasKey $customCA "configMap" }}
+        - name: custom-ca
+          configMap:
+            name: {{ $customCA.configMap | quote }}
+        {{- else if hasKey $customCA "secret" }}
+        - name: custom-ca
+          secret:
+            secretName: {{ $customCA.secret | quote }}
         {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}

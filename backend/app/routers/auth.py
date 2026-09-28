@@ -62,6 +62,13 @@ def _set_session_cookie(response: JSONResponse | RedirectResponse, token: str) -
     )
 
 
+def _is_litellm_proxy_admin(user: dict | None) -> bool:
+    if not isinstance(user, dict):
+        return False
+    details = user.get("user_info", user)
+    return isinstance(details, dict) and details.get("user_role") == "proxy_admin"
+
+
 @router.get("/login")
 async def login():
     if not settings.oidc_issuer_url:
@@ -97,16 +104,23 @@ async def callback(
         raise HTTPException(status_code=400, detail="No id_token in response")
     claims = await oidc_svc.verify_id_token(id_token, expected_nonce=nonce)
     user_id, email = claims["sub"], claims.get("email", "")
-    role = "admin" if settings.is_admin_identity(email, claims) else "user"
-    team_ids = settings.mapped_team_ids(claims)
-    if settings.oidc_require_team_mapping and not team_ids:
+    group_team_ids = settings.mapped_team_ids(claims)
+    if settings.oidc_require_team_mapping and not group_team_ids:
         raise HTTPException(status_code=403, detail="Your SSO groups are not mapped to a LiteLLM team")
+    team_ids = list(group_team_ids)
+    default_team_id = settings.sso_default_team_id.strip()
+    if default_team_id and default_team_id not in team_ids:
+        team_ids.append(default_team_id)
 
     provisioned_user = await llm.ensure_user_exists(user_id, email)
-    if provisioned_user is None and (settings.oidc_group_team_mapping or settings.oidc_require_team_mapping):
+    if provisioned_user is None and (team_ids or settings.oidc_require_team_mapping or settings.inherit_litellm_admin):
         raise HTTPException(status_code=502, detail="Could not provision the LiteLLM user")
     if team_ids:
         await llm.sync_user_team_memberships(user_id, email, team_ids)
+
+    role = "admin" if settings.is_admin_identity(email, claims) else "user"
+    if settings.inherit_litellm_admin and _is_litellm_proxy_admin(provisioned_user):
+        role = "admin"
 
     token = _make_jwt(user_id, email, role, "sso", team_ids)
     response = RedirectResponse(f"{settings.root_url}/auth/callback")

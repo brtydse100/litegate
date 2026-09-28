@@ -49,6 +49,19 @@ Common issuer patterns:
 | Okta | `https://<domain>.okta.com/oauth2/default` |
 | Keycloak | `https://<host>/realms/<realm>` |
 
+LiteGate uses the issuer's discovery document by default. For providers that
+require manual configuration, set all three endpoints together:
+
+```yaml
+oidc_authorization_endpoint: "https://login.example.com/oauth2/authorize"
+oidc_token_endpoint: "https://login.example.com/oauth2/token"
+oidc_jwks_uri: "https://login.example.com/oauth2/keys"
+```
+
+The issuer is still required for ID-token issuer validation. Manual mode keeps
+the same authorization-code flow, signed state, nonce, and token verification;
+it only replaces discovery of the provider endpoints.
+
 ## Assigning administrators
 
 SSO users receive administrator access when their email or group matches the
@@ -110,6 +123,18 @@ to continue without the intended team controls.
 Set `oidc_require_team_mapping: true` to deny SSO login when none of the user's
 groups has a configured team. Leave it `false` while rolling the feature out or
 when unmapped SSO users should retain the global key defaults.
+
+Set `sso_default_team_id` to add every SSO user to one existing LiteLLM team.
+This membership is added alongside all group-mapped teams. The first mapped
+team is primary for generated keys; when no group matches, the default team is
+primary. The default team does not satisfy `oidc_require_team_mapping: true`,
+which deliberately continues to require an explicit group mapping.
+
+To reuse LiteLLM's platform-owner assignment, set `inherit_litellm_admin: true`.
+LiteGate then grants its admin role only when the matching LiteLLM user has the
+full `proxy_admin` role. It does not promote `proxy_admin_viewer`, organization
+admins, or team admins because LiteGate admin operations are installation-wide
+and can modify data.
 
 ## API credentials
 

@@ -1,11 +1,11 @@
-from pydantic import Field
-from pydantic.fields import FieldInfo
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
-from typing import Optional, List
 import json
 from pathlib import Path
+from typing import List, Optional
 from urllib.parse import urlparse
 
+from pydantic import Field, model_validator
+from pydantic.fields import FieldInfo
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent  # …/backend/
 
@@ -51,9 +51,14 @@ class Settings(BaseSettings):
     oidc_client_secret: str = ""
     oidc_redirect_uri: str = ""
     oidc_scopes: str = "openid email profile"
+    oidc_authorization_endpoint: str = ""
+    oidc_token_endpoint: str = ""
+    oidc_jwks_uri: str = ""
     oidc_groups_claim: str = "groups"
     oidc_group_team_mapping: dict[str, str | list[str]] = Field(default_factory=dict)
     oidc_require_team_mapping: bool = False
+    sso_default_team_id: str = ""
+    inherit_litellm_admin: bool = False
 
     jwt_secret: str
     jwt_previous_secrets: str = ""
@@ -104,6 +109,21 @@ class Settings(BaseSettings):
     @property
     def local_auth_enabled(self) -> bool:
         return bool(self.local_auth_username and self.local_auth_password)
+
+    @model_validator(mode="after")
+    def validate_manual_oidc_endpoints(self):
+        endpoints = (
+            self.oidc_authorization_endpoint,
+            self.oidc_token_endpoint,
+            self.oidc_jwks_uri,
+        )
+        if any(endpoints) and not all(endpoints):
+            raise ValueError("OIDC_AUTHORIZATION_ENDPOINT, OIDC_TOKEN_ENDPOINT, and OIDC_JWKS_URI must be configured together")
+        return self
+
+    @property
+    def oidc_manual_endpoints_enabled(self) -> bool:
+        return bool(self.oidc_authorization_endpoint)
 
     @property
     def admin_emails_set(self) -> set[str]:
