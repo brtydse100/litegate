@@ -191,6 +191,22 @@ jobs:
             --set config.jwtSecret=configured-jwt > rendered-configured.yaml
           grep -q 'LITELLM_MASTER_KEY: "configured-master"' rendered-configured.yaml
           grep -q 'JWT_SECRET: "configured-jwt"' rendered-configured.yaml
+          helm template compatibility deploy/helm/litegate \
+            --set config.managementApiKey=legacy-management-key \
+            --set config.oidcRequireTeamMapping=true > rendered-compatibility.yaml
+          grep -q 'MANAGEMENT_API_KEY: "legacy-management-key"' rendered-compatibility.yaml
+          grep -q 'OIDC_REQUIRE_TEAM_MAPPING: "true"' rendered-compatibility.yaml
+          helm template new-names deploy/helm/litegate \
+            --set config.ssoRequireTeamMapping=true > rendered-new-names.yaml
+          grep -q 'OIDC_REQUIRE_TEAM_MAPPING: "true"' rendered-new-names.yaml
+          helm template restrictive-new deploy/helm/litegate \
+            --set config.oidcRequireTeamMapping=false \
+            --set config.ssoRequireTeamMapping=true > rendered-restrictive-new.yaml
+          grep -q 'OIDC_REQUIRE_TEAM_MAPPING: "true"' rendered-restrictive-new.yaml
+          helm template restrictive-old deploy/helm/litegate \
+            --set config.oidcRequireTeamMapping=true \
+            --set config.ssoRequireTeamMapping=false > rendered-restrictive-old.yaml
+          grep -q 'OIDC_REQUIRE_TEAM_MAPPING: "true"' rendered-restrictive-old.yaml
           helm template secret-ca deploy/helm/litegate \
             --set customCA.secret=corporate-ca > rendered-secret-ca.yaml
           grep -q 'secretName: "corporate-ca"' rendered-secret-ca.yaml

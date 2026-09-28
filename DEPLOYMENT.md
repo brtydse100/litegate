@@ -250,6 +250,13 @@ LiteGate local admin account. Set `inheritLitellmAdmin: true` to additionally
 promote a matching full LiteLLM `proxy_admin`; read-only, organization, and team
 administrator roles are deliberately not promoted.
 
+For upgrade compatibility, the chart still accepts the deprecated
+`config.oidcRequireTeamMapping` and `config.managementApiKey` fields even though
+they are not shown in the default values file. If either the old or new
+team-mapping field is `true`, mapping remains required so conflicting upgrade
+values cannot weaken login restrictions. Migrate to
+`config.ssoRequireTeamMapping`, then remove the old field.
+
 ### Custom CAs and additional resources
 
 Mount a complete CA bundle from an existing ConfigMap or Secret. Choose exactly

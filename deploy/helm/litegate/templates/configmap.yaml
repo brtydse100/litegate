@@ -5,6 +5,10 @@
 {{- if and (gt $manualEndpointCount 0) (lt $manualEndpointCount 3) -}}
 {{- fail "config.oidcAuthorizationEndpoint, config.oidcTokenEndpoint, and config.oidcJwksUri must be configured together" -}}
 {{- end }}
+{{- $requireTeamMapping := .Values.config.ssoRequireTeamMapping -}}
+{{- if hasKey .Values.config "oidcRequireTeamMapping" -}}
+{{- $requireTeamMapping = or $requireTeamMapping .Values.config.oidcRequireTeamMapping -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -25,7 +29,7 @@ data:
   ADMIN_GROUPS: {{ .Values.config.adminGroups | quote }}
   INHERIT_LITELLM_ADMIN: {{ .Values.config.inheritLitellmAdmin | quote }}
   SSO_DEFAULT_TEAM_ID: {{ .Values.config.ssoDefaultTeamId | quote }}
-  OIDC_REQUIRE_TEAM_MAPPING: {{ .Values.config.ssoRequireTeamMapping | quote }}
+  OIDC_REQUIRE_TEAM_MAPPING: {{ $requireTeamMapping | quote }}
   {{- if .Values.config.localAuthUsername }}
   LOCAL_AUTH_USERNAME: {{ .Values.config.localAuthUsername | quote }}
   {{- end }}
