@@ -123,7 +123,9 @@ usable credentials. Keep the existing persistent volume and restrict access to
 it and its backups. Disabling the setting stops saving and revealing keys but
 does not erase previously stored copies. Deleting or regenerating a key through
 LiteGate removes its stored copy; reveal requests also verify the key still
-exists in LiteLLM. Secrets are fetched only on demand, excluded from key listings
+exists in LiteLLM. If SQLite cleanup fails after successful revocation, LiteGate
+logs a warning and preserves the working replacement. A revoked copy can remain
+in SQLite but cannot be revealed. Secrets are fetched only on demand, excluded from key listings
 and audit events, and returned with `Cache-Control: no-store`.
 
 ### Generated-key policy

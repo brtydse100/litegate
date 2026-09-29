@@ -1,4 +1,6 @@
 import hashlib
+import json
+import sqlite3
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -175,3 +177,63 @@ async def test_failed_rotation_cleanup_removes_replacement_copy():
         await keys.regenerate_key(OWNER)
     assert key_secrets.get(old_identifier, OWNER.user_id) == old_secret
     assert key_secrets.get(IDENTIFIER, OWNER.user_id) is None
+
+
+@pytest.mark.asyncio
+async def test_database_cleanup_failure_preserves_working_replacement(caplog):
+    old_secret = "sk-synthetic-old-key"
+    old_identifier = key_secrets.key_hash(old_secret)
+    key_secrets.save(old_secret, OWNER.user_id)
+    active = {old_secret}
+    deleted = []
+
+    def transport(request):
+        if request.url.path == "/key/generate":
+            active.add(SECRET)
+        elif request.url.path == "/key/delete":
+            identifier = json.loads(request.content)["keys"][0]
+            active.discard(old_secret if identifier == old_identifier else identifier)
+            deleted.append(identifier)
+        return mock_litellm(request)
+
+    with (
+        patch.object(litellm, "_client", side_effect=lambda: httpx.AsyncClient(transport=httpx.MockTransport(transport))),
+        patch.object(litellm, "list_user_keys", new=AsyncMock(return_value=[{"token": old_identifier, "spend": 2}])),
+        patch.object(key_secrets, "remove", side_effect=sqlite3.OperationalError(f"database is locked: {old_secret}")),
+        patch("app.routers.keys.check_key_rate_limit"),
+    ):
+        result = await keys.regenerate_key(OWNER)
+
+    assert result.key == SECRET
+    assert active == {SECRET}
+    assert deleted == [old_identifier]
+    assert key_secrets.get(IDENTIFIER, OWNER.user_id) == SECRET
+    assert key_secrets.get(old_identifier, OWNER.user_id) == old_secret
+    assert "cleanup failed after successful LiteLLM revocation" in caplog.text
+    assert old_secret not in caplog.text
+    assert old_identifier not in caplog.text
+    assert SECRET not in caplog.text
+    with patch.object(litellm, "get_key_info", new=AsyncMock(return_value=None)), pytest.raises(HTTPException) as exc:
+        await keys.reveal_key(KeyDeleteRequest(key=old_identifier), Response(), OWNER)
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_failed_save_still_revokes_new_key_when_database_cleanup_fails():
+    deleted = []
+
+    def transport(request):
+        if request.url.path == "/key/delete":
+            deleted.extend(json.loads(request.content)["keys"])
+        return mock_litellm(request)
+
+    with (
+        patch.object(litellm, "_client", side_effect=lambda: httpx.AsyncClient(transport=httpx.MockTransport(transport))),
+        patch.object(key_secrets, "save", side_effect=sqlite3.OperationalError("database is locked")),
+        patch.object(key_secrets, "remove", side_effect=sqlite3.OperationalError("database is locked")),
+        pytest.raises(HTTPException) as exc,
+    ):
+        await litellm.generate_key(OWNER.user_id)
+
+    assert exc.value.status_code == 503
+    assert deleted == [SECRET]

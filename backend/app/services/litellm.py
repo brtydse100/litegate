@@ -1,6 +1,8 @@
 import asyncio
 import json
+import logging
 import math
+import sqlite3
 from urllib.parse import quote
 
 import httpx
@@ -16,6 +18,8 @@ from app.services.litellm_client import (
     start_client,
     transport_error as _transport_error,
 )
+
+_logger = logging.getLogger(__name__)
 
 
 def _team_operation_error(e: httpx.HTTPStatusError) -> NoReturn:
@@ -425,7 +429,11 @@ async def delete_key(key: str) -> dict:
                 timeout=10,
             )
             r.raise_for_status()
-            await asyncio.to_thread(key_secrets.remove, key)
+            try:
+                await asyncio.to_thread(key_secrets.remove, key)
+            except sqlite3.Error:
+                # Remote revocation succeeded; local cleanup must not trigger rotation rollback.
+                _logger.warning("Stored API key cleanup failed after successful LiteLLM revocation.")
             return r.json()
     except httpx.TransportError as e:
         _transport_error(e)
