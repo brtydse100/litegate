@@ -40,6 +40,7 @@ export interface BulkKeySpendResetResponse {
 }
 
 export interface KeyInfo {
+  secret_available?: boolean;
   token?: string;
   key_alias?: string;
   spend: number;

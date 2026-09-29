@@ -90,6 +90,12 @@ export const api = {
       method: "POST",
     }),
 
+  revealKey: (key: string) =>
+    request<{ key: string }>("/keys/reveal", {
+      method: "POST",
+      body: JSON.stringify({ key }),
+    }),
+
   deleteKey: (key: string) =>
     request<{ deleted: boolean }>("/keys", {
       method: "DELETE",

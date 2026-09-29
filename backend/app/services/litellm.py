@@ -1,11 +1,15 @@
+import asyncio
 import json
+import logging
 import math
+import sqlite3
 from urllib.parse import quote
 
 import httpx
 from typing import Optional, List, Any, NoReturn
 from fastapi import HTTPException
 from app.config import settings
+from app.services import key_secrets
 from app.services.litellm_client import (
     client as _client,
     close_client,
@@ -14,6 +18,8 @@ from app.services.litellm_client import (
     start_client,
     transport_error as _transport_error,
 )
+
+_logger = logging.getLogger(__name__)
 
 
 def _team_operation_error(e: httpx.HTTPStatusError) -> NoReturn:
@@ -399,7 +405,14 @@ async def generate_key(
                 timeout=10,
             )
             r.raise_for_status()
-            return r.json()
+            result = r.json()
+            if settings.save_api_keys_in_db:
+                try:
+                    await asyncio.to_thread(key_secrets.save, result["key"], user_id)
+                except Exception:
+                    await delete_key(result["key"])
+                    raise HTTPException(status_code=503, detail="Could not save the generated key")
+            return result
     except httpx.TransportError as e:
         _transport_error(e)
     except httpx.HTTPStatusError as e:
@@ -416,6 +429,11 @@ async def delete_key(key: str) -> dict:
                 timeout=10,
             )
             r.raise_for_status()
+            try:
+                await asyncio.to_thread(key_secrets.remove, key)
+            except sqlite3.Error:
+                # Remote revocation succeeded; local cleanup must not trigger rotation rollback.
+                _logger.warning("Stored API key cleanup failed after successful LiteLLM revocation.")
             return r.json()
     except httpx.TransportError as e:
         _transport_error(e)

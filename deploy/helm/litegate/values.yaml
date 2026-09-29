@@ -103,6 +103,8 @@ config:
   auditCleanupBatchSize: 1000
 
   # -- Generated-key defaults ------------------------------------------------
+  # Store full keys in SQLite so owners and administrators can reveal them.
+  saveApiKeysInDb: false
   # Uncomment only the limits LiteGate should apply.
   # keyMaxBudget: "10.0"
   # keyBudgetDuration: "30d"

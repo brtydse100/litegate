@@ -351,6 +351,14 @@ Set `local_auth_username` and `local_auth_password` in `config.yaml`. Both the S
 
 ## Key settings
 
+To let owners and administrators reveal saved keys, set `save_api_keys_in_db: true`
+in Docker Compose's `config.yaml`, or `config.saveApiKeysInDb: true` in Helm values.
+The environment override is `SAVE_API_KEYS_IN_DB=true`. Storage defaults to off.
+Enabled deployments replace **Regenerate key** with **Show API key** when a stored
+copy exists. Older keys need one regeneration. Full keys are stored in plaintext
+in the existing SQLite database and included in its backups; see
+[optional API key storage](docs/configuration.md#optional-api-key-storage).
+
 All API keys generated through the portal share the same policy, set in `config.yaml`:
 
 ```yaml
@@ -434,6 +442,7 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `key_rpm_limit` | `KEY_RPM_LIMIT` | `null` | Requests per minute |
 | `key_duration` | `KEY_DURATION` | `null` | Key TTL |
 | `key_team_id` | `KEY_TEAM_ID` | `""` | Fallback team for keys without an SSO-mapped primary team |
+| `save_api_keys_in_db` | `SAVE_API_KEYS_IN_DB` | `false` | Store full keys in SQLite for owners and administrators to reveal |
 | `local_users_enabled` | `LOCAL_USERS_ENABLED` | `true` | Enable admin-created local accounts and their administration page |
 | `local_users_db_path` | `LOCAL_USERS_DB_PATH` | `data/litegate.db` | SQLite account database path |
 | `audit_retention_days` | `AUDIT_RETENTION_DAYS` | `90` | Days to retain audit events before automatic cleanup |

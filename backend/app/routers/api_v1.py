@@ -25,7 +25,7 @@ from app.routers.api_actor import (
 )
 from app.routers.api_v1_system import api_audit_events, api_status, router as system_router
 from app.routers.api_v1_users import api_create_user, api_list_users, api_update_user, router as users_router
-from app.services import litellm as llm
+from app.services import key_secrets, litellm as llm
 
 router = APIRouter(prefix="/v1", tags=["api-v1"])
 router.include_router(system_router)
@@ -74,13 +74,15 @@ async def api_list_keys(
 ):
     if all_keys:
         _require_api_admin(actor)
-        return await llm.list_keys_filtered(
+        result = await llm.list_keys_filtered(
             page=page,
             size=size,
             search=search,
             team_id=team_id,
             blocked=blocked,
         )
+        result["keys"] = await asyncio.to_thread(key_secrets.annotate, result["keys"])
+        return result
     if actor.proof_key:
         info = await llm.get_key_info(actor.proof_key)
         return {"keys": [info] if info else []}

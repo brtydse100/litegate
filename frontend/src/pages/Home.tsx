@@ -20,6 +20,8 @@ import {
   Zap,
 } from "lucide-react";
 import AdminKeys from "../components/AdminKeys";
+import RevealKey from "../components/RevealKey";
+import { keyToken } from "../components/BulkKeyEditor";
 import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
 import AdminTeams from "../components/AdminTeams";
@@ -35,6 +37,7 @@ interface PortalConfig {
   litellm_ui_url: string;
   api_docs_url: string;
   local_users_enabled: boolean;
+  save_api_keys_in_db: boolean;
 }
 
 const primaryKeyActionClassName =
@@ -530,7 +533,7 @@ export default function Home() {
             ) : section === "/teams" && isAdmin ? (
               <AdminTeams />
             ) : section === "/keys" && isAdmin ? (
-              <AdminKeys />
+              <AdminKeys saveApiKeysInDb={config?.save_api_keys_in_db} />
             ) : section === "/status" && isAdmin ? (
               <AdminStatus />
             ) : (
@@ -543,8 +546,10 @@ export default function Home() {
                     Your API access
                   </h1>
                   <p className="mt-1 max-w-2xl text-sm text-slate-500">
-                    Create and manage your governed LiteLLM key. Secrets are
-                    only shown once when created or regenerated.
+                    Create and manage your governed LiteLLM key.{" "}
+                    {config?.save_api_keys_in_db
+                      ? "Saved keys can be shown again when you need them."
+                      : "Secrets are only shown once when created or regenerated."}
                   </p>
                 </div>
 
@@ -562,7 +567,9 @@ export default function Home() {
                 {newKey && (
                   <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
                     <p className="text-sm font-medium text-emerald-900">
-                      Copy this key now — it will not be shown in full again.
+                      {config?.save_api_keys_in_db
+                        ? "Your API key is ready. You can show it again later."
+                        : "Copy this key now — it will not be shown in full again."}
                     </p>
                     <div className="mt-3 flex max-w-2xl gap-2">
                       <code className="min-w-0 flex-1 truncate rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-800">
@@ -634,6 +641,17 @@ export default function Home() {
                             ? "Key actions paused"
                             : "Create API key"}
                       </button>
+                    ) : config?.save_api_keys_in_db &&
+                      keyList.some((key) => key.secret_available) ? (
+                      keyList
+                        .filter((key) => key.secret_available)
+                        .map((key) => (
+                          <RevealKey
+                            key={keyToken(key)}
+                            identifier={keyToken(key)}
+                            buttonClassName={primaryKeyActionClassName}
+                          />
+                        ))
                     ) : (
                       <button
                         onClick={() => setConfirmRegenerate(true)}

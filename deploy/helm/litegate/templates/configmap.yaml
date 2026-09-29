@@ -23,6 +23,7 @@ data:
   SUPPORT_TICKET_URL: {{ .Values.config.supportTicketUrl | quote }}
   LOCAL_USERS_ENABLED: {{ .Values.config.localUsersEnabled | quote }}
   LOCAL_USERS_DB_PATH: {{ .Values.config.localUsersDbPath | quote }}
+  SAVE_API_KEYS_IN_DB: {{ .Values.config.saveApiKeysInDb | quote }}
   AUDIT_RETENTION_DAYS: {{ .Values.config.auditRetentionDays | quote }}
   AUDIT_CLEANUP_BATCH_SIZE: {{ .Values.config.auditCleanupBatchSize | quote }}
   ADMIN_EMAILS: {{ .Values.config.adminEmails | quote }}

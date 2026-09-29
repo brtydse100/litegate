@@ -246,3 +246,15 @@ def test_sso_team_and_admin_inheritance_defaults_are_opt_in():
     assert configured.sso_default_team_id == ""
     assert configured.oidc_require_team_mapping is False
     assert configured.inherit_litellm_admin is False
+
+
+def test_key_storage_defaults_to_disabled_and_environment_overrides_yaml(tmp_path, monkeypatch):
+    import app.config as cfg_module
+
+    monkeypatch.setattr(cfg_module, "_BACKEND_DIR", tmp_path)
+    monkeypatch.delenv("SAVE_API_KEYS_IN_DB", raising=False)
+    assert cfg_module.Settings().save_api_keys_in_db is False
+    (tmp_path / "config.yaml").write_text("save_api_keys_in_db: true\n")
+    assert cfg_module.Settings().save_api_keys_in_db is True
+    monkeypatch.setenv("SAVE_API_KEYS_IN_DB", "false")
+    assert cfg_module.Settings().save_api_keys_in_db is False
