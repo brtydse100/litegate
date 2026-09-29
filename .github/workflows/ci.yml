@@ -144,6 +144,7 @@ jobs:
           version: v3.19.0
       - run: python scripts/version.py --check
       - run: python scripts/check_docs.py
+      - run: python -m unittest scripts/test_release_policy.py
       - run: helm lint deploy/helm/litegate
       - name: Render externally managed data volume
         shell: bash
