@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Optional release tag, for example 2.0.0
+        description: Optional image tag, for example test-2.10.0
         required: false
         type: string
       publish_latest:
@@ -31,6 +31,9 @@ jobs:
     name: Build and publish
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      promote_aliases: ${{ steps.policy.outputs.publish_latest }}
     permissions:
       contents: read
       packages: write
@@ -38,6 +41,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -45,7 +50,26 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
 
-      - name: Validate release tag
+      - name: Validate publication policy
+        id: policy
+        env:
+          MANUAL_TAG: ${{ inputs.version }}
+          PUBLISH_LATEST: ${{ inputs.publish_latest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          fi
+          python scripts/release_policy.py \
+            --event "$GITHUB_EVENT_NAME" \
+            --sha "$GITHUB_SHA" \
+            --main-sha "$(git rev-parse origin/main)" \
+            --manual-tag "$MANUAL_TAG" \
+            --publish-latest "$PUBLISH_LATEST"
+
+      - name: Validate release files
         if: github.event_name == 'push'
         shell: bash
         run: |
@@ -53,6 +77,9 @@ jobs:
           version="$(cat VERSION)"
           test "$GITHUB_REF_NAME" = "v$version"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test -f "docs/releases/v$version.md"
+          python scripts/version.py --check
+          python scripts/check_docs.py
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -66,11 +93,10 @@ jobs:
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ env.IMAGE_NAME }}
+          flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.version != '' }}
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && inputs.publish_latest }}
             type=raw,value=edge,enable=${{ github.event_name == 'workflow_dispatch' }}
             type=sha,prefix=sha-
           labels: |
@@ -78,6 +104,7 @@ jobs:
             org.opencontainers.image.description=A lightweight self-service portal for LiteLLM API keys
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
@@ -104,3 +131,78 @@ jobs:
           docker image rm "$image"
           docker load --input litegate-image.tar
           docker image inspect "$image" >/dev/null
+
+  promote:
+    if: needs.publish.outputs.promote_aliases == 'true'
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: container-alias-promotion
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote current main image
+        env:
+          IMAGE_DIGEST: ${{ needs.publish.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if [[ "$GITHUB_SHA" != "$(git rev-parse origin/main)" ]]; then
+            echo "Main moved since this image was built; leaving shared tags unchanged."
+            exit 0
+          fi
+          tags=(--tag "$IMAGE_NAME:latest")
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            version="$(cat VERSION)"
+            tags+=(--tag "$IMAGE_NAME:${version%.*}")
+          fi
+          docker buildx imagetools create "${tags[@]}" "$IMAGE_NAME@$IMAGE_DIGEST"
+
+  release:
+    if: github.event_name == 'push'
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(cat VERSION)"
+          python scripts/release_body.py "docs/releases/v$version.md" "$RUNNER_TEMP/release.md"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; leaving it unchanged."
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --verify-tag \
+              --title "LiteGate $GITHUB_REF_NAME" \
+              --notes-file "$RUNNER_TEMP/release.md"
+          fi

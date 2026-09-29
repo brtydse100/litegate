@@ -113,6 +113,21 @@ litegate/
 references together. The only supported production image is defined by
 `deploy/docker-compose/Dockerfile`; local development uses Uvicorn and Vite.
 
+Release tags must use stable SemVer as `vX.Y.Z`, match `VERSION`, point to a
+commit contained in `main`, and have notes at `docs/releases/vX.Y.Z.md`. Pushing
+the tag runs one ordered release workflow: it publishes the multi-architecture
+GHCR image as `X.Y.Z` and `sha-*`; adds `X.Y` and `latest` only if the tag points
+to the current `main` commit after the build; verifies a normal Docker
+pull/save/load round trip; and only then creates the GitHub Release. Shared
+tags are promoted from the verified image digest in a serialized job. A failed
+image publication therefore cannot produce a successful release without its
+container package.
+
+Manual runs are for pre-release testing. Their optional image tag must start
+with `test-` or `dev-`, so they cannot replace stable release tags. A manual run
+may update `latest` only when it is run from the current `main` commit. Image
+publication for the same Git ref is serialized.
+
 ## Technology
 
 - FastAPI, Pydantic, HTTPX, PyJWT, and SQLite
