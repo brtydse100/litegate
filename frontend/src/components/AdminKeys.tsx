@@ -1,7 +1,11 @@
 import { KeyRound } from "lucide-react";
 import BulkKeyEditor from "./BulkKeyEditor";
 
-export default function AdminKeys() {
+export default function AdminKeys({
+  saveApiKeysInDb = false,
+}: {
+  saveApiKeysInDb?: boolean;
+}) {
   return (
     <section className="w-full space-y-5">
       <div>
@@ -11,11 +15,13 @@ export default function AdminKeys() {
         </h1>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
           Search the entire installation, select individual results or every
-          matching key, and apply one policy change safely. This page never
-          reveals key secrets.
+          matching key, and apply one policy change safely.{" "}
+          {saveApiKeysInDb
+            ? "Stored key secrets can be revealed by administrators."
+            : "This page never reveals key secrets."}
         </p>
       </div>
-      <BulkKeyEditor expanded />
+      <BulkKeyEditor expanded saveApiKeysInDb={saveApiKeysInDb} />
     </section>
   );
 }

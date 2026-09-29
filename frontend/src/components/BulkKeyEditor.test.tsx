@@ -11,6 +11,7 @@ vi.mock("../api/client", () => ({
     bulkUpdateKeys: vi.fn(),
     resetKeySpend: vi.fn(),
     getOperationLimit: vi.fn(),
+    revealKey: vi.fn(),
   },
 }));
 
@@ -25,13 +26,13 @@ const keys = [
   { token: "key-2", key_alias: "Bob", spend: 2, models: [], user_id: "bob" },
 ];
 
-function renderEditor() {
+function renderEditor(saveApiKeysInDb = false) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <BulkKeyEditor expanded />
+      <BulkKeyEditor expanded saveApiKeysInDb={saveApiKeysInDb} />
     </QueryClientProvider>,
   );
 }
@@ -54,6 +55,26 @@ describe("BulkKeyEditor", () => {
       keys: ["key-1", "key-2"],
       total: 2,
     });
+  });
+
+  it("lets administrators reveal a stored key from the list", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [{ ...keys[0], secret_available: true }, keys[1]],
+      page: 1,
+      size: 25,
+      total: 2,
+      total_pages: 1,
+    });
+    vi.mocked(api.revealKey).mockResolvedValue({ key: "sk-synthetic-admin" });
+    renderEditor(true);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Show API key" }),
+    );
+    expect(await screen.findByText("sk-synthetic-admin")).toBeVisible();
+    expect(api.revealKey).toHaveBeenCalledWith("key-1");
+    expect(
+      screen.getByRole("checkbox", { name: "Select Alice" }),
+    ).not.toBeChecked();
   });
 
   it("selects every result, not only the visible page", async () => {

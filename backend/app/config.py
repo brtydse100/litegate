@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     key_rpm_limit: Optional[int] = None
     key_duration: Optional[str] = None
     key_team_id: Optional[str] = None
+    save_api_keys_in_db: bool = False
 
     root_url: str = "http://localhost"
     cors_origins: str = "http://localhost,http://localhost:5173,http://localhost:3000"

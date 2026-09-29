@@ -24,6 +24,25 @@ curl https://litegate.example.com/api/v1/me \
 
 ## Keys
 
+### Optional portal key reveal
+
+When `save_api_keys_in_db` is enabled, `POST /api/keys/reveal` accepts
+`{"key":"<key-identifier>"}` in the request body and returns `{"key":"sk-..."}`.
+This portal endpoint requires a portal session cookie or portal JWT. Owners may
+reveal their own keys; administrators may reveal any stored key. LiteLLM virtual
+keys and the management API credential cannot authenticate this portal endpoint.
+Current ownership and key existence are checked against LiteLLM. Disabled
+storage, missing keys, and keys without stored copies return 404; another user's
+key returns 403 to non-admin callers. The response uses `Cache-Control: no-store`,
+and the reveal is audited without recording the secret.
+
+With storage enabled, `GET /api/keys` and the administrator
+`GET /api/v1/keys?all=true` listing include `secret_available` on each key. This
+boolean indicates whether LiteGate has a stored copy; listings do not return the
+stored secret. Older keys require one regeneration before they can be revealed.
+
+### Key management
+
 List the authenticated portal user's keys:
 
 ```bash

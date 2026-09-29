@@ -140,7 +140,7 @@ publication for the same Git ref is serialized.
 - The dashboard derives its access snapshot from key records instead of loading
   raw spend logs during ordinary page loads.
 - Installation-wide keys are fetched lazily and paginated for administrators.
-- New key secrets are displayed only when created.
+- Key secrets are displayed only when created unless optional API key storage is enabled; stored keys can be revealed by their owner or an administrator.
 - Bulk updates report per-key success or failure and use bounded concurrency.
 - Local account role and active state are rechecked for authenticated requests.
 - SQLite stores local users and audit events, while operation cooldown state is

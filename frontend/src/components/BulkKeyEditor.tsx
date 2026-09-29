@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../api/client";
+import RevealKey from "./RevealKey";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import type {
@@ -41,8 +42,10 @@ export function maskedToken(token: string): string {
 
 export default function BulkKeyEditor({
   expanded = false,
+  saveApiKeysInDb = false,
 }: {
   expanded?: boolean;
+  saveApiKeysInDb?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { operationsBlocked, retryAfter, refreshOperationLimit } =
@@ -443,59 +446,65 @@ export default function BulkKeyEditor({
                       key.key_alias ||
                       `Key ${(adminKeys.data?.page ?? page) * 25 - 24 + index}`;
                     return (
-                      <label
-                        key={token || index}
-                        className={`group flex items-center gap-3 rounded-lg border p-3 transition focus-within:ring-2 focus-within:ring-indigo-500/50 ${!token ? "cursor-not-allowed border-transparent opacity-40" : isSelected ? "cursor-pointer border-indigo-500/55 bg-indigo-500/10" : "cursor-pointer border-transparent bg-[#151822] hover:border-[#353A52] hover:bg-[#1A1D27]"}`}
-                      >
-                        <input
-                          className="sr-only"
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleKey(token)}
-                          disabled={!token}
-                          aria-label={`${isSelected ? "Deselect" : "Select"} ${label}`}
-                        />
-                        <span
-                          aria-hidden="true"
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${isSelected ? "border-indigo-400 bg-indigo-500 text-white" : "border-gray-600 bg-[#0F1117] group-hover:border-indigo-400"}`}
+                      <div key={token || index}>
+                        <label
+                          className={`group flex items-center gap-3 rounded-lg border p-3 transition focus-within:ring-2 focus-within:ring-indigo-500/50 ${!token ? "cursor-not-allowed border-transparent opacity-40" : isSelected ? "cursor-pointer border-indigo-500/55 bg-indigo-500/10" : "cursor-pointer border-transparent bg-[#151822] hover:border-[#353A52] hover:bg-[#1A1D27]"}`}
                         >
-                          {isSelected && <Check size={13} strokeWidth={3} />}
-                        </span>
-                        <span
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isSelected ? "bg-indigo-500/20 text-indigo-300" : "bg-[#22263A] text-gray-500"}`}
-                        >
-                          <KeyRound size={16} />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-medium text-gray-200">
-                            {label}
+                          <input
+                            className="sr-only"
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleKey(token)}
+                            disabled={!token}
+                            aria-label={`${isSelected ? "Deselect" : "Select"} ${label}`}
+                          />
+                          <span
+                            aria-hidden="true"
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${isSelected ? "border-indigo-400 bg-indigo-500 text-white" : "border-gray-600 bg-[#0F1117] group-hover:border-indigo-400"}`}
+                          >
+                            {isSelected && <Check size={13} strokeWidth={3} />}
                           </span>
-                          <span className="mt-0.5 block truncate font-mono text-[10px] text-gray-600">
-                            {maskedToken(token)}
+                          <span
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isSelected ? "bg-indigo-500/20 text-indigo-300" : "bg-[#22263A] text-gray-500"}`}
+                          >
+                            <KeyRound size={16} />
                           </span>
-                          <span className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-gray-500">
-                            <UserRound size={10} className="shrink-0" />
-                            <span className="truncate">
-                              {key.user_email ||
-                                key.user_id ||
-                                "Unassigned user"}
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-medium text-gray-200">
+                              {label}
+                            </span>
+                            <span className="mt-0.5 block truncate font-mono text-[10px] text-gray-600">
+                              {maskedToken(token)}
+                            </span>
+                            <span className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-gray-500">
+                              <UserRound size={10} className="shrink-0" />
+                              <span className="truncate">
+                                {key.user_email ||
+                                  key.user_id ||
+                                  "Unassigned user"}
+                              </span>
                             </span>
                           </span>
-                        </span>
-                        <span className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
-                          <span className="rounded bg-[#22263A] px-2 py-0.5 text-[10px] text-gray-400">
-                            ${(key.spend ?? 0).toFixed(2)} spent
-                          </span>
-                          {key.team_id && (
-                            <span
-                              className="max-w-32 truncate rounded bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-300"
-                              title={key.team_id}
-                            >
-                              {key.team_id}
+                          <span className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
+                            <span className="rounded bg-[#22263A] px-2 py-0.5 text-[10px] text-gray-400">
+                              ${(key.spend ?? 0).toFixed(2)} spent
                             </span>
-                          )}
-                        </span>
-                      </label>
+                            {key.team_id && (
+                              <span
+                                className="max-w-32 truncate rounded bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-300"
+                                title={key.team_id}
+                              >
+                                {key.team_id}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                        {saveApiKeysInDb && key.secret_available && (
+                          <div className="px-3 pb-3">
+                            <RevealKey identifier={token} />
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

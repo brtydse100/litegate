@@ -16,6 +16,11 @@ Signed-in users can:
   spend into the replacement and invalidating the old key; and
 - follow configured links to a support system or LiteLLM model hub.
 
+Deployments can opt into [API key storage](configuration.md#optional-api-key-storage).
+For saved keys, **Show API key** replaces regeneration in the portal; owners can
+reveal their own keys and administrators can reveal them from the key list.
+The default remains one-time secret display without key storage.
+
 New keys inherit the installation defaults for models, budget, reset interval,
 duration, TPM, RPM, and team. For SSO users, an administrator can map identity
 provider groups to existing LiteLLM teams so new or regenerated keys use the

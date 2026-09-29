@@ -64,6 +64,13 @@ def init_db() -> None:
             """
         )
         db.execute("CREATE INDEX IF NOT EXISTS idx_audit_events_occurred_at ON audit_events(occurred_at DESC)")
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS stored_api_keys (
+                key_hash TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                key_secret TEXT NOT NULL
+            )"""
+        )
 
 
 def healthcheck() -> dict:

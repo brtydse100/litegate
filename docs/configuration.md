@@ -104,6 +104,30 @@ for lifecycle and removal behavior.
 
 ## Key defaults
 
+### Optional API key storage
+
+Key secrets are shown only at creation by default. Set `save_api_keys_in_db: true`
+in Docker Compose's `config.yaml`, `SAVE_API_KEYS_IN_DB=true` as an environment
+variable, or `config.saveApiKeysInDb: true` in Helm values to retain full API keys
+in LiteGate's existing SQLite database (`local_users_db_path`). The default is
+`false`.
+
+When enabled, **Show API key** replaces **Regenerate key** for keys with a stored
+copy. Owners can reveal their own keys, and administrators can reveal keys from
+the installation key list. Keys created before enabling storage, or outside
+LiteGate, have no recoverable copy; owners must regenerate them once to save a
+replacement. Revealing a key does not rotate it or reset its spend.
+
+Stored secrets are plaintext, so the database, its volume, and its backups contain
+usable credentials. Keep the existing persistent volume and restrict access to
+it and its backups. Disabling the setting stops saving and revealing keys but
+does not erase previously stored copies. Deleting or regenerating a key through
+LiteGate removes its stored copy; reveal requests also verify the key still
+exists in LiteLLM. Secrets are fetched only on demand, excluded from key listings
+and audit events, and returned with `Cache-Control: no-store`.
+
+### Generated-key policy
+
 These values are applied when LiteGate creates a key. Leave an optional setting
 unset to use the corresponding LiteLLM default.
 

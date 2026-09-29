@@ -72,6 +72,8 @@ logo_url: ""
 litellm_ui_url: "http://localhost:4000"
 
 # Key defaults (applied to every generated key)
+# Store full keys in SQLite so owners and administrators can reveal them.
+save_api_keys_in_db: false
 # key_max_budget: 10.0
 # key_budget_duration: "30d"
 # key_models:

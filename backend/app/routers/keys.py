@@ -1,17 +1,45 @@
+import asyncio
 from secrets import token_hex
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from app.config import settings
 from app.dependencies import get_current_user
 from app.models import CurrentUser, KeyCreateResponse, KeyDeleteRequest
 from app.rate_limit import check_key_rate_limit, key_rate_limit_status
 from app.services import litellm as llm
+from app.services import audit, key_secrets
 
 router = APIRouter(prefix="/keys", tags=["keys"])
 
 
 @router.get("")
 async def list_keys(current_user: CurrentUser = Depends(get_current_user)):
-    return {"keys": await llm.list_user_keys(current_user.user_id)}
+    keys = await llm.list_user_keys(current_user.user_id)
+    return {"keys": await asyncio.to_thread(key_secrets.annotate, keys)}
+
+
+@router.post("/reveal")
+async def reveal_key(payload: KeyDeleteRequest, response: Response, current_user: CurrentUser = Depends(get_current_user)):
+    if not settings.save_api_keys_in_db:
+        raise HTTPException(status_code=404, detail="API key storage is disabled")
+    info = await llm.get_key_info(payload.key)
+    if not info:
+        raise HTTPException(status_code=404, detail="Key not found")
+    owner = info.get("user_id")
+    if not current_user.is_admin and owner != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Key not owned by user")
+    secret = await asyncio.to_thread(key_secrets.get, payload.key, owner)
+    if not secret:
+        raise HTTPException(status_code=404, detail="No stored copy is available. Regenerate this key once to save it.")
+    await asyncio.to_thread(
+        audit.record,
+        actor_id=current_user.user_id,
+        actor_email=current_user.email,
+        action="key.reveal",
+        target=owner,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return {"key": secret}
 
 
 @router.get("/operation-limit")
