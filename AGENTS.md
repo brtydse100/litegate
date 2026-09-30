@@ -117,3 +117,30 @@ is available.
 - Keep root `README.md` concise and route detail into the focused guides.
 - The public demo builds the real frontend with `VITE_DEMO_MODE=true` and uses
   synthetic content only. Never connect it to a real backend or embed secrets.
+
+## Release notes and publication
+
+- Use the structure of [IceGraph v0.19.4](https://github.com/YanivZalach/IceGraph/releases/tag/v0.19.4)
+  for `docs/releases/vX.Y.Z.md` and the corresponding GitHub release body:
+  1. `# LiteGate vX.Y.Z` in the Markdown file (the GitHub release title provides
+     this heading; `scripts/release_body.py` removes it from the release body).
+  2. `## Artifacts` with an `Artifact | Get it` table for the versioned GHCR
+     Docker pull command, current live demo, versioned docs, source, and license.
+  3. `## What's Changed` with user-visible changes and verified author/PR or
+     commit attribution. Keep configuration, migration, security, and upgrade
+     details as `###` subsections here when needed.
+  4. A `**Full Changelog**` link comparing the previous release tag to this tag.
+     For the first release, link to its commit history instead.
+  5. `## Contributors` thanking verified GitHub contributors.
+- Include only artifacts LiteGate actually ships. Docker image tags are `X.Y.Z`,
+  while Git tags are `vX.Y.Z`. Mark the live demo as current; do not imply it
+  represents a historical release. Verify versioned artifact links exist; use
+  an explicitly current license link when an old tag has no license file.
+- When reformatting historical notes, preserve release-specific facts, upgrade
+  instructions, and existing PR/commit references. Keep checked-in notes and
+  GitHub descriptions synchronized using `scripts/release_body.py`.
+- Prepare versions with `python scripts/version.py --set X.Y.Z`, update
+  `CHANGELOG.md` and `docs/releases/README.md`, and run the release checks.
+- Publish official tags only from a validated commit contained in `main`, with
+  the tag matching `VERSION`. Push the tag and let the existing publication
+  workflow publish and verify the image before creating the GitHub Release.
