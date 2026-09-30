@@ -59,7 +59,7 @@ class GenericSSOHelmTests(unittest.TestCase):
             "OIDC_GROUPS_CLAIM": "identity.groups",
         }
         for field, value in expected.items():
-            self.assertIn(f"  {field}: {json.dumps(value)}\n", configmap)
+            self.assertIn(f"  {field}: {json.dumps(value)}", configmap.splitlines())
         self.assertIn('OIDC_GROUP_TEAM_MAPPING: "{\\"Engineering\\":\\"team-engineering\\"}"', configmap)
         self.assertNotIn("GENERIC_CLIENT_SECRET", configmap)
         self.assertNotIn(CONFIG["genericClientSecret"], configmap)
