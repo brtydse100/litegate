@@ -22,6 +22,22 @@ oidc_scopes: "openid email profile"
 oidc_authorization_endpoint: ""
 oidc_token_endpoint: ""
 oidc_jwks_uri: ""
+
+# Alternative: generic OAuth SSO with UserInfo. Leave OIDC settings blank.
+# Set client credentials and all three endpoints together to enable this mode.
+generic_client_id: ""
+generic_client_secret: ""
+generic_authorization_endpoint: ""
+generic_token_endpoint: ""
+generic_userinfo_endpoint: ""
+# Blank uses root_url + /api/auth/callback.
+generic_redirect_uri: ""
+generic_scope: "openid profile email"
+generic_user_id_attribute: "sub"
+generic_user_email_attribute: "email"
+generic_client_use_pkce: false
+# False uses HTTP Basic client authentication instead of credentials in the body.
+generic_include_client_id: true
 # ID-token claim containing group names; dot notation supports nested claims.
 oidc_groups_claim: "groups"
 # Add matched SSO users to existing LiteLLM teams. A group may map to one team

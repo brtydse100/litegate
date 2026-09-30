@@ -257,6 +257,37 @@ team-mapping field is `true`, mapping remains required so conflicting upgrade
 values cannot weaken login restrictions. Migrate to
 `config.ssoRequireTeamMapping`, then remove the old field.
 
+### Generic OAuth SSO in Helm
+
+Use `config:` for provider settings, with `oidcIssuerUrl` and manual OIDC
+endpoints left blank:
+
+```yaml
+config:
+  rootUrl: "https://litegate.example.com"
+  genericClientId: "litegate"
+  genericClientSecret: "replace-me"
+  genericAuthorizationEndpoint: "https://login.example.com/authorize"
+  genericTokenEndpoint: "https://login.example.com/token"
+  genericUserinfoEndpoint: "https://login.example.com/userinfo"
+  genericScope: "openid profile email"
+  genericUserIdAttribute: "employee_id"
+  genericUserEmailAttribute: "mail"
+  genericClientUsePkce: true
+```
+
+The chart renders `genericClientSecret` into its Kubernetes Secret; other
+generic settings go into the ConfigMap. Register
+`https://litegate.example.com/api/auth/callback` with the provider.
+`genericRedirectUri` overrides the callback derived from `rootUrl`.
+`genericIncludeClientId` defaults to `true`; `false` uses HTTP Basic client
+authentication at the token endpoint. Existing `oidcGroupsClaim`,
+`oidcGroupTeamMapping`, administrator, and default-team settings also apply to
+generic UserInfo. Partial generic configuration or simultaneous generic/OIDC
+configuration fails Helm rendering and backend startup. For Docker Compose,
+use the root-level snake_case equivalents in `config.yaml`.
+See [generic SSO](docs/authentication.md#generic-oauth-sso) for provider details.
+
 ### Custom CAs and additional resources
 
 Mount a complete CA bundle from an existing ConfigMap or Secret. Choose exactly
@@ -422,6 +453,17 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `oidc_issuer_url` | `OIDC_ISSUER_URL` | `""` | OIDC provider URL (blank = SSO disabled) |
 | `oidc_client_id` | `OIDC_CLIENT_ID` | `""` | OIDC client ID |
 | `oidc_client_secret` | `OIDC_CLIENT_SECRET` | `""` | OIDC client secret |
+| `generic_client_id` | `GENERIC_CLIENT_ID` | `""` | Generic OAuth client ID |
+| `generic_client_secret` | `GENERIC_CLIENT_SECRET` | `""` | Generic OAuth client secret |
+| `generic_authorization_endpoint` | `GENERIC_AUTHORIZATION_ENDPOINT` | `""` | Generic OAuth authorization endpoint |
+| `generic_token_endpoint` | `GENERIC_TOKEN_ENDPOINT` | `""` | Generic OAuth token endpoint |
+| `generic_userinfo_endpoint` | `GENERIC_USERINFO_ENDPOINT` | `""` | Authenticated UserInfo endpoint |
+| `generic_redirect_uri` | `GENERIC_REDIRECT_URI` | `""` | Override callback derived from `root_url` |
+| `generic_scope` | `GENERIC_SCOPE` | `openid profile email` | Generic OAuth scopes |
+| `generic_user_id_attribute` | `GENERIC_USER_ID_ATTRIBUTE` | `sub` | Stable UserInfo identity field |
+| `generic_user_email_attribute` | `GENERIC_USER_EMAIL_ATTRIBUTE` | `email` | UserInfo email field |
+| `generic_client_use_pkce` | `GENERIC_CLIENT_USE_PKCE` | `false` | Enable PKCE S256 |
+| `generic_include_client_id` | `GENERIC_INCLUDE_CLIENT_ID` | `true` | Body credentials; false uses HTTP Basic |
 | `oidc_redirect_uri` | `OIDC_REDIRECT_URI` | `""` | Callback URI registered with IdP |
 | `oidc_authorization_endpoint` | `OIDC_AUTHORIZATION_ENDPOINT` | `""` | Manual authorization endpoint; set all three manual endpoints together |
 | `oidc_token_endpoint` | `OIDC_TOKEN_ENDPOINT` | `""` | Manual token endpoint; set all three manual endpoints together |

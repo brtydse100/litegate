@@ -55,7 +55,7 @@ config:
   supportTicketUrl: ""
 
   # -- SSO: simple discovery mode --------------------------------------------
-  # Normal SSO requires these values. Leave oidcIssuerUrl blank to disable SSO.
+  # Leave oidcIssuerUrl blank when using generic SSO or disabling SSO.
   oidcIssuerUrl: ""
   oidcClientId: ""
   oidcClientSecret: ""
@@ -67,6 +67,22 @@ config:
   oidcAuthorizationEndpoint: ""
   oidcTokenEndpoint: ""
   oidcJwksUri: ""
+
+  # -- SSO: generic OAuth with UserInfo (alternative to OIDC) ------------------
+  # Set the client credentials and all three endpoints together.
+  genericClientId: ""
+  genericClientSecret: ""
+  genericAuthorizationEndpoint: ""
+  genericTokenEndpoint: ""
+  genericUserinfoEndpoint: ""
+  # Blank uses rootUrl + /api/auth/callback.
+  genericRedirectUri: ""
+  genericScope: "openid profile email"
+  genericUserIdAttribute: "sub"
+  genericUserEmailAttribute: "email"
+  genericClientUsePkce: false
+  # False uses HTTP Basic client authentication at the token endpoint.
+  genericIncludeClientId: true
 
   # -- SSO roles and LiteLLM teams -------------------------------------------
   # Group claim supports dotted paths such as realm_access.roles.

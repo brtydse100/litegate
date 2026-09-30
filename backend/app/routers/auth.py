@@ -12,6 +12,7 @@ from app.models import CurrentUser
 from app.rate_limit import check_login_rate_limit, clear_login_failures, record_login_failure
 from app.services import litellm as llm
 from app.services import local_users
+from app.services import generic_sso
 from app.services import oidc as oidc_svc
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -71,10 +72,11 @@ def _is_litellm_proxy_admin(user: dict | None) -> bool:
 
 @router.get("/login")
 async def login():
-    if not settings.oidc_issuer_url:
+    if not settings.sso_enabled:
         raise HTTPException(status_code=503, detail="SSO not configured")
-    state = oidc_svc.generate_state()
-    response = RedirectResponse(await oidc_svc.get_authorization_url(state))
+    state = oidc_svc.generate_state("generic" if settings.generic_sso_enabled else "oidc")
+    url = generic_sso.get_authorization_url(state) if settings.generic_sso_enabled else await oidc_svc.get_authorization_url(state)
+    response = RedirectResponse(url)
     response.set_cookie(
         _OIDC_STATE_COOKIE,
         state,
@@ -98,11 +100,17 @@ async def callback(
     nonce = oidc_svc.state_nonce(state)
     if not nonce:
         raise HTTPException(status_code=400, detail="Invalid state")
-    tokens = await oidc_svc.exchange_code(code)
-    id_token = tokens.get("id_token")
-    if not id_token:
-        raise HTTPException(status_code=400, detail="No id_token in response")
-    claims = await oidc_svc.verify_id_token(id_token, expected_nonce=nonce)
+    expected_flow = "generic" if settings.generic_sso_enabled else "oidc"
+    if oidc_svc.state_flow(state) != expected_flow:
+        raise HTTPException(status_code=400, detail="SSO configuration changed; start a new login")
+    if settings.generic_sso_enabled:
+        claims = await generic_sso.get_user_claims(code, state)
+    else:
+        tokens = await oidc_svc.exchange_code(code)
+        id_token = tokens.get("id_token")
+        if not id_token:
+            raise HTTPException(status_code=400, detail="No id_token in response")
+        claims = await oidc_svc.verify_id_token(id_token, expected_nonce=nonce)
     user_id, email = claims["sub"], claims.get("email", "")
     group_team_ids = settings.mapped_team_ids(claims)
     if settings.oidc_require_team_mapping and not group_team_ids:
@@ -171,7 +179,7 @@ async def logout():
 @router.get("/config")
 async def auth_config():
     return {
-        "sso_enabled": bool(settings.oidc_issuer_url),
+        "sso_enabled": settings.sso_enabled,
         "local_enabled": settings.local_auth_enabled or settings.local_users_enabled,
     }
 

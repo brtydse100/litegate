@@ -54,6 +54,17 @@ class Settings(BaseSettings):
     oidc_authorization_endpoint: str = ""
     oidc_token_endpoint: str = ""
     oidc_jwks_uri: str = ""
+    generic_client_id: str = ""
+    generic_client_secret: str = ""
+    generic_authorization_endpoint: str = ""
+    generic_token_endpoint: str = ""
+    generic_userinfo_endpoint: str = ""
+    generic_redirect_uri: str = ""
+    generic_scope: str = "openid profile email"
+    generic_user_id_attribute: str = "sub"
+    generic_user_email_attribute: str = "email"
+    generic_client_use_pkce: bool = False
+    generic_include_client_id: bool = True
     oidc_groups_claim: str = "groups"
     oidc_group_team_mapping: dict[str, str | list[str]] = Field(default_factory=dict)
     oidc_require_team_mapping: bool = False
@@ -125,6 +136,45 @@ class Settings(BaseSettings):
     @property
     def oidc_manual_endpoints_enabled(self) -> bool:
         return bool(self.oidc_authorization_endpoint)
+
+    @model_validator(mode="after")
+    def validate_generic_sso(self):
+        required = (
+            self.generic_client_id,
+            self.generic_client_secret,
+            self.generic_authorization_endpoint,
+            self.generic_token_endpoint,
+            self.generic_userinfo_endpoint,
+        )
+        if not any(required):
+            return self
+        if not all(value.strip() for value in required):
+            raise ValueError("Generic SSO requires client ID, client secret, authorization, token, and UserInfo endpoints together")
+        if self.oidc_issuer_url or self.oidc_manual_endpoints_enabled:
+            raise ValueError("Configure either generic SSO or OIDC, not both")
+        for endpoint in (*required[2:], self.generic_callback_uri):
+            url = urlparse(endpoint)
+            local = url.hostname in {"localhost", "127.0.0.1", "::1"}
+            if not url.hostname or url.username or url.password or url.fragment or (url.scheme != "https" and not (local and url.scheme == "http")):
+                raise ValueError("Generic SSO URLs require HTTPS (HTTP is allowed only on localhost) and no credentials or fragments")
+        if any(
+            not field.strip() or any(not segment for segment in field.split("."))
+            for field in (self.generic_user_id_attribute, self.generic_user_email_attribute)
+        ):
+            raise ValueError("Generic SSO user attributes must be nonempty field paths")
+        return self
+
+    @property
+    def generic_sso_enabled(self) -> bool:
+        return bool(self.generic_authorization_endpoint)
+
+    @property
+    def sso_enabled(self) -> bool:
+        return self.generic_sso_enabled or bool(self.oidc_issuer_url)
+
+    @property
+    def generic_callback_uri(self) -> str:
+        return self.generic_redirect_uri or f"{self.root_url.rstrip('/')}/api/auth/callback"
 
     @property
     def admin_emails_set(self) -> set[str]:

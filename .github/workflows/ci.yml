@@ -146,6 +146,7 @@ jobs:
       - run: python scripts/check_docs.py
       - run: python -m unittest scripts/test_release_policy.py
       - run: helm lint deploy/helm/litegate
+      - run: python -m unittest scripts/test_generic_sso_helm.py
       - name: Render externally managed data volume
         shell: bash
         run: |
