@@ -7,6 +7,35 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-09-30
+
+### Added
+
+- Optional SQLite API key storage lets owners and administrators reveal saved
+  keys on demand, with current LiteLLM ownership checks and secret-free audits.
+- Manual OIDC authorization, token, and JWKS endpoints support providers that
+  need explicit configuration while retaining token and login-flow verification.
+- SSO users can inherit an existing default LiteLLM team and, when explicitly
+  enabled, the full LiteLLM `proxy_admin` role.
+- Helm supports custom CA bundles and templated additional Kubernetes resources,
+  including OpenShift Routes; its environment reference covers all settings.
+
+### Changed
+
+- Helm configuration groups related settings while preserving existing
+  configuration and credential values.
+- Release publication verifies the container image before creating the GitHub
+  Release, validates official tags against `VERSION` and `main`, and restricts
+  manual image tags and shared-alias promotion.
+
+### Fixed
+
+- SQLite cleanup failures after successful key revocation no longer cause
+  regeneration to delete the working replacement; warnings exclude credentials.
+- Legacy Helm `oidcRequireTeamMapping` and `managementApiKey` values continue to
+  enforce their authentication behavior.
+- OIDC tests no longer depend on an undeclared mocking package.
+
 ## [2.10.0] - 2026-09-24
 
 ### Added
