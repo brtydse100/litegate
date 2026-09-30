@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-09-30
+
+### Added
+
+- Generic OAuth SSO authenticates through UserInfo with opaque access tokens,
+  configurable identity fields, scopes, optional S256 PKCE, and body or HTTP
+  Basic client authentication.
+- Compose YAML and Helm `config:` settings accept `GENERIC_*` environment
+  overrides while preserving existing administrator/team and OIDC rules.
+
+### Changed
+
+- Release notes share an Artifacts, What's Changed, Full Changelog, and
+  Contributors format; `AGENTS.md` records the template and publication rules.
+
+### Fixed
+
+- OAuth HTTP Basic authentication form-encodes reserved characters in client
+  credentials before constructing the header.
+- Helm rendering regression checks tolerate an absent terminal newline while
+  still verifying exact configuration values and Secret placement.
+
 ## [2.11.0] - 2026-09-30
 
 ### Added
@@ -276,7 +298,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/brtydse100/litegate/compare/v2.11.0...v2.12.0
+[2.11.0]: https://github.com/brtydse100/litegate/compare/v2.10.0...v2.11.0
+[2.10.0]: https://github.com/brtydse100/litegate/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/brtydse100/litegate/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/brtydse100/litegate/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/brtydse100/litegate/compare/v2.6.1...v2.7.0

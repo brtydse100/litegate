@@ -1,10 +1,12 @@
 # LiteGate release notes
 
-Release notes focus on user-visible changes, upgrade requirements, and important
-behavior. For an exhaustive history, see the [changelog](../../CHANGELOG.md).
+Release notes use a consistent Artifacts, What's Changed, Full Changelog, and
+Contributors format, retaining configuration and upgrade details when needed.
+For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.12.0](v2.12.0.md) | Generic OAuth SSO with UserInfo, YAML configuration, and consistent release notes |
 | [2.11.0](v2.11.0.md) | Optional API key reveal, flexible Helm/OIDC configuration, and ordered release publication |
 | [2.10.0](v2.10.0.md) | Portable container exports, extensible Helm storage, and resilient SSO login |
 | [2.9.0](v2.9.0.md) | Configurable, bounded audit-history retention and safe readiness responses |
