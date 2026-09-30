@@ -5,6 +5,16 @@
 {{- if and (gt $manualEndpointCount 0) (lt $manualEndpointCount 3) -}}
 {{- fail "config.oidcAuthorizationEndpoint, config.oidcTokenEndpoint, and config.oidcJwksUri must be configured together" -}}
 {{- end }}
+{{- $genericCount := 0 -}}
+{{- range list .Values.config.genericClientId .Values.config.genericClientSecret .Values.config.genericAuthorizationEndpoint .Values.config.genericTokenEndpoint .Values.config.genericUserinfoEndpoint -}}
+{{- if . -}}{{- $genericCount = add1 $genericCount -}}{{- end -}}
+{{- end -}}
+{{- if and (gt $genericCount 0) (lt $genericCount 5) -}}
+{{- fail "Generic SSO requires config.genericClientId, genericClientSecret, genericAuthorizationEndpoint, genericTokenEndpoint, and genericUserinfoEndpoint together" -}}
+{{- end -}}
+{{- if and (gt $genericCount 0) (or .Values.config.oidcIssuerUrl (gt $manualEndpointCount 0)) -}}
+{{- fail "Configure either generic SSO or OIDC, not both" -}}
+{{- end -}}
 {{- $requireTeamMapping := .Values.config.ssoRequireTeamMapping -}}
 {{- if hasKey .Values.config "oidcRequireTeamMapping" -}}
 {{- $requireTeamMapping = or $requireTeamMapping .Values.config.oidcRequireTeamMapping -}}
@@ -34,18 +44,32 @@ data:
   {{- if .Values.config.localAuthUsername }}
   LOCAL_AUTH_USERNAME: {{ .Values.config.localAuthUsername | quote }}
   {{- end }}
+  {{- if or .Values.config.oidcIssuerUrl .Values.config.genericAuthorizationEndpoint }}
+  OIDC_GROUPS_CLAIM: {{ .Values.config.oidcGroupsClaim | quote }}
+  OIDC_GROUP_TEAM_MAPPING: {{ .Values.config.oidcGroupTeamMapping | toJson | quote }}
+  {{- end }}
   {{- if .Values.config.oidcIssuerUrl }}
   OIDC_ISSUER_URL: {{ .Values.config.oidcIssuerUrl | quote }}
   OIDC_CLIENT_ID: {{ .Values.config.oidcClientId | quote }}
   OIDC_REDIRECT_URI: {{ .Values.config.oidcRedirectUri | quote }}
   OIDC_SCOPES: {{ .Values.config.oidcScopes | quote }}
-  OIDC_GROUPS_CLAIM: {{ .Values.config.oidcGroupsClaim | quote }}
-  OIDC_GROUP_TEAM_MAPPING: {{ .Values.config.oidcGroupTeamMapping | toJson | quote }}
   {{- end }}
   {{- if .Values.config.oidcAuthorizationEndpoint }}
   OIDC_AUTHORIZATION_ENDPOINT: {{ .Values.config.oidcAuthorizationEndpoint | quote }}
   OIDC_TOKEN_ENDPOINT: {{ .Values.config.oidcTokenEndpoint | quote }}
   OIDC_JWKS_URI: {{ .Values.config.oidcJwksUri | quote }}
+  {{- end }}
+  {{- if .Values.config.genericAuthorizationEndpoint }}
+  GENERIC_CLIENT_ID: {{ .Values.config.genericClientId | quote }}
+  GENERIC_AUTHORIZATION_ENDPOINT: {{ .Values.config.genericAuthorizationEndpoint | quote }}
+  GENERIC_TOKEN_ENDPOINT: {{ .Values.config.genericTokenEndpoint | quote }}
+  GENERIC_USERINFO_ENDPOINT: {{ .Values.config.genericUserinfoEndpoint | quote }}
+  GENERIC_REDIRECT_URI: {{ .Values.config.genericRedirectUri | quote }}
+  GENERIC_SCOPE: {{ .Values.config.genericScope | quote }}
+  GENERIC_USER_ID_ATTRIBUTE: {{ .Values.config.genericUserIdAttribute | quote }}
+  GENERIC_USER_EMAIL_ATTRIBUTE: {{ .Values.config.genericUserEmailAttribute | quote }}
+  GENERIC_CLIENT_USE_PKCE: {{ .Values.config.genericClientUsePkce | quote }}
+  GENERIC_INCLUDE_CLIENT_ID: {{ .Values.config.genericIncludeClientId | quote }}
   {{- end }}
   {{- if .Values.config.keyMaxBudget }}
   KEY_MAX_BUDGET: {{ .Values.config.keyMaxBudget | quote }}

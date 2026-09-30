@@ -15,6 +15,15 @@ administrator emails/groups. When `inherit_litellm_admin` is enabled, a matching
 full LiteLLM `proxy_admin` also receives that role. Read-only, organization, and
 team administrator roles remain non-admin in LiteGate.
 
+Portal SSO supports verified OIDC ID tokens or generic OAuth with authenticated
+UserInfo. Both use `GET /api/auth/login` and `GET /api/auth/callback`; the latter
+requires an authorization `code` and browser-bound signed `state` matching its
+HttpOnly state cookie. `GET /api/auth/config` reports `sso_enabled: true` for
+either configured mode. Generic provider failures or malformed identities return
+502, an explicitly unverified email returns 403, and invalid state returns 400.
+Generic UserInfo role fields never grant administrator privileges. See
+[authentication setup](docs/authentication.md#generic-oauth-sso).
+
 Check the active identity:
 
 ```bash

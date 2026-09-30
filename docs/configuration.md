@@ -19,7 +19,7 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `jwt_expire_minutes` | `1440` | Portal-session lifetime |
 | `root_url` | `http://localhost` | Public LiteGate URL |
 | `cors_origins` | local origins | Comma-separated browser origins |
-| `oidc_issuer_url` | empty | OIDC provider; empty disables SSO |
+| `oidc_issuer_url` | empty | OIDC provider; empty disables OIDC mode |
 | `oidc_client_id` | empty | OIDC client ID |
 | `oidc_client_secret` | empty | OIDC client secret |
 | `oidc_redirect_uri` | empty | Registered callback URI |
@@ -27,7 +27,7 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `oidc_authorization_endpoint` | empty | Manual authorization endpoint; set with the token and JWKS endpoints to bypass discovery |
 | `oidc_token_endpoint` | empty | Manual token endpoint; set with the authorization and JWKS endpoints |
 | `oidc_jwks_uri` | empty | Manual signing-key endpoint; set with the authorization and token endpoints |
-| `oidc_groups_claim` | `groups` | ID-token group path; dot notation supported |
+| `oidc_groups_claim` | `groups` | Group path in the verified ID token or generic UserInfo; dot notation supported |
 | `oidc_group_team_mapping` | `{}` | SSO group to existing LiteLLM team ID or team-ID list |
 | `oidc_require_team_mapping` | `false` | Deny SSO login when no configured team matches |
 | `sso_default_team_id` | empty | Existing LiteLLM team added to every SSO user in addition to group-mapped teams |
@@ -55,6 +55,36 @@ administrator access.
 OIDC discovery is used by default. Providers that do not expose usable discovery
 metadata can instead set all three manual endpoint settings. Partial manual
 configuration is rejected at startup so login cannot silently mix modes.
+
+### Generic OAuth SSO
+
+Generic mode authenticates through the configured UserInfo endpoint using the
+access token returned by the token endpoint. Configure all five required
+credentials/endpoints and leave the OIDC issuer and manual endpoints blank.
+Incomplete or conflicting configuration is rejected at startup. Provider and
+callback URLs require HTTPS; HTTP is permitted only for localhost development.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `generic_client_id` | empty | Required OAuth client ID |
+| `generic_client_secret` | empty | Required OAuth client secret |
+| `generic_authorization_endpoint` | empty | Required authorization endpoint |
+| `generic_token_endpoint` | empty | Required token endpoint |
+| `generic_userinfo_endpoint` | empty | Required authenticated UserInfo endpoint |
+| `generic_redirect_uri` | empty | Callback override; empty uses `root_url` + `/api/auth/callback` |
+| `generic_scope` | `openid profile email` | Space-separated requested scopes |
+| `generic_user_id_attribute` | `sub` | Stable user ID field in UserInfo; dot notation supported |
+| `generic_user_email_attribute` | `email` | Email field in UserInfo; dot notation supported |
+| `generic_client_use_pkce` | `false` | Enable PKCE with S256 |
+| `generic_include_client_id` | `true` | Send client credentials in the token request body; `false` uses HTTP Basic |
+
+These settings accept their uppercase `GENERIC_*` environment equivalents,
+including LiteLLM's endpoint and user-attribute names. Environment variables
+override YAML. `generic_redirect_uri` is LiteGate's callback override, and
+`root_url` is its public base URL; LiteLLM's `PROXY_BASE_URL` is not used.
+
+See [generic SSO setup](authentication.md#generic-oauth-sso) for a YAML example,
+provider limitations, and the supported compatibility scope.
 
 ### Audit-history retention
 

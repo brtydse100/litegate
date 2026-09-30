@@ -1,3 +1,6 @@
+import base64
+import hashlib
+import hmac
 import secrets
 import time
 from urllib.parse import urlencode
@@ -65,8 +68,27 @@ async def get_provider_metadata() -> dict:
     return await get_discovery()
 
 
-def generate_state() -> str:
-    return _get_signer().dumps({"nonce": secrets.token_urlsafe(16)})
+def generate_state(flow: str = "oidc") -> str:
+    return _get_signer().dumps({"nonce": secrets.token_urlsafe(16), "flow": flow})
+
+
+def state_flow(state: str) -> str:
+    return _load_state(state).get("flow", "oidc")
+
+
+def state_pkce_verifier(state: str) -> str:
+    """Derive a secret verifier without putting it in the browser-visible state.
+
+    Use the secret that signed this state so in-flight logins survive rotation.
+    """
+    for secret in settings.jwt_verification_secrets:
+        try:
+            URLSafeTimedSerializer(secret).loads(state, max_age=600)
+        except (BadSignature, SignatureExpired):
+            continue
+        digest = hmac.new(secret.encode(), state.encode(), hashlib.sha256).digest()
+        return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+    raise BadSignature("Invalid PKCE state")
 
 
 def validate_state(state: str) -> bool:

@@ -1,6 +1,6 @@
 # Authentication and security
 
-LiteGate supports browser sessions through OpenID Connect or local accounts, and
+LiteGate supports browser sessions through OpenID Connect, generic OAuth SSO, or local accounts, and
 API access through a portal JWT, LiteLLM virtual key, or management API key.
 
 ## Local accounts
@@ -62,6 +62,75 @@ The issuer is still required for ID-token issuer validation. Manual mode keeps
 the same authorization-code flow, signed state, nonce, and token verification;
 it only replaces discovery of the provider endpoints.
 
+## Generic OAuth SSO
+
+Use this alternative when the provider exposes authorization, token, and
+UserInfo endpoints, as in LiteLLM's generic OAuth setup. LiteGate exchanges the
+authorization code, then calls UserInfo with the returned bearer access token.
+Opaque access tokens are supported. This mode does not require an issuer,
+ID token, discovery document, or JWKS endpoint.
+
+In Docker Compose's `config.yaml`, leave the OIDC issuer/manual endpoints blank
+and configure:
+
+```yaml
+root_url: "https://litegate.example.com"
+generic_client_id: "litegate"
+generic_client_secret: "replace-me"
+generic_authorization_endpoint: "https://login.example.com/authorize"
+generic_token_endpoint: "https://login.example.com/token"
+generic_userinfo_endpoint: "https://login.example.com/userinfo"
+generic_scope: "openid profile email"
+generic_user_id_attribute: "sub"
+generic_user_email_attribute: "email"
+generic_client_use_pkce: true
+```
+
+The uppercase equivalents (`GENERIC_CLIENT_ID`, `GENERIC_USERINFO_ENDPOINT`,
+`GENERIC_USER_ID_ATTRIBUTE`, etc.) override YAML. Register
+`https://litegate.example.com/api/auth/callback` with the provider. The callback
+defaults to `root_url` plus `/api/auth/callback`; use `generic_redirect_uri`
+(`GENERIC_REDIRECT_URI`) when the backend has a different public origin or when
+developing with separate frontend/backend ports.
+
+Select the user ID/email fields returned by your provider. Dotted paths such as
+`identity.employee_id` are supported. Use a unique, stable ID rather than an
+editable email address. The default ID is `sub`; set it explicitly to the same
+field used by your existing LiteLLM deployment when sharing users and keys.
+LiteLLM's default generic ID field can differ. Changing the identity field or
+OAuth client can change user IDs and produce separate LiteLLM user records.
+
+The ID must be a nonempty string. Email may be absent, in which case email-based
+administrator matching does not apply. A provided email must be a nonempty
+string; an explicitly false `email_verified` value rejects login. HTTP errors,
+malformed provider responses, and missing IDs fail login without exposing
+provider responses or credentials to the browser. HTTPS is required except on
+localhost. Endpoint redirects are not followed.
+
+Enable `generic_client_use_pkce` for providers requiring PKCE (S256). The
+verifier is derived from the signed state and its signing secret; it is never
+included in the authorization URL and survives configured signing-key rotation.
+By default the token request carries client credentials in its body. Set
+`generic_include_client_id: false` for HTTP Basic client authentication.
+
+Both modes retain browser-bound signed state, HttpOnly sessions, existing
+administrator rules, default teams, and group mappings. In generic mode,
+`oidc_groups_claim` reads groups from UserInfo. Provider-supplied role fields do
+not grant LiteGate administrative access.
+
+Google and Microsoft Entra ID can use this flow with their UserInfo endpoints
+and `openid profile email` scopes. Microsoft UserInfo may omit email and does
+not return groups/custom claims. Use LiteGate's OIDC mode for groups included in
+the ID token; resolving Microsoft group-overage claims through Graph is not
+supported. See [Google UserInfo](https://developers.google.com/identity/openid-connect/reference)
+and [Microsoft UserInfo](https://learn.microsoft.com/en-us/entra/identity-platform/userinfo).
+
+This implements the core [LiteLLM generic OAuth flow](https://docs.litellm.ai/docs/proxy/admin_ui_sso)
+and the configuration options listed above. LiteLLM custom Python SSO handlers,
+custom request headers, static state values, token-claim merging, and its role
+mapping options are not interpreted. OIDC mode continues to verify ID-token
+signatures and claims; generic mode authenticates identity through UserInfo.
+
 ## Assigning administrators
 
 SSO users receive administrator access when their email or group matches the
@@ -80,7 +149,8 @@ admin_groups: "litegate-admins"
 oidc_groups_claim: "realm_access.roles"
 ```
 
-The provider must put the desired value directly in the ID token. Configure IDs
+For OIDC, the provider must put the desired value directly in the ID token;
+for generic OAuth, it must be present in UserInfo. Configure IDs
 when the token emits group IDs. Group-overage references are not resolved by
 LiteGate, so configure the provider to include the required group. Add a
 provider-specific scope such as `groups` to `oidc_scopes` when necessary.
