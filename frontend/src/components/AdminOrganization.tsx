@@ -18,16 +18,21 @@ const money = (value: number | null) =>
 
 function treeOrder(
   groups: OrganizationGroup[],
+  expanded: Set<string>,
   parent: string | null = null,
 ): OrganizationGroup[] {
   return groups
     .filter((group) => group.parent_id === parent)
-    .flatMap((group) => [group, ...treeOrder(groups, group.id)]);
+    .flatMap((group) => [
+      group,
+      ...(expanded.has(group.id) ? treeOrder(groups, expanded, group.id) : []),
+    ]);
 }
 
 export default function AdminOrganization() {
   const today = new Date().toISOString().slice(0, 10);
   const [nodeId, setNodeId] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [page, setPage] = useState(1);
   const [metric, setMetric] = useState<UsageMetric>("spend");
   const [startDate, setStartDate] = useState(() =>
@@ -62,6 +67,23 @@ export default function AdminOrganization() {
   function selectGroup(id: string) {
     setNodeId(id);
     setPage(1);
+    setExpanded((current) => {
+      const next = new Set(current);
+      let parent = groups.find((group) => group.id === id)?.parent_id;
+      while (parent) {
+        next.add(parent);
+        parent = groups.find((group) => group.id === parent)?.parent_id;
+      }
+      return next;
+    });
+  }
+  function toggleGroup(id: string) {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
   function selectChild(name: string) {
     const child = groups.find(
@@ -134,21 +156,42 @@ export default function AdminOrganization() {
             >
               All groups<span>{overview.data?.total_users}</span>
             </button>
-            {treeOrder(groups).map((group) => (
-              <button
+            {treeOrder(groups, expanded).map((group) => (
+              <div
                 key={group.id}
-                type="button"
-                aria-label={`${group.name}, ${group.members} ${group.members === 1 ? "user" : "users"}`}
-                aria-pressed={nodeId === group.id}
-                onClick={() => selectGroup(group.id)}
-                style={{ paddingLeft: 12 + group.level * 14 }}
-                className={`flex w-full items-center justify-between gap-2 rounded-md py-2 pr-3 text-left text-sm ${nodeId === group.id ? "bg-indigo-50 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-50"}`}
+                style={{ paddingLeft: 4 + group.level * 14 }}
+                className={`flex items-center rounded-md text-sm ${nodeId === group.id ? "bg-indigo-50 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-50"}`}
               >
-                <span className="truncate" title={group.path.join(" → ")}>
-                  {group.name}
-                </span>
-                <span className="text-xs">{group.members}</span>
-              </button>
+                {groups.some((child) => child.parent_id === group.id) ? (
+                  <button
+                    type="button"
+                    aria-label={`${expanded.has(group.id) ? "Collapse" : "Expand"} ${group.path.join(" → ")}`}
+                    aria-expanded={expanded.has(group.id)}
+                    onClick={() => toggleGroup(group.id)}
+                    className="shrink-0 rounded p-1 hover:bg-slate-100 focus-visible:outline-indigo-500"
+                  >
+                    <ChevronRight
+                      size={16}
+                      aria-hidden="true"
+                      className={expanded.has(group.id) ? "rotate-90" : ""}
+                    />
+                  </button>
+                ) : (
+                  <span className="w-6 shrink-0" />
+                )}
+                <button
+                  type="button"
+                  aria-label={`${group.name}, ${group.members} ${group.members === 1 ? "user" : "users"}`}
+                  aria-pressed={nodeId === group.id}
+                  onClick={() => selectGroup(group.id)}
+                  className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md py-2 pl-1 pr-3 text-left focus-visible:outline-indigo-500"
+                >
+                  <span className="truncate" title={group.path.join(" → ")}>
+                    {group.name}
+                  </span>
+                  <span className="text-xs">{group.members}</span>
+                </button>
+              </div>
             ))}
           </nav>
         </aside>

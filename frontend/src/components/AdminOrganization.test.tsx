@@ -51,6 +51,17 @@ describe("organization dashboard contracts", () => {
     const navigation = await screen.findByRole("navigation", {
       name: "Organization groups",
     });
+    expect(
+      within(navigation).queryByRole("button", { name: "Platform, 1 user" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      within(navigation).getByRole("button", { name: "Expand Engineering" }),
+    );
+    fireEvent.click(
+      within(navigation).getByRole("button", {
+        name: "Expand Engineering → Infrastructure",
+      }),
+    );
     fireEvent.click(
       within(navigation).getByRole("button", { name: "Platform, 1 user" }),
     );
@@ -76,6 +87,14 @@ describe("organization dashboard contracts", () => {
     expect(
       await screen.findByRole("img", { name: "Spend (USD) over time" }),
     ).toBeVisible();
+    fireEvent.click(
+      within(navigation).getByRole("button", { name: "Collapse Engineering" }),
+    );
+    expect(
+      within(navigation).queryByRole("button", { name: "Platform, 1 user" }),
+    ).not.toBeInTheDocument();
+    expect(within(policy).getByText("$100.00")).toBeVisible();
+    expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1);
   });
 
   it("shows inherited allowance and switches the plotted metric", async () => {
@@ -84,9 +103,26 @@ describe("organization dashboard contracts", () => {
       name: "Organization groups",
     });
     fireEvent.click(
-      within(navigation).getByRole("button", { name: "Cloud, 1 user" }),
+      await screen.findByRole("button", { name: "Select Engineering" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Infrastructure" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Cloud" }),
     );
     expect(await screen.findByText("Inherited from Engineering")).toBeVisible();
+    expect(
+      within(navigation).getByRole("button", { name: "Cloud, 1 user" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(navigation).getByRole("button", { name: "Collapse Engineering" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(
+      within(navigation).getByRole("button", {
+        name: "Collapse Engineering → Infrastructure",
+      }),
+    ).toHaveAttribute("aria-expanded", "true");
     fireEvent.change(screen.getByRole("combobox", { name: "Chart metric" }), {
       target: { value: "tokens" },
     });

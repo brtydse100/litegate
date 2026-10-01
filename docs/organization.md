@@ -138,6 +138,11 @@ inspect effective allowances and current-cycle spend, and compare daily spend,
 tokens, logged requests, groups, and models. Ordinary users and LiteLLM-key
 identities cannot access administrative organization reports.
 
+Parent groups start collapsed. Use the arrow beside a parent to show or hide its
+children, and select a group name to filter the dashboard. Collapsing a parent
+keeps the current filter; selecting a group through a chart expands its ancestors
+in the navigation.
+
 Charts use UTC daily aggregates, bounded concurrency, and a short process-local
 cache. A report supports at most 90 days between dates and 500 users; select a
 smaller group when necessary. Each user's analytics fetch follows up to 20

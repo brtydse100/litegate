@@ -8,6 +8,18 @@ test("organization demo filters usage and protects the admin view", async ({
   const navigation = page.getByRole("navigation", {
     name: "Organization groups",
   });
+  await expect(
+    navigation.getByRole("button", { name: /^Platform,/ }),
+  ).toHaveCount(0);
+  await navigation
+    .getByRole("button", { name: "Expand Engineering", exact: true })
+    .click();
+  await navigation
+    .getByRole("button", {
+      name: "Expand Engineering → Infrastructure",
+      exact: true,
+    })
+    .click();
   await navigation.getByRole("button", { name: /^Platform,/ }).click();
   const policy = page.getByRole("region", { name: "Effective budget policy" });
   await expect(policy.getByText("$100.00", { exact: false })).toBeVisible();
@@ -19,6 +31,16 @@ test("organization demo filters usage and protects the admin view", async ({
   await expect(
     page.getByRole("img", { name: "Tokens over time" }),
   ).toBeVisible();
+  await navigation
+    .getByRole("button", { name: "Collapse Engineering", exact: true })
+    .click();
+  await expect(
+    navigation.getByRole("button", { name: /^Platform,/ }),
+  ).toHaveCount(0);
+  await expect(policy.getByText("$100.00", { exact: false })).toBeVisible();
+  await navigation
+    .getByRole("button", { name: "Expand Engineering", exact: true })
+    .click();
   await navigation.getByRole("button", { name: /^Cloud,/ }).click();
   await expect(page.getByText("Inherited from Engineering")).toBeVisible();
   await expect(policy.getByText("$50.00", { exact: false })).toBeVisible();
