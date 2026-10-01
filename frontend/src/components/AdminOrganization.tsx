@@ -168,7 +168,7 @@ export default function AdminOrganization() {
           {selected && (
             <section
               aria-label="Effective budget policy"
-              className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4"
+              className="rounded-lg border border-indigo-100 bg-indigo-50 p-4"
             >
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
