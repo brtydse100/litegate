@@ -59,8 +59,16 @@ async def remember(user_id: str, email: str, source: str, groups: list[str]) -> 
     node = await record_identity(user_id, email, source, groups)
     if node is None:
         return None
+    return await synchronize_user(user_id)
+
+
+async def synchronize_user(user_id: str) -> OrganizationNode | None:
+    """Finish provisioning from current stored claims without rewriting them."""
+    if not settings.organization_hierarchy.levels:
+        return None
     async with lock_for("user", user_id):
-        return await synchronize(await asyncio.to_thread(store.get, user_id))
+        identity = await asyncio.to_thread(store.get, user_id)
+        return await synchronize(identity) if identity else None
 
 
 async def sync_root(node: OrganizationNode) -> dict:

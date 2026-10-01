@@ -125,7 +125,7 @@ async def callback(
     provisioned_user = await llm.ensure_user_exists(user_id, email)
     if provisioned_user is None and (node or team_ids or settings.oidc_require_team_mapping or settings.inherit_litellm_admin):
         raise HTTPException(status_code=502, detail="Could not provision the LiteLLM user")
-    node = await organization_sync.remember(user_id, email, "sso", settings.oidc_groups(claims))
+    node = await organization_sync.synchronize_user(user_id)
     if node:
         team_ids = [node.team_id, *[team for team in team_ids if team != node.team_id]]
     if team_ids:

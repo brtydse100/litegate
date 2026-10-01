@@ -187,3 +187,46 @@ async def test_verified_membership_rejection_blocks_key_creation_with_an_existin
         assert store.get("u")["sync_error"]
         assert (await browser.post(path)).status_code == 403
     generate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_an_older_inflight_login_cannot_restore_removed_verified_groups(monkeypatch):
+    store.remember("u", "u@example.com", "sso", ["squad1"])
+    store.synced("u", "engineering", {})
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def provision(*args):
+        entered.set()
+        await release.wait()
+        return {}
+
+    monkeypatch.setattr(litellm, "ensure_user_exists", provision)
+    monkeypatch.setattr(oidc, "exchange_code", AsyncMock(return_value={"id_token": "verified-token"}))
+    monkeypatch.setattr(
+        oidc,
+        "verify_id_token",
+        AsyncMock(
+            side_effect=[
+                {"sub": "u", "email": "u@example.com", "groups": ["squad1"]},
+                {"sub": "u", "email": "u@example.com", "groups": []},
+            ]
+        ),
+    )
+    upstream_sync = AsyncMock(return_value={})
+    monkeypatch.setattr(upstream, "sync_root", upstream_sync)
+    first_state, second_state = oidc.generate_state(), oidc.generate_state()
+    async with client() as first, client() as second:
+        first.cookies.set("litegate_oidc_state", first_state, path="/api/auth")
+        second.cookies.set("litegate_oidc_state", second_state, path="/api/auth")
+        earlier = asyncio.create_task(first.get("/api/auth/callback", params={"state": first_state, "code": "earlier"}))
+        try:
+            await asyncio.wait_for(entered.wait(), 2)
+            rejected = await second.get("/api/auth/callback", params={"state": second_state, "code": "later"})
+            assert rejected.status_code == 403
+            release.set()
+            assert (await earlier).status_code == 403
+            assert store.get("u")["groups"] == []
+        finally:
+            release.set()
+            await earlier
+    upstream_sync.assert_not_awaited()
