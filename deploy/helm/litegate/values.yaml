@@ -1,3 +1,14 @@
+# Complete reference and chart defaults. Copy this file to your own values.yaml,
+# then remove optional settings you do not need to override.
+# Pass your copy with --values; Helm fills omitted settings from this file.
+# Keep this bundled file intact so the chart retains its defaults.
+# Empty strings and false are explicit overrides; omit a key to use its default.
+# Replace credential placeholders and choose a login method before deploying.
+
+# Optional overrides for the application name and full Kubernetes resource name.
+nameOverride: ""
+fullnameOverride: ""
+
 # LiteGate uses SQLite and process-local operation limits, so one replica is required.
 replicaCount: 1
 
@@ -97,6 +108,9 @@ config:
 
   # False permits valid SSO users without a group mapping. True rejects them.
   ssoRequireTeamMapping: false
+  # Deprecated compatibility option; prefer ssoRequireTeamMapping.
+  # If either option is true, team mapping remains required.
+  # oidcRequireTeamMapping: false
   # Existing team added to every SSO user in addition to group-mapped teams.
   # A group-mapped team is primary; otherwise this team is primary.
   ssoDefaultTeamId: ""
@@ -112,6 +126,10 @@ config:
   localAuthUsername: "admin"
   localAuthPassword: "changeme"
   localUsersEnabled: true
+
+  # -- Management API ---------------------------------------------------------
+  # Optional administrator credential for /api/v1; blank disables this credential.
+  managementApiKey: ""
 
   # -- Local database and audit history --------------------------------------
   localUsersDbPath: "/app/backend/data/litegate.db"
