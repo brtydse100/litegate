@@ -185,6 +185,50 @@ docker push your-registry.io/litegate:2.6.1
 
 ### Step 2 — Install
 
+The bundled [`values.yaml`](deploy/helm/litegate/values.yaml) is the complete
+reference and contains the chart defaults. Copy it to your own `values.yaml`
+outside the chart directory, replace the deployment-specific values, and delete
+any optional settings you do not need to override. Keep the bundled file intact.
+Helm merges your file with the chart defaults, including nested settings.
+
+For example, this small file uses mock credentials and local administrator login:
+
+```yaml
+config:
+  litellmUrl: "http://litellm-svc:4000"
+  litellmMasterKey: "sk-mock-replace-me"
+  jwtSecret: "mock-session-secret-at-least-32-characters"
+  rootUrl: "https://portal.example.com"
+  localAuthUsername: "portal-admin"
+  localAuthPassword: "mock-password-replace-me"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: portal.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+Install or upgrade using your file:
+
+```bash
+helm upgrade --install litegate ./deploy/helm/litegate --values values.yaml
+```
+
+Omitted options retain their bundled defaults: one replica, the pinned release
+image, a ClusterIP Service on port 80, non-root security contexts, and a 1 Gi PVC.
+Omitting a setting restores its default rather than disabling it. To disable
+the bootstrap administrator when using SSO, explicitly set
+`config.localAuthUsername: ""` and `config.localAuthPassword: ""`; removing those
+keys would retain the bundled bootstrap credentials. Use explicit `false` or
+empty strings for other settings you want to disable. Delete unused keys or
+whole sections rather than leaving them as YAML `null` values. Lists such as
+`ingress.hosts` replace the default list, so include their required nested fields.
+
+You can also supply individual overrides with `--set`:
+
 ```bash
 helm install litegate ./deploy/helm/litegate \
   --set image.repository=your-registry.io/litegate \
@@ -204,8 +248,12 @@ helm install litegate ./deploy/helm/litegate \
 ### Step 3 — Upgrade after changes
 
 ```bash
-helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.10.0
+helm upgrade litegate ./deploy/helm/litegate --values values.yaml
 ```
+
+Keep your custom file as the source of your overrides on upgrades. Avoid
+`--reuse-values` when you want deleted settings to return to chart defaults,
+because it retains overrides from the previous release.
 
 ### SSO roles and LiteLLM teams in Helm
 
@@ -251,9 +299,10 @@ promote a matching full LiteLLM `proxy_admin`; read-only, organization, and team
 administrator roles are deliberately not promoted.
 
 For upgrade compatibility, the chart still accepts the deprecated
-`config.oidcRequireTeamMapping` and `config.managementApiKey` fields even though
-they are not shown in the default values file. If either the old or new
-team-mapping field is `true`, mapping remains required so conflicting upgrade
+`config.oidcRequireTeamMapping` field, shown as a commented option in the
+reference values file. The optional `config.managementApiKey` field supplies
+an administrator credential for `/api/v1` and defaults to empty. If either the
+old or new team-mapping field is `true`, mapping remains required so conflicting upgrade
 values cannot weaken login restrictions. Migrate to
 `config.ssoRequireTeamMapping`, then remove the old field.
 
