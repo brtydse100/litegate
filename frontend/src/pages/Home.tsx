@@ -13,6 +13,7 @@ import {
   Gauge,
   KeyRound,
   LogOut,
+  Network,
   RefreshCw,
   Shield,
   Ticket,
@@ -25,6 +26,7 @@ import { keyToken } from "../components/BulkKeyEditor";
 import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
 import AdminTeams from "../components/AdminTeams";
+import AdminOrganization from "../components/AdminOrganization";
 import ThemeToggle from "../components/ThemeToggle";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
@@ -124,16 +126,22 @@ function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
       </div>
       <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
         <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">Spend</dt>
+          <dt className="text-xs text-slate-500">
+            {keyInfo.organization_path ? "User spend" : "Spend"}
+          </dt>
           <dd className="mt-1 font-semibold text-slate-950">
-            ${keyInfo.spend.toFixed(4)}
+            ${(keyInfo.user_spend ?? keyInfo.spend).toFixed(4)}
           </dd>
         </div>
         <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">Budget</dt>
+          <dt className="text-xs text-slate-500">
+            {keyInfo.organization_path ? "User budget" : "Budget"}
+          </dt>
           <dd className="mt-1 font-semibold text-slate-950">
-            {keyInfo.max_budget != null
-              ? `$${keyInfo.max_budget}`
+            {(keyInfo.organization_path
+              ? keyInfo.user_budget
+              : keyInfo.max_budget) != null
+              ? `$${keyInfo.organization_path ? keyInfo.user_budget : keyInfo.max_budget}`
               : "Unlimited"}
           </dd>
         </div>
@@ -156,7 +164,9 @@ function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
         <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
           <Building2 size={13} />
           Assigned through{" "}
-          <span className="font-medium text-slate-800">{keyInfo.team_id}</span>
+          <span className="font-medium text-slate-800">
+            {keyInfo.organization_path?.join(" → ") ?? keyInfo.team_id}
+          </span>
         </div>
       )}
     </article>
@@ -344,6 +354,7 @@ export default function Home() {
     "/keys",
     ...(localUsersEnabled ? ["/users"] : []),
     "/teams",
+    "/organization",
     "/status",
   ]);
   if (location.pathname === "/") return <Navigate to="/my-key" replace />;
@@ -359,6 +370,7 @@ export default function Home() {
     "/keys": "Key policies",
     "/users": "Local users",
     "/teams": "Teams",
+    "/organization": "Organization",
     "/status": "System status",
   };
   const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -376,6 +388,7 @@ export default function Home() {
             ? [{ to: "/users", label: "Local users", icon: Users }]
             : []),
           { to: "/teams", label: "Teams", icon: Building2 },
+          { to: "/organization", label: "Organization", icon: Network },
           { to: "/status", label: "Status", icon: Activity },
         ]
       : []),
@@ -417,6 +430,9 @@ export default function Home() {
                     )}
                     <NavLink to="/teams" className={navClass}>
                       <Building2 size={16} /> Teams
+                    </NavLink>
+                    <NavLink to="/organization" className={navClass}>
+                      <Network size={16} /> Organization
                     </NavLink>
                   </div>
                 </div>
@@ -530,6 +546,8 @@ export default function Home() {
           <div className="mx-auto w-full max-w-6xl">
             {section === "/users" && isAdmin ? (
               <AdminUsers />
+            ) : section === "/organization" && isAdmin ? (
+              <AdminOrganization />
             ) : section === "/teams" && isAdmin ? (
               <AdminTeams />
             ) : section === "/keys" && isAdmin ? (

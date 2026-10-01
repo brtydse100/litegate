@@ -6,6 +6,8 @@ from uuid import uuid4
 import pytest
 
 from app.services import litellm
+from app.organization import OrganizationHierarchy
+from app.services import organization_client as organization
 
 
 pytestmark = pytest.mark.skipif(
@@ -76,4 +78,61 @@ async def test_user_team_and_key_contracts_against_litellm():
         if key:
             await litellm.delete_key(key)
         if team_created and await litellm.get_team(team_id):
+            await litellm.delete_team(team_id)
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.environ.get("RUN_LITELLM_ORGANIZATION_INTEGRATION") != "1", reason="requires current LiteLLM Enterprise organization contracts"
+)
+async def test_managed_user_allowance_and_rotation_preserve_the_budget_window():
+    suffix = uuid4().hex[:12]
+    user_id, team_id = f"organization-{suffix}", f"organization-team-{suffix}"
+    tree = OrganizationHierarchy.model_validate(
+        {
+            "levels": [
+                {
+                    "name": "Group",
+                    "groups": [
+                        {
+                            "members": [
+                                {"name": "Engineering", "litellmTeamId": team_id, "budget": {"perUser": 50, "groupTotal": 5000, "duration": "30d"}}
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+    root = tree.roots[0]
+    keys = []
+    try:
+        await litellm.create_user(user_id, f"{user_id}@example.invalid")
+        info = await organization.sync_root(root)
+        await organization.sync_member(root, user_id, info)
+        first = organization.membership(await organization.team_info(team_id), user_id)
+        first_budget = first["litellm_budget_table"]
+        assert first_budget["max_budget"] == 50
+        assert first_budget["budget_duration"] == "30d"
+        assert first_budget["budget_reset_at"]
+        generated = await organization.generate_key(user_id, "", team_id)
+        keys.append(generated["key"])
+        await litellm.delete_key(keys.pop())
+        replacement = await organization.generate_key(user_id, "", team_id)
+        keys.append(replacement["key"])
+        rotated = organization.membership(await organization.team_info(team_id), user_id)
+        assert rotated["spend"] == first["spend"]
+        assert rotated["litellm_budget_table"]["budget_reset_at"] == first_budget["budget_reset_at"]
+        root.member.budget.perUser = 100
+        tree = OrganizationHierarchy.model_validate(tree.model_dump(exclude_unset=True))
+        updated_root = tree.roots[0]
+        await organization.sync_member(updated_root, user_id, await organization.team_info(team_id))
+        changed = organization.membership(await organization.team_info(team_id), user_id)
+        assert changed["litellm_budget_table"]["max_budget"] == 100
+        assert changed["litellm_budget_table"]["budget_reset_at"] == first_budget["budget_reset_at"]
+        assert changed["spend"] == first["spend"]
+    finally:
+        for key in keys:
+            await litellm.delete_key(key)
+        if await litellm.get_team(team_id):
             await litellm.delete_team(team_id)

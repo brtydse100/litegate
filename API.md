@@ -1,5 +1,27 @@
 # LiteGate API v1
 
+## Organization reporting
+
+- `GET /api/v1/organization`: configured levels/groups, effective allowances,
+  shared cycle spend, member counts, and synchronization issues. When disabled,
+  returns `enabled: false`.
+- `GET /api/v1/organization/users?node=<id>&page=1&page_size=25`: paginated users,
+  current paths, allowances, and member-cycle spend. Page size is at most 100.
+- `GET /api/v1/organization/usage?node=<id>&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`:
+  daily/group/model spend, tokens, and logged requests. Defaults to 30 days through
+  today. Supports up to 90 days between UTC dates and 500 users per report.
+
+Omit `node` for all mapped users. These read-only routes require an administrator
+portal session or management credential; ordinary users and LiteLLM-key identities
+receive `403`. Unknown nodes receive `404`, invalid ranges `422`, and upstream
+failures return an error without partial totals. Reports use current membership.
+
+Helm-managed team budget changes, deletion, and member moves receive `409`.
+Bulk-key budget or team changes report per-item failures for managed keys.
+Personal `/api/keys` responses can add `user_budget`, `user_spend`, and
+`organization_path`, describing the member allowance and current-cycle spend
+separately from key counters. See [Organization hierarchy](docs/organization.md).
+
 Interactive OpenAPI documentation is available at `/api/docs` on every LiteGate deployment. All v1 routes are under `/api/v1`.
 
 ## Authentication
