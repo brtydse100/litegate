@@ -7,6 +7,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-10-01
+
+### Changed
+
+- Helm deployment documentation includes a minimal values example and explains
+  defaults, explicit disabling, list replacement, and upgrades without retaining
+  removed overrides.
+- The bundled Helm values reference includes name overrides, the optional
+  management API credential, and the deprecated team-mapping alias.
+
 ## [2.12.0] - 2026-09-30
 
 ### Added
