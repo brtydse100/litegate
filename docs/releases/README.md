@@ -6,6 +6,7 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.12.1](v2.12.1.md) | Minimal Helm values documentation and complete defaults reference |
 | [2.12.0](v2.12.0.md) | Generic OAuth SSO with UserInfo, YAML configuration, and consistent release notes |
 | [2.11.0](v2.11.0.md) | Optional API key reveal, flexible Helm/OIDC configuration, and ordered release publication |
 | [2.10.0](v2.10.0.md) | Portable container exports, extensible Helm storage, and resilient SSO login |

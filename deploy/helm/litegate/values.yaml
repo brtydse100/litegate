@@ -29,7 +29,7 @@ securityContext:
 
 image:
   repository: ghcr.io/brtydse100/litegate
-  tag: "2.12.0"  # Pin a specific tag in production.
+  tag: "2.12.1"  # Pin a specific tag in production.
   pullPolicy: IfNotPresent
 
 service:
