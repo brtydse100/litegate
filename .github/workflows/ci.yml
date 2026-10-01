@@ -111,6 +111,7 @@ jobs:
         working-directory: backend
         env:
           RUN_LITELLM_INTEGRATION: "1"
+          RUN_LITELLM_ORGANIZATION_INTEGRATION: "1"
           LITELLM_URL: http://127.0.0.1:4000
           LITELLM_MASTER_KEY: sk-litegate-integration-master
           JWT_SECRET: litegate-integration-jwt-secret-at-least-32-characters

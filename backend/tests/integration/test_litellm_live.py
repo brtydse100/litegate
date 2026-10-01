@@ -82,9 +82,7 @@ async def test_user_team_and_key_contracts_against_litellm():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.environ.get("RUN_LITELLM_ORGANIZATION_INTEGRATION") != "1", reason="requires current LiteLLM Enterprise organization contracts"
-)
+@pytest.mark.skipif(os.environ.get("RUN_LITELLM_ORGANIZATION_INTEGRATION") != "1", reason="requires current LiteLLM member-budget contracts")
 async def test_managed_user_allowance_and_rotation_preserve_the_budget_window():
     suffix = uuid4().hex[:12]
     user_id, team_id = f"organization-{suffix}", f"organization-team-{suffix}"

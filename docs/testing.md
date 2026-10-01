@@ -46,7 +46,7 @@ boundaries, synchronization ordering, and complete usage totals. The chart has
 rendering tests in `scripts/test_organization_helm.py`; the public demo browser
 flow checks group filtering, allowance overrides, charts, and user restrictions.
 
-The current Enterprise budget contract can be exercised against a disposable
+The current budget management contract can be exercised against a disposable
 LiteLLM instance with a database. Set `LITELLM_URL`, `LITELLM_MASTER_KEY`, and
 `JWT_SECRET`, then run from `backend`:
 
@@ -58,6 +58,7 @@ RUN_LITELLM_INTEGRATION=1 RUN_LITELLM_ORGANIZATION_INTEGRATION=1 \
 This creates temporary test users, teams, and keys. It checks applied member
 budgets and verifies that key replacement and allowance changes preserve the
 member's spend and reset window. Teams and keys are removed afterward; test users
-remain for inspection. Use a current Enterprise deployment; the ordinary pinned
-CI integration stack does not opt into this version-specific test or require a
-license. Never run this against a production proxy.
+remain for inspection. The pinned CI stack also runs this management contract;
+it checks budget persistence and reset windows without requiring a license.
+Enterprise request enforcement and analytics access still require validation on
+a licensed deployment. Never run this against a production proxy.
