@@ -138,3 +138,84 @@ async def test_ignored_root_budget_writes_are_visible_even_when_team_is_readable
     result = await reports.overview()
     assert result["groups"][0]["group_spend"] == 4
     assert "differs" in result["groups"][0]["sync_error"]
+
+
+@pytest.mark.asyncio
+async def test_paginated_daily_records_combine_the_same_day_and_model_without_losing_totals(monkeypatch, setup):
+    day = datetime.now(timezone.utc).date()
+    fetch = AsyncMock(
+        side_effect=[
+            {"results": [row(day, 10)], "metadata": {"page": 1, "total_pages": 2, "has_more": True}},
+            {"results": [row(day, 5)], "metadata": {"page": 2, "total_pages": 2, "has_more": False}},
+        ]
+    )
+    monkeypatch.setattr(upstream, "request", fetch)
+    node = setup.resolve("alice", ["squad1"])
+    result = await reports.usage(node.id, day, day)
+    assert result["totals"] == {"spend": 15, "tokens": 200, "requests": 4}
+    assert result["daily"][0]["spend"] == 15
+    assert result["by_model"][0]["spend"] == 15
+    assert [call.kwargs["params"]["page"] for call in fetch.call_args_list] == [1, 2]
+    await reports.usage(node.id, day, day)
+    assert fetch.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_a_later_page_failure_never_caches_or_returns_partial_data(monkeypatch, setup):
+    day = datetime.now(timezone.utc).date()
+    fetch = AsyncMock(
+        side_effect=[
+            {"results": [row(day, 10)], "metadata": {"page": 1, "total_pages": 2, "has_more": True}},
+            HTTPException(status_code=502, detail="Page two failed"),
+        ]
+    )
+    monkeypatch.setattr(upstream, "request", fetch)
+    node = setup.resolve("alice", ["squad1"])
+    with pytest.raises(HTTPException, match="Page two failed"):
+        await reports.usage(node.id, day, day)
+    assert reports._usage_cache == {}
+
+
+@pytest.mark.asyncio
+async def test_pagination_is_bounded_and_ignored_page_parameters_are_rejected(monkeypatch):
+    fetch = AsyncMock(return_value={"results": [], "metadata": {"total_pages": 21}})
+    monkeypatch.setattr(upstream, "request", fetch)
+    with pytest.raises(HTTPException) as exc:
+        await upstream.daily_usage("alice", "2026-09-01", "2026-09-02")
+    assert exc.value.status_code == 422
+    assert fetch.await_count == 1
+    fetch.side_effect = [
+        {"results": [{"date": "2026-09-01"}], "metadata": {"page": 1, "total_pages": 2}},
+        {"results": [{"date": "2026-09-01"}], "metadata": {"page": 1, "total_pages": 2}},
+    ]
+    with pytest.raises(HTTPException) as exc:
+        await upstream.daily_usage("alice", "2026-09-01", "2026-09-02")
+    assert exc.value.status_code == 502
+
+
+@pytest.mark.asyncio
+async def test_has_more_without_a_page_count_is_supported_but_cannot_loop_forever(monkeypatch):
+    fetch = AsyncMock(return_value={"results": [{"date": "2026-09-01"}], "metadata": {"has_more": True}})
+    monkeypatch.setattr(upstream, "request", fetch)
+    with pytest.raises(HTTPException) as exc:
+        await upstream.daily_usage("alice", "2026-09-01", "2026-09-02")
+    assert exc.value.status_code == 422
+    assert fetch.await_count == 20
+    fetch.reset_mock()
+    fetch.side_effect = [
+        {"results": [{"date": "2026-09-01"}], "metadata": {"has_more": True}},
+        {"results": [{"date": "2026-09-01"}], "metadata": {"has_more": False}},
+    ]
+    assert len(await upstream.daily_usage("alice", "2026-09-01", "2026-09-02")) == 2
+    assert fetch.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_report_deadline_is_an_explicit_error_and_leaves_the_cache_empty(monkeypatch, setup):
+    monkeypatch.setattr(upstream, "request", AsyncMock(side_effect=TimeoutError))
+    day = datetime.now(timezone.utc).date()
+    node = setup.resolve("alice", ["squad1"])
+    with pytest.raises(HTTPException) as exc:
+        await reports.usage(node.id, day, day)
+    assert exc.value.status_code == 504
+    assert reports._usage_cache == {}

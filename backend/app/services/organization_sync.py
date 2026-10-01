@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from weakref import WeakValueDictionary
 
 from fastapi import HTTPException
 
@@ -12,7 +13,16 @@ from app.services import audit, litellm
 from app.services import organization_client as upstream, organization_store as store
 
 _logger = logging.getLogger(__name__)
-_lock = asyncio.Lock()
+_locks: WeakValueDictionary[tuple[str, str], asyncio.Lock] = WeakValueDictionary()
+
+
+def lock_for(kind: str, identifier: str) -> asyncio.Lock:
+    key = (kind, identifier)
+    lock = _locks.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _locks[key] = lock
+    return lock
 
 
 def resolve(user_id: str, groups: list[str]) -> OrganizationNode | None:
@@ -26,18 +36,37 @@ def policy(node: OrganizationNode) -> dict:
     return {"node_id": node.id, "per_user": node.per_user, "duration": node.duration}
 
 
-async def remember(user_id: str, email: str, source: str, groups: list[str]) -> OrganizationNode | None:
+async def record_identity(user_id: str, email: str, source: str, groups: list[str]) -> OrganizationNode | None:
+    """Persist verified claims even when they invalidate an existing membership."""
     if not settings.organization_hierarchy.levels:
         return None
-    node = resolve(user_id, groups)
-    previous = await asyncio.to_thread(store.get, user_id)
-    if node is None and previous and previous.get("team_id"):
-        raise HTTPException(status_code=403, detail="Your managed organization mapping was removed; contact an administrator")
-    if node is not None:
-        await asyncio.to_thread(store.remember, user_id, email, source, groups)
-        async with _lock:
-            await synchronize(await asyncio.to_thread(store.get, user_id))
-    return node
+    async with lock_for("user", user_id):
+        previous = await asyncio.to_thread(store.get, user_id)
+        try:
+            node = resolve(user_id, groups)
+            if node is not None or previous:
+                await asyncio.to_thread(store.remember, user_id, email, source, groups)
+            if node is None and previous:
+                raise HTTPException(status_code=403, detail="Your managed organization mapping was removed; contact an administrator")
+        except HTTPException as exc:
+            await asyncio.to_thread(store.remember, user_id, email, source, groups)
+            await asyncio.to_thread(store.failed, user_id, str(exc.detail))
+            raise
+        return node
+
+
+async def remember(user_id: str, email: str, source: str, groups: list[str]) -> OrganizationNode | None:
+    node = await record_identity(user_id, email, source, groups)
+    if node is None:
+        return None
+    async with lock_for("user", user_id):
+        return await synchronize(await asyncio.to_thread(store.get, user_id))
+
+
+async def sync_root(node: OrganizationNode) -> dict:
+    root = next(root for root in settings.organization_hierarchy.roots if root.team_id == node.team_id)
+    async with lock_for("team", root.team_id):
+        return await upstream.sync_root(root)
 
 
 async def synchronize(identity: dict) -> OrganizationNode:
@@ -45,8 +74,7 @@ async def synchronize(identity: dict) -> OrganizationNode:
         node = resolve(identity["user_id"], identity["groups"])
         if node is None:
             raise HTTPException(status_code=403, detail="Your organization mapping is no longer valid")
-        root = next(root for root in settings.organization_hierarchy.roots if root.team_id == node.team_id)
-        return await sync_identity(identity, await upstream.sync_root(root))
+        return await sync_identity(identity, await sync_root(node))
     except HTTPException as exc:
         await asyncio.to_thread(store.failed, identity["user_id"], str(exc.detail))
         raise
@@ -99,55 +127,66 @@ async def prepare_user(user_id: str, email: str) -> OrganizationNode | None:
         return None
     identity = await asyncio.to_thread(store.get, user_id)
     if identity is None:
-        return await remember(user_id, email, "explicit", [])
+        node = resolve(user_id, [])
+        if node is None:
+            return None
+        await asyncio.to_thread(store.remember, user_id, email, "explicit", [])
+        identity = await asyncio.to_thread(store.get, user_id)
     node = resolve(user_id, identity["groups"])
     if node is None:
         raise HTTPException(status_code=403, detail="Your organization mapping is no longer valid")
-    async with _lock:
-        return await synchronize(identity)
+    return await synchronize(identity)
 
 
 async def generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
-    node = await prepare_user(user_id, email)
-    if node is None:
-        return await litellm.generate_key(user_id, email, team_id, **options)
-    return await upstream.generate_key(user_id, email, node.team_id, **options)
+    async with lock_for("user", user_id):
+        node = await prepare_user(user_id, email)
+        if node is None:
+            return await litellm.generate_key(user_id, email, team_id, **options)
+        return await upstream.generate_key(user_id, email, node.team_id, **options)
 
 
 async def reconcile() -> None:
     if not settings.organization_hierarchy.levels:
         return
-    async with _lock:
-        identities = await asyncio.to_thread(store.list_identities)
-        known = {identity["user_id"] for identity in identities}
-        for node in settings.organization_hierarchy.nodes.values():
-            for user_id in node.member.userIds:
-                if user_id not in known:
-                    existing = await litellm.get_user(user_id)
-                    if existing:
-                        user = existing.get("user_info", existing)
-                        await asyncio.to_thread(store.remember, user_id, user.get("user_email") or "", "explicit", [])
-                        known.add(user_id)
-        identities = await asyncio.to_thread(store.list_identities)
-        infos: dict[str, dict] = {}
-        for root in settings.organization_hierarchy.roots:
+    identities = await asyncio.to_thread(store.list_identities)
+    known = {identity["user_id"] for identity in identities}
+    for node in settings.organization_hierarchy.nodes.values():
+        for user_id in node.member.userIds:
+            if user_id not in known:
+                async with lock_for("user", user_id):
+                    if await asyncio.to_thread(store.get, user_id) is None:
+                        existing = await litellm.get_user(user_id)
+                        if existing:
+                            user = existing.get("user_info", existing)
+                            await asyncio.to_thread(store.remember, user_id, user.get("user_email") or "", "explicit", [])
+                known.add(user_id)
+    identities = await asyncio.to_thread(store.list_identities)
+    ready: set[str] = set()
+    semaphore = asyncio.Semaphore(5)
+
+    async def prepare_root(root):
+        async with semaphore:
             try:
-                infos[root.team_id] = await upstream.sync_root(root)
+                await sync_root(root)
+                ready.add(root.team_id)
             except HTTPException as exc:
                 _logger.warning("Organization root %s synchronization failed: %s", root.team_id, exc.detail)
-        semaphore = asyncio.Semaphore(5)
 
-        async def sync_one(identity: dict):
-            async with semaphore:
-                try:
-                    node = resolve(identity["user_id"], identity["groups"])
-                    if node is None or node.team_id not in infos:
-                        raise HTTPException(status_code=409, detail="Organization mapping or its LiteLLM team is unavailable")
-                    await sync_identity(identity, infos[node.team_id])
-                except HTTPException as exc:
-                    await asyncio.to_thread(store.failed, identity["user_id"], str(exc.detail))
+    await asyncio.gather(*(prepare_root(root) for root in settings.organization_hierarchy.roots))
 
-        await asyncio.gather(*(sync_one(identity) for identity in identities))
+    async def sync_one(user_id: str):
+        async with semaphore, lock_for("user", user_id):
+            try:
+                identity = await asyncio.to_thread(store.get, user_id)
+                node = resolve(user_id, identity["groups"])
+                if node is None or node.team_id not in ready:
+                    raise HTTPException(status_code=409, detail="Organization mapping or its LiteLLM team is unavailable")
+                await sync_identity(identity, await upstream.team_info(node.team_id))
+            except HTTPException as exc:
+                await asyncio.to_thread(store.failed, user_id, str(exc.detail))
+
+    await asyncio.gather(*(sync_one(identity["user_id"]) for identity in identities))
 
 
 async def run_reconciliation() -> None:

@@ -24,7 +24,7 @@ def setup(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "admin_groups", "")
     monkeypatch.setattr(settings, "management_api_key", "test-management-key")
     monkeypatch.setattr(settings, "inherit_litellm_admin", False)
-    monkeypatch.setattr(sync, "_lock", asyncio.Lock())
+    sync._locks.clear()
     _key_ops.clear()
     _login_failures.clear()
     local_users.init_db()
@@ -162,3 +162,28 @@ async def test_bulk_policy_updates_report_managed_key_failure(monkeypatch):
     assert response.json()["failed"] == 1
     assert "organizationHierarchy" in response.json()["results"][0]["error"]
     update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("groups", [[], ["squad1", "squad2"]])
+@pytest.mark.parametrize("require_mapping", [False, True])
+@pytest.mark.parametrize("path", ["/api/keys", "/api/keys/regenerate", "/api/v1/keys"])
+async def test_verified_membership_rejection_blocks_key_creation_with_an_existing_session(monkeypatch, groups, require_mapping, path):
+    store.remember("u", "u@example.com", "sso", ["squad1"])
+    store.synced("u", "engineering", {})
+    monkeypatch.setattr(settings, "oidc_require_team_mapping", require_mapping)
+    monkeypatch.setattr(oidc, "exchange_code", AsyncMock(return_value={"id_token": "verified-token"}))
+    monkeypatch.setattr(oidc, "verify_id_token", AsyncMock(return_value={"sub": "u", "email": "u@example.com", "groups": groups}))
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
+    generate = AsyncMock(return_value={"key": "sk-forbidden"})
+    monkeypatch.setattr(upstream, "generate_key", generate)
+    state = oidc.generate_state()
+    async with client() as browser:
+        browser.cookies.set("litegate_session", auth._make_jwt("u", "u@example.com"), path="/api")
+        browser.cookies.set("litegate_oidc_state", state, path="/api/auth")
+        rejected = await browser.get("/api/auth/callback", params={"state": state, "code": "code"})
+        assert rejected.status_code == 403
+        assert store.get("u")["groups"] == groups
+        assert store.get("u")["sync_error"]
+        assert (await browser.post(path)).status_code == 403
+    generate.assert_not_awaited()

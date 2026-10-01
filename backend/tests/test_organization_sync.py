@@ -18,7 +18,7 @@ def hierarchy(monkeypatch, tmp_path):
     tree = OrganizationHierarchy.model_validate(example())
     monkeypatch.setattr(settings, "organization_hierarchy", tree)
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "organization.db"))
-    monkeypatch.setattr(sync, "_lock", asyncio.Lock())
+    sync._locks.clear()
     local_users.init_db()
     return tree
 
@@ -36,9 +36,10 @@ async def test_reconcile_updates_existing_member_without_resetting_spend(monkeyp
         upstream,
         "team_info",
         AsyncMock(
-            return_value={
-                "team_memberships": [{"user_id": "alice", "spend": 42, "litellm_budget_table": {"max_budget": 100, "budget_duration": "30d"}}]
-            }
+            side_effect=[
+                info,
+                {"team_memberships": [{"user_id": "alice", "spend": 42, "litellm_budget_table": {"max_budget": 100, "budget_duration": "30d"}}]},
+            ]
         ),
     )
     monkeypatch.setattr(upstream, "sync_root", root)
@@ -196,3 +197,83 @@ async def test_bulk_updates_cannot_move_unmapped_keys_into_managed_roots(monkeyp
     with pytest.raises(HTTPException) as exc:
         await sync.guard_key("key", {"team_id": "engineering"})
     assert exc.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_slow_reconciliation_does_not_block_another_user_in_the_same_root(monkeypatch):
+    store.remember("alice", "alice@example.com", "sso", ["squad1"])
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def member(node, user_id, info):
+        if user_id == "alice":
+            entered.set()
+            await release.wait()
+
+    monkeypatch.setattr(upstream, "sync_root", AsyncMock(return_value={}))
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={}))
+    monkeypatch.setattr(upstream, "sync_member", member)
+    monkeypatch.setattr(upstream, "generate_key", AsyncMock(return_value={"key": "sk-bob-test"}))
+    monkeypatch.setattr(litellm, "get_user", AsyncMock(return_value=None))
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
+    background = asyncio.create_task(sync.reconcile())
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        node = await asyncio.wait_for(sync.remember("bob", "bob@example.com", "sso", ["squad2"]), 2)
+        assert node.per_user == 50
+        assert store.get("bob")["team_id"] == "engineering"
+        generated = await asyncio.wait_for(sync.generate_key("bob", "bob@example.com", None), 2)
+        assert generated["key"] == "sk-bob-test"
+        assert not background.done()
+    finally:
+        release.set()
+        await background
+
+
+@pytest.mark.asyncio
+async def test_identity_changes_and_key_issuance_are_serialized_for_the_same_user(monkeypatch):
+    store.remember("u", "u@example.com", "sso", ["squad1"])
+    store.synced("u", "engineering", {})
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def generate(*args, **kwargs):
+        entered.set()
+        await release.wait()
+        return {"key": "sk-test"}
+
+    monkeypatch.setattr(upstream, "sync_root", AsyncMock(return_value={}))
+    monkeypatch.setattr(upstream, "sync_member", AsyncMock())
+    monkeypatch.setattr(upstream, "generate_key", generate)
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
+    issued = asyncio.create_task(sync.generate_key("u", "u@example.com", None))
+    invalidated = None
+    try:
+        await asyncio.wait_for(entered.wait(), 2)
+        invalidated = asyncio.create_task(sync.record_identity("u", "u@example.com", "sso", []))
+        await asyncio.sleep(0)
+        assert not invalidated.done()
+        release.set()
+        await issued
+        with pytest.raises(HTTPException) as exc:
+            await invalidated
+        assert exc.value.status_code == 403
+        with pytest.raises(HTTPException):
+            await sync.generate_key("u", "u@example.com", None)
+        assert store.get("u")["groups"] == []
+    finally:
+        release.set()
+        await asyncio.gather(issued, *([invalidated] if invalidated else []), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_queued_key_creation_reads_membership_after_acquiring_the_user_lock(monkeypatch):
+    store.remember("u", "u@example.com", "sso", ["squad1"])
+    store.synced("u", "engineering", {})
+    upstream_sync = AsyncMock()
+    monkeypatch.setattr(upstream, "sync_root", upstream_sync)
+    async with sync.lock_for("user", "u"):
+        invalidation = asyncio.create_task(sync.record_identity("u", "u@example.com", "sso", []))
+        creation = asyncio.create_task(sync.generate_key("u", "u@example.com", None))
+        await asyncio.sleep(0)
+    results = await asyncio.gather(invalidation, creation, return_exceptions=True)
+    assert all(isinstance(result, HTTPException) and result.status_code == 403 for result in results)
+    upstream_sync.assert_not_awaited()

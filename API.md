@@ -15,12 +15,17 @@ Omit `node` for all mapped users. These read-only routes require an administrato
 portal session or management credential; ordinary users and LiteLLM-key identities
 receive `403`. Unknown nodes receive `404`, invalid ranges `422`, and upstream
 failures return an error without partial totals. Reports use current membership.
+Analytics follows up to 20 upstream pages of 1,000 records per user. Exceeding
+this bound returns `422` and asks for a shorter date range; exceeding a user's
+60-second analytics deadline returns `504`. Only complete fetches are cached.
 
 Helm-managed team budget changes, deletion, and member moves receive `409`.
 Bulk-key budget or team changes report per-item failures for managed keys.
 Personal `/api/keys` responses can add `user_budget`, `user_spend`, and
 `organization_path`, describing the member allowance and current-cycle spend
 separately from key counters. See [Organization hierarchy](docs/organization.md).
+Verified removed or conflicting SSO membership is persisted before rejecting
+login, and existing sessions also receive `403` on key creation or regeneration.
 
 Interactive OpenAPI documentation is available at `/api/docs` on every LiteGate deployment. All v1 routes are under `/api/v1`.
 

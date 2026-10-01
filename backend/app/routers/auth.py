@@ -114,7 +114,7 @@ async def callback(
         claims = await oidc_svc.verify_id_token(id_token, expected_nonce=nonce)
     user_id, email = claims["sub"], claims.get("email", "")
     group_team_ids = settings.mapped_team_ids(claims)
-    node = organization_sync.resolve(user_id, settings.oidc_groups(claims))
+    node = await organization_sync.record_identity(user_id, email, "sso", settings.oidc_groups(claims))
     if settings.oidc_require_team_mapping and not group_team_ids and node is None:
         raise HTTPException(status_code=403, detail="Your SSO groups are not mapped to a LiteLLM team")
     team_ids = list(group_team_ids)

@@ -124,22 +124,41 @@ def finite_number(value, *, integer: bool = False) -> float | int:
 
 
 async def daily_usage(user_id: str, start: str, end: str) -> list[dict]:
-    data = await request(
-        "GET",
-        "/user/daily/activity",
-        params={
-            "user_id": user_id,
-            "start_date": start,
-            "end_date": end,
-            "page": 1,
-            "page_size": 1000,
-        },
-    )
-    rows = data.get("results")
-    metadata = data.get("metadata") or {}
-    if not isinstance(metadata, dict):
-        raise HTTPException(status_code=502, detail="LiteLLM returned an incomplete usage aggregate")
-    pages = data.get("total_pages", metadata.get("total_pages", 1))
-    if not isinstance(rows, list) or len(rows) > 1000 or not isinstance(pages, int) or pages > 1 or metadata.get("has_more"):
-        raise HTTPException(status_code=502, detail="LiteLLM returned an incomplete usage aggregate")
-    return rows
+    rows, expected_pages = [], None
+    page_size, max_pages = 1000, 20
+    limit_error = f"Usage exceeds {max_pages} upstream pages for one user; select a shorter date range"
+    try:
+        async with asyncio.timeout(60):
+            for page in range(1, max_pages + 1):
+                data = await request(
+                    "GET",
+                    "/user/daily/activity",
+                    params={"user_id": user_id, "start_date": start, "end_date": end, "page": page, "page_size": page_size},
+                )
+                batch, metadata = data.get("results"), data.get("metadata") or {}
+                if not isinstance(batch, list) or len(batch) > page_size or not isinstance(metadata, dict):
+                    raise HTTPException(status_code=502, detail="LiteLLM returned an incomplete usage aggregate")
+                pages = data.get("total_pages", metadata.get("total_pages"))
+                more = metadata.get("has_more", False)
+                actual_page = metadata.get("page", data.get("page", page))
+                if (
+                    type(actual_page) is not int
+                    or actual_page != page
+                    or type(more) is not bool
+                    or (pages is not None and (type(pages) is not int or pages < 0 or (pages > 0 and page > pages) or (pages == 0 and batch)))
+                    or (expected_pages is not None and pages != expected_pages)
+                ):
+                    raise HTTPException(status_code=502, detail="LiteLLM returned invalid analytics pagination")
+                if pages is not None:
+                    expected_pages = pages
+                    if pages > max_pages:
+                        raise HTTPException(status_code=422, detail=limit_error)
+                    more = more or page < pages
+                if more and not batch:
+                    raise HTTPException(status_code=502, detail="LiteLLM returned an incomplete usage aggregate")
+                rows.extend(batch)
+                if not more:
+                    return rows
+    except TimeoutError as exc:
+        raise HTTPException(status_code=504, detail="LiteLLM analytics exceeded the 60-second report deadline") from exc
+    raise HTTPException(status_code=422, detail=limit_error)

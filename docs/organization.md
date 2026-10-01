@@ -76,6 +76,8 @@ one path; the deepest compatible match wins. A higher-level match does not guess
 a child. Conflicting paths reject login before a session is issued. A removed
 mapping for a previously managed user blocks new login and key creation/replacement until
 an administrator resolves it. A hierarchy match satisfies `ssoRequireTeamMapping`.
+Verified removed or conflicting claims are saved before rejecting login, so
+existing sessions also lose permission to create or replace a managed key.
 Existing flat mappings remain supported, with the hierarchy's root taking
 priority for managed key ownership. Other unmapped users retain existing behavior.
 
@@ -104,8 +106,13 @@ such as `30d` (30-day duration) or `1mo` (calendar month), using LiteLLM's reset
 behavior. A null duration means no automatic reset.
 
 LiteGate reconciles roots and known users every 60 seconds with bounded
-concurrency, and again during managed login/key creation. Policy writes preserve
-accrued spend and leave unchanged reset durations out of update requests. Changing
+concurrency, and again during managed login/key creation.
+Synchronization and key issuance serialize per user. A slow user's member update
+does not hold a lock across other users; root-team policy writes serialize only
+while that shared policy is being synchronized. Each queued operation rereads
+the current verified membership before applying its policy.
+Policy writes preserve accrued spend and leave unchanged reset durations out of
+update requests. Changing
 only an allowance retains its existing reset window; changing the duration uses
 LiteLLM's reset scheduling. Lowering a cap below current spend may prevent further paid
 requests immediately. Failures are shown in the admin dashboard.
@@ -133,7 +140,10 @@ identities cannot access administrative organization reports.
 
 Charts use UTC daily aggregates, bounded concurrency, and a short process-local
 cache. A report supports at most 90 days between dates and 500 users; select a
-smaller group when necessary. Incomplete or unavailable upstream data produces
+smaller group when necessary. Each user's analytics fetch follows up to 20
+pages of 1,000 underlying daily records with a 60-second deadline, summing all
+per-page daily and model aggregates. A page-limit error asks for a shorter date
+range; a deadline returns `504`. Incomplete or unavailable upstream data produces
 an error instead of partial totals. Dashboard loads do not scan raw spend logs.
 Logged requests count upstream attempts, including retries, rather than all
 gateway requests. Reporting totals are independent of budget resets.
