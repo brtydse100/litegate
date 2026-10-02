@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from app.config import settings
 from app.organization import OrganizationNode
-from app.services import key_secrets, litellm
+from app.services import key_cleanup, key_secrets, litellm
 from app.services.litellm_client import client, headers, transport_error
 
 
@@ -40,14 +40,45 @@ async def sync_root(root: OrganizationNode) -> dict:
     elif any(existing.get(key) != value for key, value in policy.items()):
         await litellm.update_team(root.team_id, {key: value for key, value in policy.items() if existing.get(key) != value})
     info = await team_info(root.team_id)
+    if default_member_budget(info) is not None:
+        await litellm.update_team(root.team_id, {"team_member_budget": None})
+        info = await team_info(root.team_id)
     actual = info.get("team_info")
     if not isinstance(actual, dict) or any(actual.get(key) != value for key, value in policy.items()):
         raise HTTPException(status_code=502, detail="LiteLLM did not apply the top-level budget policy")
+    if default_member_budget(info) is not None:
+        raise HTTPException(status_code=502, detail="LiteLLM did not clear the managed team's default member budget")
     return info
 
 
 def membership(info: dict, user_id: str) -> dict | None:
     return next((item for item in info.get("team_memberships", []) if item.get("user_id") == user_id), None)
+
+
+def default_member_budget(info: dict) -> float | None:
+    team = info.get("team_info") or {}
+    budget = team.get("team_member_budget_table")
+    if budget is None:
+        if (team.get("metadata") or {}).get("team_member_budget_id"):
+            raise HTTPException(status_code=502, detail="Could not verify LiteLLM's default team-member budget")
+        return None
+    if not isinstance(budget, dict):
+        raise HTTPException(status_code=502, detail="LiteLLM returned an invalid default team-member budget")
+    value = budget.get("max_budget")
+    return finite_number(value) if value is not None and finite_number(value) > 0 else None
+
+
+def member_budget(info: dict, user_id: str) -> dict:
+    member = membership(info, user_id)
+    if member is None:
+        raise HTTPException(status_code=502, detail="Could not read your managed LiteLLM membership")
+    budget = member.get("litellm_budget_table") or {}
+    value = budget.get("max_budget")
+    return {
+        "per_user": finite_number(value) if value is not None else default_member_budget(info),
+        "duration": budget.get("budget_duration"),
+        "spend": finite_number(member.get("spend")),
+    }
 
 
 async def sync_member(node: OrganizationNode, user_id: str, info: dict) -> None:
@@ -69,10 +100,10 @@ async def sync_member(node: OrganizationNode, user_id: str, info: dict) -> None:
             },
         )
         verified_info = await team_info(node.team_id)
-        verified = membership(verified_info, user_id)
-        actual = verified.get("litellm_budget_table") or {} if verified else {}
-        if verified is None or actual.get("max_budget") != node.per_user or actual.get("budget_duration") != node.duration:
-            raise HTTPException(status_code=502, detail="LiteLLM did not apply the per-user budget policy; check its version")
+        info = verified_info
+    actual = member_budget(info, user_id)
+    if actual["per_user"] != node.per_user or actual["duration"] != node.duration:
+        raise HTTPException(status_code=502, detail="LiteLLM did not apply the per-user budget policy; check its version")
 
 
 async def generate_key(user_id: str, email: str, team_id: str, **options) -> dict:
@@ -107,8 +138,8 @@ async def generate_key(user_id: str, email: str, team_id: str, **options) -> dic
                 raise HTTPException(status_code=502, detail="LiteLLM's key defaults conflict with organization budgets")
         if settings.save_api_keys_in_db:
             await asyncio.to_thread(key_secrets.save, result["key"], user_id)
-    except Exception:
-        await litellm.delete_key(result["key"])
+    except BaseException:
+        await key_cleanup.revoke_created_key(result["key"])
         raise
     return result
 

@@ -45,19 +45,24 @@ export default function AdminOrganization() {
     refetchInterval: 60000,
   });
   const enabled = overview.data?.enabled === true;
+  const groups = overview.data?.groups ?? [];
+  const validSelection = !nodeId || groups.some((group) => group.id === nodeId);
+  if (overview.data && !validSelection) {
+    setNodeId("");
+    setPage(1);
+  }
   const usage = useQuery({
     queryKey: ["organization-usage", nodeId, startDate, endDate],
     queryFn: () => api.organizationUsage(nodeId, startDate, endDate),
-    enabled,
+    enabled: enabled && validSelection,
     staleTime: 60000,
   });
   const users = useQuery({
     queryKey: ["organization-users", nodeId, page],
     queryFn: () => api.organizationUsers(nodeId, page),
-    enabled,
+    enabled: enabled && validSelection,
     refetchInterval: 60000,
   });
-  const groups = overview.data?.groups ?? [];
   const selected = groups.find((group) => group.id === nodeId);
   const budgetSource = groups.find(
     (group) => group.id === selected?.budget_source,

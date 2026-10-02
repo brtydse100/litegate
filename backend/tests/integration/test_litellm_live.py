@@ -129,6 +129,20 @@ async def test_managed_user_allowance_and_rotation_preserve_the_budget_window():
         assert changed["litellm_budget_table"]["max_budget"] == 100
         assert changed["litellm_budget_table"]["budget_reset_at"] == first_budget["budget_reset_at"]
         assert changed["spend"] == first["spend"]
+        # Managed roots must remove a fallback that would cap a null allowance.
+        await litellm.update_team(team_id, {"team_member_budget": 50, "team_member_rpm_limit": 120})
+        verified_root = await organization.sync_root(updated_root)
+        default = verified_root["team_info"]["team_member_budget_table"]
+        assert default["max_budget"] is None
+        assert default["rpm_limit"] == 120
+        updated_root.member.budget.perUser = None
+        unlimited_tree = OrganizationHierarchy.model_validate(tree.model_dump(exclude_unset=True))
+        unlimited = unlimited_tree.roots[0]
+        await organization.sync_member(unlimited, user_id, await organization.team_info(team_id))
+        info = await organization.team_info(team_id)
+        assert organization.member_budget(info, user_id)["per_user"] is None
+        assert organization.membership(info, user_id)["spend"] == first["spend"]
+        assert organization.membership(info, user_id)["litellm_budget_table"]["budget_reset_at"] == first_budget["budget_reset_at"]
     finally:
         for key in keys:
             await litellm.delete_key(key)

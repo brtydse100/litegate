@@ -79,7 +79,9 @@ an administrator resolves it. A hierarchy match satisfies `ssoRequireTeamMapping
 Verified removed or conflicting claims are saved before rejecting login, so
 existing sessions also lose permission to create or replace a managed key.
 Existing flat mappings remain supported, with the hierarchy's root taking
-priority for managed key ownership. Other unmapped users retain existing behavior.
+priority for managed key ownership. Flat mappings and the default SSO team cannot
+automatically add memberships in managed roots; those memberships come from the
+resolved hierarchy path. Mappings to other, unmanaged teams remain supported.
 
 SSO users appear after successful login. Explicit IDs already present in LiteLLM
 can synchronize before their next login. Stored claims come from the last verified
@@ -105,8 +107,16 @@ explicitly free models. `duration` inherits independently and accepts values
 such as `30d` (30-day duration) or `1mo` (calendar month), using LiteLLM's reset
 behavior. A null duration means no automatic reset.
 
+LiteGate clears and verifies the fallback `team_member_budget` cap on managed
+root teams, so it cannot silently constrain `perUser: null`. Explicit member
+allowances and the shared root budget still apply. Default rate limits and
+other team settings are preserved. An unverifiable fallback blocks policy
+synchronization and managed key issuance.
+
 LiteGate reconciles roots and known users every 60 seconds with bounded
 concurrency, and again during managed login/key creation.
+An explicit-user discovery failure is logged independently and does not prevent
+that cycle from updating roots and known users.
 Synchronization and key issuance serialize per user. A slow user's member update
 does not hold a lock across other users; root-team policy writes serialize only
 while that shared policy is being synchronized. Each queued operation rereads
@@ -123,6 +133,10 @@ key caps are cleared and verified. Usage before joining that team is not
 retroactively charged to its member budget. Keys belonging to another team,
 and moves to another root, require explicit migration in LiteLLM. Review old
 and new budget windows; LiteGate does not silently transfer/reset spend.
+Before changing a user's root, an administrator must remove the old membership
+after reviewing spend, create the destination membership, and migrate or revoke
+old keys. Destination membership alone does not approve a move. LiteGate verifies
+the old roster and member row are absent before applying the destination policy.
 
 Managed budgets and membership are read-only in LiteGate. Managed roots cannot
 be deleted or used for manual member moves. Bulk-key budget/team changes report
@@ -136,6 +150,13 @@ keys. An unsuccessful response or verification keeps that root binding, so a
 later root change still requires migration even when the user has no keys.
 Retrying synchronization within the original root remains supported.
 
+The personal dashboard shows the allowance LiteLLM currently enforces, with a
+warning for policy drift or removed mappings. Budget lookup outages leave key
+metadata and the regeneration action visible, with budget/spend marked
+Unavailable. A failed key listing does not offer key creation. Cancellation
+during managed key verification or rotation cleanup revokes the undelivered
+replacement before the operation finishes.
+
 ## Dashboard and reporting
 
 Administrators open **Organization** to filter users and graphs by any level,
@@ -146,7 +167,8 @@ identities cannot access administrative organization reports.
 Parent groups start collapsed. Use the arrow beside a parent to show or hide its
 children, and select a group name to filter the dashboard. Collapsing a parent
 keeps the current filter; selecting a group through a chart expands its ancestors
-in the navigation.
+in the navigation. If a selected group is removed or renamed during a hierarchy
+refresh, the filter and pagination reset to All groups.
 
 Charts use UTC daily aggregates, bounded concurrency, and a short process-local
 cache. A report supports at most 90 days between dates and 500 users; select a
@@ -154,7 +176,10 @@ smaller group when necessary. Each user's analytics fetch follows up to 20
 pages of 1,000 underlying daily records with a 60-second deadline, summing all
 per-page daily and model aggregates. A page-limit error asks for a shorter date
 range; a deadline returns `504`. Incomplete or unavailable upstream data produces
-an error instead of partial totals. Dashboard loads do not scan raw spend logs.
+an error instead of partial totals. Required metrics, finite non-negative values,
+integer counts, dates, and model breakdowns are validated before a fetch enters
+the cache. A corrected retry can therefore recover immediately from malformed
+data. Dashboard loads do not scan raw spend logs.
 Logged requests count upstream attempts, including retries, rather than all
 gateway requests. Reporting totals are independent of budget resets.
 

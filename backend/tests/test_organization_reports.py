@@ -33,6 +33,52 @@ def row(day, spend, tokens=100, requests=2):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        "empty",
+        "missing",
+        "null",
+        "nan",
+        "infinity",
+        "negative",
+        "boolean",
+        "string",
+        "fractional",
+        "model",
+        "date",
+    ],
+)
+async def test_invalid_aggregates_are_not_cached_and_a_corrected_retry_succeeds(monkeypatch, setup, invalid):
+    day = datetime.now(timezone.utc).date()
+    bad = row(day, 5)
+    if invalid == "empty":
+        bad["metrics"] = {}
+    elif invalid == "missing":
+        bad["metrics"].pop("api_requests")
+    elif invalid == "model":
+        bad["breakdown"]["models"]["model-a"] = {"metrics": {}}
+    elif invalid == "date":
+        bad["date"] = (day + timedelta(days=1)).isoformat()
+    elif invalid == "fractional":
+        bad["metrics"]["api_requests"] = 1.5
+    else:
+        bad["metrics"]["spend"] = {"null": None, "nan": float("nan"), "infinity": float("inf"), "negative": -1, "boolean": False, "string": ""}[
+            invalid
+        ]
+    fetch = AsyncMock(side_effect=[[bad], [row(day, 5)]])
+    monkeypatch.setattr(upstream, "daily_usage", fetch)
+    node = setup.resolve("alice", ["squad1"])
+    with pytest.raises(HTTPException) as exc:
+        await reports.usage(node.id, day, day)
+    assert exc.value.status_code == 502
+    assert reports._usage_cache == {}
+    result = await reports.usage(node.id, day, day)
+    assert result["totals"] == {"spend": 5, "tokens": 100, "requests": 2}
+    assert fetch.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_usage_aggregates_users_by_current_path_and_includes_zero_days(monkeypatch, setup):
     day = datetime.now(timezone.utc).date() - timedelta(days=1)
     fetch = AsyncMock(side_effect=[[row(day, 10)], [row(day, 5)]])
@@ -82,6 +128,7 @@ async def test_invalid_upstream_dates_and_nan_do_not_pollute_reports(monkeypatch
     monkeypatch.setattr(upstream, "daily_usage", AsyncMock(return_value=[row(day + timedelta(days=1), 5)]))
     with pytest.raises(HTTPException):
         await reports.usage(None, day, day)
+    assert reports._usage_cache == {}
     reports._usage_cache.clear()
     monkeypatch.setattr(upstream, "daily_usage", AsyncMock(return_value=[row(day, float("nan"))]))
     with pytest.raises(HTTPException):

@@ -93,10 +93,21 @@ async def sync_identity(identity: dict, info: dict) -> OrganizationNode:
     if node is None:
         raise HTTPException(status_code=409, detail="Organization mapping was removed; review the user's keys before changing membership")
     existing = await litellm.list_user_keys(identity["user_id"])
-    if identity.get("team_id") and identity["team_id"] != node.team_id and upstream.membership(info, identity["user_id"]) is None:
-        raise HTTPException(
-            status_code=409, detail="Top-level organization changed; migrate the user's LiteLLM membership before applying its new budget"
-        )
+    previous_team = identity.get("team_id")
+    if previous_team and previous_team != node.team_id:
+        if upstream.membership(info, identity["user_id"]) is None:
+            raise HTTPException(
+                status_code=409, detail="Top-level organization changed; migrate the user's LiteLLM membership before applying its new budget"
+            )
+        previous = await upstream.team_info(previous_team)
+        roster = (previous.get("team_info") or {}).get("members_with_roles")
+        if not isinstance(roster, list):
+            raise HTTPException(status_code=502, detail="Could not verify the user's previous LiteLLM membership")
+        if upstream.membership(previous, identity["user_id"]) or any(member.get("user_id") == identity["user_id"] for member in roster):
+            raise HTTPException(
+                status_code=409,
+                detail="Top-level organization changed; an administrator must remove the previous LiteLLM membership after reviewing spend",
+            )
     if any(key.get("team_id") and key["team_id"] != node.team_id for key in existing):
         raise HTTPException(
             status_code=409, detail="Existing keys belong to another team; migrate them in LiteLLM before changing the top-level organization"
@@ -160,17 +171,6 @@ async def reconcile() -> None:
         return
     identities = await asyncio.to_thread(store.list_identities)
     known = {identity["user_id"] for identity in identities}
-    for node in settings.organization_hierarchy.nodes.values():
-        for user_id in node.member.userIds:
-            if user_id not in known:
-                async with lock_for("user", user_id):
-                    if await asyncio.to_thread(store.get, user_id) is None:
-                        existing = await litellm.get_user(user_id)
-                        if existing:
-                            user = existing.get("user_info", existing)
-                            await asyncio.to_thread(store.remember, user_id, user.get("user_email") or "", "explicit", [])
-                known.add(user_id)
-    identities = await asyncio.to_thread(store.list_identities)
     ready: set[str] = set()
     semaphore = asyncio.Semaphore(5)
 
@@ -196,6 +196,24 @@ async def reconcile() -> None:
                 await asyncio.to_thread(store.failed, user_id, str(exc.detail))
 
     await asyncio.gather(*(sync_one(identity["user_id"]) for identity in identities))
+
+    async def discover(user_id: str):
+        async with semaphore, lock_for("user", user_id):
+            try:
+                if await asyncio.to_thread(store.get, user_id) is None:
+                    existing = await litellm.get_user(user_id)
+                    if not existing:
+                        return None
+                    user = existing.get("user_info", existing)
+                    await asyncio.to_thread(store.remember, user_id, user.get("user_email") or "", "explicit", [])
+                return user_id
+            except HTTPException as exc:
+                _logger.warning("Organization user %s discovery failed: %s", user_id, exc.detail)
+                return None
+
+    explicit = {user_id for node in settings.organization_hierarchy.nodes.values() for user_id in node.member.userIds}
+    discovered = await asyncio.gather(*(discover(user_id) for user_id in sorted(explicit - known)))
+    await asyncio.gather(*(sync_one(user_id) for user_id in discovered if user_id is not None))
 
 
 async def run_reconciliation() -> None:
@@ -227,21 +245,41 @@ async def guard_key(key: str, changes: dict) -> None:
         raise HTTPException(status_code=409, detail="This key's team and budget are managed by organizationHierarchy")
 
 
-async def personal_policy(user: CurrentUser) -> dict | None:
+async def personal_policy(user: CurrentUser, keys: list[dict] | None = None) -> dict | None:
     if not settings.organization_hierarchy.levels:
         return None
     identity = await asyncio.to_thread(store.get, user.user_id)
-    node = resolve(user.user_id, identity["groups"] if identity else [])
-    if node is None:
+    error = identity.get("sync_error") if identity else None
+    try:
+        node = resolve(user.user_id, identity["groups"] if identity else [])
+    except HTTPException as exc:
+        node, error = None, str(exc.detail)
+    team_id = next((key["team_id"] for key in keys or [] if settings.organization_hierarchy.is_managed_team(key.get("team_id"))), None)
+    team_id = team_id or (identity.get("team_id") if identity else None) or (node.team_id if node else None)
+    if team_id is None:
         return None
-    info = await upstream.team_info(node.team_id)
-    member = upstream.membership(info, user.user_id)
-    if member is None:
-        raise HTTPException(status_code=502, detail="Could not read your managed LiteLLM membership")
-    return {
-        "path": list(node.path),
-        "per_user": node.per_user,
-        "duration": node.duration,
-        "spend": upstream.finite_number(member.get("spend")),
-        "sync_error": identity.get("sync_error") if identity else None,
+    root = next((root for root in settings.organization_hierarchy.roots if root.team_id == team_id), None)
+    valid = node is not None and node.team_id == team_id
+    result = {
+        "path": list(node.path) if valid else list(root.path) if root else [],
+        "per_user": None,
+        "duration": None,
+        "spend": None,
+        "budget_available": False,
+        "sync_error": error,
     }
+    if not valid:
+        result["sync_error"] = error or "Your organization mapping was removed or changed; contact an administrator"
+    if any(key.get("team_id") != team_id for key in keys or []):
+        result["sync_error"] = result["sync_error"] or "Your key's team assignment is not synchronized; its user allowance is unavailable"
+        return result
+    try:
+        actual = upstream.member_budget(await upstream.team_info(team_id), user.user_id)
+        result.update(actual, budget_available=True)
+        if valid and (actual["per_user"] != node.per_user or actual["duration"] != node.duration):
+            result["sync_error"] = result["sync_error"] or "Your enforced allowance differs from organizationHierarchy; contact an administrator"
+        if any(key.get("max_budget") is not None or key.get("budget_duration") is not None for key in keys or []):
+            result["sync_error"] = result["sync_error"] or "Your key still has an additional LiteLLM budget restriction; contact an administrator"
+    except HTTPException as exc:
+        result["sync_error"] = result["sync_error"] or str(exc.detail)
+    return result

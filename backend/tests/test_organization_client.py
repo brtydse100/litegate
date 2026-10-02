@@ -108,3 +108,38 @@ async def test_clearing_an_inherited_allowance_sends_explicit_null(monkeypatch):
     )
     await upstream.sync_member(node, "u", old)
     assert patch.call_args.kwargs["payload"] == {"team_id": "engineering", "user_id": "u", "max_budget_in_team": None}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("write_needed", [False, True])
+async def test_null_allowance_cannot_pass_with_a_finite_team_default(monkeypatch, write_needed):
+    node = OrganizationHierarchy.model_validate(example()).resolve("u", ["unlimited"])
+    info = {
+        "team_info": {"metadata": {"team_member_budget_id": "default"}, "team_member_budget_table": {"max_budget": 50}},
+        "team_memberships": [{"user_id": "u", "spend": 60, "litellm_budget_table": {"max_budget": None, "budget_duration": "30d"}}],
+    }
+    old = {**info, "team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": 100}}]} if write_needed else info
+    monkeypatch.setattr(upstream, "request", AsyncMock(return_value={}))
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=info))
+    with pytest.raises(HTTPException, match="per-user budget"):
+        await upstream.sync_member(node, "u", old)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("applied", [True, False])
+async def test_root_sync_clears_and_verifies_only_the_default_member_cap(monkeypatch, applied):
+    root = OrganizationHierarchy.model_validate(example()).roots[0]
+    team = {"max_budget": 5000, "budget_duration": "30d", "metadata": {"team_member_budget_id": "default"}}
+    original = {"team_info": {**team, "team_member_budget_table": {"max_budget": 50, "rpm_limit": 10}}}
+    verified = {"team_info": {**team, "team_member_budget_table": {"max_budget": None, "rpm_limit": 10}}} if applied else original
+    update = AsyncMock()
+    monkeypatch.setattr(litellm, "get_team", AsyncMock(return_value=team))
+    monkeypatch.setattr(litellm, "update_team", update)
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(side_effect=[original, verified]))
+    if applied:
+        result = await upstream.sync_root(root)
+        assert result["team_info"]["team_member_budget_table"]["rpm_limit"] == 10
+    else:
+        with pytest.raises(HTTPException, match="default member budget"):
+            await upstream.sync_root(root)
+    update.assert_awaited_once_with("engineering", {"team_member_budget": None})

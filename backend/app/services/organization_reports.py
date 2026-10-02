@@ -130,6 +130,7 @@ async def cached_usage(user_id: str, start: str, end: str) -> list[dict]:
     if cached and now - cached[0] < 60:
         return cached[1]
     rows = await upstream.daily_usage(user_id, start, end)
+    validate_usage(rows, start, end)
     if len(_usage_cache) >= 1000:
         _usage_cache.clear()
     _usage_cache[key] = (now, rows)
@@ -140,10 +141,45 @@ def zero_metrics() -> dict:
     return {"spend": 0.0, "tokens": 0, "requests": 0}
 
 
+def metric_values(source: dict) -> dict:
+    if not isinstance(source, dict):
+        raise HTTPException(status_code=502, detail="LiteLLM returned invalid usage metrics")
+    result = {}
+    for source_key, target_key in (("spend", "spend"), ("total_tokens", "tokens"), ("api_requests", "requests")):
+        value = source.get(source_key)
+        if type(value) not in (int, float):
+            raise HTTPException(status_code=502, detail="LiteLLM returned missing or invalid usage metrics")
+        number = upstream.finite_number(value)
+        if target_key != "spend" and number != int(number):
+            raise HTTPException(status_code=502, detail="LiteLLM returned fractional usage counts")
+        result[target_key] = number if target_key == "spend" else int(number)
+    return result
+
+
+def validate_usage(rows: list[dict], start: str, end: str) -> None:
+    if not isinstance(rows, list):
+        raise HTTPException(status_code=502, detail="LiteLLM returned an invalid daily usage aggregate")
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("date"), str) or not start <= row["date"] <= end:
+            raise HTTPException(status_code=502, detail="LiteLLM returned an invalid daily usage aggregate")
+        try:
+            if date.fromisoformat(row["date"]).isoformat() != row["date"]:
+                raise ValueError
+        except ValueError as exc:
+            raise HTTPException(status_code=502, detail="LiteLLM returned an invalid usage date") from exc
+        metric_values(row.get("metrics"))
+        breakdown = row.get("breakdown", {})
+        if not isinstance(breakdown, dict) or not isinstance(breakdown.get("models", {}), dict):
+            raise HTTPException(status_code=502, detail="LiteLLM returned an invalid model usage aggregate")
+        for name, values in breakdown.get("models", {}).items():
+            if not isinstance(name, str) or not name or not isinstance(values, dict):
+                raise HTTPException(status_code=502, detail="LiteLLM returned an invalid model usage aggregate")
+            metric_values(values.get("metrics", values))
+
+
 def add_metrics(target: dict, source: dict) -> None:
-    target["spend"] += upstream.finite_number(source.get("spend"))
-    target["tokens"] += upstream.finite_number(source.get("total_tokens"), integer=True)
-    target["requests"] += upstream.finite_number(source.get("api_requests"), integer=True)
+    for key, value in metric_values(source).items():
+        target[key] = upstream.finite_number(target[key] + value, integer=key != "spend")
 
 
 async def usage(node_id: str | None, start: date, end: date) -> dict:

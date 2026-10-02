@@ -1,5 +1,6 @@
 import {
   fireEvent,
+  act,
   render,
   screen,
   waitFor,
@@ -27,11 +28,12 @@ function renderOrganization() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <AdminOrganization />
     </QueryClientProvider>,
   );
+  return { ...view, client };
 }
 
 describe("organization dashboard contracts", () => {
@@ -229,5 +231,61 @@ describe("organization dashboard contracts", () => {
     ).toBeVisible();
     expect(api.organizationUsage).not.toHaveBeenCalled();
     expect(api.organizationUsers).not.toHaveBeenCalled();
+  });
+
+  it("resets a removed selection when the hierarchy refreshes", async () => {
+    const { client } = renderOrganization();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Engineering" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Infrastructure" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Platform" }),
+    );
+    await waitFor(() =>
+      expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1),
+    );
+    expect(await screen.findByText("alex@example.com")).toBeVisible();
+    const overview = organizationOverview();
+    vi.mocked(api.organization).mockResolvedValue({
+      ...overview,
+      groups: overview.groups.map((group) =>
+        group.id === "platform"
+          ? { ...group, id: "renamed", name: "Renamed" }
+          : group,
+      ),
+    });
+    vi.mocked(api.organizationUsers).mockClear();
+    vi.mocked(api.organizationUsage).mockClear();
+    await act(async () => {
+      await client.invalidateQueries({
+        queryKey: ["organization"],
+        exact: true,
+      });
+    });
+    await waitFor(() =>
+      expect(api.organizationUsers).toHaveBeenLastCalledWith("", 1),
+    );
+    expect(api.organizationUsers).not.toHaveBeenCalledWith(
+      "platform",
+      expect.any(Number),
+    );
+    expect(api.organizationUsage).not.toHaveBeenCalledWith(
+      "platform",
+      expect.any(String),
+      expect.any(String),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Select Marketing" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "Effective budget policy" }),
+    ).not.toBeInTheDocument();
+    expect(await screen.findByText("sam@example.com")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "All groups, 4 users" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 });

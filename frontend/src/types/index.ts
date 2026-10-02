@@ -41,7 +41,10 @@ export interface BulkKeySpendResetResponse {
 
 export interface KeyInfo {
   user_budget?: number | null;
-  user_spend?: number;
+  organization_managed?: boolean;
+  user_budget_available?: boolean;
+  policy_error?: string | null;
+  user_spend?: number | null;
   organization_path?: string[];
   secret_available?: boolean;
   token?: string;

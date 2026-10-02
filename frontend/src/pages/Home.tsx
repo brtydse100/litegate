@@ -79,6 +79,8 @@ function Brand({ logoUrl }: { logoUrl?: string }) {
 
 function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
   const [copied, setCopied] = useState(false);
+  const managed = keyInfo.organization_managed || !!keyInfo.organization_path;
+  const budgetAvailable = keyInfo.user_budget_available !== false;
   const token = keyInfo.token ?? "";
   const display = token
     ? `${token.slice(0, 9)}${"•".repeat(8)}${token.slice(-4)}`
@@ -127,22 +129,24 @@ function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
       <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
         <div className="px-5 py-4">
           <dt className="text-xs text-slate-500">
-            {keyInfo.organization_path ? "User spend" : "Spend"}
+            {managed ? "User spend" : "Spend"}
           </dt>
           <dd className="mt-1 font-semibold text-slate-950">
-            ${(keyInfo.user_spend ?? keyInfo.spend).toFixed(4)}
+            {managed && !budgetAvailable
+              ? "Unavailable"
+              : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(4)}`}
           </dd>
         </div>
         <div className="px-5 py-4">
           <dt className="text-xs text-slate-500">
-            {keyInfo.organization_path ? "User budget" : "Budget"}
+            {managed ? "User budget" : "Budget"}
           </dt>
           <dd className="mt-1 font-semibold text-slate-950">
-            {(keyInfo.organization_path
-              ? keyInfo.user_budget
-              : keyInfo.max_budget) != null
-              ? `$${keyInfo.organization_path ? keyInfo.user_budget : keyInfo.max_budget}`
-              : "Unlimited"}
+            {managed && !budgetAvailable
+              ? "Unavailable"
+              : (managed ? keyInfo.user_budget : keyInfo.max_budget) != null
+                ? `$${managed ? keyInfo.user_budget : keyInfo.max_budget}`
+                : "Unlimited"}
           </dd>
         </div>
         <div className="px-5 py-4">
@@ -160,6 +164,14 @@ function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
           </dd>
         </div>
       </dl>
+      {keyInfo.policy_error && (
+        <p
+          role="alert"
+          className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
+        >
+          {keyInfo.policy_error}
+        </p>
+      )}
       {keyInfo.team_id && (
         <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
           <Building2 size={13} />
@@ -646,7 +658,13 @@ export default function Home() {
                 )}
                 {!keys.isLoading && !confirmRegenerate && (
                   <div className="w-full">
-                    {!hasKey ? (
+                    {keys.isPending || (keys.isError && !hasKey) ? (
+                      <p className="text-sm text-slate-500">
+                        {keys.isPending
+                          ? "Loading key information…"
+                          : "Key information is unavailable. Retry before creating or replacing a key."}
+                      </p>
+                    ) : !hasKey ? (
                       <button
                         onClick={() => create.mutate()}
                         disabled={create.isPending || operationsBlocked}

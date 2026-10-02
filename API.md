@@ -17,7 +17,10 @@ receive `403`. Unknown nodes receive `404`, invalid ranges `422`, and upstream
 failures return an error without partial totals. Reports use current membership.
 Analytics follows up to 20 upstream pages of 1,000 records per user. Exceeding
 this bound returns `422` and asks for a shorter date range; exceeding a user's
-60-second analytics deadline returns `504`. Only complete fetches are cached.
+60-second analytics deadline returns `504`. Only complete, validated fetches are
+cached. Missing, non-finite, negative, or fractional count metrics return `502`.
+An end date too early for the default range requires an explicit start date;
+otherwise the request returns `422`.
 On a report failure or cancellation, remaining user fetches are cancelled and
 awaited. Each `by_group` row includes an opaque group `id` and display `name`.
 The bucket for users assigned directly to the selected group has `id: null` and
@@ -25,9 +28,14 @@ the label `Direct members`; a child with that name has its own non-null ID.
 
 Helm-managed team budget changes, deletion, and member moves receive `409`.
 Bulk-key budget or team changes report per-item failures for managed keys.
-Personal `/api/keys` responses can add `user_budget`, `user_spend`, and
-`organization_path`, describing the member allowance and current-cycle spend
-separately from key counters. See [Organization hierarchy](docs/organization.md).
+Personal `/api/keys` responses can add `organization_managed`, `user_budget`,
+`user_spend`, `user_budget_available`, `organization_path`, and `policy_error`.
+The budget and spend come from the user's actual LiteLLM team membership,
+including any fallback member allowance. A failed budget lookup still returns
+healthy key metadata with `user_budget_available: false`, null budget/spend, and
+a policy warning. Null budget means no individual cap only when
+`user_budget_available` is true. Removed or conflicting mappings retain managed
+status and report a warning. See [Organization hierarchy](docs/organization.md).
 Verified removed or conflicting SSO membership is persisted before rejecting
 login, and existing sessions also receive `403` on key creation or regeneration.
 

@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.routers.api_actor import ApiActor, get_api_actor, require_api_admin
 from app.services import organization_reports
@@ -36,4 +36,8 @@ async def organization_usage(
 ):
     require_api_admin(actor)
     end = end_date or datetime.now(timezone.utc).date()
-    return await organization_reports.usage(node, start_date or end - timedelta(days=29), end)
+    if start_date is None:
+        if (end - date.min).days < 29:
+            raise HTTPException(status_code=422, detail="Provide a start_date when the default 30-day range precedes year 1")
+        start_date = end - timedelta(days=29)
+    return await organization_reports.usage(node, start_date, end)
