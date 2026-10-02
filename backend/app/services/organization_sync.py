@@ -101,6 +101,7 @@ async def sync_identity(identity: dict, info: dict) -> OrganizationNode:
         raise HTTPException(
             status_code=409, detail="Existing keys belong to another team; migrate them in LiteLLM before changing the top-level organization"
         )
+    await asyncio.to_thread(store.bind_team, identity["user_id"], node.team_id)
     await upstream.sync_member(node, identity["user_id"], info)
     for key in existing:
         identifier = key.get("token") or key.get("api_key") or key.get("key")

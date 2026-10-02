@@ -56,6 +56,12 @@ def synced(user_id: str, team_id: str, policy: dict) -> None:
         )
 
 
+def bind_team(user_id: str, team_id: str) -> None:
+    """Retain the root before an upstream mutation whose result may be uncertain."""
+    with connect() as db:
+        db.execute("UPDATE organization_identities SET team_id=? WHERE user_id=?", (team_id, user_id))
+
+
 def failed(user_id: str, message: str) -> None:
     with connect() as db:
         db.execute("UPDATE organization_identities SET sync_error=? WHERE user_id=?", (message[:300], user_id))

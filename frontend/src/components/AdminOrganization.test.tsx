@@ -149,6 +149,72 @@ describe("organization dashboard contracts", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("drills into a group named Direct members using its ID", async () => {
+    const overview = organizationOverview();
+    vi.mocked(api.organization).mockResolvedValue({
+      ...overview,
+      groups: overview.groups.map((group) =>
+        group.id === "platform"
+          ? {
+              ...group,
+              name: "Direct members",
+              path: ["Engineering", "Infrastructure", "Direct members"],
+            }
+          : group,
+      ),
+    });
+    vi.mocked(api.organizationUsage).mockImplementation(
+      async (node, start, end) => {
+        const usage = organizationUsage(node, start, end);
+        return node === "infrastructure"
+          ? {
+              ...usage,
+              by_group: [
+                {
+                  id: null,
+                  name: "Direct members",
+                  spend: 10,
+                  tokens: 100,
+                  requests: 2,
+                },
+                {
+                  id: "platform",
+                  name: "Direct members",
+                  spend: 5,
+                  tokens: 50,
+                  requests: 1,
+                },
+              ],
+            }
+          : usage;
+      },
+    );
+    renderOrganization();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Engineering" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Infrastructure" }),
+    );
+    const chart = (
+      await screen.findByRole("heading", { name: "Usage by Team" })
+    ).closest("section")!;
+    expect(within(chart).getByText("$10.00")).toBeVisible();
+    expect(within(chart).getByText("$5.00")).toBeVisible();
+    expect(within(chart).getAllByText("Direct members")).toHaveLength(2);
+    fireEvent.click(
+      within(chart).getByRole("button", { name: "Select Direct members" }),
+    );
+    await waitFor(() =>
+      expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1),
+    );
+    expect(
+      within(
+        screen.getByRole("navigation", { name: "Organization groups" }),
+      ).getByRole("button", { name: "Direct members, 1 user" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("does not query usage or users when the hierarchy is disabled", async () => {
     vi.mocked(api.organization).mockResolvedValue({
       enabled: false,

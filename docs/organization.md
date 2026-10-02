@@ -131,6 +131,11 @@ Reconciliation reasserts configured policies after drift in LiteLLM. Disabling
 the feature leaves upstream teams, budgets, membership, and keys intact; review
 them when retiring the configuration.
 
+LiteGate records a user's root before changing their member allowance or managed
+keys. An unsuccessful response or verification keeps that root binding, so a
+later root change still requires migration even when the user has no keys.
+Retrying synchronization within the original root remains supported.
+
 ## Dashboard and reporting
 
 Administrators open **Organization** to filter users and graphs by any level,
@@ -152,6 +157,11 @@ range; a deadline returns `504`. Incomplete or unavailable upstream data produce
 an error instead of partial totals. Dashboard loads do not scan raw spend logs.
 Logged requests count upstream attempts, including retries, rather than all
 gateway requests. Reporting totals are independent of budget resets.
+
+Failed or cancelled reports cancel and await outstanding user analytics fetches.
+Group breakdowns use group IDs for aggregation and chart drill-down. `Direct members`
+is the display label for direct assignments, with a null ID; a child group with
+that same name remains a separate, selectable bucket with its own ID.
 
 Reports attribute the selected period to **current membership**. Moving a user
 changes where their earlier usage appears; these graphs do not reconstruct

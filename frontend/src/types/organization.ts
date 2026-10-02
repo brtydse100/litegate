@@ -49,7 +49,7 @@ export interface OrganizationUsage {
   end_date: string;
   totals: UsageMetrics;
   daily: Array<UsageMetrics & { date: string }>;
-  by_group: Array<UsageMetrics & { name: string }>;
+  by_group: Array<UsageMetrics & { id: string | null; name: string }>;
   by_model: Array<UsageMetrics & { name: string }>;
   users: number;
   attribution: "current_membership";

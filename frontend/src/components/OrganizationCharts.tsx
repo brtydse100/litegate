@@ -145,9 +145,9 @@ export function UsageBars({
   onSelect,
 }: {
   title: string;
-  values: OrganizationUsage["by_group"];
+  values: Array<UsageMetrics & { id?: string | null; name: string }>;
   metric: UsageMetric;
-  onSelect?: (name: string) => void;
+  onSelect?: (id: string) => void;
 }) {
   const sorted = [...values].sort((a, b) => b[metric] - a[metric]);
   const max = Math.max(...sorted.map((row) => row[metric]), 1);
@@ -156,6 +156,9 @@ export function UsageBars({
       <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
       <div className="mt-4 space-y-4">
         {sorted.map((row) => {
+          const groupId = row.id;
+          const key =
+            groupId == null ? `label:${row.name}` : `group:${groupId}`;
           const content = (
             <>
               <span className="flex justify-between gap-3 text-xs">
@@ -174,18 +177,18 @@ export function UsageBars({
               </span>
             </>
           );
-          return onSelect && row.name !== "Direct members" ? (
+          return onSelect && groupId != null ? (
             <button
-              key={row.name}
+              key={key}
               type="button"
               aria-label={`Select ${row.name}`}
-              onClick={() => onSelect(row.name)}
+              onClick={() => onSelect(groupId)}
               className="block w-full text-left hover:opacity-75"
             >
               {content}
             </button>
           ) : (
-            <div key={row.name}>{content}</div>
+            <div key={key}>{content}</div>
           );
         })}
         {!sorted.length && (

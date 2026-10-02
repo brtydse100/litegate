@@ -1,5 +1,6 @@
 """Reporting totals come from complete daily aggregates and preserve role scoping."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
@@ -56,7 +57,7 @@ async def test_leaf_selection_queries_only_members_in_that_group(monkeypatch, se
     result = await reports.usage(node.id, day, day)
     assert result["users"] == 1
     fetch.assert_awaited_once_with("alice", day.isoformat(), day.isoformat())
-    assert result["by_group"] == [{"name": "Direct members", "spend": 10, "tokens": 100, "requests": 2}]
+    assert result["by_group"] == [{"id": None, "name": "Direct members", "spend": 10, "tokens": 100, "requests": 2}]
 
 
 @pytest.mark.asyncio
@@ -219,3 +220,80 @@ async def test_report_deadline_is_an_explicit_error_and_leaves_the_cache_empty(m
         await reports.usage(node.id, day, day)
     assert exc.value.status_code == 504
     assert reports._usage_cache == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel_caller", [False, True])
+async def test_failed_or_cancelled_report_cancels_and_awaits_active_and_queued_fetches(monkeypatch, cancel_caller):
+    for index in range(18):
+        store.remember(f"user-{index}", "", "sso", ["squad1"])
+    started, cancelled = set(), set()
+    ready, fail, cleanup_started, cleanup_release = (asyncio.Event() for _ in range(4))
+    error = HTTPException(status_code=502, detail="Analytics failed")
+
+    async def fetch(user_id, start, end):
+        started.add(user_id)
+        if len(started) == 8:
+            ready.set()
+        try:
+            await fail.wait()
+            if user_id == "alice" and not cancel_caller:
+                raise error
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.add(user_id)
+            cleanup_started.set()
+            await cleanup_release.wait()
+            raise
+
+    monkeypatch.setattr(upstream, "daily_usage", fetch)
+    day = datetime.now(timezone.utc).date()
+    report = asyncio.create_task(reports.usage(None, day, day))
+    try:
+        await asyncio.wait_for(ready.wait(), 2)
+        if cancel_caller:
+            report.cancel()
+        else:
+            fail.set()
+        await asyncio.wait_for(cleanup_started.wait(), 2)
+        assert not report.done()
+        cleanup_release.set()
+        with pytest.raises(asyncio.CancelledError if cancel_caller else HTTPException) as exc:
+            await asyncio.wait_for(report, 2)
+        if not cancel_caller:
+            assert exc.value is error
+        assert cancelled == started - (set() if cancel_caller else {"alice"})
+        assert len(started) < 20
+        completed = set(started)
+        await asyncio.sleep(0)
+        assert started == completed
+        assert reports._usage_cache == {}
+    finally:
+        cleanup_release.set()
+        report.cancel()
+        await asyncio.gather(report, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_direct_members_and_a_child_with_that_name_have_distinct_group_ids(monkeypatch):
+    values = example()
+    values["levels"][2]["groups"][0]["members"][0]["name"] = "Direct members"
+    tree = OrganizationHierarchy.model_validate(values)
+    monkeypatch.setattr(settings, "organization_hierarchy", tree)
+    store.remember("alice", "alice@example.com", "sso", ["digital"])
+    store.remember("bob", "bob@example.com", "sso", ["squad1"])
+    day = datetime.now(timezone.utc).date()
+
+    async def fetch(user_id, start, end):
+        return [row(day, 10 if user_id == "alice" else 5)]
+
+    monkeypatch.setattr(upstream, "daily_usage", fetch)
+    parent = tree.resolve("alice", ["digital"])
+    child = tree.resolve("bob", ["squad1"])
+    result = await reports.usage(parent.id, day, day)
+    assert result["totals"]["spend"] == 15
+    assert {bucket["id"]: bucket["spend"] for bucket in result["by_group"]} == {None: 10, child.id: 5}
+    assert [bucket["name"] for bucket in result["by_group"]] == ["Direct members", "Direct members"]
+    detail = await reports.usage(child.id, day, day)
+    assert detail["users"] == 1
+    assert detail["totals"]["spend"] == 5

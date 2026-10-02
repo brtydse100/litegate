@@ -85,10 +85,9 @@ export default function AdminOrganization() {
       return next;
     });
   }
-  function selectChild(name: string) {
+  function selectChild(id: string) {
     const child = groups.find(
-      (group) =>
-        group.name === name && group.parent_id === (selected?.id ?? null),
+      (group) => group.id === id && group.parent_id === (selected?.id ?? null),
     );
     if (child) selectGroup(child.id);
   }

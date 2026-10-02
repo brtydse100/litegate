@@ -277,3 +277,59 @@ async def test_queued_key_creation_reads_membership_after_acquiring_the_user_loc
     results = await asyncio.gather(invalidation, creation, return_exceptions=True)
     assert all(isinstance(result, HTTPException) and result.status_code == 403 for result in results)
     upstream_sync.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["member response", "member verification", "key verification"])
+async def test_partial_sync_retains_root_and_blocks_a_fresh_allowance_in_another_root(monkeypatch, failure):
+    values = example()
+    values["levels"][0]["groups"][0]["members"][1]["ssoGroups"] = ["marketers"]
+    monkeypatch.setattr(settings, "organization_hierarchy", OrganizationHierarchy.model_validate(values))
+    root = AsyncMock(return_value={})
+    monkeypatch.setattr(upstream, "sync_root", root)
+    keys = AsyncMock(return_value=[{"token": "old-key", "max_budget": 50}] if failure == "key verification" else [])
+    monkeypatch.setattr(litellm, "list_user_keys", keys)
+    monkeypatch.setattr(litellm, "add_team_member", AsyncMock())
+    monkeypatch.setattr(litellm, "update_key", AsyncMock())
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value=None))
+    writes = []
+
+    async def write(method, path, *, payload):
+        assert store.get("u")["team_id"] == "engineering"
+        writes.append(payload["team_id"])
+        if failure == "member response":
+            raise HTTPException(status_code=502, detail="Response lost after writing member budget")
+        return {}
+
+    verified = {"team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": 100, "budget_duration": "30d"}}]}
+    monkeypatch.setattr(upstream, "request", write)
+    monkeypatch.setattr(
+        upstream,
+        "team_info",
+        AsyncMock(
+            side_effect=HTTPException(status_code=502, detail="Verification unavailable") if failure == "member verification" else None,
+            return_value=verified,
+        ),
+    )
+    with pytest.raises(HTTPException) as exc:
+        await sync.remember("u", "u@example.com", "sso", ["squad1"])
+    assert exc.value.status_code == 502
+    assert writes == ["engineering"]
+    identity = store.get("u")
+    assert identity["team_id"] == "engineering"
+    assert identity["policy"] is None
+    assert identity["sync_error"]
+
+    keys.return_value = []
+    with pytest.raises(HTTPException) as exc:
+        await sync.remember("u", "u@example.com", "sso", ["marketers"])
+    assert exc.value.status_code == 409
+    assert writes == ["engineering"]
+    assert store.get("u")["team_id"] == "engineering"
+
+    # Retrying the original root uses its existing allowance rather than making a new one.
+    root.return_value = verified
+    await sync.remember("u", "u@example.com", "sso", ["squad1"])
+    assert writes == ["engineering"]
+    assert store.get("u")["policy"]["per_user"] == 100
+    assert store.get("u")["sync_error"] is None

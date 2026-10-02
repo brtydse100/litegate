@@ -18,6 +18,10 @@ failures return an error without partial totals. Reports use current membership.
 Analytics follows up to 20 upstream pages of 1,000 records per user. Exceeding
 this bound returns `422` and asks for a shorter date range; exceeding a user's
 60-second analytics deadline returns `504`. Only complete fetches are cached.
+On a report failure or cancellation, remaining user fetches are cancelled and
+awaited. Each `by_group` row includes an opaque group `id` and display `name`.
+The bucket for users assigned directly to the selected group has `id: null` and
+the label `Direct members`; a child with that name has its own non-null ID.
 
 Helm-managed team budget changes, deletion, and member moves receive `409`.
 Bulk-key budget or team changes report per-item failures for managed keys.

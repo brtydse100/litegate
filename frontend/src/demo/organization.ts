@@ -230,7 +230,10 @@ export function organizationUsage(
   const ancestor = groups.find((group) => group.id === nodeId);
   const selected = selectedMembers(nodeId);
   const totals = zero();
-  const byGroup: Record<string, UsageMetrics> = {};
+  const byGroup = new Map<
+    string | null,
+    OrganizationUsage["by_group"][number]
+  >();
   const daily: OrganizationUsage["daily"] = [];
   for (
     let time = Date.parse(start);
@@ -241,7 +244,13 @@ export function organizationUsage(
     const metrics = zero();
     selected.forEach((member) => {
       const group = groups.find((value) => value.id === member.node)!;
-      const name = group.path[(ancestor?.level ?? -1) + 1] ?? "Direct members";
+      const depth = (ancestor?.level ?? -1) + 1;
+      const child = groups.find(
+        (candidate) =>
+          candidate.level === depth &&
+          candidate.path.every((name, index) => group.path[index] === name),
+      );
+      const id = child?.id ?? null;
       const requests = Math.round(
         (member.budget_spend / 3) * ((day.getUTCDay() % 6) + 1),
       );
@@ -251,7 +260,13 @@ export function organizationUsage(
         requests,
       };
       add(metrics, value);
-      add((byGroup[name] ??= zero()), value);
+      const bucket = byGroup.get(id) ?? {
+        id,
+        name: child?.name ?? "Direct members",
+        ...zero(),
+      };
+      add(bucket, value);
+      byGroup.set(id, bucket);
     });
     add(totals, metrics);
     daily.push({ date: day.toISOString().slice(0, 10), ...metrics });
@@ -261,10 +276,7 @@ export function organizationUsage(
     end_date: end,
     totals,
     daily,
-    by_group: Object.entries(byGroup).map(([name, metrics]) => ({
-      name,
-      ...metrics,
-    })),
+    by_group: [...byGroup.values()],
     by_model: [
       {
         name: "gpt-5-mini",

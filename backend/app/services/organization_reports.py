@@ -160,13 +160,24 @@ async def usage(node_id: str | None, start: date, end: date) -> dict:
         async with semaphore:
             return node, await cached_usage(identity["user_id"], start.isoformat(), end.isoformat())
 
-    batches = await asyncio.gather(*(fetch(identity, node) for identity, node in selected))
+    tasks = [asyncio.create_task(fetch(identity, node)) for identity, node in selected]
+    try:
+        batches = await asyncio.gather(*tasks)
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
     daily = {(start + timedelta(days=offset)).isoformat(): zero_metrics() for offset in range((end - start).days + 1)}
     total, by_group, by_model = zero_metrics(), {}, {}
     for node, rows in batches:
         depth = ancestor.level + 1 if ancestor else 0
-        group_name = node.path[depth] if len(node.path) > depth else "Direct members"
-        group = by_group.setdefault(group_name, zero_metrics())
+        child = node
+        while child.level > depth:
+            child = settings.organization_hierarchy.nodes[child.parent_id]
+        group_id = child.id if child.level == depth else None
+        group_name = child.member.name if group_id is not None else "Direct members"
+        group = by_group.setdefault(group_id, {"id": group_id, "name": group_name, **zero_metrics()})
         for row in rows:
             if not isinstance(row, dict):
                 raise HTTPException(status_code=502, detail="LiteLLM returned an invalid daily usage aggregate")
@@ -191,7 +202,7 @@ async def usage(node_id: str | None, start: date, end: date) -> dict:
         "end_date": end.isoformat(),
         "totals": total,
         "daily": [{"date": day, **values} for day, values in daily.items()],
-        "by_group": [{"name": name, **values} for name, values in by_group.items()],
+        "by_group": list(by_group.values()),
         "by_model": [{"name": name, **values} for name, values in by_model.items()],
         "users": len(selected),
         "attribution": "current_membership",
