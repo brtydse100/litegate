@@ -7,7 +7,7 @@ from app.dependencies import get_current_user
 from app.models import CurrentUser, KeyCreateResponse, KeyDeleteRequest
 from app.rate_limit import check_key_rate_limit, key_rate_limit_status
 from app.services import litellm as llm
-from app.services import audit, key_secrets
+from app.services import audit, key_cleanup, key_secrets, organization_sync
 
 router = APIRouter(prefix="/keys", tags=["keys"])
 
@@ -15,6 +15,20 @@ router = APIRouter(prefix="/keys", tags=["keys"])
 @router.get("")
 async def list_keys(current_user: CurrentUser = Depends(get_current_user)):
     keys = await llm.list_user_keys(current_user.user_id)
+    policy = await organization_sync.personal_policy(current_user, keys)
+    if policy:
+        keys = [
+            {
+                **key,
+                "organization_managed": True,
+                "user_budget": policy["per_user"],
+                "user_spend": policy["spend"],
+                "user_budget_available": policy["budget_available"],
+                "organization_path": policy["path"],
+                "policy_error": policy["sync_error"],
+            }
+            for key in keys
+        ]
     return {"keys": await asyncio.to_thread(key_secrets.annotate, keys)}
 
 
@@ -55,7 +69,7 @@ async def create_key(current_user: CurrentUser = Depends(get_current_user)):
     if existing:
         raise HTTPException(status_code=409, detail="You already have a key. Delete it before creating a new one.")
     team_id = current_user.team_ids[0] if current_user.team_ids else None
-    result = await llm.generate_key(current_user.user_id, current_user.email, team_id)
+    result = await organization_sync.generate_key(current_user.user_id, current_user.email, team_id)
     return KeyCreateResponse(
         key=result["key"],
         user_id=result.get("user_id", current_user.user_id),
@@ -71,7 +85,7 @@ async def regenerate_key(current_user: CurrentUser = Depends(get_current_user)):
     carried_spend = llm.total_key_spend(existing)
     team_id = current_user.team_ids[0] if current_user.team_ids else None
     name = current_user.email.split("@")[0] if current_user.email else current_user.user_id.split(":")[-1]
-    result = await llm.generate_key(
+    result = await organization_sync.generate_key(
         current_user.user_id,
         current_user.email,
         team_id,
@@ -83,9 +97,9 @@ async def regenerate_key(current_user: CurrentUser = Depends(get_current_user)):
             token = key_info.get("token") or key_info.get("api_key") or key_info.get("key")
             if token:
                 await llm.delete_key(token)
-    except Exception:
+    except BaseException:
         # Revoke the replacement so a failed cleanup does not leave an extra live key.
-        await llm.delete_key(result["key"])
+        await key_cleanup.revoke_created_key(result["key"])
         raise
     return KeyCreateResponse(
         key=result["key"],
