@@ -165,11 +165,14 @@ persistence:
   size: 1Gi
 
 # Mount a complete CA bundle from exactly one existing ConfigMap or Secret.
+# mountPath is the destination inside the pod, not a local certificate file.
+# A nonempty customCA requires configMap or secret; key/mountPath alone fail.
 customCA: {}
-#  configMap: corporate-ca
-#  secret: corporate-ca
-#  key: ca-bundle.crt
-#  mountPath: /etc/ssl/certs/litegate-custom-ca.pem
+# Example (replace customCA: {} above; choose only one source):
+# customCA:
+#   configMap: corporate-ca  # Or secret: corporate-ca
+#   key: ca-bundle.crt
+#   mountPath: /etc/ssl/certs/litegate-custom-ca.pem
 
 extraVolumeMounts: []
 extraVolumes: []

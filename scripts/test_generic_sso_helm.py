@@ -26,10 +26,10 @@ CONFIG = {
 }
 
 
-def render(config):
+def render(config, **chart_values):
     with tempfile.TemporaryDirectory() as directory:
         values = Path(directory) / "values.json"
-        values.write_text(json.dumps({"config": config}), encoding="utf-8")
+        values.write_text(json.dumps({"config": config, **chart_values}), encoding="utf-8")
         return subprocess.run(
             ["helm", "template", "generic-sso", str(ROOT / "deploy/helm/litegate"), "-f", str(values)],
             text=True,
@@ -39,6 +39,48 @@ def render(config):
 
 
 class GenericSSOHelmTests(unittest.TestCase):
+    def test_custom_ca_requires_a_certificate_source(self):
+        for custom_ca in ({"mountPath": "/etc/ssl/certs/custom.pem"}, {"key": "custom.pem"}, {"key": "custom.pem", "mountPath": "/tmp/custom.pem"}):
+            with self.subTest(custom_ca=custom_ca):
+                result = render({}, customCA=custom_ca)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("set customCA.configMap or customCA.secret", result.stderr)
+                self.assertIn("destination inside the pod", result.stderr)
+
+    def test_custom_ca_source_volume_mount_and_environment_match(self):
+        for source in ("configMap", "secret"):
+            for persistence_enabled in (True, False):
+                for custom_path in (False, True):
+                    with self.subTest(source=source, persistence=persistence_enabled, custom_path=custom_path):
+                        path = "/etc/ssl/certs/custom.pem" if custom_path else "/etc/ssl/certs/litegate-custom-ca.pem"
+                        key = "custom.pem" if custom_path else "ca-bundle.crt"
+                        custom_ca = {source: "corporate-ca"}
+                        if custom_path:
+                            custom_ca.update(mountPath=path, key=key)
+                        result = render({}, customCA=custom_ca, persistence={"enabled": persistence_enabled})
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        deployment = next(doc for doc in result.stdout.split("\n---") if "kind: Deployment\n" in doc)
+                        self.assertIn(f'- name: SSL_CERT_FILE\n              value: "{path}"', deployment)
+                        self.assertIn(
+                            f'- name: custom-ca\n              mountPath: "{path}"\n              subPath: "{key}"\n              readOnly: true',
+                            deployment,
+                        )
+                        name_field = "name" if source == "configMap" else "secretName"
+                        self.assertIn(f'- name: custom-ca\n          {source}:\n            {name_field}: "corporate-ca"', deployment)
+
+    def test_empty_custom_ca_disables_mount_and_environment(self):
+        result = render({}, customCA={}, persistence={"enabled": False})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("name: custom-ca", result.stdout)
+        self.assertNotIn("SSL_CERT_FILE", result.stdout)
+
+    def test_custom_ca_empty_or_conflicting_sources_remain_rejected(self):
+        for custom_ca in ({"configMap": ""}, {"secret": ""}, {"configMap": "one", "secret": "two"}):
+            with self.subTest(custom_ca=custom_ca):
+                result = render({}, customCA=custom_ca)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("customCA", result.stderr)
+
     def test_verification_defaults_and_explicit_opt_outs(self):
         for enabled in (True, False):
             with self.subTest(enabled=enabled):

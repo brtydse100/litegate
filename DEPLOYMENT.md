@@ -346,17 +346,31 @@ administrator groups.
 
 ### Custom CAs and additional resources
 
-Mount a complete CA bundle from an existing ConfigMap or Secret. Choose exactly
-one source; `key` defaults to `ca-bundle.crt`:
+Mount a complete CA bundle from an existing ConfigMap or Secret in LiteGate's
+namespace. For a local bundle, create the source first (use your namespace and
+file path):
+
+```bash
+kubectl create configmap corporate-ca --namespace <namespace> \
+  --from-file=ca-bundle.crt=/path/to/ca-bundle.crt
+```
+
+Choose exactly one source; `key` defaults to `ca-bundle.crt`:
 
 ```yaml
 customCA:
   configMap: corporate-ca
   key: ca-bundle.crt
+  mountPath: /etc/ssl/certs/litegate-custom-ca.pem
 ```
 
-The chart sets `SSL_CERT_FILE` to the mounted bundle. Include public roots in
-that file when LiteGate also connects to public HTTPS endpoints.
+Use `secret: corporate-ca` instead of `configMap` for an existing Secret. The
+chart creates the pod volume and read-only file mount, and sets `SSL_CERT_FILE`
+to `mountPath`. This path is the destination inside the pod; it does not read a
+file from your computer or create the source ConfigMap/Secret. Setting only
+`key` or `mountPath` fails Helm rendering with a source-required error. Leave
+`customCA: {}` to disable the mount. Include public roots in the bundle when
+LiteGate also connects to public HTTPS endpoints.
 
 To skip certificate verification for outgoing LiteLLM and SSO HTTPS requests:
 
