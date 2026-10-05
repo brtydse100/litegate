@@ -7,6 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.12.2] - 2026-10-05
+
+### Added
+
+- Optional outgoing HTTPS certificate verification control through `ssl_verify`
+  and Helm `config.sslVerify` for LiteLLM and all SSO requests.
+- Optional generic SSO email verification control through
+  `generic_require_verified_email` and Helm `config.genericRequireVerifiedEmail`.
+  Both verification settings remain enabled by default.
+
+### Fixed
+
+- Helm rejects custom CA paths or keys without a ConfigMap or Secret source,
+  instead of silently ignoring them. Examples explain how to load a local CA
+  bundle and distinguish its source from the destination inside the pod.
+
 ## [2.12.1] - 2026-10-01
 
 ### Changed
