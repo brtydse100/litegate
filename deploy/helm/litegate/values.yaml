@@ -47,6 +47,11 @@ ingress:
           pathType: Prefix
   tls: []
 
+# Optional organization structure. See docs/organization.md for a complete example.
+# Groups and budgets are managed through these values; labels are chosen by you.
+organizationHierarchy:
+  levels: []
+
 config:
   # -- Required credentials ---------------------------------------------------
   litellmMasterKey: "sk-your-litellm-master-key"

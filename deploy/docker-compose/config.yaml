@@ -107,3 +107,6 @@ save_api_keys_in_db: false
 
 # URL for the Open Support Ticket button (leave blank to hide)
 support_ticket_url: ""
+# Optional organization hierarchy; see docs/organization.md for examples.
+organizationHierarchy:
+  levels: []

@@ -1,5 +1,10 @@
 # Configuration reference
 
+For custom organizational levels, inline identity mappings, inherited per-user
+allowances, and shared pools, see [Organization hierarchy](organization.md).
+`organizationHierarchy` is a top-level Helm value. Direct deployments accept
+the same YAML block or JSON in `ORGANIZATION_HIERARCHY` (default `{"levels":[]}`).
+
 LiteGate reads `config.yaml` and environment variables. Environment variables
 take precedence and use uppercase names; for example, `management_api_key`
 becomes `MANAGEMENT_API_KEY`.

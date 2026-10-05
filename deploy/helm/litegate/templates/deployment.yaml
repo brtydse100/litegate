@@ -30,6 +30,8 @@ spec:
       {{- include "litegate.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/organization: {{ .Values.organizationHierarchy | default (dict "levels" (list)) | toJson | sha256sum | quote }}
       labels:
         {{- include "litegate.selectorLabels" . | nindent 8 }}
     spec:

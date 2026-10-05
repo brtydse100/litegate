@@ -40,6 +40,12 @@ export interface BulkKeySpendResetResponse {
 }
 
 export interface KeyInfo {
+  user_budget?: number | null;
+  organization_managed?: boolean;
+  user_budget_available?: boolean;
+  policy_error?: string | null;
+  user_spend?: number | null;
+  organization_path?: string[];
   secret_available?: boolean;
   token?: string;
   key_alias?: string;
@@ -116,6 +122,7 @@ export interface OperationLimit {
 }
 
 export interface TeamInfo {
+  organization_managed?: boolean;
   team_id: string;
   team_alias?: string | null;
   organization_id?: string | null;
@@ -161,8 +168,8 @@ export interface TeamCreatePayload {
 export interface TeamUpdatePayload {
   team_alias: string;
   models: string[];
-  max_budget: number | null;
-  budget_duration: string | null;
+  max_budget?: number | null;
+  budget_duration?: string | null;
   tpm_limit: number | null;
   rpm_limit: number | null;
   blocked: boolean;

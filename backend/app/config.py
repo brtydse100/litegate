@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from pydantic import Field, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from app.organization import OrganizationHierarchy
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent  # …/backend/
 
@@ -38,6 +39,8 @@ class YamlConfigSettingsSource(PydanticBaseSettingsSource):
         data = _load_yaml_config()
         if isinstance(data.get("key_models"), list):
             data["key_models"] = json.dumps(data["key_models"])
+        if "organizationHierarchy" in data:
+            data["organization_hierarchy"] = data.pop("organizationHierarchy")
         return data
 
 
@@ -71,6 +74,7 @@ class Settings(BaseSettings):
     oidc_group_team_mapping: dict[str, str | list[str]] = Field(default_factory=dict)
     oidc_require_team_mapping: bool = False
     sso_default_team_id: str = ""
+    organization_hierarchy: OrganizationHierarchy = Field(default_factory=OrganizationHierarchy)
     inherit_litellm_admin: bool = False
 
     jwt_secret: str

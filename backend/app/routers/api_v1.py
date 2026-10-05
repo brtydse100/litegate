@@ -25,7 +25,7 @@ from app.routers.api_actor import (
 )
 from app.routers.api_v1_system import api_audit_events, api_status, router as system_router
 from app.routers.api_v1_users import api_create_user, api_list_users, api_update_user, router as users_router
-from app.services import key_secrets, litellm as llm
+from app.services import key_secrets, litellm as llm, organization_sync
 
 router = APIRouter(prefix="/v1", tags=["api-v1"])
 router.include_router(system_router)
@@ -48,6 +48,7 @@ def _decorate_team(team: dict) -> dict:
         **team,
         "mapped_groups": mapped_groups,
         "default_key_team": default_key_team,
+        "organization_managed": settings.organization_hierarchy.is_managed_team(team_id),
     }
 
 
@@ -124,7 +125,7 @@ async def api_create_key(
         raise HTTPException(status_code=409, detail="This user already has a key")
     is_self_service = not requested_user_id or requested_user_id == actor.user.user_id
     team_id = actor.user.team_ids[0] if is_self_service and actor.user.team_ids else None
-    result = await llm.generate_key(user_id, email, team_id)
+    result = await organization_sync.generate_key(user_id, email, team_id)
     if actor.is_admin:
         await _record_audit(
             actor,
@@ -212,6 +213,7 @@ async def bulk_update_keys(
     async def update_one(key: str) -> dict:
         async with semaphore:
             try:
+                await organization_sync.guard_key(key, changes)
                 await llm.update_key(key, changes)
                 return {"key": key, "updated": True}
             except HTTPException as exc:
@@ -274,6 +276,7 @@ async def api_update_team(
 ):
     """Update a LiteLLM team's core budget and access policy."""
     _require_api_admin(actor)
+    organization_sync.guard_team(team_id, payload.model_dump(exclude_unset=True))
     check_key_rate_limit(actor.user.user_id)
     updated = await llm.update_team(team_id, payload.model_dump(exclude_unset=True))
     await _record_audit(actor, "team.update", team_id, details={"setting_fields": sorted(payload.model_fields_set)})
@@ -287,6 +290,7 @@ async def api_delete_team(
 ):
     """Delete a team and its team-scoped keys after configuration safeguards."""
     _require_api_admin(actor)
+    organization_sync.guard_team(team_id)
     mapped_groups, default_key_team = _team_config_references(team_id)
     references = []
     if mapped_groups:
@@ -312,6 +316,8 @@ async def api_move_team_member(
 ):
     """Move a member and their source-team keys to another LiteLLM team."""
     _require_api_admin(actor)
+    organization_sync.guard_team(source_team_id)
+    organization_sync.guard_team(payload.destination_team_id)
     if source_team_id == payload.destination_team_id:
         raise HTTPException(status_code=422, detail="Source and destination teams must be different")
 

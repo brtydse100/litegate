@@ -257,6 +257,10 @@ because it retains overrides from the previous release.
 
 ### SSO roles and LiteLLM teams in Helm
 
+For custom organizational levels and inherited budgets, configure the top-level
+`organizationHierarchy` value. See [Organization hierarchy](docs/organization.md)
+for inline SSO/local mappings, parent bundles, synchronization, and usage graphs.
+
 The chart keeps application settings together under `config`. Discovery is the
 normal SSO mode; the three manual endpoints are only needed for providers whose
 discovery metadata cannot be used.

@@ -1,5 +1,60 @@
 import { expect, test } from "@playwright/test";
 
+test("organization demo filters usage and protects the admin view", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
+  const navigation = page.getByRole("navigation", {
+    name: "Organization groups",
+  });
+  await expect(
+    navigation.getByRole("button", { name: /^Platform,/ }),
+  ).toHaveCount(0);
+  await navigation
+    .getByRole("button", { name: "Expand Engineering", exact: true })
+    .click();
+  await navigation
+    .getByRole("button", {
+      name: "Expand Engineering → Infrastructure",
+      exact: true,
+    })
+    .click();
+  await navigation.getByRole("button", { name: /^Platform,/ }).click();
+  const policy = page.getByRole("region", { name: "Effective budget policy" });
+  await expect(policy.getByText("$100.00", { exact: false })).toBeVisible();
+  await expect(policy.getByText("Engineering shared pool")).toBeVisible();
+  await expect(page.getByText("sam@example.com", { exact: true })).toHaveCount(
+    0,
+  );
+  await page.getByLabel("Chart metric").selectOption("tokens");
+  await expect(
+    page.getByRole("img", { name: "Tokens over time" }),
+  ).toBeVisible();
+  await navigation
+    .getByRole("button", { name: "Collapse Engineering", exact: true })
+    .click();
+  await expect(
+    navigation.getByRole("button", { name: /^Platform,/ }),
+  ).toHaveCount(0);
+  await expect(policy.getByText("$100.00", { exact: false })).toBeVisible();
+  await navigation
+    .getByRole("button", { name: "Expand Engineering", exact: true })
+    .click();
+  await navigation.getByRole("button", { name: /^Cloud,/ }).click();
+  await expect(page.getByText("Inherited from Engineering")).toBeVisible();
+  await expect(policy.getByText("$50.00", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "View demo as user" }).click();
+  await expect(page).toHaveURL(/\/my-key$/);
+  await expect(
+    page.getByRole("link", { name: "Organization", exact: true }),
+  ).toHaveCount(0);
+  const status = await page.evaluate(
+    async () => (await fetch("/api/v1/organization")).status,
+  );
+  expect(status).toBe(403);
+});
+
 test("interactive demo keeps its key views consistent and supports local sign-in", async ({
   page,
 }) => {

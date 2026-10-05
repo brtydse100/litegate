@@ -96,8 +96,12 @@ function TeamEditor({
     onUpdate(state.team.team_id, {
       team_alias: alias.trim(),
       models: modelList,
-      max_budget: nullableNumber(budget),
-      budget_duration: budgetDuration.trim() || null,
+      ...(!state.team.organization_managed
+        ? {
+            max_budget: nullableNumber(budget),
+            budget_duration: budgetDuration.trim() || null,
+          }
+        : {}),
       tpm_limit: nullableNumber(tpm),
       rpm_limit: nullableNumber(rpm),
       blocked,
@@ -166,6 +170,7 @@ function TeamEditor({
           <label className="space-y-1 text-xs text-gray-400">
             <span>Maximum budget (USD)</span>
             <input
+              disabled={existing?.organization_managed}
               className={inputClass}
               value={budget}
               onChange={(event) => setBudget(event.target.value)}
@@ -178,6 +183,7 @@ function TeamEditor({
           <label className="space-y-1 text-xs text-gray-400">
             <span>Budget reset</span>
             <input
+              disabled={existing?.organization_managed}
               className={inputClass}
               value={budgetDuration}
               onChange={(event) => setBudgetDuration(event.target.value)}
@@ -516,7 +522,9 @@ export default function AdminTeams() {
           <div className="divide-y divide-[#2A2E42]">
             {teams.data.teams.map((team) => {
               const protectedTeam =
-                team.mapped_groups.length > 0 || team.default_key_team;
+                team.organization_managed ||
+                team.mapped_groups.length > 0 ||
+                team.default_key_team;
               return (
                 <article key={team.team_id} className="p-4">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center">

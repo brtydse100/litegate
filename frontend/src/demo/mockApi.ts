@@ -1,4 +1,9 @@
 import type { AuditEvent, KeyInfo, LocalUser, TeamInfo, User } from "../types";
+import {
+  organizationOverview,
+  organizationUsers,
+  organizationUsage,
+} from "./organization";
 
 let demoUser: User = {
   user_id: "demo-admin",
@@ -214,6 +219,36 @@ async function mockResponse(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
+  if (path.startsWith("/api/v1/organization")) {
+    if (!signedIn) return json({ detail: "Not signed in" }, 401);
+    if (demoUser.role !== "admin")
+      return json({ detail: "Administrator access required" }, 403);
+    if (method !== "GET") return json({ detail: "Method not allowed" }, 405);
+    if (path === "/api/v1/organization") return json(organizationOverview());
+    if (path.endsWith("/users"))
+      return json(
+        organizationUsers(
+          url.searchParams.get("node"),
+          Number(url.searchParams.get("page") ?? 1),
+        ),
+      );
+    if (path.endsWith("/usage")) {
+      const start = url.searchParams.get("start_date") ?? "";
+      const end = url.searchParams.get("end_date") ?? "";
+      if (
+        !Number.isFinite(Date.parse(start)) ||
+        !Number.isFinite(Date.parse(end)) ||
+        Date.parse(end) < Date.parse(start) ||
+        (Date.parse(end) - Date.parse(start)) / 86400000 > 90
+      )
+        return json(
+          { detail: "Select a valid date range of at most 90 days" },
+          422,
+        );
+      return json(organizationUsage(url.searchParams.get("node"), start, end));
+    }
+    return json({ detail: "Not found" }, 404);
+  }
 
   if (path === "/api/auth/config")
     return json({ sso_enabled: false, local_enabled: true });
