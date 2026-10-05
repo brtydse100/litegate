@@ -13,6 +13,7 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | --- | --- | --- |
 | `litellm_url` | `http://localhost:4000` | LiteLLM proxy and management URL |
 | `litellm_master_key` | required | LiteLLM administrator key |
+| `ssl_verify` | `true` | Verify certificates on outgoing LiteLLM and SSO HTTPS connections |
 | `jwt_secret` | required | Portal-session signing secret |
 | `jwt_previous_secrets` | empty | Comma-separated prior session secrets accepted only for verification during rotation |
 | `jwt_algorithm` | `HS256` | Portal-session signing algorithm |
@@ -77,6 +78,7 @@ callback URLs require HTTPS; HTTP is permitted only for localhost development.
 | `generic_user_email_attribute` | `email` | Email field in UserInfo; dot notation supported |
 | `generic_client_use_pkce` | `false` | Enable PKCE with S256 |
 | `generic_include_client_id` | `true` | Send client credentials in the token request body; `false` uses HTTP Basic |
+| `generic_require_verified_email` | `true` | Reject a provided email when UserInfo explicitly reports `email_verified: false`; `false` permits it |
 
 These settings accept their uppercase `GENERIC_*` environment equivalents,
 including LiteLLM's endpoint and user-attribute names. Environment variables
@@ -85,6 +87,16 @@ override YAML. `generic_redirect_uri` is LiteGate's callback override, and
 
 See [generic SSO setup](authentication.md#generic-oauth-sso) for a YAML example,
 provider limitations, and the supported compatibility scope.
+
+### Outgoing HTTPS certificate verification
+
+`ssl_verify` (`SSL_VERIFY`, Helm `config.sslVerify`) defaults to `true` for
+LiteLLM requests and SSO discovery, token, JWKS, and UserInfo requests. Set it
+to `false` to skip server certificate verification. HTTPS remains encrypted,
+but the server's identity is no longer authenticated. Prefer a trusted CA bundle
+(`SSL_CERT_FILE`, or Helm `customCA`) for private certificates. This setting
+does not change the portal's ingress TLS or the HTTPS requirement for generic
+SSO URLs. Restart LiteGate after changing it.
 
 ### Audit-history retention
 

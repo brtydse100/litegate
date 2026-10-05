@@ -60,6 +60,10 @@ config:
   # Browser-facing "Open LiteLLM Hub" link; blank hides it.
   litellmUiUrl: ""
 
+  # Verify certificates for outgoing LiteLLM and SSO HTTPS connections.
+  # False skips certificate verification; prefer customCA for private CAs.
+  sslVerify: true
+
   # -- Portal URL and appearance ---------------------------------------------
   rootUrl: "http://litegate.example.com"
   logoUrl: ""
@@ -94,6 +98,9 @@ config:
   genericClientUsePkce: false
   # False uses HTTP Basic client authentication at the token endpoint.
   genericIncludeClientId: true
+  # Reject a provided email when UserInfo explicitly reports email_verified: false.
+  # False allows that email; missing email/verification claims remain accepted.
+  genericRequireVerifiedEmail: true
 
   # -- SSO roles and LiteLLM teams -------------------------------------------
   # Group claim supports dotted paths such as realm_access.roles.

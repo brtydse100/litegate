@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
     litellm_url: str = "http://localhost:4000"
     litellm_master_key: str
+    ssl_verify: bool = True
 
     oidc_issuer_url: str = ""
     oidc_client_id: str = ""
@@ -65,6 +66,7 @@ class Settings(BaseSettings):
     generic_user_email_attribute: str = "email"
     generic_client_use_pkce: bool = False
     generic_include_client_id: bool = True
+    generic_require_verified_email: bool = True
     oidc_groups_claim: str = "groups"
     oidc_group_team_mapping: dict[str, str | list[str]] = Field(default_factory=dict)
     oidc_require_team_mapping: bool = False

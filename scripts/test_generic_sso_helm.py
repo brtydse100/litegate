@@ -39,6 +39,23 @@ def render(config):
 
 
 class GenericSSOHelmTests(unittest.TestCase):
+    def test_verification_defaults_and_explicit_opt_outs(self):
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                config = CONFIG if enabled else CONFIG | {"sslVerify": False, "genericRequireVerifiedEmail": False}
+                result = render(config)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                for field in ("SSL_VERIFY", "GENERIC_REQUIRE_VERIFIED_EMAIL"):
+                    self.assertIn(f'  {field}: "{str(enabled).lower()}"', result.stdout.splitlines())
+
+    def test_ssl_verification_setting_is_rendered_without_sso(self):
+        for enabled in (True, False):
+            with self.subTest(enabled=enabled):
+                result = render({"sslVerify": enabled})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f'  SSL_VERIFY: "{str(enabled).lower()}"', result.stdout.splitlines())
+                self.assertNotIn("GENERIC_REQUIRE_VERIFIED_EMAIL", result.stdout)
+
     def test_generic_settings_and_group_mapping_are_rendered_without_oidc(self):
         result = render(CONFIG)
         self.assertEqual(result.returncode, 0, result.stderr)

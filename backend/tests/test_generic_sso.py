@@ -30,6 +30,7 @@ def provider(monkeypatch):
         "generic_user_email_attribute": "mail",
         "generic_client_use_pkce": True,
         "generic_include_client_id": True,
+        "generic_require_verified_email": True,
         "admin_emails": "",
         "admin_groups": "",
         "oidc_groups_claim": "groups",
@@ -165,6 +166,44 @@ async def test_explicitly_unverified_email_is_rejected(provider, monkeypatch):
     with pytest.raises(HTTPException) as exc:
         await generic_sso.get_user_claims("code", oidc.generate_state("generic"))
     assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("verification", [True, False, None])
+@pytest.mark.parametrize("required", [True, False])
+async def test_email_verification_policy(provider, monkeypatch, verification, required):
+    provider.generic_require_verified_email = required
+    userinfo = {"identity": {"employee_id": "u"}, "mail": "alex@example.com"}
+    if verification is not None:
+        userinfo["email_verified"] = verification
+    mock_provider(monkeypatch, userinfo=userinfo)
+    state = oidc.generate_state("generic")
+    if required and verification is False:
+        with pytest.raises(HTTPException) as exc:
+            await generic_sso.get_user_claims("code", state)
+        assert exc.value.status_code == 403
+    else:
+        claims = await generic_sso.get_user_claims("code", state)
+        assert claims["sub"] == "u"
+        assert claims["email"] == "alex@example.com"
+
+
+@pytest.mark.asyncio
+async def test_unverified_email_opt_out_allows_callback_and_session(provider, monkeypatch):
+    provider.generic_require_verified_email = False
+    ensure = AsyncMock(return_value={"user_id": "u"})
+    monkeypatch.setattr(auth.llm, "ensure_user_exists", ensure)
+    mock_provider(monkeypatch, userinfo={"identity": {"employee_id": "u"}, "mail": "alex@example.com", "email_verified": False})
+    state = oidc.generate_state("generic")
+    response = await auth.callback("code", state, state_cookie=state)
+    from http.cookies import SimpleCookie
+
+    cookie = SimpleCookie(response.headers.getlist("set-cookie")[0])
+    user = auth.get_current_user(credentials=None, session_cookie=cookie["litegate_session"].value)
+    assert user.user_id == "u"
+    assert user.email == "alex@example.com"
+    assert user.is_admin is False
+    ensure.assert_awaited_once_with("u", "alex@example.com")
 
 
 @pytest.mark.asyncio

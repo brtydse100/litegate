@@ -337,6 +337,13 @@ configuration fails Helm rendering and backend startup. For Docker Compose,
 use the root-level snake_case equivalents in `config.yaml`.
 See [generic SSO](docs/authentication.md#generic-oauth-sso) for provider details.
 
+To allow generic SSO users whose provider explicitly reports an unverified
+email, set `config.genericRequireVerifiedEmail: false` (default: `true`). A
+missing email or `email_verified` claim remains accepted. OIDC email handling
+is unchanged. When disabled, email-based administrator matching can use that
+unverified email; configure a provider-controlled email attribute or trusted
+administrator groups.
+
 ### Custom CAs and additional resources
 
 Mount a complete CA bundle from an existing ConfigMap or Secret. Choose exactly
@@ -350,6 +357,20 @@ customCA:
 
 The chart sets `SSL_CERT_FILE` to the mounted bundle. Include public roots in
 that file when LiteGate also connects to public HTTPS endpoints.
+
+To skip certificate verification for outgoing LiteLLM and SSO HTTPS requests:
+
+```yaml
+config:
+  sslVerify: false
+```
+
+The default is `true`. This covers SSO discovery, token, JWKS, and UserInfo
+requests as well as LiteLLM requests. Disabling verification removes server
+identity checks; prefer `customCA` for private certificates. The setting does
+not change ingress TLS or generic SSO's HTTPS URL requirement. After applying
+either verification setting with Helm, restart the LiteGate Deployment so the
+pod picks up the updated ConfigMap environment variables.
 
 Use `extraObjects` for arbitrary cluster resources. For example, an OpenShift
 Route can target the chart's Service without a dedicated Route option:
