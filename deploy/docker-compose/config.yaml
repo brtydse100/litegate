@@ -10,6 +10,8 @@ jwt_previous_secrets: ""
 
 # LiteLLM location
 litellm_url: "http://host.docker.internal:4000"
+# Verify outgoing LiteLLM and SSO HTTPS certificates; prefer a trusted CA bundle.
+ssl_verify: true
 
 # SSO (OIDC) - leave blank to disable
 oidc_issuer_url: ""
@@ -38,6 +40,8 @@ generic_user_email_attribute: "email"
 generic_client_use_pkce: false
 # False uses HTTP Basic client authentication instead of credentials in the body.
 generic_include_client_id: true
+# Reject email_verified: false; false permits explicitly unverified email.
+generic_require_verified_email: true
 # ID-token claim containing group names; dot notation supports nested claims.
 oidc_groups_claim: "groups"
 # Add matched SSO users to existing LiteLLM teams. A group may map to one team

@@ -28,6 +28,7 @@ metadata:
 data:
   LITELLM_URL: {{ .Values.config.litellmUrl | quote }}
   LITELLM_UI_URL: {{ .Values.config.litellmUiUrl | quote }}
+  SSL_VERIFY: {{ .Values.config.sslVerify | quote }}
   ROOT_URL: {{ .Values.config.rootUrl | quote }}
   LOGO_URL: {{ .Values.config.logoUrl | quote }}
   SUPPORT_TICKET_URL: {{ .Values.config.supportTicketUrl | quote }}
@@ -70,6 +71,7 @@ data:
   GENERIC_USER_EMAIL_ATTRIBUTE: {{ .Values.config.genericUserEmailAttribute | quote }}
   GENERIC_CLIENT_USE_PKCE: {{ .Values.config.genericClientUsePkce | quote }}
   GENERIC_INCLUDE_CLIENT_ID: {{ .Values.config.genericIncludeClientId | quote }}
+  GENERIC_REQUIRE_VERIFIED_EMAIL: {{ .Values.config.genericRequireVerifiedEmail | quote }}
   {{- end }}
   {{- if .Values.config.keyMaxBudget }}
   KEY_MAX_BUDGET: {{ .Values.config.keyMaxBudget | quote }}

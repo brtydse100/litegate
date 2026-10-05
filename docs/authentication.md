@@ -102,7 +102,14 @@ OAuth client can change user IDs and produce separate LiteLLM user records.
 
 The ID must be a nonempty string. Email may be absent, in which case email-based
 administrator matching does not apply. A provided email must be a nonempty
-string; an explicitly false `email_verified` value rejects login. HTTP errors,
+string; an explicitly false `email_verified` value rejects login by default.
+Set `generic_require_verified_email: false` (`GENERIC_REQUIRE_VERIFIED_EMAIL=false`,
+Helm `config.genericRequireVerifiedEmail: false`) to allow it. A missing
+`email_verified` claim remains accepted. This option applies only to generic
+OAuth; OIDC email handling is unchanged. Allowing unverified email also permits
+email-based administrator matching against that email, so use a provider that
+controls the email attribute or assign administrators through trusted groups.
+HTTP errors,
 malformed provider responses, and missing IDs fail login without exposing
 provider responses or credentials to the browser. HTTPS is required except on
 localhost. Endpoint redirects are not followed.

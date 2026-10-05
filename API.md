@@ -20,7 +20,9 @@ UserInfo. Both use `GET /api/auth/login` and `GET /api/auth/callback`; the latte
 requires an authorization `code` and browser-bound signed `state` matching its
 HttpOnly state cookie. `GET /api/auth/config` reports `sso_enabled: true` for
 either configured mode. Generic provider failures or malformed identities return
-502, an explicitly unverified email returns 403, and invalid state returns 400.
+502, an explicitly unverified email returns 403 when
+`generic_require_verified_email` is enabled (the default), and invalid state
+returns 400. Set that option to `false` to permit unverified email in generic SSO.
 Generic UserInfo role fields never grant administrator privileges. See
 [authentication setup](docs/authentication.md#generic-oauth-sso).
 
