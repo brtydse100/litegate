@@ -96,7 +96,7 @@ function KeyCard({
     >
       {(action) => (
         <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
+          <div className="border-b border-slate-200 px-5 py-5">
             <div className="flex min-w-0 items-start gap-3">
               <div className="shrink-0 rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
                 <KeyRound size={17} />
@@ -109,7 +109,7 @@ function KeyCard({
               </div>
             </div>
           </div>
-          {action}
+          {action && <div className="py-4">{action}</div>}
           <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
             <div className="px-5 py-4">
               <dt className="text-xs text-slate-500">

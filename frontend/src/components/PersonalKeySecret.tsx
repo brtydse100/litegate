@@ -101,23 +101,26 @@ function SecretContent({
 
   return (
     <div
-      className="w-full min-w-0 space-y-3"
+      className="w-full min-w-0 space-y-6"
       role="group"
       aria-label="API key secret"
     >
       {secret ? (
-        <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-5">
-          <code className="min-w-0 basis-full break-all font-mono text-base font-medium leading-relaxed text-emerald-900 sm:flex-1 sm:basis-auto md:text-lg">
+        <div className="flex min-w-0 items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+          <code className="min-w-0 flex-1 break-all font-mono text-sm leading-relaxed text-emerald-900">
             {secret}
           </code>
           <button
             type="button"
             onClick={() => void copy()}
             aria-label="Copy API key"
-            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-indigo-50 hover:bg-indigo-700"
+            title={copied ? "Copied" : "Copy API key"}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-emerald-900 hover:bg-emerald-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 [html.dark_&]:hover:bg-emerald-900"
           >
             {copied ? <Check size={17} /> : <Copy size={17} />}
-            {copied ? "Copied" : "Copy API key"}
+            <span className="sr-only" role="status">
+              {copied ? "Copied" : ""}
+            </span>
           </button>
         </div>
       ) : !canReveal ? (
