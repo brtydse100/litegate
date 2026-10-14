@@ -282,6 +282,11 @@ async function mockResponse(request: Request): Promise<Response> {
       expires: personalKeys[0]?.expires ?? null,
     });
   }
+  if (path === "/api/v1/models" && method === "GET") {
+    if (demoUser.role !== "admin")
+      return json({ detail: "Administrator access required" }, 403);
+    return json({ models: ["gpt-5", "claude-sonnet-4", "gemini-2.5-pro"] });
+  }
   if (path === "/api/v1/keys" && method === "GET") {
     const page = Number(url.searchParams.get("page") ?? 1);
     const size = Number(url.searchParams.get("size") ?? 25);

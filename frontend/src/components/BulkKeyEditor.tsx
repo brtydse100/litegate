@@ -12,6 +12,11 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import RevealKey from "./RevealKey";
+import {
+  CurrentPolicySettings,
+  DurationChoices,
+  ModelChoices,
+} from "./PolicySettings";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import type {
@@ -65,6 +70,8 @@ export default function BulkKeyEditor({
   const [rpm, setRpm] = useState("");
   const [duration, setDuration] = useState("");
   const [blockedSetting, setBlockedSetting] = useState("");
+  const [useKeyBudgetOnly, setUseKeyBudgetOnly] = useState(false);
+  const [lastUseKeyBudgetOnly, setLastUseKeyBudgetOnly] = useState(false);
   const [localError, setLocalError] = useState("");
   const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const [lastSettings, setLastSettings] = useState<KeySettingsUpdate | null>(
@@ -97,10 +104,15 @@ export default function BulkKeyEditor({
     mutationFn: ({
       targetKeys,
       settings,
+      keyBudgetOnly = false,
     }: {
       targetKeys: string[];
       settings: KeySettingsUpdate;
-    }) => api.bulkUpdateKeys(targetKeys, settings),
+      keyBudgetOnly?: boolean;
+    }) =>
+      keyBudgetOnly
+        ? api.bulkUpdateKeys(targetKeys, settings, true)
+        : api.bulkUpdateKeys(targetKeys, settings),
     onSuccess: (data) => {
       const failedKeys = data.results
         .filter((result) => !result.updated)
@@ -173,12 +185,13 @@ export default function BulkKeyEditor({
       return;
     }
     const settings = settingsFromForm();
-    if (!Object.keys(settings).length) {
+    if (!Object.keys(settings).length && !useKeyBudgetOnly) {
       setLocalError("Choose at least one setting to change.");
       return;
     }
     setLastSettings(settings);
-    update.mutate({ targetKeys, settings });
+    setLastUseKeyBudgetOnly(useKeyBudgetOnly);
+    update.mutate({ targetKeys, settings, keyBudgetOnly: useKeyBudgetOnly });
   }
 
   function applySearch() {
@@ -235,6 +248,7 @@ export default function BulkKeyEditor({
     update.mutate({
       targetKeys: failedResults.map((result) => result.key),
       settings: lastSettings,
+      keyBudgetOnly: lastUseKeyBudgetOnly,
     });
   }
 
@@ -301,6 +315,8 @@ export default function BulkKeyEditor({
         onSubmit={submit}
         className="grid gap-4 border-t border-[#2A2E42] p-4 sm:grid-cols-2"
       >
+        <DurationChoices id="key-budget-durations" />
+        <DurationChoices id="key-lifetime-durations" />
         <div className="space-y-3 sm:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -612,6 +628,47 @@ export default function BulkKeyEditor({
           )}
         </div>
 
+        {targetCount > 0 && (
+          <section
+            aria-label="Current key settings"
+            className="space-y-3 rounded-lg border border-[#2A2E42] p-3 sm:col-span-2"
+          >
+            <h3 className="text-sm font-semibold text-gray-200">
+              Current key settings
+            </h3>
+            {visibleKeys
+              .filter((key) => selected.includes(keyToken(key)))
+              .map((key) => (
+                <div
+                  key={keyToken(key)}
+                  className="space-y-2 border-t border-[#2A2E42] pt-2"
+                >
+                  <p className="text-xs font-medium text-gray-300">
+                    {key.key_alias || maskedToken(keyToken(key))}
+                  </p>
+                  <CurrentPolicySettings settings={key} />
+                </div>
+              ))}
+            {targetCount >
+              visibleTokens.filter((token) => selected.includes(token))
+                .length && (
+              <p className="text-xs text-amber-600">
+                {targetCount -
+                  visibleTokens.filter((token) => selected.includes(token))
+                    .length}{" "}
+                selected{" "}
+                {targetCount -
+                  visibleTokens.filter((token) => selected.includes(token))
+                    .length ===
+                1
+                  ? "key is"
+                  : "keys are"}{" "}
+                on another page. View that page to inspect their current
+                settings.
+              </p>
+            )}
+          </section>
+        )}
         <div className="sm:col-span-2">
           <p className="text-xs font-semibold text-gray-200">
             2. Choose settings to change
@@ -639,6 +696,11 @@ export default function BulkKeyEditor({
             placeholder="Comma-separated; no change when empty"
           />
         </label>
+        <ModelChoices
+          value={models}
+          onChange={setModels}
+          className={`${inputClass} w-full`}
+        />
         <label className={fieldClass}>
           <span>Maximum budget</span>
           <input
@@ -656,6 +718,7 @@ export default function BulkKeyEditor({
           <input
             className={`${inputClass} w-full`}
             value={budgetDuration}
+            list="key-budget-durations"
             onChange={(event) => setBudgetDuration(event.target.value)}
             placeholder="For example 30d"
           />
@@ -687,6 +750,7 @@ export default function BulkKeyEditor({
           <input
             className={`${inputClass} w-full`}
             value={duration}
+            list="key-lifetime-durations"
             onChange={(event) => setDuration(event.target.value)}
             placeholder="For example 90d"
           />
@@ -704,6 +768,22 @@ export default function BulkKeyEditor({
           </select>
         </label>
 
+        <div className="space-y-1 sm:col-span-2">
+          <label className="flex items-center gap-2 text-xs text-gray-400">
+            <input
+              type="checkbox"
+              checked={useKeyBudgetOnly}
+              onChange={(event) => setUseKeyBudgetOnly(event.target.checked)}
+            />
+            Use key budget as the individual allowance
+          </label>
+          <p className="text-xs text-gray-500">
+            Requires one key per owner with a finite budget. Removes the owner's
+            separate personal budget and member budget in this key's team.
+            Shared team budgets remain in force. Key settings may be saved even
+            if removing a user budget fails; failures can be retried.
+          </p>
+        </div>
         {error && <p className="text-xs text-red-400 sm:col-span-2">{error}</p>}
         {operationsBlocked && (
           <p className="text-xs text-amber-300 sm:col-span-2">

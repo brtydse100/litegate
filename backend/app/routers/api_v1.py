@@ -25,11 +25,14 @@ from app.routers.api_actor import (
 )
 from app.routers.api_v1_system import api_audit_events, api_status, router as system_router
 from app.routers.api_v1_users import api_create_user, api_list_users, api_update_user, router as users_router
+from app.routers.api_v1_models import router as models_router
+from app.services import key_budgets
 from app.services import key_secrets, litellm as llm
 
 router = APIRouter(prefix="/v1", tags=["api-v1"])
 router.include_router(system_router)
 router.include_router(users_router)
+router.include_router(models_router)
 
 
 def _team_config_references(team_id: str) -> tuple[list[str], bool]:
@@ -206,13 +209,13 @@ async def bulk_update_keys(
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
 
-    changes = payload.settings.model_dump(exclude_unset=True)
+    changes = payload.settings.model_dump(exclude_unset=True) if payload.settings else {}
     semaphore = asyncio.Semaphore(10)
 
     async def update_one(key: str) -> dict:
         async with semaphore:
             try:
-                await llm.update_key(key, changes)
+                await key_budgets.update_key(key, changes, use_key_budget_only=payload.use_key_budget_only)
                 return {"key": key, "updated": True}
             except HTTPException as exc:
                 return {"key": key, "updated": False, "error": str(exc.detail)}
@@ -230,6 +233,7 @@ async def bulk_update_keys(
         details={
             "keys": payload.keys,
             "setting_fields": sorted(changes),
+            "use_key_budget_only": payload.use_key_budget_only,
             "updated": updated,
             "failed": failed,
         },

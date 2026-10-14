@@ -55,6 +55,10 @@ to another team in a few clicks. The same operations are available to trusted
 automation through the [v1 API](../API.md#teams-admin-only). Normal users cannot
 see the tab or call the team endpoints.
 
+The team editor keeps a **Current team settings** summary visible while you
+edit. It prefills saved values and offers available model names and common
+budget-reset durations. Custom model names and durations remain supported.
+
 A move deliberately changes the policy applied to that user's source-team keys.
 LiteGate first adds the destination membership, reassigns and verifies every
 source-team key, and only then removes the source membership. The administrator
@@ -84,6 +88,21 @@ The bulk editor lets an administrator:
 - reset selected keys' accumulated spend to zero after confirmation while
   preserving their budgets, limits, and LiteLLM spend logs; and
 - submit only changed fields so untouched settings remain unchanged.
+
+After selecting keys, **Current key settings** shows each selected key's saved
+budget, reset interval, models, rate limits, status and available expiry metadata
+on the current page. Selections on other pages are explicitly identified;
+their settings are not assumed to match. Change fields remain separate from the
+saved values, so reviewing a key does not cause unrelated settings to be written.
+Model choices and common reset/lifetime durations are available alongside custom input.
+
+Select **Use key budget as the individual allowance** to remove a duplicate
+personal user cap and the owner's team-member cap for the key's team. This
+requires one key per owner and a finite key budget; shared team budgets still
+apply. You can migrate an existing key with its saved budget, or enter a new
+key budget at the same time. LiteGate verifies the change and keeps failures
+selected for retry. This is an explicit administrator action, not a change
+performed during ordinary user login or key creation.
 
 The API accepts up to 5,000 keys in a request, updates them with bounded
 concurrency, and returns a result for each key so partial failures remain visible,

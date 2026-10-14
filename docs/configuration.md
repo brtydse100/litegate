@@ -196,6 +196,22 @@ key_team_id: "team-id"
 | `key_rpm_limit` | unset | Requests-per-minute limit |
 | `key_team_id` | unset | Fallback LiteLLM team for generated keys without an SSO-mapped primary team |
 
+For one individual allowance per user, configure `key_max_budget` (and optionally
+`key_budget_duration`) and leave LiteLLM personal-user and team-member budget
+defaults unset. Keep shared team budgets configured as desired. LiteGate does
+not copy the key budget onto the user, but upstream defaults can independently
+introduce user/member caps. Sending an unset budget during user creation does
+not reliably override those defaults.
+
+For existing keys with duplicate individual caps, administrators can explicitly
+select **Use key budget as the individual allowance** in the key editor. It
+requires exactly one key per owner and verifies removal of personal and
+team-member caps while preserving shared team budgets. This also works for
+newly generated keys that inherited an upstream cap. Later external policy or
+default changes may reintroduce those caps; align LiteLLM defaults with the
+per-key policy rather than relying on migration alone. See
+[administrator-only bulk editing](features.md#administrator-only-bulk-editing).
+
 Administrators can override supported settings later with the portal bulk editor
 or `PATCH /api/v1/keys/bulk`. Normal users cannot bulk-edit keys. See
 [Features and access model](features.md#administrator-only-bulk-editing).

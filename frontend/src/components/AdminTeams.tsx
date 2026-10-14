@@ -15,6 +15,11 @@ import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import type { TeamCreatePayload, TeamInfo, TeamUpdatePayload } from "../types";
 import TeamMembersDialog from "./TeamMembersDialog";
+import {
+  CurrentPolicySettings,
+  DurationChoices,
+  ModelChoices,
+} from "./PolicySettings";
 
 const inputClass =
   "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
@@ -140,6 +145,18 @@ function TeamEditor({
             <X size={18} />
           </button>
         </div>
+        {existing && (
+          <section
+            aria-label="Current team settings"
+            className="mt-4 space-y-2 rounded-lg border border-[#2A2E42] p-3"
+          >
+            <h4 className="text-sm font-semibold text-gray-200">
+              Current team settings
+            </h4>
+            <CurrentPolicySettings settings={existing} />
+          </section>
+        )}
+        <DurationChoices id="team-budget-durations" />
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="space-y-1 text-xs text-gray-400">
             <span>Team name</span>
@@ -180,6 +197,7 @@ function TeamEditor({
             <input
               className={inputClass}
               value={budgetDuration}
+              list="team-budget-durations"
               onChange={(event) => setBudgetDuration(event.target.value)}
               placeholder="For example 30d"
               maxLength={32}
@@ -216,6 +234,13 @@ function TeamEditor({
               placeholder="gpt-4o, claude-sonnet"
             />
           </label>
+          <div className="sm:col-span-2">
+            <ModelChoices
+              value={models}
+              onChange={setModels}
+              className={inputClass}
+            />
+          </div>
           <label className="flex items-center gap-2 text-sm text-gray-300 sm:col-span-2">
             <input
               type="checkbox"

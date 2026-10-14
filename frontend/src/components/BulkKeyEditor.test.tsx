@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
@@ -12,6 +18,7 @@ vi.mock("../api/client", () => ({
     resetKeySpend: vi.fn(),
     getOperationLimit: vi.fn(),
     revealKey: vi.fn(),
+    listModels: vi.fn(),
   },
 }));
 
@@ -39,6 +46,10 @@ function renderEditor(saveApiKeysInDb = false) {
 
 describe("BulkKeyEditor", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.listModels).mockResolvedValue({
+      models: ["model-a", "model-b"],
+    });
     vi.mocked(api.getOperationLimit).mockResolvedValue({
       limit: 5,
       remaining: 5,
@@ -55,6 +66,105 @@ describe("BulkKeyEditor", () => {
       keys: ["key-1", "key-2"],
       total: 2,
     });
+  });
+
+  it("shows saved settings without submitting them as changes", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [
+        {
+          ...keys[0],
+          max_budget: 75,
+          budget_duration: "30d",
+          models: ["model-a"],
+          blocked: true,
+        },
+      ],
+      page: 1,
+      size: 25,
+      total: 1,
+      total_pages: 1,
+    });
+    vi.mocked(api.bulkUpdateKeys).mockResolvedValue({
+      updated: 1,
+      failed: 0,
+      results: [{ key: "key-1", updated: true }],
+    });
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    const current = screen.getByRole("region", {
+      name: "Current key settings",
+    });
+    expect(within(current).getByText("$75")).toBeVisible();
+    expect(within(current).getByText("30d")).toBeVisible();
+    expect(within(current).getByText("Blocked")).toBeVisible();
+    expect(screen.getByLabelText("Maximum budget")).toHaveValue(null);
+    fireEvent.change(screen.getByLabelText("RPM limit"), {
+      target: { value: "100" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    await waitFor(() =>
+      expect(api.bulkUpdateKeys).toHaveBeenCalledWith(["key-1"], {
+        rpm_limit: 100,
+      }),
+    );
+  });
+
+  it("does not imply that keys on other pages share the displayed settings", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [keys[0]],
+      page: 1,
+      size: 25,
+      total: 2,
+      total_pages: 2,
+    });
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select all keys (2)" }),
+    );
+    const current = await screen.findByRole("region", {
+      name: "Current key settings",
+    });
+    expect(
+      within(current).getByText(/1 selected key is on another page/),
+    ).toBeVisible();
+  });
+
+  it("offers model choices and explicitly requests removal of separate user caps", async () => {
+    vi.mocked(api.bulkUpdateKeys).mockResolvedValue({
+      updated: 1,
+      failed: 0,
+      results: [{ key: "key-1", updated: true }],
+    });
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    const models = await screen.findByLabelText("Add available model");
+    await within(models).findByRole("option", { name: "model-b" });
+    fireEvent.change(models, { target: { value: "model-b" } });
+    expect(screen.getByLabelText("Allowed models")).toHaveValue("model-b");
+    fireEvent.change(screen.getByLabelText("Maximum budget"), {
+      target: { value: "150" },
+    });
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Use key budget as the individual allowance",
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    await waitFor(() =>
+      expect(api.bulkUpdateKeys).toHaveBeenCalledWith(
+        ["key-1"],
+        { max_budget: 150, models: ["model-b"] },
+        true,
+      ),
+    );
   });
 
   it("lets administrators reveal a stored key from the list", async () => {
@@ -75,6 +185,40 @@ describe("BulkKeyEditor", () => {
     expect(
       screen.getByRole("checkbox", { name: "Select Alice" }),
     ).not.toBeChecked();
+  });
+
+  it("migrates an existing allowance without edits and preserves that choice on retry", async () => {
+    vi.mocked(api.bulkUpdateKeys)
+      .mockResolvedValueOnce({
+        updated: 0,
+        failed: 1,
+        results: [{ key: "key-1", updated: false, error: "Retry migration" }],
+      })
+      .mockResolvedValueOnce({
+        updated: 1,
+        failed: 0,
+        results: [{ key: "key-1", updated: true }],
+      });
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Use key budget as the individual allowance",
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Retry failed" }),
+    );
+    await waitFor(() => expect(api.bulkUpdateKeys).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.bulkUpdateKeys).mock.calls.slice(-2)).toEqual([
+      [["key-1"], {}, true],
+      [["key-1"], {}, true],
+    ]);
   });
 
   it("selects every result, not only the visible page", async () => {
