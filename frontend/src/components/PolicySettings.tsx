@@ -47,16 +47,17 @@ export function ModelChoices({
     ]),
   ].sort();
   return (
-    <fieldset className="space-y-2 rounded-md border border-slate-300 p-3 text-xs text-gray-400 sm:col-span-2">
-      <legend className="px-1">Allowed models</legend>
+    <fieldset className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-700 sm:col-span-2">
+      <legend className="px-1 font-semibold">Allowed models</legend>
       {status && (
-        <p>
+        <p className="text-slate-500">
           {status}. Choose a replacement model policy for the selected keys.
         </p>
       )}
-      <label className="flex items-center gap-2">
+      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
         <input
           type="checkbox"
+          className="h-4 w-4 shrink-0 accent-indigo-600"
           checked={value.all}
           onChange={(event) =>
             onChange({ models: [], all: event.target.checked })
@@ -64,11 +65,15 @@ export function ModelChoices({
         />
         All allowed models
       </label>
-      <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+      <div className="grid max-h-48 gap-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 sm:grid-cols-2">
         {options.map((model) => (
-          <label key={model} className="flex items-center gap-2 break-all">
+          <label
+            key={model}
+            className={`flex min-w-0 cursor-pointer items-start gap-2 rounded-md border px-2 py-2 ${!value.all && value.models.includes(model) ? "border-indigo-200 bg-indigo-50 text-indigo-800" : "border-transparent hover:bg-slate-50"}`}
+          >
             <input
               type="checkbox"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
               checked={!value.all && value.models.includes(model)}
               onChange={(event) =>
                 onChange({
@@ -79,10 +84,13 @@ export function ModelChoices({
                 })
               }
             />
-            {model}
+            <span className="min-w-0 break-all leading-5">{model}</span>
           </label>
         ))}
       </div>
+      <p className="text-[11px] text-slate-500">
+        {value.all ? "All models allowed" : `${value.models.length} selected`}
+      </p>
       {catalog.isPending && <p>Loading models...</p>}
       {catalog.isError && (
         <p className="text-xs text-amber-600">

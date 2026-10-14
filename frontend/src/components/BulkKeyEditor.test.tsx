@@ -68,6 +68,20 @@ describe("BulkKeyEditor", () => {
     });
   });
 
+  it("collapses settings until a key is selected and opens them for a new selection", async () => {
+    renderEditor();
+    const alice = await screen.findByRole("checkbox", { name: "Select Alice" });
+    expect(screen.getByLabelText("Alias")).not.toBeVisible();
+    fireEvent.click(alice);
+    expect(screen.getByLabelText("Alias")).toBeVisible();
+    fireEvent.click(screen.getByText("2. Choose settings to change"));
+    expect(screen.getByLabelText("Alias")).not.toBeVisible();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Bob" }));
+    expect(screen.getByLabelText("Alias")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+    expect(screen.getByLabelText("Alias")).not.toBeVisible();
+  });
+
   it("shows saved settings without submitting them as changes", async () => {
     vi.mocked(api.listAllKeys).mockResolvedValue({
       keys: [

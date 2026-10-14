@@ -95,6 +95,9 @@ budget, reset interval, models, rate limits, status and available expiry metadat
 on the current page. Selections on other pages are explicitly identified;
 their settings are not assumed to match. Inspecting a key does not submit its
 saved settings or overwrite unrelated values.
+**Choose settings to change** starts collapsed and opens when keys are selected.
+It can be collapsed manually; changing the selection opens it again. Model
+choices appear in a scrollable list with highlighted selections and a count.
 The editable fields themselves are prefilled with the selected key's saved
 values. Key and team fields also use saved values as placeholders, so clearing
 an edit still shows the current setting. When all selected keys are visible, shared values are filled in and
