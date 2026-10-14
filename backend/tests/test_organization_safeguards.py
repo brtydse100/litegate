@@ -133,7 +133,7 @@ async def test_cancelled_key_operations_finish_revoking_undelivered_keys(monkeyp
                 created.append("sk-new")
                 return {"key": "sk-new"}
 
-            monkeypatch.setattr(sync, "generate_key", replacement)
+            monkeypatch.setattr(sync, "_generate_key", replacement)
         else:
             monkeypatch.setattr(sync, "prepare_user", AsyncMock(return_value=settings.organization_hierarchy.roots[0]))
         operation = keys.regenerate_key(CurrentUser(user_id="u", email="u@example.com"))

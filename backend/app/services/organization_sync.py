@@ -162,17 +162,36 @@ async def prepare_user(user_id: str, email: str) -> OrganizationNode | None:
 
 async def generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
     async with lock_for("user", user_id):
-        node = await prepare_user(user_id, email)
-        if node is None:
-            return await litellm.generate_key(user_id, email, team_id, **options)
-        if not {"initial_spend", "key_alias"}.intersection(options) and await litellm.list_user_keys(user_id):
-            raise HTTPException(status_code=409, detail="This user already has a key; regenerate it instead")
-        result = await upstream.generate_key(
-            user_id, email, node.team_id, **{**options, "max_budget": node.per_user, "budget_duration": node.duration}
-        )
+        return await _generate_key(user_id, email, team_id, **options)
+
+
+async def _generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
+    """Generate while the caller holds the owner's operation lock."""
+    node = await prepare_user(user_id, email)
+    if node is None:
+        return await litellm.generate_key(user_id, email, team_id, **options)
+    if not {"initial_spend", "key_alias"}.intersection(options) and await litellm.list_user_keys(user_id):
+        raise HTTPException(status_code=409, detail="This user already has a key; regenerate it instead")
+    result = await upstream.generate_key(user_id, email, node.team_id, **{**options, "max_budget": node.per_user, "budget_duration": node.duration})
+    try:
+        async with lock_for("team", node.team_id):
+            await key_policy.normalize_individual_caps(node, user_id)
+    except BaseException:
+        await key_cleanup.revoke_created_key(result["key"])
+        raise
+    return result
+
+
+async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias: str) -> dict:
+    """Serialize the spend snapshot, replacement, and old-key revocation together."""
+    async with lock_for("user", user_id):
+        existing = await litellm.list_user_keys(user_id)
+        result = await _generate_key(user_id, email, team_id, initial_spend=litellm.total_key_spend(existing), key_alias=key_alias)
         try:
-            async with lock_for("team", node.team_id):
-                await key_policy.normalize_individual_caps(node, user_id)
+            for key_info in existing:
+                token = key_info.get("token") or key_info.get("api_key") or key_info.get("key")
+                if token:
+                    await litellm.delete_key(token)
         except BaseException:
             await key_cleanup.revoke_created_key(result["key"])
             raise
