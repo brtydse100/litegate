@@ -1,9 +1,8 @@
 import { useState } from "react";
-import type { KeyInfo } from "../types";
+import type { KeyInfo, ModelSelection } from "../types";
 
 type Field =
   | "alias"
-  | "models"
   | "budget"
   | "budgetDuration"
   | "tpm"
@@ -13,7 +12,6 @@ type Field =
 
 const fields: Field[] = [
   "alias",
-  "models",
   "budget",
   "budgetDuration",
   "tpm",
@@ -26,12 +24,6 @@ function savedValue(key: KeyInfo, field: Field): string | null | undefined {
   switch (field) {
     case "alias":
       return key.key_alias;
-    case "models":
-      return Array.isArray(key.models)
-        ? [...key.models].sort().join(", ")
-        : key.models === null
-          ? ""
-          : undefined;
     case "budget":
       return key.max_budget == null ? key.max_budget : String(key.max_budget);
     case "budgetDuration":
@@ -53,6 +45,7 @@ export function useKeySettingsForm(selected: string[], knownKeys: KeyInfo[]) {
   const [draft, setDraft] = useState<{
     selection: string;
     values: Partial<Record<Field, string>>;
+    models?: ModelSelection;
   }>({ selection, values: {} });
   // A different target must never inherit edits intended for the previous one.
   if (draft.selection !== selection) setDraft({ selection, values: {} });
@@ -74,13 +67,52 @@ export function useKeySettingsForm(selected: string[], knownKeys: KeyInfo[]) {
             ? "Not provided"
             : values[0] === null && ["budget", "tpm", "rpm"].includes(field)
               ? "Unlimited"
-              : field === "models"
-                ? "All allowed models"
-                : field === "budgetDuration"
-                  ? "No reset"
-                  : "No change";
+              : field === "budgetDuration"
+                ? "No reset"
+                : "No change";
   }
+  const modelLists = knownKeys.map((key) =>
+    Array.isArray(key.models)
+      ? [...new Set(key.models)].sort()
+      : key.models === null
+        ? []
+        : undefined,
+  );
+  const sharedModels =
+    complete &&
+    modelLists[0] !== undefined &&
+    modelLists.every(
+      (models) => JSON.stringify(models) === JSON.stringify(modelLists[0]),
+    );
+  const savedModels = sharedModels ? modelLists[0]! : [];
+  const modelDraft = draft.selection === selection ? draft.models : undefined;
+  const modelSelection = modelDraft ?? {
+    models: savedModels,
+    all: sharedModels && savedModels.length === 0,
+  };
+  const modelsChanged =
+    modelDraft !== undefined &&
+    (!sharedModels ||
+      modelDraft.all !== (savedModels.length === 0) ||
+      JSON.stringify([...modelDraft.models].sort()) !==
+        JSON.stringify(savedModels));
   return {
+    modelSelection,
+    modelsChanged,
+    modelStatus:
+      modelDraft || sharedModels
+        ? undefined
+        : !selected.length
+          ? "No change"
+          : complete && modelLists.every((models) => models !== undefined)
+            ? "Mixed values"
+            : "Current values unavailable",
+    setModels: (models: ModelSelection) =>
+      setDraft((current) => ({
+        selection,
+        values: current.selection === selection ? current.values : {},
+        models,
+      })),
     values: { ...saved, ...edits },
     placeholder: (field: Field) => placeholders[field],
     isChanged: (field: Field) =>
@@ -92,6 +124,7 @@ export function useKeySettingsForm(selected: string[], knownKeys: KeyInfo[]) {
           ...(current.selection === selection ? current.values : {}),
           [field]: value,
         },
+        models: current.selection === selection ? current.models : undefined,
       })),
   };
 }

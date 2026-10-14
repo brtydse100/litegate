@@ -102,7 +102,10 @@ describe("BulkKeyEditor", () => {
     expect(screen.getByLabelText("Alias")).toHaveValue("Alice");
     expect(screen.getByLabelText("Maximum budget")).toHaveValue(75);
     expect(screen.getByLabelText("Budget reset")).toHaveValue("30d");
-    expect(screen.getByLabelText("Allowed models")).toHaveValue("model-a");
+    expect(screen.getByRole("checkbox", { name: "model-a" })).toBeChecked();
+    expect(
+      screen.queryByRole("textbox", { name: "Allowed models" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Blocked state")).toHaveValue("true");
     fireEvent.change(screen.getByLabelText("RPM limit"), {
       target: { value: "100" },
@@ -146,9 +149,8 @@ describe("BulkKeyEditor", () => {
     );
     expect(screen.getByLabelText("Maximum budget")).toHaveValue(75);
     expect(screen.getByLabelText("Blocked state")).toHaveValue("false");
-    expect(screen.getByLabelText("Allowed models")).toHaveValue(
-      "model-a, model-b",
-    );
+    expect(screen.getByRole("checkbox", { name: "model-a" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "model-b" })).toBeChecked();
     expect(screen.getByLabelText("Alias")).toHaveAttribute(
       "placeholder",
       "Mixed values",
@@ -233,10 +235,8 @@ describe("BulkKeyEditor", () => {
     fireEvent.click(
       await screen.findByRole("checkbox", { name: "Select Alice" }),
     );
-    const models = await screen.findByLabelText("Add available model");
-    await within(models).findByRole("option", { name: "model-b" });
-    fireEvent.change(models, { target: { value: "model-b" } });
-    expect(screen.getByLabelText("Allowed models")).toHaveValue("model-b");
+    fireEvent.click(await screen.findByRole("checkbox", { name: "model-b" }));
+    expect(screen.getByRole("checkbox", { name: "model-b" })).toBeChecked();
     fireEvent.change(screen.getByLabelText("Maximum budget"), {
       target: { value: "150" },
     });
@@ -254,6 +254,111 @@ describe("BulkKeyEditor", () => {
         { max_budget: 150, models: ["model-b"] },
         true,
       ),
+    );
+  });
+
+  it("does not turn an empty checkbox selection into unrestricted model access", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [{ ...keys[0], models: ["model-a"] }],
+      page: 1,
+      size: 25,
+      total: 1,
+      total_pages: 1,
+    });
+    vi.mocked(api.bulkUpdateKeys).mockResolvedValue({
+      updated: 1,
+      failed: 0,
+      results: [{ key: "key-1", updated: true }],
+    });
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "model-a" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    expect(
+      await screen.findAllByText(
+        "Select at least one model or allow all models.",
+      ),
+    ).not.toHaveLength(0);
+    expect(api.bulkUpdateKeys).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "All allowed models" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    await waitFor(() =>
+      expect(api.bulkUpdateKeys).toHaveBeenCalledWith(["key-1"], {
+        models: [],
+      }),
+    );
+  });
+
+  it("sends catalog model names as array entries without splitting their punctuation", async () => {
+    vi.mocked(api.listModels).mockResolvedValue({
+      models: ["vendor/model,variant"],
+    });
+    vi.mocked(api.bulkUpdateKeys).mockResolvedValue({
+      updated: 1,
+      failed: 0,
+      results: [{ key: "key-1", updated: true }],
+    });
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "vendor/model,variant" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    await waitFor(() =>
+      expect(api.bulkUpdateKeys).toHaveBeenCalledWith(["key-1"], {
+        models: ["vendor/model,variant"],
+      }),
+    );
+  });
+
+  it("leaves different model policies untouched when only another bulk setting is edited", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [
+        { ...keys[0], models: ["model-a"] },
+        { ...keys[1], models: ["model-b"] },
+      ],
+      page: 1,
+      size: 25,
+      total: 2,
+      total_pages: 1,
+    });
+    vi.mocked(api.bulkUpdateKeys).mockResolvedValue({
+      updated: 2,
+      failed: 0,
+      results: [
+        { key: "key-1", updated: true },
+        { key: "key-2", updated: true },
+      ],
+    });
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select page (2)" }),
+    );
+    expect(
+      screen.getByRole("checkbox", { name: "All allowed models" }),
+    ).not.toBeChecked();
+    fireEvent.change(screen.getByLabelText("RPM limit"), {
+      target: { value: "100" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 2 keys" }),
+    );
+    await waitFor(() =>
+      expect(api.bulkUpdateKeys).toHaveBeenCalledWith(["key-1", "key-2"], {
+        rpm_limit: 100,
+      }),
     );
   });
 

@@ -16,6 +16,11 @@ export interface LocalUser {
   updated_at: string;
 }
 
+export interface ModelSelection {
+  models: string[];
+  all: boolean;
+}
+
 export interface KeySettingsUpdate {
   key_alias?: string;
   models?: string[];

@@ -162,7 +162,9 @@ reported error. The audit event records whether the migration was requested.
 `GET /api/v1/models` returns `{"models":["model-name"]}` to administrators only.
 It reads LiteLLM's `/model/info` catalog and exposes unique, sorted model names,
 without provider credentials or deployment parameters. The key and team
-editors use these choices while retaining custom model input.
+editors use these choices as checkboxes and also retain saved model names that
+are absent from the current catalog. Model updates remain arrays; selecting
+**All allowed models** explicitly submits an empty `models` array.
 
 Reset up to 5,000 selected keys' accumulated spend to zero as an administrator.
 The keys stay active, their budgets and limits are unchanged, and LiteLLM

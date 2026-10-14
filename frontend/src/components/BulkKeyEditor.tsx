@@ -140,20 +140,18 @@ export default function BulkKeyEditor({
   const selectedVisibleKeys = visibleKeys.filter((key) =>
     selected.includes(keyToken(key)),
   );
-  const { values, setValue, isChanged, placeholder } = useKeySettingsForm(
-    selected,
-    selectedVisibleKeys,
-  );
   const {
-    alias,
-    models,
-    budget,
-    budgetDuration,
-    tpm,
-    rpm,
-    duration,
-    blockedSetting,
-  } = values;
+    values,
+    setValue,
+    isChanged,
+    placeholder,
+    modelSelection,
+    setModels,
+    modelsChanged,
+    modelStatus,
+  } = useKeySettingsForm(selected, selectedVisibleKeys);
+  const { alias, budget, budgetDuration, tpm, rpm, duration, blockedSetting } =
+    values;
   const allVisibleSelected =
     visibleTokens.length > 0 &&
     visibleTokens.every((token) => selected.includes(token));
@@ -172,11 +170,8 @@ export default function BulkKeyEditor({
   function settingsFromForm(): KeySettingsUpdate {
     const settings: KeySettingsUpdate = {};
     if (isChanged("alias") && alias.trim()) settings.key_alias = alias.trim();
-    if (isChanged("models") && models.trim())
-      settings.models = models
-        .split(/[\n,]/)
-        .map((value) => value.trim())
-        .filter(Boolean);
+    if (modelsChanged)
+      settings.models = modelSelection.all ? [] : modelSelection.models;
     if (isChanged("budget") && budget !== "")
       settings.max_budget = Number(budget);
     if (isChanged("budgetDuration") && budgetDuration.trim())
@@ -196,6 +191,10 @@ export default function BulkKeyEditor({
     setLocalError("");
     if (!targetKeys.length) {
       setLocalError("Select at least one key to update.");
+      return;
+    }
+    if (modelsChanged && !modelSelection.all && !modelSelection.models.length) {
+      setLocalError("Select at least one model or allow all models.");
       return;
     }
     const settings = settingsFromForm();
@@ -702,19 +701,11 @@ export default function BulkKeyEditor({
             placeholder={placeholder("alias")}
           />
         </label>
-        <label className={fieldClass}>
-          <span>Allowed models</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={models}
-            onChange={(event) => setValue("models", event.target.value)}
-            placeholder={placeholder("models")}
-          />
-        </label>
         <ModelChoices
-          value={models}
-          onChange={(value) => setValue("models", value)}
-          className={`${inputClass} w-full`}
+          value={modelSelection}
+          onChange={setModels}
+          knownModels={selectedVisibleKeys.flatMap((key) => key.models ?? [])}
+          status={modelStatus}
         />
         <label className={fieldClass}>
           <span>Maximum budget</span>

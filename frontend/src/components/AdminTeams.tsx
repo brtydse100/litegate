@@ -13,7 +13,12 @@ import {
 import { api } from "../api/client";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
-import type { TeamCreatePayload, TeamInfo, TeamUpdatePayload } from "../types";
+import type {
+  TeamCreatePayload,
+  TeamInfo,
+  TeamUpdatePayload,
+  ModelSelection,
+} from "../types";
 import TeamMembersDialog from "./TeamMembersDialog";
 import {
   CurrentPolicySettings,
@@ -55,7 +60,11 @@ function TeamEditor({
   const existing = state.mode === "edit" ? state.team : null;
   const [alias, setAlias] = useState(existing?.team_alias ?? "");
   const [teamId, setTeamId] = useState(existing?.team_id ?? "");
-  const [models, setModels] = useState(existing?.models?.join(", ") ?? "");
+  const [models, setModels] = useState<ModelSelection>({
+    models: existing?.models ?? [],
+    all: !existing?.models?.length,
+  });
+  const [modelError, setModelError] = useState("");
   const [budget, setBudget] = useState(
     existing?.max_budget != null ? String(existing.max_budget) : "",
   );
@@ -72,14 +81,12 @@ function TeamEditor({
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    const modelList = Array.from(
-      new Set(
-        models
-          .split(/[\n,]/)
-          .map((value) => value.trim())
-          .filter(Boolean),
-      ),
-    );
+    if (!models.all && !models.models.length) {
+      setModelError("Select at least one model or allow all models.");
+      return;
+    }
+    setModelError("");
+    const modelList = models.all ? [] : models.models;
     if (state.mode === "create") {
       const payload: TeamCreatePayload = {
         team_alias: alias.trim(),
@@ -132,8 +139,8 @@ function TeamEditor({
               {state.mode === "create" ? "Create team" : "Edit team"}
             </h3>
             <p className="mt-1 text-xs text-gray-500">
-              Models left empty means all models. Blank numeric limits remove
-              the limit when editing.
+              Choose allowed models below. Blank numeric limits remove the limit
+              when editing.
             </p>
           </div>
           <button
@@ -225,22 +232,11 @@ function TeamEditor({
               placeholder="Unlimited"
             />
           </label>
-          <label className="space-y-1 text-xs text-gray-400 sm:col-span-2">
-            <span>Allowed models (comma-separated or one per line)</span>
-            <textarea
-              className={`${inputClass} min-h-24`}
-              value={models}
-              onChange={(event) => setModels(event.target.value)}
-              placeholder="gpt-4o, claude-sonnet"
-            />
-          </label>
-          <div className="sm:col-span-2">
-            <ModelChoices
-              value={models}
-              onChange={setModels}
-              className={inputClass}
-            />
-          </div>
+          <ModelChoices
+            value={models}
+            onChange={setModels}
+            knownModels={existing?.models ?? []}
+          />
           <label className="flex items-center gap-2 text-sm text-gray-300 sm:col-span-2">
             <input
               type="checkbox"
@@ -250,9 +246,9 @@ function TeamEditor({
             Block requests from this team
           </label>
         </div>
-        {error && (
+        {(modelError || error) && (
           <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-            {error}
+            {modelError || error}
           </p>
         )}
         <div className="mt-5 flex justify-end gap-2">

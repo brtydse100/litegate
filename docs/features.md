@@ -56,8 +56,9 @@ automation through the [v1 API](../API.md#teams-admin-only). Normal users cannot
 see the tab or call the team endpoints.
 
 The team editor keeps a **Current team settings** summary visible while you
-edit. It prefills saved values and offers available model names and common
-budget-reset durations. Custom model names and durations remain supported.
+edit. It prefills saved values and offers model checkboxes and common
+budget-reset durations. Saved models remain selectable even if they are missing
+from the current catalog. Custom durations remain supported.
 
 A move deliberately changes the policy applied to that user's source-team keys.
 LiteGate first adds the destination membership, reassigns and verifies every
@@ -100,7 +101,11 @@ different values are marked **Mixed values**. When the selection includes keys
 on another page, fields show **Current values unavailable** rather than assuming
 that the visible keys represent the entire selection. Only edited, filled
 fields are submitted; changing the selected keys resets field edits.
-Model choices and common reset/lifetime durations are available alongside custom input.
+Models are selected using checkboxes, with saved models already checked. Model
+names remain array entries through submission, without comma-separated input.
+Select **All allowed models** explicitly to remove model restrictions; an empty
+selection alone cannot grant unrestricted access. Common reset/lifetime durations
+are available alongside custom duration input.
 
 Select **Use key budget as the individual allowance** to remove a duplicate
 personal user cap and the owner's team-member cap for the key's team. This

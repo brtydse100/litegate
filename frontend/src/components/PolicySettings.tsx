@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { KeyInfo, TeamInfo } from "../types";
+import type { KeyInfo, TeamInfo, ModelSelection } from "../types";
 
 const durationChoices = [
   ["1h", "Hourly"],
@@ -26,47 +26,75 @@ export function DurationChoices({ id }: { id: string }) {
 export function ModelChoices({
   value,
   onChange,
-  className,
+  knownModels = [],
+  status,
 }: {
-  value: string;
-  onChange: (value: string) => void;
-  className: string;
+  value: ModelSelection;
+  onChange: (value: ModelSelection) => void;
+  knownModels?: string[];
+  status?: string;
 }) {
   const catalog = useQuery({
     queryKey: ["admin-models"],
     queryFn: () => api.listModels(),
     staleTime: 60_000,
   });
-  const selected = value
-    .split(/[\n,]/)
-    .map((model) => model.trim())
-    .filter(Boolean);
+  const options = [
+    ...new Set([
+      ...(catalog.data?.models ?? []),
+      ...knownModels,
+      ...value.models,
+    ]),
+  ].sort();
   return (
-    <div className="space-y-1">
-      <select
-        aria-label="Add available model"
-        value=""
-        className={className}
-        onChange={(event) => {
-          if (event.target.value && !selected.includes(event.target.value))
-            onChange([...selected, event.target.value].join(", "));
-        }}
-      >
-        <option value="">
-          {catalog.isPending ? "Loading models..." : "Choose a model to add"}
-        </option>
-        {(catalog.data?.models ?? []).map((model) => (
-          <option key={model} value={model} disabled={selected.includes(model)}>
-            {model}
-          </option>
-        ))}
-      </select>
-      {catalog.isError && (
-        <p className="text-xs text-amber-600">
-          Model choices are unavailable. You can still enter model names.
+    <fieldset className="space-y-2 rounded-md border border-slate-300 p-3 text-xs text-gray-400 sm:col-span-2">
+      <legend className="px-1">Allowed models</legend>
+      {status && (
+        <p>
+          {status}. Choose a replacement model policy for the selected keys.
         </p>
       )}
-    </div>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={value.all}
+          onChange={(event) =>
+            onChange({ models: [], all: event.target.checked })
+          }
+        />
+        All allowed models
+      </label>
+      <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+        {options.map((model) => (
+          <label key={model} className="flex items-center gap-2 break-all">
+            <input
+              type="checkbox"
+              checked={!value.all && value.models.includes(model)}
+              onChange={(event) =>
+                onChange({
+                  all: false,
+                  models: event.target.checked
+                    ? [...value.models, model]
+                    : value.models.filter((item) => item !== model),
+                })
+              }
+            />
+            {model}
+          </label>
+        ))}
+      </div>
+      {catalog.isPending && <p>Loading models...</p>}
+      {catalog.isError && (
+        <p className="text-xs text-amber-600">
+          Model choices are unavailable. Saved selections are still shown.
+        </p>
+      )}
+      {!status && !value.all && !value.models.length && (
+        <p className="text-amber-600">
+          Select at least one model or allow all models.
+        </p>
+      )}
+    </fieldset>
   );
 }
 
