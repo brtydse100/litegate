@@ -92,8 +92,14 @@ The bulk editor lets an administrator:
 After selecting keys, **Current key settings** shows each selected key's saved
 budget, reset interval, models, rate limits, status and available expiry metadata
 on the current page. Selections on other pages are explicitly identified;
-their settings are not assumed to match. Change fields remain separate from the
-saved values, so reviewing a key does not cause unrelated settings to be written.
+their settings are not assumed to match. Inspecting a key does not submit its
+saved settings or overwrite unrelated values.
+The editable fields themselves are prefilled with the selected key's saved
+values. When all selected keys are visible, shared values are filled in and
+different values are marked **Mixed values**. When the selection includes keys
+on another page, fields show **Current values unavailable** rather than assuming
+that the visible keys represent the entire selection. Only edited, filled
+fields are submitted; changing the selected keys resets field edits.
 Model choices and common reset/lifetime durations are available alongside custom input.
 
 Select **Use key budget as the individual allowance** to remove a duplicate

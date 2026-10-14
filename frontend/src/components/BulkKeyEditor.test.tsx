@@ -99,7 +99,11 @@ describe("BulkKeyEditor", () => {
     expect(within(current).getByText("$75")).toBeVisible();
     expect(within(current).getByText("30d")).toBeVisible();
     expect(within(current).getByText("Blocked")).toBeVisible();
-    expect(screen.getByLabelText("Maximum budget")).toHaveValue(null);
+    expect(screen.getByLabelText("Alias")).toHaveValue("Alice");
+    expect(screen.getByLabelText("Maximum budget")).toHaveValue(75);
+    expect(screen.getByLabelText("Budget reset")).toHaveValue("30d");
+    expect(screen.getByLabelText("Allowed models")).toHaveValue("model-a");
+    expect(screen.getByLabelText("Blocked state")).toHaveValue("true");
     fireEvent.change(screen.getByLabelText("RPM limit"), {
       target: { value: "100" },
     });
@@ -111,6 +115,87 @@ describe("BulkKeyEditor", () => {
         rpm_limit: 100,
       }),
     );
+  });
+
+  it("prefills shared values and marks different selected-key values as mixed", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [
+        {
+          ...keys[0],
+          max_budget: 75,
+          rpm_limit: 100,
+          models: ["model-a", "model-b"],
+          blocked: false,
+        },
+        {
+          ...keys[1],
+          max_budget: 75,
+          rpm_limit: 200,
+          models: ["model-b", "model-a"],
+          blocked: false,
+        },
+      ],
+      page: 1,
+      size: 25,
+      total: 2,
+      total_pages: 1,
+    });
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select page (2)" }),
+    );
+    expect(screen.getByLabelText("Maximum budget")).toHaveValue(75);
+    expect(screen.getByLabelText("Blocked state")).toHaveValue("false");
+    expect(screen.getByLabelText("Allowed models")).toHaveValue(
+      "model-a, model-b",
+    );
+    expect(screen.getByLabelText("Alias")).toHaveAttribute(
+      "placeholder",
+      "Mixed values",
+    );
+    expect(screen.getByLabelText("RPM limit")).toHaveValue(null);
+    expect(screen.getByLabelText("RPM limit")).toHaveAttribute(
+      "placeholder",
+      "Mixed values",
+    );
+  });
+
+  it("resets drafts when the selected keys change instead of carrying one key's edits to another", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [
+        { ...keys[0], max_budget: 75 },
+        { ...keys[1], max_budget: 150 },
+      ],
+      page: 1,
+      size: 25,
+      total: 2,
+      total_pages: 1,
+    });
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.change(screen.getByLabelText("Maximum budget"), {
+      target: { value: "500" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Deselect Alice" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Bob" }));
+    expect(screen.getByLabelText("Alias")).toHaveValue("Bob");
+    expect(screen.getByLabelText("Maximum budget")).toHaveValue(150);
+  });
+
+  it("does not submit saved values just because a key was selected", async () => {
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    expect(
+      await screen.findByText("Choose at least one setting to change."),
+    ).toBeVisible();
+    expect(api.bulkUpdateKeys).not.toHaveBeenCalled();
   });
 
   it("does not imply that keys on other pages share the displayed settings", async () => {
@@ -131,6 +216,11 @@ describe("BulkKeyEditor", () => {
     expect(
       within(current).getByText(/1 selected key is on another page/),
     ).toBeVisible();
+    expect(screen.getByLabelText("Alias")).toHaveValue("");
+    expect(screen.getByLabelText("Alias")).toHaveAttribute(
+      "placeholder",
+      "Current values unavailable",
+    );
   });
 
   it("offers model choices and explicitly requests removal of separate user caps", async () => {

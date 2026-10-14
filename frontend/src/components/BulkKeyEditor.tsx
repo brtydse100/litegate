@@ -19,6 +19,7 @@ import {
 } from "./PolicySettings";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
+import { useKeySettingsForm } from "../hooks/useKeySettingsForm";
 import type {
   AdminKeyFilters,
   BulkKeySpendResetResponse,
@@ -62,14 +63,6 @@ export default function BulkKeyEditor({
   const [teamFilter, setTeamFilter] = useState("");
   const [blockedFilter, setBlockedFilter] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
-  const [alias, setAlias] = useState("");
-  const [models, setModels] = useState("");
-  const [budget, setBudget] = useState("");
-  const [budgetDuration, setBudgetDuration] = useState("");
-  const [tpm, setTpm] = useState("");
-  const [rpm, setRpm] = useState("");
-  const [duration, setDuration] = useState("");
-  const [blockedSetting, setBlockedSetting] = useState("");
   const [useKeyBudgetOnly, setUseKeyBudgetOnly] = useState(false);
   const [lastUseKeyBudgetOnly, setLastUseKeyBudgetOnly] = useState(false);
   const [localError, setLocalError] = useState("");
@@ -144,6 +137,23 @@ export default function BulkKeyEditor({
 
   const visibleKeys = adminKeys.data?.keys ?? [];
   const visibleTokens = visibleKeys.map(keyToken).filter(Boolean);
+  const selectedVisibleKeys = visibleKeys.filter((key) =>
+    selected.includes(keyToken(key)),
+  );
+  const { values, setValue, isChanged, placeholder } = useKeySettingsForm(
+    selected,
+    selectedVisibleKeys,
+  );
+  const {
+    alias,
+    models,
+    budget,
+    budgetDuration,
+    tpm,
+    rpm,
+    duration,
+    blockedSetting,
+  } = values;
   const allVisibleSelected =
     visibleTokens.length > 0 &&
     visibleTokens.every((token) => selected.includes(token));
@@ -161,18 +171,22 @@ export default function BulkKeyEditor({
 
   function settingsFromForm(): KeySettingsUpdate {
     const settings: KeySettingsUpdate = {};
-    if (alias.trim()) settings.key_alias = alias.trim();
-    if (models.trim())
+    if (isChanged("alias") && alias.trim()) settings.key_alias = alias.trim();
+    if (isChanged("models") && models.trim())
       settings.models = models
         .split(/[\n,]/)
         .map((value) => value.trim())
         .filter(Boolean);
-    if (budget !== "") settings.max_budget = Number(budget);
-    if (budgetDuration.trim()) settings.budget_duration = budgetDuration.trim();
-    if (tpm !== "") settings.tpm_limit = Number(tpm);
-    if (rpm !== "") settings.rpm_limit = Number(rpm);
-    if (duration.trim()) settings.duration = duration.trim();
-    if (blockedSetting !== "") settings.blocked = blockedSetting === "true";
+    if (isChanged("budget") && budget !== "")
+      settings.max_budget = Number(budget);
+    if (isChanged("budgetDuration") && budgetDuration.trim())
+      settings.budget_duration = budgetDuration.trim();
+    if (isChanged("tpm") && tpm !== "") settings.tpm_limit = Number(tpm);
+    if (isChanged("rpm") && rpm !== "") settings.rpm_limit = Number(rpm);
+    if (isChanged("duration") && duration.trim())
+      settings.duration = duration.trim();
+    if (isChanged("blockedSetting") && blockedSetting !== "")
+      settings.blocked = blockedSetting === "true";
     return settings;
   }
 
@@ -674,8 +688,9 @@ export default function BulkKeyEditor({
             2. Choose settings to change
           </p>
           <p className="mt-0.5 text-[11px] text-gray-600">
-            Only filled fields are changed. Empty fields leave existing values
-            untouched.
+            Saved values are filled in below. Only edited, filled fields are
+            changed. Mixed values differ between selected keys. Changing the
+            selection resets edits.
           </p>
         </div>
         <label className={fieldClass}>
@@ -683,8 +698,8 @@ export default function BulkKeyEditor({
           <input
             className={`${inputClass} w-full`}
             value={alias}
-            onChange={(event) => setAlias(event.target.value)}
-            placeholder="No change"
+            onChange={(event) => setValue("alias", event.target.value)}
+            placeholder={placeholder("alias")}
           />
         </label>
         <label className={fieldClass}>
@@ -692,13 +707,13 @@ export default function BulkKeyEditor({
           <input
             className={`${inputClass} w-full`}
             value={models}
-            onChange={(event) => setModels(event.target.value)}
-            placeholder="Comma-separated; no change when empty"
+            onChange={(event) => setValue("models", event.target.value)}
+            placeholder={placeholder("models")}
           />
         </label>
         <ModelChoices
           value={models}
-          onChange={setModels}
+          onChange={(value) => setValue("models", value)}
           className={`${inputClass} w-full`}
         />
         <label className={fieldClass}>
@@ -706,11 +721,11 @@ export default function BulkKeyEditor({
           <input
             className={`${inputClass} w-full`}
             value={budget}
-            onChange={(event) => setBudget(event.target.value)}
+            onChange={(event) => setValue("budget", event.target.value)}
             type="number"
             min="0"
             step="any"
-            placeholder="No change"
+            placeholder={placeholder("budget")}
           />
         </label>
         <label className={fieldClass}>
@@ -719,8 +734,8 @@ export default function BulkKeyEditor({
             className={`${inputClass} w-full`}
             value={budgetDuration}
             list="key-budget-durations"
-            onChange={(event) => setBudgetDuration(event.target.value)}
-            placeholder="For example 30d"
+            onChange={(event) => setValue("budgetDuration", event.target.value)}
+            placeholder={placeholder("budgetDuration")}
           />
         </label>
         <label className={fieldClass}>
@@ -728,10 +743,10 @@ export default function BulkKeyEditor({
           <input
             className={`${inputClass} w-full`}
             value={tpm}
-            onChange={(event) => setTpm(event.target.value)}
+            onChange={(event) => setValue("tpm", event.target.value)}
             type="number"
             min="0"
-            placeholder="No change"
+            placeholder={placeholder("tpm")}
           />
         </label>
         <label className={fieldClass}>
@@ -739,10 +754,10 @@ export default function BulkKeyEditor({
           <input
             className={`${inputClass} w-full`}
             value={rpm}
-            onChange={(event) => setRpm(event.target.value)}
+            onChange={(event) => setValue("rpm", event.target.value)}
             type="number"
             min="0"
-            placeholder="No change"
+            placeholder={placeholder("rpm")}
           />
         </label>
         <label className={fieldClass}>
@@ -751,7 +766,7 @@ export default function BulkKeyEditor({
             className={`${inputClass} w-full`}
             value={duration}
             list="key-lifetime-durations"
-            onChange={(event) => setDuration(event.target.value)}
+            onChange={(event) => setValue("duration", event.target.value)}
             placeholder="For example 90d"
           />
         </label>
@@ -760,9 +775,9 @@ export default function BulkKeyEditor({
           <select
             className={`${inputClass} w-full`}
             value={blockedSetting}
-            onChange={(event) => setBlockedSetting(event.target.value)}
+            onChange={(event) => setValue("blockedSetting", event.target.value)}
           >
-            <option value="">No change</option>
+            <option value="">{placeholder("blockedSetting")}</option>
             <option value="false">Unblock</option>
             <option value="true">Block</option>
           </select>
