@@ -61,7 +61,12 @@ def default_member_budget(info: dict) -> float | None:
 def member_budget(info: dict, user_id: str) -> dict:
     member = membership(info, user_id)
     if member is None:
-        raise HTTPException(status_code=502, detail="Could not read your managed LiteLLM membership")
+        roster = (info.get("team_info") or {}).get("members_with_roles")
+        owner = next((item for item in roster if item.get("user_id") == user_id), None) if isinstance(roster, list) else None
+        if not isinstance(info.get("team_memberships"), list) or owner is None or owner.get("budget_id") or owner.get("litellm_budget_table"):
+            raise HTTPException(status_code=502, detail="Could not read your managed LiteLLM membership")
+        # LiteLLM can keep uncapped members only in the roster, without a budget row.
+        return {"per_user": default_member_budget(info), "duration": None, "spend": None}
     budget = member.get("litellm_budget_table")
     if (
         "litellm_budget_table" not in member

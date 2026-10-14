@@ -40,14 +40,15 @@ async def guard_ancestor_restrictions(node: OrganizationNode, user_id: str, keys
         if not isinstance(team, dict):
             raise HTTPException(status_code=502, detail="Could not verify ancestor team restrictions")
         member = upstream.membership(info, user_id) if ancestor.team_id in source_teams else None
+        roster_member = None
         if ancestor.team_id in source_teams:
-            if member is not None:
+            roster = team.get("members_with_roles")
+            if not isinstance(roster, list) or not isinstance(info.get("team_memberships"), list):
+                raise HTTPException(status_code=502, detail="Could not verify the source team member's restrictions")
+            roster_member = next((item for item in roster if item.get("user_id") == user_id), None)
+            if member is not None or roster_member is not None:
                 upstream.member_budget(info, user_id)  # Reject unhydrated linked policy records.
-            else:
-                roster = team.get("members_with_roles")
-                if not isinstance(roster, list) or any(item.get("user_id") == user_id for item in roster):
-                    raise HTTPException(status_code=502, detail="Could not verify the source team member's restrictions")
-        records = [team, member or {}, (member or {}).get("litellm_budget_table") or {}]
+        records = [team, member or {}, roster_member or {}, (member or {}).get("litellm_budget_table") or {}]
         if any(
             record.get("blocked") or any(record.get(field) is not None for field in limits) or any(record.get(field) for field in policies)
             for record in records

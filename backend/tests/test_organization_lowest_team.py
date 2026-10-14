@@ -61,7 +61,8 @@ async def native(monkeypatch, tmp_path):
                 json={
                     "team_info": {
                         **state["teams"][team_id],
-                        "members_with_roles": [{"user_id": item["user_id"], "role": "user"} for item in members],
+                        "members_with_roles": [{"user_id": item["user_id"], "role": "user"} for item in members]
+                        + state.get("roster_only", {}).get(team_id, []),
                     },
                     "team_memberships": members,
                 },
@@ -278,3 +279,11 @@ async def test_source_member_restrictions_must_be_verified_before_moving_a_key(n
         await sync.remember("alice", "alice@example.com", "sso", ["squad1"])
     assert state["keys"]["key-old"]["team_id"] == "engineering"
     assert state["user_budget"] == 25
+
+
+@pytest.mark.asyncio
+async def test_uncapped_roster_only_source_member_can_migrate_to_the_lowest_team(native):
+    tree, state = native
+    state["roster_only"] = {"engineering": [{"user_id": "alice", "role": "user"}]}
+    await sync.remember("alice", "alice@example.com", "sso", ["squad1"])
+    assert state["keys"]["key-old"]["team_id"] == tree.resolve("alice", ["squad1"]).team_id

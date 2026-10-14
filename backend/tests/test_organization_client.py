@@ -55,6 +55,45 @@ async def test_member_budget_patch_leaves_the_active_reset_window_untouched(monk
 
 
 @pytest.mark.asyncio
+async def test_uncapped_roster_member_does_not_require_a_separate_budget_row(monkeypatch):
+    node = OrganizationHierarchy.model_validate(example()).resolve("u", ["squad1"])
+    info = {"team_info": {"members_with_roles": [{"user_id": "u", "role": "user"}]}, "team_memberships": []}
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=info))
+    monkeypatch.setattr(litellm, "add_team_member", AsyncMock())
+    patch = AsyncMock(return_value={})
+    monkeypatch.setattr(upstream, "request", patch)
+    await upstream.sync_member(node, "u", info)
+    assert upstream.member_budget(info, "u")["per_user"] is None
+    assert patch.call_args.kwargs["payload"]["max_budget_in_team"] is None
+
+
+@pytest.mark.parametrize("missing", ["team_memberships", "members_with_roles"])
+def test_missing_membership_evidence_does_not_imply_an_unlimited_allowance(missing):
+    info = {"team_info": {"members_with_roles": [{"user_id": "u"}]}, "team_memberships": []}
+    if missing == "team_memberships":
+        del info[missing]
+    else:
+        del info["team_info"][missing]
+    with pytest.raises(HTTPException):
+        upstream.member_budget(info, "u")
+
+
+@pytest.mark.parametrize("cap", [0, 50])
+def test_roster_only_members_still_use_the_verified_default_cap(cap):
+    info = {
+        "team_info": {"members_with_roles": [{"user_id": "u"}], "team_member_budget_table": {"max_budget": cap}},
+        "team_memberships": [],
+    }
+    assert upstream.member_budget(info, "u")["per_user"] == cap
+
+
+def test_roster_only_member_with_an_unreadable_budget_link_is_rejected():
+    info = {"team_info": {"members_with_roles": [{"user_id": "u", "budget_id": "linked"}]}, "team_memberships": []}
+    with pytest.raises(HTTPException):
+        upstream.member_budget(info, "u")
+
+
+@pytest.mark.asyncio
 async def test_ignored_member_fields_fail_verification_before_key_changes(monkeypatch):
     node = OrganizationHierarchy.model_validate(example()).resolve("u", ["squad1"])
     old = {"team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": 50, "budget_duration": "30d"}}]}
