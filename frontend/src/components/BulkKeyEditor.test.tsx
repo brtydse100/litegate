@@ -77,6 +77,8 @@ describe("BulkKeyEditor", () => {
           budget_duration: "30d",
           models: ["model-a"],
           blocked: true,
+          tpm_limit: 500,
+          rpm_limit: 125,
         },
       ],
       page: 1,
@@ -101,6 +103,34 @@ describe("BulkKeyEditor", () => {
     expect(within(current).getByText("Blocked")).toBeVisible();
     expect(screen.getByLabelText("Alias")).toHaveValue("Alice");
     expect(screen.getByLabelText("Maximum budget")).toHaveValue(75);
+    expect(screen.getByLabelText("Alias")).toHaveAttribute(
+      "placeholder",
+      "Alice",
+    );
+    expect(screen.getByLabelText("Maximum budget")).toHaveAttribute(
+      "placeholder",
+      "75",
+    );
+    expect(screen.getByLabelText("Budget reset")).toHaveAttribute(
+      "placeholder",
+      "30d",
+    );
+    expect(screen.getByLabelText("TPM limit")).toHaveAttribute(
+      "placeholder",
+      "500",
+    );
+    expect(screen.getByLabelText("RPM limit")).toHaveAttribute(
+      "placeholder",
+      "125",
+    );
+    fireEvent.change(screen.getByLabelText("Maximum budget"), {
+      target: { value: "" },
+    });
+    expect(screen.getByLabelText("Maximum budget")).toHaveValue(null);
+    expect(screen.getByLabelText("Maximum budget")).toHaveAttribute(
+      "placeholder",
+      "75",
+    );
     expect(screen.getByLabelText("Budget reset")).toHaveValue("30d");
     expect(screen.getByRole("checkbox", { name: "model-a" })).toBeChecked();
     expect(

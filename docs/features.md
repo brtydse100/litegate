@@ -96,7 +96,8 @@ on the current page. Selections on other pages are explicitly identified;
 their settings are not assumed to match. Inspecting a key does not submit its
 saved settings or overwrite unrelated values.
 The editable fields themselves are prefilled with the selected key's saved
-values. When all selected keys are visible, shared values are filled in and
+values. Key and team fields also use saved values as placeholders, so clearing
+an edit still shows the current setting. When all selected keys are visible, shared values are filled in and
 different values are marked **Mixed values**. When the selection includes keys
 on another page, fields show **Current values unavailable** rather than assuming
 that the visible keys represent the entire selection. Only edited, filled

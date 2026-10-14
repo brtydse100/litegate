@@ -67,9 +67,16 @@ export function useKeySettingsForm(selected: string[], knownKeys: KeyInfo[]) {
             ? "Not provided"
             : values[0] === null && ["budget", "tpm", "rpm"].includes(field)
               ? "Unlimited"
-              : field === "budgetDuration"
-                ? "No reset"
-                : "No change";
+              : field === "blockedSetting"
+                ? values[0] === "true"
+                  ? "Current: Blocked"
+                  : "Current: Active"
+                : values[0] ||
+                  (field === "budgetDuration"
+                    ? "No reset"
+                    : field === "alias"
+                      ? "No alias"
+                      : "No change");
   }
   const modelLists = knownKeys.map((key) =>
     Array.isArray(key.models)

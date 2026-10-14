@@ -78,12 +78,30 @@ describe("team policy editing", () => {
       name: "Current team settings",
     });
     expect(within(current).getByText("$2000")).toBeVisible();
+    expect(within(dialog).getByLabelText("Team name")).toHaveAttribute(
+      "placeholder",
+      "DevOps",
+    );
+    expect(
+      within(dialog).getByLabelText("Maximum budget (USD)"),
+    ).toHaveAttribute("placeholder", "2000");
+    expect(within(dialog).getByLabelText("Budget reset")).toHaveAttribute(
+      "placeholder",
+      "30d",
+    );
+    expect(within(dialog).getByLabelText("RPM limit")).toHaveAttribute(
+      "placeholder",
+      "100",
+    );
     expect(within(dialog).getByLabelText("Maximum budget (USD)")).toHaveValue(
       2000,
     );
     fireEvent.change(within(dialog).getByLabelText("Maximum budget (USD)"), {
       target: { value: "3000" },
     });
+    expect(
+      within(dialog).getByLabelText("Maximum budget (USD)"),
+    ).toHaveAttribute("placeholder", "2000");
     expect(within(current).getByText("$2000")).toBeVisible();
     expect(within(dialog).getByLabelText("Budget reset")).toHaveValue("30d");
     expect(
