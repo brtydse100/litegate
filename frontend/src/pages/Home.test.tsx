@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -64,6 +64,7 @@ describe("personal key storage", () => {
     policy: Partial<KeyInfo> = {},
     listError?: Error,
     cachedEmpty = false,
+    initiallyEmpty = false,
   ) {
     vi.stubGlobal(
       "fetch",
@@ -84,10 +85,11 @@ describe("personal key storage", () => {
       ],
     });
     if (listError) list.mockRejectedValue(listError);
+    if (initiallyEmpty) list.mockResolvedValueOnce({ keys: [] });
     vi.spyOn(api, "getOperationLimit").mockResolvedValue({
       limit: 5,
-      remaining: 0,
-      retry_after: 60,
+      remaining: initiallyEmpty ? 5 : 0,
+      retry_after: initiallyEmpty ? 0 : 60,
     });
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -115,6 +117,42 @@ describe("personal key storage", () => {
     fireEvent.click(button);
     expect(await screen.findByText("sk-synthetic-personal")).toBeVisible();
     expect(reveal).toHaveBeenCalledWith("hashed-key");
+    expect(
+      screen
+        .getByText("sk-synthetic-personal")
+        .compareDocumentPosition(screen.getByText("Virtual key")),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
+    expect(screen.queryByText("sk-synthetic-personal")).not.toBeInTheDocument();
+  });
+
+  it("keeps one secret panel above the summary when showing a newly created key", async () => {
+    vi.spyOn(api, "createKey").mockResolvedValue({
+      key: "sk-synthetic-created",
+      user_id: "owner",
+    });
+    vi.spyOn(api, "revealKey").mockResolvedValue({
+      key: "sk-synthetic-created",
+    });
+    renderHome(true, true, {}, undefined, false, true);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Create API key" }),
+    );
+    expect(await screen.findByText("sk-synthetic-created")).toBeVisible();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Show API key" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Show API key" }),
+      ).toBeEnabled(),
+    );
+    expect(await screen.findAllByText("sk-synthetic-created")).toHaveLength(1);
+    expect(
+      screen
+        .getByText("sk-synthetic-created")
+        .compareDocumentPosition(screen.getByText("Virtual key")),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it.each([

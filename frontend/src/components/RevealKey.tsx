@@ -5,9 +5,11 @@ import { api } from "../api/client";
 export default function RevealKey({
   identifier,
   buttonClassName,
+  onReveal,
 }: {
   identifier: string;
   buttonClassName?: string;
+  onReveal?: (secret: string) => void;
 }) {
   const [secret, setSecret] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -20,7 +22,8 @@ export default function RevealKey({
     setCopied(false);
     try {
       const result = await api.revealKey(identifier);
-      setSecret(result.key);
+      if (onReveal) onReveal(result.key);
+      else setSecret(result.key);
     } catch (cause) {
       setError((cause as Error).message);
     } finally {

@@ -304,6 +304,11 @@ export default function Home() {
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [demoRolePending, setDemoRolePending] = useState(false);
 
+  function showKey(secret: string) {
+    setNewKey(secret);
+    setCopied(false);
+  }
+
   const portal = useQuery({
     queryKey: ["portal-config"],
     queryFn: fetchPortalConfig,
@@ -318,7 +323,7 @@ export default function Home() {
   const create = useMutation({
     mutationFn: api.createKey,
     onSuccess: (result) => {
-      setNewKey(result.key);
+      showKey(result.key);
       void queryClient.invalidateQueries({ queryKey: ["keys"] });
     },
     onSettled: refreshOperationLimit,
@@ -326,7 +331,7 @@ export default function Home() {
   const regenerate = useMutation({
     mutationFn: api.regenerateKey,
     onSuccess: (result) => {
-      setNewKey(result.key);
+      showKey(result.key);
       setConfirmRegenerate(false);
       void queryClient.invalidateQueries({ queryKey: ["keys"] });
     },
@@ -607,6 +612,7 @@ export default function Home() {
                       </code>
                       <button
                         onClick={copyNewKey}
+                        aria-label="Copy API key"
                         className="rounded-md border border-emerald-200 bg-white px-3 text-emerald-700 hover:bg-emerald-100"
                       >
                         {copied ? <Check size={15} /> : <Copy size={15} />}
@@ -616,7 +622,7 @@ export default function Home() {
                       onClick={() => setNewKey(null)}
                       className="mt-3 text-xs font-medium text-emerald-700 hover:text-emerald-900"
                     >
-                      Dismiss
+                      Hide API key
                     </button>
                   </div>
                 )}
@@ -686,6 +692,7 @@ export default function Home() {
                             key={keyToken(key)}
                             identifier={keyToken(key)}
                             buttonClassName={primaryKeyActionClassName}
+                            onReveal={showKey}
                           />
                         ))
                     ) : (

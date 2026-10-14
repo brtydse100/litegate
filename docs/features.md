@@ -20,6 +20,9 @@ Deployments can opt into [API key storage](configuration.md#optional-api-key-sto
 For saved keys, **Show API key** replaces regeneration in the portal; owners can
 reveal their own keys and administrators can reveal them from the key list.
 The default remains one-time secret display without key storage.
+Created and revealed personal secrets use one panel above the key summary, with
+copy and hide controls. Showing a key again updates that panel without adding
+a second secret display.
 
 New keys inherit the installation defaults for models, budget, reset interval,
 duration, TPM, RPM, and team. For SSO users, an administrator can map identity
