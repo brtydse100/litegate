@@ -12,7 +12,7 @@ LiteGate verifies the applied budgets rather than accepting ignored API fields.
 ## Configuration
 
 Declare `organizationHierarchy` at the **top level** of Helm values. The default
-`levels: []` disables the feature. A complete example:
+`levels: []` disables the feature. You can configure up to eight levels. A complete example:
 
 ```yaml
 organizationHierarchy:

@@ -67,6 +67,12 @@ describe("organization dashboard contracts", () => {
     fireEvent.click(
       within(navigation).getByRole("button", { name: "Platform, 1 user" }),
     );
+    expect(
+      within(navigation).getByRole("button", { name: "Platform, 1 user" }),
+    ).toHaveTextContent(/^Platform$/);
+    expect(
+      within(navigation).getByRole("button", { name: "Engineering, 3 users" }),
+    ).toHaveTextContent("3");
     const policy = await screen.findByRole("region", {
       name: "Effective budget policy",
     });

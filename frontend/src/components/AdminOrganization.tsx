@@ -193,7 +193,9 @@ export default function AdminOrganization() {
                   <span className="truncate" title={group.path.join(" → ")}>
                     {group.name}
                   </span>
-                  <span className="text-xs">{group.members}</span>
+                  {group.level < (overview.data?.levels.length ?? 0) - 1 && (
+                    <span className="text-xs">{group.members}</span>
+                  )}
                 </button>
               </div>
             ))}
