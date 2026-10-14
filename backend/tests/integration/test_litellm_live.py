@@ -135,7 +135,7 @@ async def test_managed_allowance_updates_preserve_windows_and_rotation_carries_s
         assert changed["max_budget"] == 100
         assert changed["spend"] == 12
         assert changed["budget_reset_at"] == first["budget_reset_at"]
-        replacement = await organization_sync.generate_key(user_id, "", team_id, initial_spend=12)
+        replacement = await organization_sync.generate_key(user_id, "", team_id, initial_spend=12, key_alias=f"rotated-{suffix}")
         keys.append(replacement["key"])
         rotated = await litellm.get_key_info(replacement["key"])
         assert rotated["team_id"] == leaf.team_id
