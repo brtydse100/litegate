@@ -287,3 +287,15 @@ async def test_uncapped_roster_only_source_member_can_migrate_to_the_lowest_team
     state["roster_only"] = {"engineering": [{"user_id": "alice", "role": "user"}]}
     await sync.remember("alice", "alice@example.com", "sso", ["squad1"])
     assert state["keys"]["key-old"]["team_id"] == tree.resolve("alice", ["squad1"]).team_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rpm", [0, 120])
+async def test_roster_only_source_cannot_lose_default_member_rate_limits(native, rpm):
+    _, state = native
+    state["roster_only"] = {"engineering": [{"user_id": "alice", "role": "user"}]}
+    state["teams"]["engineering"]["team_member_budget_table"] = {"max_budget": None, "rpm_limit": rpm}
+    with pytest.raises(HTTPException, match="ancestor.*restrictions"):
+        await sync.remember("alice", "alice@example.com", "sso", ["squad1"])
+    assert state["keys"]["key-old"]["team_id"] == "engineering"
+    assert state["user_budget"] == 25

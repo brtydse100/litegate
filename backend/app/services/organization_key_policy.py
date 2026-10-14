@@ -48,7 +48,14 @@ async def guard_ancestor_restrictions(node: OrganizationNode, user_id: str, keys
             roster_member = next((item for item in roster if item.get("user_id") == user_id), None)
             if member is not None or roster_member is not None:
                 upstream.member_budget(info, user_id)  # Reject unhydrated linked policy records.
-        records = [team, member or {}, roster_member or {}, (member or {}).get("litellm_budget_table") or {}]
+        upstream.default_member_budget(info)  # Verify linked default policies before inspecting rate/model controls.
+        records = [
+            team,
+            team.get("team_member_budget_table") or {},
+            member or {},
+            roster_member or {},
+            (member or {}).get("litellm_budget_table") or {},
+        ]
         if any(
             record.get("blocked") or any(record.get(field) is not None for field in limits) or any(record.get(field) for field in policies)
             for record in records
