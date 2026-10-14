@@ -132,7 +132,7 @@ function TeamEditor({
 
   return (
     <div
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
+      className="!m-0 fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="team-editor-title"
@@ -574,6 +574,14 @@ export default function AdminTeams() {
                         {team.blocked && (
                           <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">
                             Blocked
+                          </span>
+                        )}
+                        {team.organization_managed && (
+                          <span
+                            title="Managed by the organization hierarchy configuration, including Helm values"
+                            className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300"
+                          >
+                            Config managed
                           </span>
                         )}
                         {team.default_key_team && (

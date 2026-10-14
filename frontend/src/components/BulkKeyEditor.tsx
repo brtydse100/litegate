@@ -21,6 +21,7 @@ import {
 } from "./PolicySettings";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
+import { metricValue } from "./OrganizationCharts";
 import { useKeySettingsForm } from "../hooks/useKeySettingsForm";
 import type {
   AdminKeyFilters,
@@ -477,9 +478,12 @@ export default function BulkKeyEditor({
                       key.key_alias ||
                       `Key ${(adminKeys.data?.page ?? page) * 25 - 24 + index}`;
                     return (
-                      <div key={token || index}>
+                      <div
+                        key={token || index}
+                        className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border px-2 ${!token ? "opacity-40" : isSelected ? "border-indigo-500/55 bg-indigo-500/10" : "border-transparent bg-[#151822] hover:border-[#353A52] hover:bg-[#1A1D27]"}`}
+                      >
                         <label
-                          className={`group flex items-center gap-3 rounded-lg border p-3 transition focus-within:ring-2 focus-within:ring-indigo-500/50 ${!token ? "cursor-not-allowed border-transparent opacity-40" : isSelected ? "cursor-pointer border-indigo-500/55 bg-indigo-500/10" : "cursor-pointer border-transparent bg-[#151822] hover:border-[#353A52] hover:bg-[#1A1D27]"}`}
+                          className={`group flex min-w-0 items-center gap-2 rounded-lg py-2 transition focus-within:ring-2 focus-within:ring-indigo-500/50 ${!token ? "cursor-not-allowed" : "cursor-pointer"}`}
                         >
                           <input
                             className="sr-only"
@@ -518,7 +522,7 @@ export default function BulkKeyEditor({
                           </span>
                           <span className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
                             <span className="rounded bg-[#22263A] px-2 py-0.5 text-[10px] text-gray-400">
-                              ${(key.spend ?? 0).toFixed(2)} spent
+                              {metricValue(key.spend ?? 0, "spend")} spent
                             </span>
                             {key.team_id && (
                               <span
@@ -531,9 +535,11 @@ export default function BulkKeyEditor({
                           </span>
                         </label>
                         {saveApiKeysInDb && key.secret_available && (
-                          <div className="px-3 pb-3">
-                            <RevealKey identifier={token} />
-                          </div>
+                          <RevealKey
+                            identifier={token}
+                            compact
+                            buttonClassName="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+                          />
                         )}
                       </div>
                     );

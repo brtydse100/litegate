@@ -19,10 +19,13 @@ Signed-in users can:
 Deployments can opt into [API key storage](configuration.md#optional-api-key-storage).
 For saved keys, **Show API key** replaces regeneration in the portal; owners can
 reveal their own keys and administrators can reveal them from the key list.
-The default remains one-time secret display without key storage.
-Created and revealed personal secrets use one panel above the key summary, with
-copy and hide controls. Showing a key again updates that panel without adding
-a second secret display.
+The default remains one-time secret display without key storage. Rotation holds
+the owner lock from the spend snapshot through old-key revocation, preventing
+simultaneous rotations from leaving multiple replacement allowances.
+The personal key summary shows the actual stored secret in its header with copy
+and hide controls. It loads through the authorized reveal endpoint and stays in
+component memory. Hashes are never offered as usable API keys. Without stored
+secrets, newly created keys remain copyable until hidden or the page is left.
 
 New keys inherit the installation defaults for models, budget, reset interval,
 duration, TPM, RPM, and team. For SSO users, an administrator can map identity
@@ -57,6 +60,9 @@ or blocked state. Its **Members** action also lets an administrator move a user
 to another team in a few clicks. The same operations are available to trusted
 automation through the [v1 API](../API.md#teams-admin-only). Normal users cannot
 see the tab or call the team endpoints.
+
+Hierarchy-managed teams carry a **Config managed** tag. This identifies their
+configuration ownership without claiming a Helm installation history.
 
 Teams and Organization show four decimal places for spend below one cent, so
 small real charges stay visible. Positive amounts below $0.0001 show **<$0.0001**.
@@ -108,6 +114,8 @@ saved settings or overwrite unrelated values.
 **Choose settings to change** starts collapsed and opens when keys are selected.
 It can be collapsed manually; changing the selection opens it again. Model
 choices appear in a scrollable list with highlighted selections and a count.
+Key selection rows keep their reveal button inside the row beside spend, and
+revealed secrets expand within the same card.
 The editable fields themselves are prefilled with the selected key's saved
 values. Key and team fields also use saved values as placeholders, so clearing
 an edit still shows the current setting. When all selected keys are visible, shared values are filled in and

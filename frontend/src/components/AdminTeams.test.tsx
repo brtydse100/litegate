@@ -46,6 +46,7 @@ describe("team policy editing", () => {
         {
           team_id: "devops",
           team_alias: "DevOps",
+          organization_managed: true,
           max_budget: 2000,
           spend: 0.0024,
           budget_duration: "30d",
@@ -75,6 +76,7 @@ describe("team policy editing", () => {
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     expect(screen.getByText("$0.0024")).toBeVisible();
+    expect(screen.getByText("Config managed")).toBeVisible();
     const dialog = screen.getByRole("dialog", { name: "Edit team" });
     const current = within(dialog).getByRole("region", {
       name: "Current team settings",

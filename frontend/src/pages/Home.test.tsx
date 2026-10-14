@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -102,31 +109,64 @@ describe("personal key storage", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
+    return { list, client };
   }
 
-  it("replaces regeneration with reveal for stored keys even during a mutation cooldown", async () => {
+  it("retains a one-time rotated secret if multiple cached cards remain after refresh fails", async () => {
+    vi.spyOn(api, "regenerateKey").mockResolvedValue({
+      key: "sk-synthetic-one-time",
+      user_id: "owner",
+    });
+    const { list, client } = renderHome(false, false);
+    await screen.findByRole("button", { name: "Regeneration paused" });
+    vi.mocked(api.getOperationLimit).mockResolvedValue({
+      limit: 5,
+      remaining: 5,
+      retry_after: 0,
+    });
+    list.mockRejectedValue(new Error("Metadata refresh unavailable"));
+    act(() => {
+      client.setQueryData(["keys"], {
+        keys: [
+          { token: "old-one", spend: 1, models: [] },
+          { token: "old-two", spend: 2, models: [] },
+        ],
+      });
+      client.setQueryData(["key-operation-limit"], {
+        limit: 5,
+        remaining: 5,
+        retry_after: 0,
+      });
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Regenerate key" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Replace key" }));
+    await screen.findByText("Metadata refresh unavailable");
+    expect(screen.getByText("sk-synthetic-one-time")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Copy API key" })).toBeEnabled();
+  });
+
+  it("shows the actual stored key in the summary corner even during a mutation cooldown", async () => {
     const reveal = vi
       .spyOn(api, "revealKey")
       .mockResolvedValue({ key: "sk-synthetic-personal" });
     renderHome(true, true);
-    const button = await screen.findByRole("button", { name: "Show API key" });
-    expect(button).toBeEnabled();
     expect(
       screen.queryByRole("button", { name: /regenerat/i }),
     ).not.toBeInTheDocument();
-    fireEvent.click(button);
     expect(await screen.findByText("sk-synthetic-personal")).toBeVisible();
     expect(reveal).toHaveBeenCalledWith("hashed-key");
-    expect(
-      screen
-        .getByText("sk-synthetic-personal")
-        .compareDocumentPosition(screen.getByText("Virtual key")),
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const card = screen.getByText("Virtual key").closest("article")!;
+    expect(within(card).getByText("sk-synthetic-personal")).toBeVisible();
+    expect(screen.queryByTitle("Copy key identifier")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
     expect(screen.queryByText("sk-synthetic-personal")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show API key" }));
+    expect(await screen.findByText("sk-synthetic-personal")).toBeVisible();
   });
 
-  it("keeps one secret panel above the summary when showing a newly created key", async () => {
+  it("keeps one secret inside the summary after creating and showing a key", async () => {
     vi.spyOn(api, "createKey").mockResolvedValue({
       key: "sk-synthetic-created",
       user_id: "owner",
@@ -138,21 +178,25 @@ describe("personal key storage", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Create API key" }),
     );
-    expect(await screen.findByText("sk-synthetic-created")).toBeVisible();
+    await screen.findByText("Virtual key");
+    await waitFor(() =>
+      expect(screen.getByText("sk-synthetic-created")).toBeVisible(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "Show API key" }),
     );
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: "Show API key" }),
+        screen.getByRole("button", { name: "Copy API key" }),
       ).toBeEnabled(),
     );
     expect(await screen.findAllByText("sk-synthetic-created")).toHaveLength(1);
     expect(
-      screen
-        .getByText("sk-synthetic-created")
-        .compareDocumentPosition(screen.getByText("Virtual key")),
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      within(screen.getByText("Virtual key").closest("article")!).getByText(
+        "sk-synthetic-created",
+      ),
+    ).toBeVisible();
   });
 
   it.each([
