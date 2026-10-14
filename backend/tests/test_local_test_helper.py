@@ -108,3 +108,17 @@ def test_request_distinguishes_provider_auth_from_virtual_key_auth(monkeypatch, 
     assert expected in output
     assert "sensitive-provider-secret" not in output
     assert "synthetic-user-secret" not in output
+
+
+def test_request_reports_litellm_accounting_separately_from_provider_cost(monkeypatch, capsys):
+    monkeypatch.setenv("LITEGATE_TEST_KEY", "synthetic-user-secret")
+
+    def completion(*args, **kwargs):
+        kwargs["response_headers"]["x-litellm-response-cost"] = "0.0024"
+        return {"choices": [{"message": {"content": "OK"}}], "usage": {"total_tokens": 24, "cost": 0}}
+
+    monkeypatch.setattr(helper, "call", completion)
+    helper.request(SimpleNamespace(count=1, model="free-2", prompt="hello", max_tokens=8))
+    output = capsys.readouterr().out
+    assert "LiteLLM accounted cost: $0.002400" in output
+    assert "synthetic-user-secret" not in output

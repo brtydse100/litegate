@@ -5,16 +5,37 @@ import getpass
 import os
 import urllib.error
 
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+
 
 def local_models(call, proxy, master):
     return call(proxy, "/v2/model/info?page=1&size=100", key=master).get("data", [])
 
 
 def free_deployment(model):
-    upstream = model.get("litellm_params", {}).get("model", "")
-    return upstream == "openrouter/openrouter/free" or (
-        upstream.startswith("openrouter/") and upstream.endswith(":free")
+    params = model.get("litellm_params", {})
+    upstream = params.get("model", "")
+    native = (
+        upstream.startswith("openrouter/")
+        and params.get("api_base") in (None, OPENROUTER_BASE)
+        and params.get("custom_llm_provider") in (None, "openrouter")
     )
+    compatible = (
+        upstream.startswith("openai/")
+        and params.get("api_base") == OPENROUTER_BASE
+        and params.get("custom_llm_provider") == "openai"
+    )
+    return (native or compatible) and (
+        upstream.split("/", 1)[1] == "openrouter/free" or upstream.endswith(":free")
+    )
+
+
+def accounting_route(model):
+    return {
+        "model": "openai/" + model["litellm_params"]["model"].split("/", 1)[1],
+        "api_base": OPENROUTER_BASE,
+        "custom_llm_provider": "openai",
+    }
 
 
 def configure_pricing(call, proxy, master):
@@ -44,7 +65,7 @@ def configure_pricing(call, proxy, master):
             key=master,
             payload={
                 "model_info": {"id": model["model_info"]["id"], **prices},
-                "litellm_params": prices,
+                "litellm_params": {**accounting_route(model), **prices},
             },
         )
     verified = local_models(call, proxy, master)
@@ -58,9 +79,15 @@ def configure_pricing(call, proxy, master):
             None,
         )
         rate = rates[model["model_name"]]
+        expected = {
+            **accounting_route(model),
+            "input_cost_per_token": rate,
+            "output_cost_per_token": rate,
+            "api_key": model["litellm_params"].get("api_key"),
+        }
         if not actual or any(
-            actual.get("litellm_params", {}).get(field) != rate
-            for field in ("input_cost_per_token", "output_cost_per_token")
+            actual.get("litellm_params", {}).get(field) != value
+            for field, value in expected.items()
         ):
             raise RuntimeError(
                 "Could not verify the saved test prices; inspect the local model settings."
@@ -97,7 +124,13 @@ def refresh_key(call, proxy, master, provider_key):
             },
         )
     verified = local_models(call, proxy, master)
-    preserved = ("model", "input_cost_per_token", "output_cost_per_token")
+    preserved = (
+        "model",
+        "api_base",
+        "custom_llm_provider",
+        "input_cost_per_token",
+        "output_cost_per_token",
+    )
     for model in models:
         actual = next(
             (

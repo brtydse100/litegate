@@ -40,13 +40,42 @@ def native():
     return models, updates, call
 
 
-def test_pricing_changes_only_accounting_rates_and_verifies_them(native, capsys):
+def test_pricing_uses_compatible_adapter_and_preserves_credentials(native, capsys):
     models, updates, call = native
     models_helper.configure_pricing(call, "http://127.0.0.1:4000", "synthetic-master")
     assert [model["litellm_params"]["input_cost_per_token"] for model in models] == [0.1, 0.0001]
-    assert all(set(update["litellm_params"]) == {"input_cost_per_token", "output_cost_per_token"} for update in updates)
+    assert all("api_key" not in update["litellm_params"] for update in updates)
+    assert [model["litellm_params"]["model"] for model in models] == ["openai/author/model1:free", "openai/author/model2:free"]
+    assert all(model["litellm_params"]["api_base"] == "https://openrouter.ai/api/v1" for model in models)
+    assert all(model["litellm_params"]["custom_llm_provider"] == "openai" for model in models)
     assert all(model["litellm_params"]["api_key"] == "synthetic-provider-secret" for model in models)
     assert "synthetic-provider-secret" not in capsys.readouterr().out
+
+
+def test_pricing_is_repeatable_for_normalized_free_routes(native):
+    models, updates, call = native
+    models_helper.configure_pricing(call, "http://127.0.0.1:4000", "synthetic-master")
+    first = deepcopy(models)
+    models_helper.configure_pricing(call, "http://127.0.0.1:4000", "synthetic-master")
+    assert models == first
+    assert len(updates) == 4
+
+
+@pytest.mark.parametrize(
+    "upstream,provider,base",
+    [
+        ("openrouter/author/model:free", "openrouter", "https://unrelated.example/v1"),
+        ("openai/author/model:free", "openai", "https://unrelated.example/v1"),
+        ("openai/author/model", "openai", "https://openrouter.ai/api/v1"),
+        ("openai/author/model:free", "other", "https://openrouter.ai/api/v1"),
+    ],
+)
+def test_unsafe_routes_rejected_before_any_updates(native, upstream, provider, base):
+    models, updates, call = native
+    models[1]["litellm_params"].update(model=upstream, custom_llm_provider=provider, api_base=base)
+    with pytest.raises(RuntimeError, match="known free"):
+        models_helper.configure_pricing(call, "http://127.0.0.1:4000", "synthetic-master")
+    assert updates == []
 
 
 def test_key_refresh_preserves_existing_prices_and_routes(native, capsys):

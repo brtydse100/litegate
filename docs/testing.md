@@ -126,9 +126,16 @@ python scripts/local_test.py request --model free-1 --max-tokens 16
 
 `free-1` uses $0.10 per input/output token and `free-2` uses $0.0001 per token
 in LiteLLM's local accounting. These are test rates, not OpenRouter charges;
-the upstream routes remain free and requests use real providers. Input tokens
+the upstream routes remain free and requests use real providers. The pricing
+command uses LiteLLM's OpenAI-compatible adapter with the exact OpenRouter API
+endpoint for these two aliases. The native OpenRouter adapter prioritizes the
+provider's zero-dollar cost over custom prices; the compatible adapter lets
+LiteLLM calculate the artificial test rates. Existing credentials and underlying
+free model IDs are preserved. Input tokens
 also count, so a single expensive request can exceed Alice's $5 allowance.
 Check the recorded spend and retry to test the next-request budget rejection.
+The request helper prints **LiteLLM accounted cost** separately from OpenRouter's
+zero `usage.cost`. Refresh the portal after sending requests to load updated spend.
 `free-router` retains its default free pricing. Pricing setup verifies the saved
 rates; successful inference and spend enforcement still require a valid provider
 credential and available provider quota. The disposable management integration

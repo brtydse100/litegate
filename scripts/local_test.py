@@ -20,7 +20,7 @@ PORTAL = "http://127.0.0.1:8000"
 MASTER = "sk-litegate-integration-master"  # Disposable Compose stack's test credential.
 
 
-def call(base, path, *, key=None, payload=None):
+def call(base, path, *, key=None, payload=None, response_headers=None):
     headers = {"Content-Type": "application/json"}
     if key:
         if base == PORTAL:
@@ -30,6 +30,10 @@ def call(base, path, *, key=None, payload=None):
     data = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request(base + path, data=data, headers=headers)
     with urllib.request.urlopen(request, timeout=120) as response:
+        if response_headers is not None:
+            response_headers.update(
+                {name.lower(): value for name, value in response.headers.items()}
+            )
         return json.load(response)
 
 
@@ -269,11 +273,13 @@ def request(args):
     if key == MASTER:
         raise ValueError("Use a user's virtual key, not the LiteLLM master key")
     for index in range(args.count):
+        response_headers = {}
         try:
             result = call(
                 PROXY,
                 "/v1/chat/completions",
                 key=key,
+                response_headers=response_headers,
                 payload={
                     "model": args.model,
                     "messages": [{"role": "user", "content": args.prompt}],
@@ -300,6 +306,11 @@ def request(args):
             raise SystemExit(1) from None
         print(f"Request {index + 1}: {result['choices'][0]['message'].get('content')}")
         print("Usage:", result.get("usage", {}))
+        try:
+            cost = float(response_headers.get("x-litellm-response-cost"))
+            print(f"LiteLLM accounted cost: ${cost:.6f}")
+        except (TypeError, ValueError):
+            print("LiteLLM accounted cost: unavailable; check native spend logs.")
         if index + 1 < args.count:
             time.sleep(1)
 
