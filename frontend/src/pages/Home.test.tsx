@@ -147,7 +147,7 @@ describe("personal key storage", () => {
     expect(screen.getByRole("button", { name: "Copy API key" })).toBeEnabled();
   });
 
-  it("shows the actual stored key in the summary corner even during a mutation cooldown", async () => {
+  it("shows the stored key above its summary with the toggle inside the card during a cooldown", async () => {
     const reveal = vi
       .spyOn(api, "revealKey")
       .mockResolvedValue({ key: "sk-synthetic-personal" });
@@ -158,7 +158,14 @@ describe("personal key storage", () => {
     expect(await screen.findByText("sk-synthetic-personal")).toBeVisible();
     expect(reveal).toHaveBeenCalledWith("hashed-key");
     const card = screen.getByText("Virtual key").closest("article")!;
-    expect(within(card).getByText("sk-synthetic-personal")).toBeVisible();
+    const secret = screen.getByText("sk-synthetic-personal");
+    expect(card.contains(secret)).toBe(false);
+    expect(
+      secret.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(card).getByRole("button", { name: "Hide API key" }),
+    ).toBeVisible();
     expect(screen.queryByTitle("Copy key identifier")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
     expect(screen.queryByText("sk-synthetic-personal")).not.toBeInTheDocument();
@@ -166,7 +173,7 @@ describe("personal key storage", () => {
     expect(await screen.findByText("sk-synthetic-personal")).toBeVisible();
   });
 
-  it("keeps one secret inside the summary after creating and showing a key", async () => {
+  it("uses the same green panel above the summary after creating and revealing a key", async () => {
     vi.spyOn(api, "createKey").mockResolvedValue({
       key: "sk-synthetic-created",
       user_id: "owner",
@@ -182,6 +189,10 @@ describe("personal key storage", () => {
     await waitFor(() =>
       expect(screen.getByText("sk-synthetic-created")).toBeVisible(),
     );
+    const createdPanel = screen.getByText(
+      "sk-synthetic-created",
+    ).parentElement!;
+    expect(createdPanel).toHaveClass("bg-emerald-50", "border-emerald-200");
     fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "Show API key" }),
@@ -192,11 +203,16 @@ describe("personal key storage", () => {
       ).toBeEnabled(),
     );
     expect(await screen.findAllByText("sk-synthetic-created")).toHaveLength(1);
+    const revealed = screen.getByText("sk-synthetic-created");
+    expect(revealed.parentElement).toHaveAttribute(
+      "class",
+      createdPanel.className,
+    );
     expect(
-      within(screen.getByText("Virtual key").closest("article")!).getByText(
-        "sk-synthetic-created",
-      ),
-    ).toBeVisible();
+      revealed.compareDocumentPosition(
+        screen.getByText("Virtual key").closest("article")!,
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it.each([

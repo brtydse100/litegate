@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { api } from "../api/client";
 import { primaryKeyActionClassName } from "./keyActionStyles";
@@ -8,6 +9,7 @@ interface Props {
   canReveal: boolean;
   initialSecret?: string | null;
   onHide?: () => void;
+  children?: (action: ReactNode) => ReactNode;
 }
 
 export default function PersonalKeySecret(props: Props) {
@@ -21,6 +23,7 @@ function SecretContent({
   canReveal,
   initialSecret,
   onHide,
+  children,
 }: Props) {
   const [secret, setSecret] = useState<string | null>(initialSecret ?? null);
   const [pending, setPending] = useState(false);
@@ -78,6 +81,24 @@ function SecretContent({
     onHide?.();
   }
 
+  const action =
+    secret || canReveal ? (
+      <button
+        type="button"
+        onClick={() => (secret ? hide() : void reveal())}
+        disabled={pending}
+        aria-expanded={!!secret}
+        className={primaryKeyActionClassName}
+      >
+        {secret ? <EyeOff size={21} /> : <Eye size={21} />}
+        {pending
+          ? "Loading API key..."
+          : secret
+            ? "Hide API key"
+            : "Show API key"}
+      </button>
+    ) : null;
+
   return (
     <div
       className="w-full min-w-0 space-y-3"
@@ -85,8 +106,8 @@ function SecretContent({
       aria-label="API key secret"
     >
       {secret ? (
-        <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-4 shadow-sm">
-          <code className="min-w-0 basis-full break-all font-mono text-base font-medium leading-relaxed text-slate-900 sm:flex-1 sm:basis-auto md:text-lg">
+        <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-5">
+          <code className="min-w-0 basis-full break-all font-mono text-base font-medium leading-relaxed text-emerald-900 sm:flex-1 sm:basis-auto md:text-lg">
             {secret}
           </code>
           <button
@@ -102,22 +123,7 @@ function SecretContent({
       ) : !canReveal ? (
         <span className="text-xs text-slate-500">Original key unavailable</span>
       ) : null}
-      {(secret || canReveal) && (
-        <button
-          type="button"
-          onClick={() => (secret ? hide() : void reveal())}
-          disabled={pending}
-          aria-expanded={!!secret}
-          className={primaryKeyActionClassName}
-        >
-          {secret ? <EyeOff size={21} /> : <Eye size={21} />}
-          {pending
-            ? "Loading API key..."
-            : secret
-              ? "Hide API key"
-              : "Show API key"}
-        </button>
-      )}
+      {children ? children(action) : action}
       {error && (
         <p role="alert" className="mt-1 text-xs text-red-600">
           {error}

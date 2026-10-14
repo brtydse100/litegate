@@ -88,84 +88,86 @@ function KeyCard({
   const managed = keyInfo.organization_managed || !!keyInfo.organization_path;
   const budgetAvailable = keyInfo.user_budget_available !== false;
   return (
-    <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="shrink-0 rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
-            <KeyRound size={17} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-slate-950">
-              {keyInfo.key_alias || "API key"}
-            </p>
-            <p className="text-xs text-slate-500">Virtual key</p>
-            <div className="mt-3">
-              <PersonalKeySecret
-                identifier={keyToken(keyInfo)}
-                canReveal={canReveal}
-                initialSecret={initialSecret}
-                onHide={onHide}
-              />
+    <PersonalKeySecret
+      identifier={keyToken(keyInfo)}
+      canReveal={canReveal}
+      initialSecret={initialSecret}
+      onHide={onHide}
+    >
+      {(action) => (
+        <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="shrink-0 rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
+                <KeyRound size={17} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-slate-950">
+                  {keyInfo.key_alias || "API key"}
+                </p>
+                <p className="text-xs text-slate-500">Virtual key</p>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-      <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
-        <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">
-            {managed ? "Key spend" : "Spend"}
-          </dt>
-          <dd className="mt-1 font-semibold text-slate-950">
-            {managed && !budgetAvailable
-              ? "Unavailable"
-              : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(4)}`}
-          </dd>
-        </div>
-        <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">
-            {managed ? "Key budget" : "Budget"}
-          </dt>
-          <dd className="mt-1 font-semibold text-slate-950">
-            {managed && !budgetAvailable
-              ? "Unavailable"
-              : (managed ? keyInfo.user_budget : keyInfo.max_budget) != null
-                ? `$${managed ? keyInfo.user_budget : keyInfo.max_budget}`
-                : "Unlimited"}
-          </dd>
-        </div>
-        <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">Models</dt>
-          <dd className="mt-1 font-semibold text-slate-950">
-            {keyInfo.models?.length ? keyInfo.models.length : "All"}
-          </dd>
-        </div>
-        <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">Expires</dt>
-          <dd className="mt-1 font-semibold text-slate-950">
-            {keyInfo.expires
-              ? new Date(keyInfo.expires).toLocaleDateString()
-              : "Never"}
-          </dd>
-        </div>
-      </dl>
-      {keyInfo.policy_error && (
-        <p
-          role="alert"
-          className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
-        >
-          {keyInfo.policy_error}
-        </p>
+          {action}
+          <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+            <div className="px-5 py-4">
+              <dt className="text-xs text-slate-500">
+                {managed ? "Key spend" : "Spend"}
+              </dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {managed && !budgetAvailable
+                  ? "Unavailable"
+                  : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(4)}`}
+              </dd>
+            </div>
+            <div className="px-5 py-4">
+              <dt className="text-xs text-slate-500">
+                {managed ? "Key budget" : "Budget"}
+              </dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {managed && !budgetAvailable
+                  ? "Unavailable"
+                  : (managed ? keyInfo.user_budget : keyInfo.max_budget) != null
+                    ? `$${managed ? keyInfo.user_budget : keyInfo.max_budget}`
+                    : "Unlimited"}
+              </dd>
+            </div>
+            <div className="px-5 py-4">
+              <dt className="text-xs text-slate-500">Models</dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {keyInfo.models?.length ? keyInfo.models.length : "All"}
+              </dd>
+            </div>
+            <div className="px-5 py-4">
+              <dt className="text-xs text-slate-500">Expires</dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {keyInfo.expires
+                  ? new Date(keyInfo.expires).toLocaleDateString()
+                  : "Never"}
+              </dd>
+            </div>
+          </dl>
+          {keyInfo.policy_error && (
+            <p
+              role="alert"
+              className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
+            >
+              {keyInfo.policy_error}
+            </p>
+          )}
+          {keyInfo.team_id && (
+            <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
+              <Building2 size={13} />
+              Assigned through{" "}
+              <span className="font-medium text-slate-800">
+                {keyInfo.organization_path?.join(" → ") ?? keyInfo.team_id}
+              </span>
+            </div>
+          )}
+        </article>
       )}
-      {keyInfo.team_id && (
-        <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
-          <Building2 size={13} />
-          Assigned through{" "}
-          <span className="font-medium text-slate-800">
-            {keyInfo.organization_path?.join(" → ") ?? keyInfo.team_id}
-          </span>
-        </div>
-      )}
-    </article>
+    </PersonalKeySecret>
   );
 }
 
@@ -583,7 +585,7 @@ export default function Home() {
                   </p>
                 )}
                 {newKey && !newKeyIdentifier && (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
+                  <div>
                     <p className="mb-3 text-sm text-emerald-900">
                       Your API key is ready. Copy it before leaving this page.
                     </p>
