@@ -213,6 +213,25 @@ async def test_bulk_policy_updates_report_managed_key_failure(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("changes", [None, {"key_alias": "renamed"}])
+@pytest.mark.parametrize("owner", ["u", "local:alice"])
+async def test_key_only_migration_cannot_bypass_pending_or_managed_organization_policy(monkeypatch, changes, owner):
+    if owner == "u":
+        store.remember(owner, "u@example.com", "sso", ["squad1"])
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"user_id": owner, "team_id": "manual", "max_budget": 100}))
+    update = AsyncMock()
+    monkeypatch.setattr(litellm, "update_key", update)
+    payload = {"keys": ["hash"], "use_key_budget_only": True}
+    if changes is not None:
+        payload["settings"] = changes
+    async with client() as browser:
+        response = await browser.patch("/api/v1/keys/bulk", headers=token("admin"), json=payload)
+    assert response.json()["failed"] == 1
+    assert "organizationHierarchy" in response.json()["results"][0]["error"]
+    update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("groups", [[], ["squad1", "squad2"]])
 @pytest.mark.parametrize("require_mapping", [False, True])
 @pytest.mark.parametrize("path", ["/api/keys", "/api/keys/regenerate", "/api/v1/keys"])
