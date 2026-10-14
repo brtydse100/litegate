@@ -4,6 +4,7 @@ from contextlib import closing
 import importlib.util
 import io
 import urllib.error
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -81,3 +82,29 @@ def test_start_rejects_a_different_running_instance_without_seeding(portal, monk
     with pytest.raises(RuntimeError, match="Cannot authenticate.*401"):
         helper.start()
     assert local_users.list_users() == []
+
+
+@pytest.mark.parametrize(
+    "message, expected",
+    [
+        ("OpenrouterException: User not found; sensitive-provider-secret", "OpenRouter rejected"),
+        ("Invalid virtual key sensitive-provider-secret", "LiteLLM rejected"),
+    ],
+)
+def test_request_distinguishes_provider_auth_from_virtual_key_auth(monkeypatch, capsys, message, expected):
+    import json
+
+    monkeypatch.setenv("LITEGATE_TEST_KEY", "synthetic-user-secret")
+
+    def rejected(*args, **kwargs):
+        raise urllib.error.HTTPError(
+            "http://127.0.0.1:4000/v1/chat/completions", 401, "Unauthorized", {}, io.BytesIO(json.dumps({"error": {"message": message}}).encode())
+        )
+
+    monkeypatch.setattr(helper, "call", rejected)
+    with pytest.raises(SystemExit):
+        helper.request(SimpleNamespace(count=1, model="free-router", prompt="hello", max_tokens=8))
+    output = capsys.readouterr().out
+    assert expected in output
+    assert "sensitive-provider-secret" not in output
+    assert "synthetic-user-secret" not in output

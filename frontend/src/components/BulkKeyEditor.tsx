@@ -17,6 +17,7 @@ import {
   CurrentPolicySettings,
   DurationChoices,
   ModelChoices,
+  NumericPolicyInput,
 } from "./PolicySettings";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
@@ -719,18 +720,13 @@ export default function BulkKeyEditor({
               )}
               status={modelStatus}
             />
-            <label className={fieldClass}>
-              <span>Maximum budget</span>
-              <input
-                className={`${inputClass} w-full`}
-                value={budget}
-                onChange={(event) => setValue("budget", event.target.value)}
-                type="number"
-                min="0"
-                step="any"
-                placeholder={placeholder("budget")}
-              />
-            </label>
+            <NumericPolicyInput
+              label="Maximum budget"
+              value={budget}
+              onValueChange={(value) => setValue("budget", value)}
+              step="any"
+              placeholder={placeholder("budget")}
+            />
             <label className={fieldClass}>
               <span>Budget reset</span>
               <input
@@ -743,28 +739,18 @@ export default function BulkKeyEditor({
                 placeholder={placeholder("budgetDuration")}
               />
             </label>
-            <label className={fieldClass}>
-              <span>TPM limit</span>
-              <input
-                className={`${inputClass} w-full`}
-                value={tpm}
-                onChange={(event) => setValue("tpm", event.target.value)}
-                type="number"
-                min="0"
-                placeholder={placeholder("tpm")}
-              />
-            </label>
-            <label className={fieldClass}>
-              <span>RPM limit</span>
-              <input
-                className={`${inputClass} w-full`}
-                value={rpm}
-                onChange={(event) => setValue("rpm", event.target.value)}
-                type="number"
-                min="0"
-                placeholder={placeholder("rpm")}
-              />
-            </label>
+            <NumericPolicyInput
+              label="TPM limit"
+              value={tpm}
+              onValueChange={(value) => setValue("tpm", value)}
+              placeholder={placeholder("tpm")}
+            />
+            <NumericPolicyInput
+              label="RPM limit"
+              value={rpm}
+              onValueChange={(value) => setValue("rpm", value)}
+              placeholder={placeholder("rpm")}
+            />
             <label className={fieldClass}>
               <span>New duration</span>
               <input

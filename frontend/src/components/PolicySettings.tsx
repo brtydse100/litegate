@@ -1,6 +1,68 @@
 import { useQuery } from "@tanstack/react-query";
+import { useId, type InputHTMLAttributes } from "react";
+import { Minus, Plus } from "lucide-react";
 import { api } from "../api/client";
 import type { KeyInfo, TeamInfo, ModelSelection } from "../types";
+
+export function NumericPolicyInput({
+  label,
+  value,
+  onValueChange,
+  disabled,
+  ...props
+}: Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  "type" | "value" | "onChange" | "className" | "min"
+> & {
+  label: string;
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  const generatedId = useId();
+  const id = props.id ?? generatedId;
+  const current = Number(value || 0);
+  function adjust(delta: number) {
+    const next = Math.max(0, current + delta);
+    if (Number.isFinite(next)) onValueChange(String(next));
+  }
+  return (
+    <div className="space-y-1 text-xs text-slate-600">
+      <label htmlFor={id}>{label}</label>
+      <div className="flex overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+        <input
+          {...props}
+          id={id}
+          type="number"
+          min="0"
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onValueChange(event.target.value)}
+          className="policy-number-input min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 disabled:opacity-50"
+        />
+        <div className="flex items-stretch border-l border-slate-200">
+          <button
+            type="button"
+            aria-label={`Decrease ${label}`}
+            disabled={disabled || current <= 0}
+            onClick={() => adjust(-1)}
+            className="px-2 text-slate-600 hover:bg-slate-100 focus-visible:outline-indigo-500 disabled:opacity-30"
+          >
+            <Minus size={14} />
+          </button>
+          <button
+            type="button"
+            aria-label={`Increase ${label}`}
+            disabled={disabled}
+            onClick={() => adjust(1)}
+            className="border-l border-slate-200 px-2 text-slate-600 hover:bg-slate-100 focus-visible:outline-indigo-500 disabled:opacity-30"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const durationChoices = [
   ["1h", "Hourly"],
@@ -47,7 +109,7 @@ export function ModelChoices({
     ]),
   ].sort();
   return (
-    <fieldset className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-3 text-xs text-slate-700 sm:col-span-2">
+    <fieldset className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 sm:col-span-2">
       <legend className="px-1 font-semibold">Allowed models</legend>
       {status && (
         <p className="text-slate-500">
@@ -69,7 +131,8 @@ export function ModelChoices({
         {options.map((model) => (
           <label
             key={model}
-            className={`flex min-w-0 cursor-pointer items-start gap-2 rounded-md border px-2 py-2 ${!value.all && value.models.includes(model) ? "border-indigo-200 bg-indigo-50 text-indigo-800" : "border-transparent hover:bg-slate-50"}`}
+            data-selected={!value.all && value.models.includes(model)}
+            className="policy-model-option flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-transparent px-2 py-2 hover:bg-slate-50"
           >
             <input
               type="checkbox"

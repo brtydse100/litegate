@@ -204,6 +204,7 @@ def providers():
     )
     if not provider_key:
         raise ValueError("An OpenRouter API key is required")
+    call("https://openrouter.ai", "/api/v1/auth/key", key=provider_key)
     catalog = call("https://openrouter.ai", "/api/v1/models")["data"]
     free = sorted(
         model["id"]
@@ -261,6 +262,10 @@ def request(args):
     )
     if not key:
         raise ValueError("A user virtual key is required")
+    if key.startswith("sk-litegate-demo-"):
+        raise RuntimeError(
+            "This is a demo key. Sign in at http://localhost:5189 and use Show API key to copy a real key."
+        )
     if key == MASTER:
         raise ValueError("Use a user's virtual key, not the LiteLLM master key")
     for index in range(args.count):
@@ -272,13 +277,26 @@ def request(args):
                 payload={
                     "model": args.model,
                     "messages": [{"role": "user", "content": args.prompt}],
-                    "max_tokens": 64,
+                    "max_tokens": args.max_tokens,
                 },
             )
         except urllib.error.HTTPError as exc:
-            print(
-                f"Request {index + 1}: HTTP {exc.code}; inspect the user's key/team policy and provider quota."
-            )
+            try:
+                message = str(json.load(exc).get("error", {}).get("message", ""))
+            except (ValueError, AttributeError):
+                message = ""
+            if exc.code == 401 and "openrouter" in message.lower():
+                print(
+                    "OpenRouter rejected the provider credential. Run: python scripts/local_test_models.py refresh-key"
+                )
+            elif exc.code == 401:
+                print(
+                    "LiteLLM rejected this virtual key. Copy a real key with Show API key at http://localhost:5189."
+                )
+            else:
+                print(
+                    f"Request {index + 1}: HTTP {exc.code}; inspect key/team limits and provider quota."
+                )
             raise SystemExit(1) from None
         print(f"Request {index + 1}: {result['choices'][0]['message'].get('content')}")
         print("Usage:", result.get("usage", {}))
@@ -306,6 +324,7 @@ def main():
         default="Reply with one short sentence confirming the request worked.",
     )
     send.add_argument("--count", type=int, choices=range(1, 21), default=1)
+    send.add_argument("--max-tokens", type=int, choices=[8, 16, 32, 64], default=16)
     args = parser.parse_args()
     try:
         {"start": start, "providers": providers, "request": lambda: request(args)}[

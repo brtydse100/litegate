@@ -59,6 +59,8 @@ The team editor keeps a **Current team settings** summary visible while you
 edit. It prefills saved values and offers model checkboxes and common
 budget-reset durations. Saved models remain selectable even if they are missing
 from the current catalog. Custom durations remain supported.
+Numeric budget and rate-limit fields use styled minus/plus buttons alongside
+direct numeric input. Model selections stay readable in light and dark themes.
 
 A move deliberately changes the policy applied to that user's source-team keys.
 LiteGate first adds the destination membership, reassigns and verifies every

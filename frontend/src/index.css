@@ -267,3 +267,26 @@ html.dark select,
 html.dark textarea {
   color-scheme: dark;
 }
+
+.policy-model-option[data-selected="true"] {
+  border-color: #c7d2fe;
+  background-color: #eef2ff;
+  color: #3730a3;
+}
+
+html.dark .policy-model-option[data-selected="true"] {
+  border-color: rgb(99 102 241 / 40%);
+  background-color: rgb(99 102 241 / 15%);
+  color: #c7d2fe;
+}
+
+.policy-number-input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.policy-number-input::-webkit-inner-spin-button,
+.policy-number-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

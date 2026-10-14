@@ -24,6 +24,7 @@ import {
   CurrentPolicySettings,
   DurationChoices,
   ModelChoices,
+  NumericPolicyInput,
 } from "./PolicySettings";
 
 const inputClass =
@@ -202,23 +203,18 @@ function TeamEditor({
               }
             />
           </label>
-          <label className="space-y-1 text-xs text-gray-400">
-            <span>Maximum budget (USD)</span>
-            <input
-              disabled={existing?.organization_managed}
-              className={inputClass}
-              value={budget}
-              onChange={(event) => setBudget(event.target.value)}
-              type="number"
-              min="0"
-              step="any"
-              placeholder={
-                existing
-                  ? currentLimitPlaceholder(existing.max_budget)
-                  : "Unlimited"
-              }
-            />
-          </label>
+          <NumericPolicyInput
+            label="Maximum budget (USD)"
+            disabled={existing?.organization_managed}
+            value={budget}
+            onValueChange={setBudget}
+            step="any"
+            placeholder={
+              existing
+                ? currentLimitPlaceholder(existing.max_budget)
+                : "Unlimited"
+            }
+          />
           <label className="space-y-1 text-xs text-gray-400">
             <span>Budget reset</span>
             <input
@@ -237,36 +233,26 @@ function TeamEditor({
               maxLength={32}
             />
           </label>
-          <label className="space-y-1 text-xs text-gray-400">
-            <span>TPM limit</span>
-            <input
-              className={inputClass}
-              value={tpm}
-              onChange={(event) => setTpm(event.target.value)}
-              type="number"
-              min="0"
-              placeholder={
-                existing
-                  ? currentLimitPlaceholder(existing.tpm_limit)
-                  : "Unlimited"
-              }
-            />
-          </label>
-          <label className="space-y-1 text-xs text-gray-400">
-            <span>RPM limit</span>
-            <input
-              className={inputClass}
-              value={rpm}
-              onChange={(event) => setRpm(event.target.value)}
-              type="number"
-              min="0"
-              placeholder={
-                existing
-                  ? currentLimitPlaceholder(existing.rpm_limit)
-                  : "Unlimited"
-              }
-            />
-          </label>
+          <NumericPolicyInput
+            label="TPM limit"
+            value={tpm}
+            onValueChange={setTpm}
+            placeholder={
+              existing
+                ? currentLimitPlaceholder(existing.tpm_limit)
+                : "Unlimited"
+            }
+          />
+          <NumericPolicyInput
+            label="RPM limit"
+            value={rpm}
+            onValueChange={setRpm}
+            placeholder={
+              existing
+                ? currentLimitPlaceholder(existing.rpm_limit)
+                : "Unlimited"
+            }
+          />
           <ModelChoices
             value={models}
             onChange={setModels}
