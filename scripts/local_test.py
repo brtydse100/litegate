@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +23,10 @@ MASTER = "sk-litegate-integration-master"  # Disposable Compose stack's test cre
 def call(base, path, *, key=None, payload=None):
     headers = {"Content-Type": "application/json"}
     if key:
-        headers["Authorization"] = f"Bearer {key}"
+        if base == PORTAL:
+            headers["X-API-Key"] = key
+        else:
+            headers["Authorization"] = f"Bearer {key}"
     data = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request(base + path, data=data, headers=headers)
     with urllib.request.urlopen(request, timeout=120) as response:
@@ -121,29 +125,39 @@ def start():
         config.write_text(
             (ROOT / "deploy/docker-compose/config.local-test.yaml").read_text()
         )
-    if ready(PORTAL, "/api/health/ready"):
-        raise RuntimeError(
-            "Port 8000 already serves an application. Stop it before starting this isolated setup."
+    if not ready(PORTAL, "/api/health/ready"):
+        launch(
+            [
+                sys.executable,
+                "-m",
+                "uvicorn",
+                "app.main:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8000",
+                "--reload",
+                "--reload-include",
+                "config.yaml",
+            ],
+            ROOT / "backend",
+            environment,
+            "manual-backend.log",
         )
-    launch(
-        [
-            sys.executable,
-            "-m",
-            "uvicorn",
-            "app.main:app",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "8000",
-            "--reload",
-            "--reload-include",
-            "config.yaml",
-        ],
-        ROOT / "backend",
-        environment,
-        "manual-backend.log",
-    )
-    wait_ready(PORTAL, "/api/health/ready")
+        wait_ready(PORTAL, "/api/health/ready")
+    try:
+        existing = call(PORTAL, "/api/v1/users", key=access["management"])
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(
+            f"Cannot authenticate this local setup on port 8000 (HTTP {exc.code}). Stop a different instance before retrying."
+        ) from None
+    if not isinstance(existing, list) or any(
+        not isinstance(user, dict) or not isinstance(user.get("username"), str)
+        for user in existing
+    ):
+        raise RuntimeError(
+            "Port 8000 returned an unexpected users response; refusing to modify this instance."
+        )
     if not ready("http://127.0.0.1:5189", "/"):
         launch(
             [
@@ -160,7 +174,6 @@ def start():
             "manual-frontend.log",
         )
     wait_ready("http://127.0.0.1:5189", "/api/health/ready")
-    existing = call(PORTAL, "/api/v1/users", key=access["management"])
     names = {user["username"] for user in existing}
     for name in ("alice", "bob", "carol"):
         if name not in names:
@@ -210,7 +223,7 @@ def providers():
             selected.append((f"free-{len(selected)}", model))
         if len(selected) == 3:
             break
-    existing = call(PROXY, "/model/info", key=MASTER).get("data", [])
+    existing = call(PROXY, "/v2/model/info?page=1&size=100", key=MASTER).get("data", [])
     names = {model["model_name"] for model in existing}
     for alias, model in selected:
         if alias in names:
@@ -298,6 +311,13 @@ def main():
         {"start": start, "providers": providers, "request": lambda: request(args)}[
             args.command
         ]()
+    except urllib.error.HTTPError as exc:
+        target = urllib.parse.urlsplit(exc.url)
+        print(
+            f"Local test failed: HTTP {exc.code} at {target.netloc}{target.path}.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from None
     except RuntimeError as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(1) from None

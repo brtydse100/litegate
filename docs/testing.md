@@ -81,6 +81,9 @@ and logs use ignored `.env.local-test*` paths. It preserves an existing
 [the manual hierarchy example](../deploy/docker-compose/config.local-test.yaml).
 Saving that config reloads the backend; periodic reconciliation runs every 60
 seconds. Do not commit the local config or use this stack with production data.
+If setup stops after starting the backend, rerun `start`: it reuses the running
+instance only after authenticating with this setup's saved management credential.
+An instance with different credentials is rejected before any accounts are changed.
 
 The second command prompts for an OpenRouter API key without echoing it (or reads
 `OPENROUTER_API_KEY`). It registers `free-router` and up to two current `:free`
