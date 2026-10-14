@@ -96,8 +96,12 @@ function TeamEditor({
     onUpdate(state.team.team_id, {
       team_alias: alias.trim(),
       models: modelList,
-      max_budget: nullableNumber(budget),
-      budget_duration: budgetDuration.trim() || null,
+      ...(!state.team.organization_managed
+        ? {
+            max_budget: nullableNumber(budget),
+            budget_duration: budgetDuration.trim() || null,
+          }
+        : {}),
       tpm_limit: nullableNumber(tpm),
       rpm_limit: nullableNumber(rpm),
       blocked,
@@ -167,6 +171,7 @@ function TeamEditor({
             <span>Maximum budget (USD)</span>
             <input
               className={inputClass}
+              disabled={existing?.organization_managed}
               value={budget}
               onChange={(event) => setBudget(event.target.value)}
               type="number"
@@ -179,6 +184,7 @@ function TeamEditor({
             <span>Budget reset</span>
             <input
               className={inputClass}
+              disabled={existing?.organization_managed}
               value={budgetDuration}
               onChange={(event) => setBudgetDuration(event.target.value)}
               placeholder="For example 30d"

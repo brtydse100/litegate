@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app import observability
-from app.routers import api_v1, auth, keys, logs, users
-from app.services import litellm, local_users
+from app.routers import api_v1, auth, keys, logs, users, organization
+from app.services import litellm, local_users, organization_sync
 from app.version import VERSION
 
 
@@ -17,9 +17,13 @@ from app.version import VERSION
 async def lifespan(_: FastAPI):
     local_users.init_db()
     await litellm.start_client()
+    organization_task = asyncio.create_task(organization_sync.run_reconciliation()) if settings.organization_hierarchy.levels else None
     try:
         yield
     finally:
+        if organization_task:
+            organization_task.cancel()
+            await asyncio.gather(organization_task, return_exceptions=True)
         await litellm.close_client()
 
 
@@ -83,6 +87,7 @@ app.include_router(keys.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(api_v1.router, prefix="/api")
+app.include_router(organization.router, prefix="/api")
 
 
 @app.get("/api/portal-config")

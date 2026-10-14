@@ -1,4 +1,11 @@
 import type { AuditEvent, KeyInfo, LocalUser, TeamInfo, User } from "../types";
+import {
+  organizationOverview,
+  organizationUsers,
+  organizationUsage,
+  organizationKeyPolicy,
+  organizationTeams,
+} from "./organization";
 
 let demoUser: User = {
   user_id: "demo-admin",
@@ -62,6 +69,10 @@ let installationKeys: KeyInfo[] = [
   },
 ];
 
+for (const key of installationKeys)
+  Object.assign(key, organizationKeyPolicy(key.user_id ?? ""));
+demoUser.team_ids = [organizationKeyPolicy(demoUser.user_id)!.team_id];
+
 let users: LocalUser[] = [
   {
     username: "contractor",
@@ -93,6 +104,7 @@ let users: LocalUser[] = [
 ];
 
 let teams: TeamInfo[] = [
+  ...organizationTeams(),
   {
     team_id: "platform-engineering",
     team_alias: "Platform Engineering",
@@ -214,6 +226,36 @@ async function mockResponse(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
+  if (path.startsWith("/api/v1/organization")) {
+    if (!signedIn) return json({ detail: "Not signed in" }, 401);
+    if (demoUser.role !== "admin")
+      return json({ detail: "Administrator access required" }, 403);
+    if (method !== "GET") return json({ detail: "Method not allowed" }, 405);
+    if (path === "/api/v1/organization") return json(organizationOverview());
+    if (path.endsWith("/users"))
+      return json(
+        organizationUsers(
+          url.searchParams.get("node"),
+          Number(url.searchParams.get("page") ?? 1),
+        ),
+      );
+    if (path.endsWith("/usage")) {
+      const start = url.searchParams.get("start_date") ?? "";
+      const end = url.searchParams.get("end_date") ?? "";
+      if (
+        !Number.isFinite(Date.parse(start)) ||
+        !Number.isFinite(Date.parse(end)) ||
+        Date.parse(end) < Date.parse(start) ||
+        (Date.parse(end) - Date.parse(start)) / 86400000 > 90
+      )
+        return json(
+          { detail: "Select a valid date range of at most 90 days" },
+          422,
+        );
+      return json(organizationUsage(url.searchParams.get("node"), start, end));
+    }
+    return json({ detail: "Not found" }, 404);
+  }
 
   if (path === "/api/auth/config")
     return json({ sso_enabled: false, local_enabled: true });
@@ -251,12 +293,14 @@ async function mockResponse(request: Request): Promise<Response> {
     const created: KeyInfo = {
       token: key,
       key_alias: "alex-primary",
-      spend: 0,
       max_budget: 100,
       models: ["gpt-5", "claude-sonnet-4", "gemini-2.5-pro"],
       rpm_limit: 120,
       team_id: "platform-engineering",
       user_email: demoUser.email,
+      user_id: demoUser.user_id,
+      ...organizationKeyPolicy(demoUser.user_id),
+      spend: 0,
     };
     personalKeys = [created];
     installationKeys = [

@@ -26,6 +26,7 @@ metadata:
   labels:
     {{- include "litegate.labels" . | nindent 4 }}
 data:
+  ORGANIZATION_HIERARCHY: {{ .Values.organizationHierarchy | default (dict "levels" (list)) | toJson | quote }}
   LITELLM_URL: {{ .Values.config.litellmUrl | quote }}
   LITELLM_UI_URL: {{ .Values.config.litellmUiUrl | quote }}
   SSL_VERIFY: {{ .Values.config.sslVerify | quote }}

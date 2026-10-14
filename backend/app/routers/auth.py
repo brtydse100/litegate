@@ -14,6 +14,7 @@ from app.services import litellm as llm
 from app.services import local_users
 from app.services import generic_sso
 from app.services import oidc as oidc_svc
+from app.services import organization_sync
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 _OIDC_STATE_COOKIE = "litegate_oidc_state"
@@ -112,17 +113,21 @@ async def callback(
             raise HTTPException(status_code=400, detail="No id_token in response")
         claims = await oidc_svc.verify_id_token(id_token, expected_nonce=nonce)
     user_id, email = claims["sub"], claims.get("email", "")
-    group_team_ids = settings.mapped_team_ids(claims)
-    if settings.oidc_require_team_mapping and not group_team_ids:
+    group_team_ids = [team for team in settings.mapped_team_ids(claims) if not settings.organization_hierarchy.is_managed_team(team)]
+    node = await organization_sync.record_identity(user_id, email, "sso", settings.oidc_groups(claims))
+    if settings.oidc_require_team_mapping and not group_team_ids and node is None:
         raise HTTPException(status_code=403, detail="Your SSO groups are not mapped to a LiteLLM team")
     team_ids = list(group_team_ids)
     default_team_id = settings.sso_default_team_id.strip()
-    if default_team_id and default_team_id not in team_ids:
+    if default_team_id and default_team_id not in team_ids and not settings.organization_hierarchy.is_managed_team(default_team_id):
         team_ids.append(default_team_id)
 
     provisioned_user = await llm.ensure_user_exists(user_id, email)
-    if provisioned_user is None and (team_ids or settings.oidc_require_team_mapping or settings.inherit_litellm_admin):
+    if provisioned_user is None and (node or team_ids or settings.oidc_require_team_mapping or settings.inherit_litellm_admin):
         raise HTTPException(status_code=502, detail="Could not provision the LiteLLM user")
+    node = await organization_sync.synchronize_user(user_id)
+    if node:
+        team_ids = [node.team_id, *[team for team in team_ids if team != node.team_id]]
     if team_ids:
         await llm.sync_user_team_memberships(user_id, email, team_ids)
 
@@ -163,9 +168,12 @@ async def local_login(request: Request, username: str = Form(...), password: str
         record_login_failure(client_id)
         raise HTTPException(status_code=401, detail="Invalid credentials")
     clear_login_failures(client_id)
-    await llm.ensure_user_exists(user_id, email)
+    provisioned = await llm.ensure_user_exists(user_id, email)
+    if organization_sync.resolve(user_id, []) and provisioned is None:
+        raise HTTPException(status_code=502, detail="Could not provision the LiteLLM user")
+    node = await organization_sync.remember(user_id, email, "local", [])
     response = JSONResponse({"authenticated": True}, headers={"Cache-Control": "no-store"})
-    _set_session_cookie(response, _make_jwt(user_id, email, role, "local"))
+    _set_session_cookie(response, _make_jwt(user_id, email, role, "local", [node.team_id] if node else []))
     return response
 
 
