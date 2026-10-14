@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import AdminKeys from "../components/AdminKeys";
 import PersonalKeySecret from "../components/PersonalKeySecret";
+import { primaryKeyActionClassName } from "../components/keyActionStyles";
 import { keyToken } from "../components/BulkKeyEditor";
 import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
@@ -40,9 +41,6 @@ interface PortalConfig {
   local_users_enabled: boolean;
   save_api_keys_in_db: boolean;
 }
-
-const primaryKeyActionClassName =
-  "flex min-h-16 w-full items-center justify-center gap-3 rounded-lg bg-indigo-600 px-8 py-5 text-lg font-semibold text-white shadow-lg shadow-indigo-200/60 transition-colors hover:bg-indigo-700 disabled:opacity-50 [html.dark_&]:shadow-indigo-950/50";
 
 async function fetchPortalConfig(): Promise<PortalConfig> {
   const response = await fetch("/api/portal-config");

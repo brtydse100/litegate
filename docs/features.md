@@ -24,6 +24,8 @@ the owner lock from the spend snapshot through old-key revocation, preventing
 simultaneous rotations from leaving multiple replacement allowances.
 The personal key summary shows the actual stored secret directly below its name
 in a prominent area with larger text, a labelled copy button, and a hide control.
+The full-width **Show API key** / **Hide API key** button uses the same primary
+style as **Create API key**. Created and revealed secrets share the same display.
 It loads through the authorized reveal endpoint and stays in component memory.
 Hashes are never offered as usable API keys. Without stored
 secrets, newly created keys remain copyable until hidden or the page is left.
