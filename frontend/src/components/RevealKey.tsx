@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, Eye } from "lucide-react";
+import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { api } from "../api/client";
 
 export default function RevealKey({
@@ -39,19 +39,34 @@ export default function RevealKey({
     setCopied(true);
   }
 
+  function toggle() {
+    if (secret) {
+      setSecret(null);
+      setCopied(false);
+      setError("");
+    } else {
+      void reveal();
+    }
+  }
+
   return (
     <div className={compact ? "contents" : "space-y-3"}>
       <button
         type="button"
-        onClick={() => void reveal()}
+        onClick={toggle}
+        aria-expanded={!!secret}
         disabled={pending}
         className={
           buttonClassName ??
           "inline-flex items-center gap-2 rounded-md border border-indigo-200 px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
         }
       >
-        <Eye size={compact ? 14 : 18} />{" "}
-        {pending ? "Loading..." : "Show API key"}
+        {secret ? (
+          <EyeOff size={compact ? 14 : 18} />
+        ) : (
+          <Eye size={compact ? 14 : 18} />
+        )}{" "}
+        {pending ? "Loading..." : secret ? "Hide API key" : "Show API key"}
       </button>
       {error && (
         <p
@@ -79,13 +94,6 @@ export default function RevealKey({
               {copied ? <Check size={15} /> : <Copy size={15} />}
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setSecret(null)}
-            className="mt-3 text-xs font-medium text-emerald-700"
-          >
-            Hide API key
-          </button>
         </div>
       )}
     </div>

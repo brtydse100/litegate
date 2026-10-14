@@ -116,6 +116,8 @@ It can be collapsed manually; changing the selection opens it again. Model
 choices appear in a scrollable list with highlighted selections and a count.
 Key selection rows keep their reveal button inside the row beside spend, and
 revealed secrets expand within the same card.
+The row's **Show API key** button switches to **Hide API key** while the secret
+is visible, so the same control hides it again.
 The editable fields themselves are prefilled with the selected key's saved
 values. Key and team fields also use saved values as placeholders, so clearing
 an edit still shows the current setting. When all selected keys are visible, shared values are filled in and
