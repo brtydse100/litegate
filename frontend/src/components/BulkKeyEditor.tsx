@@ -337,7 +337,7 @@ export default function BulkKeyEditor({
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-gray-200">
-                1. Find and choose keys
+                Find and choose keys
               </p>
               <p className="mt-0.5 text-[11px] text-gray-600">
                 Search runs across the installation. Selections persist across
@@ -480,10 +480,10 @@ export default function BulkKeyEditor({
                     return (
                       <div
                         key={token || index}
-                        className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border px-2 ${!token ? "opacity-40" : isSelected ? "border-indigo-500/55 bg-indigo-500/10" : "border-transparent bg-[#151822] hover:border-[#353A52] hover:bg-[#1A1D27]"}`}
+                        className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border px-2 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-indigo-500/50 ${!token ? "opacity-40" : isSelected ? "border-indigo-500/55 bg-indigo-500/10" : "border-transparent bg-[#151822] hover:border-[#353A52] hover:bg-[#1A1D27]"}`}
                       >
                         <label
-                          className={`group flex min-w-0 items-center gap-2 rounded-lg py-2 transition focus-within:ring-2 focus-within:ring-indigo-500/50 ${!token ? "cursor-not-allowed" : "cursor-pointer"}`}
+                          className={`group flex min-w-0 items-center gap-2 py-2 transition ${!token ? "cursor-not-allowed" : "cursor-pointer"}`}
                         >
                           <input
                             className="sr-only"
@@ -690,133 +690,135 @@ export default function BulkKeyEditor({
             )}
           </section>
         )}
-        <details
-          key={JSON.stringify(selected)}
-          open={targetCount > 0}
-          className="group rounded-lg border border-slate-200 sm:col-span-2"
-        >
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-xs font-semibold text-slate-700">
-            <span>2. Choose settings to change</span>
-            <ChevronDown
-              size={16}
-              aria-hidden="true"
-              className="transition-transform group-open:rotate-180"
-            />
-          </summary>
-          <div className="grid gap-4 border-t border-slate-200 p-3 sm:grid-cols-2">
-            <p className="text-[11px] text-slate-500 sm:col-span-2">
-              Saved values are filled in below. Only edited, filled fields are
-              changed. Mixed values differ between selected keys. Changing the
-              selection resets edits.
-            </p>
-            <label className={fieldClass}>
-              <span>Alias</span>
-              <input
-                className={`${inputClass} w-full`}
-                value={alias}
-                onChange={(event) => setValue("alias", event.target.value)}
-                placeholder={placeholder("alias")}
+        {targetCount > 0 && (
+          <details
+            key={JSON.stringify(selected)}
+            open={targetCount > 0}
+            className="group rounded-lg border border-slate-200 sm:col-span-2"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-xs font-semibold text-slate-700">
+              <span>Choose settings to change</span>
+              <ChevronDown
+                size={16}
+                aria-hidden="true"
+                className="transition-transform group-open:rotate-180"
               />
-            </label>
-            <ModelChoices
-              value={modelSelection}
-              onChange={setModels}
-              knownModels={selectedVisibleKeys.flatMap(
-                (key) => key.models ?? [],
-              )}
-              status={modelStatus}
-            />
-            <NumericPolicyInput
-              label="Maximum budget"
-              value={budget}
-              onValueChange={(value) => setValue("budget", value)}
-              step="any"
-              placeholder={placeholder("budget")}
-            />
-            <label className={fieldClass}>
-              <span>Budget reset</span>
-              <input
-                className={`${inputClass} w-full`}
-                value={budgetDuration}
-                list="key-budget-durations"
-                onChange={(event) =>
-                  setValue("budgetDuration", event.target.value)
-                }
-                placeholder={placeholder("budgetDuration")}
-              />
-            </label>
-            <NumericPolicyInput
-              label="TPM limit"
-              value={tpm}
-              onValueChange={(value) => setValue("tpm", value)}
-              placeholder={placeholder("tpm")}
-            />
-            <NumericPolicyInput
-              label="RPM limit"
-              value={rpm}
-              onValueChange={(value) => setValue("rpm", value)}
-              placeholder={placeholder("rpm")}
-            />
-            <label className={fieldClass}>
-              <span>New duration</span>
-              <input
-                className={`${inputClass} w-full`}
-                value={duration}
-                list="key-lifetime-durations"
-                onChange={(event) => setValue("duration", event.target.value)}
-                placeholder="For example 90d"
-              />
-            </label>
-            <label className={fieldClass}>
-              <span>Blocked state</span>
-              <select
-                className={`${inputClass} w-full`}
-                value={blockedSetting}
-                onChange={(event) =>
-                  setValue("blockedSetting", event.target.value)
-                }
-              >
-                <option value="">{placeholder("blockedSetting")}</option>
-                <option value="false">Unblock</option>
-                <option value="true">Block</option>
-              </select>
-            </label>
-
-            <div className="space-y-1 sm:col-span-2">
-              <label className="flex items-center gap-2 text-xs text-gray-400">
-                <input
-                  type="checkbox"
-                  checked={useKeyBudgetOnly}
-                  onChange={(event) =>
-                    setUseKeyBudgetOnly(event.target.checked)
-                  }
-                />
-                Use key budget as the individual allowance
-              </label>
-              <p className="text-xs text-gray-500">
-                Requires one key per owner with a finite budget. Removes the
-                owner's separate personal budget and member budget in this key's
-                team. Shared team budgets remain in force. Key settings may be
-                saved even if removing a user budget fails; failures can be
-                retried.
+            </summary>
+            <div className="grid gap-4 border-t border-slate-200 p-3 sm:grid-cols-2">
+              <p className="text-[11px] text-slate-500 sm:col-span-2">
+                Saved values are filled in below. Only edited, filled fields are
+                changed. Mixed values differ between selected keys. Changing the
+                selection resets edits.
               </p>
+              <label className={fieldClass}>
+                <span>Alias</span>
+                <input
+                  className={`${inputClass} w-full`}
+                  value={alias}
+                  onChange={(event) => setValue("alias", event.target.value)}
+                  placeholder={placeholder("alias")}
+                />
+              </label>
+              <ModelChoices
+                value={modelSelection}
+                onChange={setModels}
+                knownModels={selectedVisibleKeys.flatMap(
+                  (key) => key.models ?? [],
+                )}
+                status={modelStatus}
+              />
+              <NumericPolicyInput
+                label="Maximum budget"
+                value={budget}
+                onValueChange={(value) => setValue("budget", value)}
+                step="any"
+                placeholder={placeholder("budget")}
+              />
+              <label className={fieldClass}>
+                <span>Budget reset</span>
+                <input
+                  className={`${inputClass} w-full`}
+                  value={budgetDuration}
+                  list="key-budget-durations"
+                  onChange={(event) =>
+                    setValue("budgetDuration", event.target.value)
+                  }
+                  placeholder={placeholder("budgetDuration")}
+                />
+              </label>
+              <NumericPolicyInput
+                label="TPM limit"
+                value={tpm}
+                onValueChange={(value) => setValue("tpm", value)}
+                placeholder={placeholder("tpm")}
+              />
+              <NumericPolicyInput
+                label="RPM limit"
+                value={rpm}
+                onValueChange={(value) => setValue("rpm", value)}
+                placeholder={placeholder("rpm")}
+              />
+              <label className={fieldClass}>
+                <span>New duration</span>
+                <input
+                  className={`${inputClass} w-full`}
+                  value={duration}
+                  list="key-lifetime-durations"
+                  onChange={(event) => setValue("duration", event.target.value)}
+                  placeholder="For example 90d"
+                />
+              </label>
+              <label className={fieldClass}>
+                <span>Blocked state</span>
+                <select
+                  className={`${inputClass} w-full`}
+                  value={blockedSetting}
+                  onChange={(event) =>
+                    setValue("blockedSetting", event.target.value)
+                  }
+                >
+                  <option value="">{placeholder("blockedSetting")}</option>
+                  <option value="false">Unblock</option>
+                  <option value="true">Block</option>
+                </select>
+              </label>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="flex items-center gap-2 text-xs text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={useKeyBudgetOnly}
+                    onChange={(event) =>
+                      setUseKeyBudgetOnly(event.target.checked)
+                    }
+                  />
+                  Use key budget as the individual allowance
+                </label>
+                <p className="text-xs text-gray-500">
+                  Requires one key per owner with a finite budget. Removes the
+                  owner's separate personal budget and member budget in this
+                  key's team. Shared team budgets remain in force. Key settings
+                  may be saved even if removing a user budget fails; failures
+                  can be retried.
+                </p>
+              </div>
+              <button
+                disabled={
+                  update.isPending || operationsBlocked || targetCount === 0
+                }
+                className="rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-950/30 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+              >
+                {update.isPending
+                  ? "Updating..."
+                  : operationsBlocked
+                    ? "Bulk updates paused"
+                    : targetCount
+                      ? `Apply settings to ${targetCount} ${targetCount === 1 ? "key" : "keys"}`
+                      : "Select keys to continue"}
+              </button>
             </div>
-            <button
-              disabled={
-                update.isPending || operationsBlocked || targetCount === 0
-              }
-              className="rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-950/30 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
-            >
-              {update.isPending
-                ? "Updating..."
-                : operationsBlocked
-                  ? "Bulk updates paused"
-                  : targetCount
-                    ? `Apply settings to ${targetCount} ${targetCount === 1 ? "key" : "keys"}`
-                    : "Select keys to continue"}
-            </button>
-          </div>
-        </details>
+          </details>
+        )}
         {error && <p className="text-xs text-red-400 sm:col-span-2">{error}</p>}
         {operationsBlocked && (
           <p className="text-xs text-amber-300 sm:col-span-2">

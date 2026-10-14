@@ -112,8 +112,10 @@ budget, reset interval, models, rate limits, status and available expiry metadat
 on the current page. Selections on other pages are explicitly identified;
 their settings are not assumed to match. Inspecting a key does not submit its
 saved settings or overwrite unrelated values.
-**Choose settings to change** starts collapsed and opens when keys are selected.
-It can be collapsed manually; changing the selection opens it again. Model
+**Choose settings to change** appears and opens when keys are selected, and is
+removed when the selection is cleared. It can be collapsed manually; changing
+the selection opens it again. Selection and editing headings are unnumbered.
+Selected rows use one border, with keyboard focus shown around the whole row. Model
 choices appear in a scrollable list with highlighted selections and a count.
 Key selection rows keep their reveal button inside the row beside spend, and
 revealed secrets expand within the same card.
