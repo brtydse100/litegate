@@ -3,10 +3,10 @@
 ## Organization reporting
 
 - `GET /api/v1/organization`: configured levels/groups, effective allowances,
-  shared cycle spend, member counts, and synchronization issues. When disabled,
+  aggregate team/descendant cycle spend, tracking targets, member counts, and synchronization issues. When disabled,
   returns `enabled: false`.
 - `GET /api/v1/organization/users?node=<id>&page=1&page_size=25`: paginated users,
-  current paths, allowances, and member-cycle spend. Page size is at most 100.
+  current paths, per-key allowances, and key spend. Page size is at most 100.
 - `GET /api/v1/organization/usage?node=<id>&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`:
   daily/group/model spend, tokens, and logged requests. Defaults to 30 days through
   today. Supports up to 90 days between UTC dates and 500 users per report.
@@ -30,12 +30,17 @@ Helm-managed team budget changes, deletion, and member moves receive `409`.
 Bulk-key budget or team changes report per-item failures for managed keys.
 Personal `/api/keys` responses can add `organization_managed`, `user_budget`,
 `user_spend`, `user_budget_available`, `organization_path`, and `policy_error`.
-The budget and spend come from the user's actual LiteLLM team membership,
-including any fallback member allowance. A failed budget lookup still returns
+The compatibility-named budget/spend fields come from actual key metadata,
+not a separate user or member allowance. Missing budget metadata still returns
 healthy key metadata with `user_budget_available: false`, null budget/spend, and
 a policy warning. Null budget means no individual cap only when
 `user_budget_available` is true. Removed or conflicting mappings retain managed
 status and report a warning. See [Organization hierarchy](docs/organization.md).
+Managed keys belong to their owner's deepest mapped group. Each hierarchy group
+has a unique real LiteLLM team. `group_total` is that group's informational target;
+`group_spend` sums its team and descendant teams once each. Ancestor targets do
+not enforce request limits. Explicit per-key migrations are rejected for managed
+owners, including those awaiting provisioning; their inherited policy is synchronized automatically.
 Verified removed or conflicting SSO membership is persisted before rejecting
 login, and existing sessions also receive `403` on key creation or regeneration.
 
@@ -59,7 +64,9 @@ UserInfo. Both use `GET /api/auth/login` and `GET /api/auth/callback`; the latte
 requires an authorization `code` and browser-bound signed `state` matching its
 HttpOnly state cookie. `GET /api/auth/config` reports `sso_enabled: true` for
 either configured mode. Generic provider failures or malformed identities return
-502, an explicitly unverified email returns 403, and invalid state returns 400.
+502, an explicitly unverified email returns 403 when
+`generic_require_verified_email` is enabled (the default), and invalid state
+returns 400. Set that option to `false` to permit unverified email in generic SSO.
 Generic UserInfo role fields never grant administrator privileges. See
 [authentication setup](docs/authentication.md#generic-oauth-sso).
 
@@ -171,6 +178,37 @@ curl -X PATCH https://litegate.example.com/api/v1/keys/bulk \
 ```
 
 Supported bulk fields are `key_alias`, `models`, `max_budget`, `budget_duration`, `tpm_limit`, `rpm_limit`, `duration`, and `blocked`. A request can contain up to 5,000 unique keys. Updates run with bounded concurrency and return a result for every key, so partial failures are visible.
+
+To use the key's budget as its owner's individual allowance, explicitly include
+`"use_key_budget_only": true` alongside `keys` and optional `settings`. For example:
+
+```json
+{
+  "keys": ["key-1"],
+  "settings": { "max_budget": 100, "budget_duration": "30d" },
+  "use_key_budget_only": true
+}
+```
+
+This administrator-only migration requires exactly one key for each owner and
+a finite key budget. LiteGate saves and verifies the key budget, then clears
+the owner's personal `max_budget` and the member's `max_budget_in_team` in
+that key's team. Shared team budgets, spend, roles, rate limits and model policy
+are preserved. Omit `settings` to migrate an already-budgeted key without
+changing its settings. Normal edits leave user budgets untouched.
+
+LiteGate verifies the upstream user and membership records rather than assuming
+that a successful HTTP response cleared a budget. Unsupported LiteLLM versions
+or incomplete verification produce a per-key failure. Key settings and some
+individual caps may already have changed; retry failed keys after resolving the
+reported error. The audit event records whether the migration was requested.
+
+`GET /api/v1/models` returns `{"models":["model-name"]}` to administrators only.
+It reads LiteLLM's `/model/info` catalog and exposes unique, sorted model names,
+without provider credentials or deployment parameters. The key and team
+editors use these choices as checkboxes and also retain saved model names that
+are absent from the current catalog. Model updates remain arrays; selecting
+**All allowed models** explicitly submits an empty `models` array.
 
 Reset up to 5,000 selected keys' accumulated spend to zero as an administrator.
 The keys stay active, their budgets and limits are unchanged, and LiteLLM

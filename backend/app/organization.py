@@ -92,17 +92,14 @@ class OrganizationHierarchy(BaseModel):
                 for member in bundle.members:
                     if member.name in current:
                         raise ValueError(f"Duplicate group name in {level.name}: {member.name}")
-                    if parent and (member.litellmTeamId is not None or "groupTotal" in member.budget.model_fields_set):
-                        raise ValueError("litellmTeamId and groupTotal are supported only on top-level groups")
                     if not parent and not member.litellmTeamId:
                         raise ValueError(f"Top-level group {member.name} requires litellmTeamId")
-                    team_id = parent.team_id if parent else member.litellmTeamId
-                    if not parent:
-                        if team_id in team_ids:
-                            raise ValueError("Each top-level group requires a distinct LiteLLM team ID")
-                        team_ids.add(team_id)
                     path = (*parent.path, member.name) if parent else (member.name,)
                     node_id = sha256(json.dumps(path, ensure_ascii=False).encode()).hexdigest()[:24]
+                    team_id = member.litellmTeamId or f"litegate-org-{node_id}"
+                    if team_id in team_ids:
+                        raise ValueError("Every organization group requires a distinct LiteLLM team ID")
+                    team_ids.add(team_id)
                     budget = member.budget
                     per_user = budget.perUser if "perUser" in budget.model_fields_set else parent.per_user if parent else None
                     duration = budget.duration if "duration" in budget.model_fields_set else parent.duration if parent else None
@@ -151,4 +148,4 @@ class OrganizationHierarchy(BaseModel):
         return [node for node in self.nodes.values() if node.parent_id is None]
 
     def is_managed_team(self, team_id: str | None) -> bool:
-        return bool(team_id) and any(root.team_id == team_id for root in self.roots)
+        return bool(team_id) and any(node.team_id == team_id for node in self.nodes.values())

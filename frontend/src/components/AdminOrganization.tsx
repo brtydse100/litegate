@@ -219,7 +219,7 @@ export default function AdminOrganization() {
             >
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-xs text-slate-500">Per-user allowance</p>
+                  <p className="text-xs text-slate-500">Per-key allowance</p>
                   <p className="mt-1 font-semibold text-slate-950">
                     {money(selected.per_user)}
                     {selected.duration && (
@@ -237,7 +237,7 @@ export default function AdminOrganization() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">
-                    {selected.path[0]} shared pool
+                    {selected.name} tracking target
                   </p>
                   <p className="mt-1 font-semibold text-slate-950">
                     {selected.group_spend === null
@@ -246,7 +246,8 @@ export default function AdminOrganization() {
                     / {money(selected.group_total)}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Current budget-cycle spend across the top-level group
+                    Combined team and descendant usage. Tracking only; ancestor
+                    targets do not block keys.
                   </p>
                 </div>
               </div>
@@ -372,7 +373,9 @@ export default function AdminOrganization() {
                     <tr>
                       <th className="px-4 py-3">User</th>
                       <th className="px-4 py-3">Organization</th>
-                      <th className="px-4 py-3">Cycle spend / allowance</th>
+                      <th className="px-4 py-3">
+                        Total key spend / per-key allowance
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">

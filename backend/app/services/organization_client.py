@@ -34,21 +34,11 @@ async def team_info(team_id: str) -> dict:
 
 async def sync_root(root: OrganizationNode) -> dict:
     existing = await litellm.get_team(root.team_id)
-    policy = {"max_budget": root.member.budget.groupTotal, "budget_duration": root.member.budget.duration}
+    policy = {"max_budget": None, "budget_duration": root.duration}
     if existing is None:
         await litellm.create_team({"team_id": root.team_id, "team_alias": root.member.name, **policy})
-    elif any(existing.get(key) != value for key, value in policy.items()):
-        await litellm.update_team(root.team_id, {key: value for key, value in policy.items() if existing.get(key) != value})
-    info = await team_info(root.team_id)
-    if default_member_budget(info) is not None:
-        await litellm.update_team(root.team_id, {"team_member_budget": None})
-        info = await team_info(root.team_id)
-    actual = info.get("team_info")
-    if not isinstance(actual, dict) or any(actual.get(key) != value for key, value in policy.items()):
-        raise HTTPException(status_code=502, detail="LiteLLM did not apply the top-level budget policy")
-    if default_member_budget(info) is not None:
-        raise HTTPException(status_code=502, detail="LiteLLM did not clear the managed team's default member budget")
-    return info
+    # Existing caps are finalized only after individual key policies are verified.
+    return await team_info(root.team_id)
 
 
 def membership(info: dict, user_id: str) -> dict | None:
@@ -62,17 +52,24 @@ def default_member_budget(info: dict) -> float | None:
         if (team.get("metadata") or {}).get("team_member_budget_id"):
             raise HTTPException(status_code=502, detail="Could not verify LiteLLM's default team-member budget")
         return None
-    if not isinstance(budget, dict):
+    if not isinstance(budget, dict) or "max_budget" not in budget:
         raise HTTPException(status_code=502, detail="LiteLLM returned an invalid default team-member budget")
     value = budget.get("max_budget")
-    return finite_number(value) if value is not None and finite_number(value) > 0 else None
+    return finite_number(value) if value is not None else None
 
 
 def member_budget(info: dict, user_id: str) -> dict:
     member = membership(info, user_id)
     if member is None:
         raise HTTPException(status_code=502, detail="Could not read your managed LiteLLM membership")
-    budget = member.get("litellm_budget_table") or {}
+    budget = member.get("litellm_budget_table")
+    if (
+        "litellm_budget_table" not in member
+        or (budget is None and member.get("budget_id"))
+        or (budget is not None and (not isinstance(budget, dict) or "max_budget" not in budget))
+    ):
+        raise HTTPException(status_code=502, detail="Could not verify the team-member budget record")
+    budget = budget or {}
     value = budget.get("max_budget")
     return {
         "per_user": finite_number(value) if value is not None else default_member_budget(info),
@@ -86,24 +83,21 @@ async def sync_member(node: OrganizationNode, user_id: str, info: dict) -> None:
     budget = member.get("litellm_budget_table") or {} if member else {}
     if member is None:
         await litellm.add_team_member(node.team_id, user_id)
-    if member is None or budget.get("max_budget") != node.per_user or budget.get("budget_duration") != node.duration:
-        patch = {"max_budget_in_team": node.per_user, "budget_duration": node.duration}
-        if member is not None:
-            patch = {key: value for key, value in patch.items() if budget.get("max_budget" if key == "max_budget_in_team" else key) != value}
+    if member is None or budget.get("max_budget") is not None:
         await request(
             "POST",
             "/team/member_update",
             payload={
                 "team_id": node.team_id,
                 "user_id": user_id,
-                **patch,
+                "max_budget_in_team": None,
             },
         )
         verified_info = await team_info(node.team_id)
         info = verified_info
     actual = member_budget(info, user_id)
-    if actual["per_user"] != node.per_user or actual["duration"] != node.duration:
-        raise HTTPException(status_code=502, detail="LiteLLM did not apply the per-user budget policy; check its version")
+    if actual["per_user"] is not None:
+        raise HTTPException(status_code=502, detail="LiteLLM did not remove the separate team-member budget; check its version")
 
 
 async def generate_key(user_id: str, email: str, team_id: str, **options) -> dict:
@@ -112,8 +106,8 @@ async def generate_key(user_id: str, email: str, team_id: str, **options) -> dic
         "user_id": user_id,
         "team_id": team_id,
         "key_alias": options.get("key_alias") or f"{name}'s key",
-        "max_budget": None,
-        "budget_duration": None,
+        "max_budget": options.get("max_budget"),
+        "budget_duration": options.get("budget_duration"),
     }
     for field in ("tpm_limit", "rpm_limit", "duration"):
         value = getattr(settings, f"key_{field}")
@@ -131,10 +125,16 @@ async def generate_key(user_id: str, email: str, team_id: str, **options) -> dic
         info = await litellm.get_key_info(result["key"])
         if not info or info.get("user_id") != user_id or info.get("team_id") != team_id:
             raise HTTPException(status_code=502, detail="Could not verify the managed key's ownership")
-        if info.get("max_budget") is not None or info.get("budget_duration") is not None:
-            await litellm.update_key(result["key"], {"max_budget": None, "budget_duration": None})
+        expected = {field: payload[field] for field in ("max_budget", "budget_duration")}
+        if any(info.get(field) != value for field, value in expected.items()):
+            await litellm.update_key(result["key"], {field: value for field, value in expected.items() if info.get(field) != value})
             verified = await litellm.get_key_info(result["key"])
-            if not verified or verified.get("max_budget") is not None or verified.get("budget_duration") is not None:
+            if (
+                not verified
+                or verified.get("user_id") != user_id
+                or verified.get("team_id") != team_id
+                or any(verified.get(field) != value for field, value in expected.items())
+            ):
                 raise HTTPException(status_code=502, detail="LiteLLM's key defaults conflict with organization budgets")
         if settings.save_api_keys_in_db:
             await asyncio.to_thread(key_secrets.save, result["key"], user_id)

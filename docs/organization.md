@@ -1,10 +1,12 @@
 # Organization hierarchy and budgets
 
 LiteGate organizes users under configurable level labels and provides inherited
-per-user allowances, top-level shared budgets, and administrative usage graphs.
+per-key allowances, aggregate budget tracking, and administrative usage graphs.
 LiteLLM remains the source of truth for budgets, spend, and request enforcement.
-This integration targets current LiteLLM Enterprise with a database connected,
-team-member budget updates including `budget_duration`, and `/user/daily/activity`.
+This integration requires LiteLLM with a database and its key/team management APIs.
+Detailed daily graphs also require `/user/daily/activity`; its availability depends
+on the deployed LiteLLM version and license. Parent budget tracking does not add
+request enforcement or require a nested-team enforcement feature.
 LiteGate verifies the applied budgets rather than accepting ignored API fields.
 
 ## Configuration
@@ -54,11 +56,12 @@ bundles omit `parent`. Level order comes from the list. Group names must be
 unique within each level. All labels and names are deployment-defined. Invalid
 parents, conflicting mappings, duplicate names, and invalid budgets are rejected.
 
-Every root requires a distinct, stable `litellmTeamId`. LiteGate creates that
-LiteLLM team when absent and manages its budget fields. Existing model and rate
-policies are preserved. Lower groups are reporting groups, without separate
-LiteLLM teams. Renaming a group requires updating its children's `parent` names;
-keep the root's team ID stable to retain its upstream budget history.
+Every group has its own distinct LiteLLM team. Roots require `litellmTeamId`;
+children may set one explicitly or use a deterministic `litegate-org-<path hash>`
+ID. LiteGate creates missing teams and preserves existing models and rate limits.
+Use explicit child IDs when group names may change: renaming a path changes an
+automatically generated ID and requires reviewing existing key assignments.
+Renaming a group also requires updating its children's `parent` names.
 
 Direct and Compose deployments accept the same `organizationHierarchy` block
 in `config.yaml`, or its contents as JSON in `ORGANIZATION_HIERARCHY`. Helm
@@ -78,9 +81,9 @@ mapping for a previously managed user blocks new login and key creation/replacem
 an administrator resolves it. A hierarchy match satisfies `ssoRequireTeamMapping`.
 Verified removed or conflicting claims are saved before rejecting login, so
 existing sessions also lose permission to create or replace a managed key.
-Existing flat mappings remain supported, with the hierarchy's root taking
+Existing flat mappings remain supported, with the hierarchy's deepest match taking
 priority for managed key ownership. Flat mappings and the default SSO team cannot
-automatically add memberships in managed roots; those memberships come from the
+automatically add memberships in other managed teams; those memberships come from the
 resolved hierarchy path. Mappings to other, unmanaged teams remain supported.
 
 SSO users appear after successful login. Explicit IDs already present in LiteLLM
@@ -94,31 +97,40 @@ The closest explicitly configured `perUser` wins, overriding every ancestor's
 per-user default. In the example Engineering defaults to $200, Digital overrides
 that to $50, squad1 overrides it to $100, and squads 2–4 inherit $50.
 
-`groupTotal` is a separate shared pool, supported only at the top level.
-Engineering's $5,000 cap applies collectively, including squad1. Both limits must
-allow a request. Individual allowances do not reserve part of the shared pool.
-LiteLLM team-member budgets enforce allowances per internal user across key
-replacement. Managed keys have no separate per-key budget.
+The inherited `perUser` value is the allowance on each user's unique key; the
+configuration name is retained for compatibility. The key belongs to the deepest
+matched group, including users assigned directly to a middle level. Duplicate
+personal-user and team-member caps are removed only after the key policy is
+applied and verified. Normal creation remains limited to one key per user,
+including concurrent creation requests.
+
+`groupTotal` is an informational tracking target, allowed at any level.
+Engineering's $5,000 target compares against direct-team and descendant-team
+usage, counting each distinct team once. Exceeding it does **not** block keys.
+Managed teams have no native shared spend cap; individual keys enforce the
+inherited allowance. Native shared budgets on unrelated, unmanaged teams remain
+unchanged. Detailed historical user graphs attribute usage to current membership.
 
 Omitted `perUser` inherits. Explicit `perUser: null` disables that cap at this
-group and below unless another descendant sets it. Root caps omitted or null
-are unlimited. `0` is zero allowance, not unlimited; LiteLLM can still serve
+group and below unless another descendant sets it. Tracking targets omitted or
+null have no threshold. `0` is zero key allowance, not unlimited; LiteLLM can still serve
 explicitly free models. `duration` inherits independently and accepts values
 such as `30d` (30-day duration) or `1mo` (calendar month), using LiteLLM's reset
 behavior. A null duration means no automatic reset.
 
-LiteGate clears and verifies the fallback `team_member_budget` cap on managed
-root teams, so it cannot silently constrain `perUser: null`. Explicit member
-allowances and the shared root budget still apply. Default rate limits and
-other team settings are preserved. An unverifiable fallback blocks policy
-synchronization and managed key issuance.
+LiteGate clears and verifies personal/member caps and default member caps on
+managed teams. Before removing an old native shared cap, every affected key must
+match its owner's configured allowance and assignment. Unknown or unmigrated
+credentials keep that old cap in place and produce a synchronization warning.
+Spend, model access, roles and rate limits are preserved. Missing verification
+records block normalization rather than being interpreted as an unlimited budget.
 
-LiteGate reconciles roots and known users every 60 seconds with bounded
+LiteGate reconciles all group teams and known users every 60 seconds with bounded
 concurrency, and again during managed login/key creation.
 An explicit-user discovery failure is logged independently and does not prevent
-that cycle from updating roots and known users.
-Synchronization and key issuance serialize per user. A slow user's member update
-does not hold a lock across other users; root-team policy writes serialize only
+that cycle from updating teams and known users.
+Synchronization and key issuance serialize per user. A slow user's key update
+does not hold a lock across other users; team policy writes serialize only
 while that shared policy is being synchronized. Each queued operation rereads
 the current verified membership before applying its policy.
 Policy writes preserve accrued spend and leave unchanged reset durations out of
@@ -128,27 +140,33 @@ LiteLLM's reset scheduling. Lowering a cap below current spend may prevent furth
 requests immediately. Failures are shown in the admin dashboard.
 
 Legacy `KEY_MAX_BUDGET` and `KEY_BUDGET_DURATION` do not apply to managed keys.
-Existing unassigned keys adopt the root after the member budget is applied;
-key caps are cleared and verified. Usage before joining that team is not
-retroactively charged to its member budget. Keys belonging to another team,
-and moves to another root, require explicit migration in LiteLLM. Review old
-and new budget windows; LiteGate does not silently transfer/reset spend.
+Existing unassigned keys, and keys assigned to an ancestor on the same path,
+adopt the deepest team with the inherited key allowance. Their existing spend is
+preserved. Keys belonging to an unmanaged team or another hierarchy path require
+explicit migration in LiteLLM. Review old and new budget windows; LiteGate does
+not reset spend. Rotation carries accrued key spend into the replacement, whose
+reset schedule is established by LiteLLM for that new key.
+Ancestor model, blocking, permission, and rate policies are not inherited by native
+child teams. LiteGate blocks provisioning or migration when it detects these
+restrictions on an ancestor (including member rate limits on a key's source team).
+An operator must review and explicitly configure the intended controls in LiteLLM
+before removing the ancestor restrictions and retrying synchronization.
 Before changing a user's root, an administrator must remove the old membership
 after reviewing spend, create the destination membership, and migrate or revoke
 old keys. Destination membership alone does not approve a move. LiteGate verifies
 the old roster and member row are absent before applying the destination policy.
 
-Managed budgets and membership are read-only in LiteGate. Managed roots cannot
+Managed budgets and membership are read-only in LiteGate. Managed teams cannot
 be deleted or used for manual member moves. Bulk-key budget/team changes report
 per-item failures. Model, rate-limit, and blocking controls remain available.
 Reconciliation reasserts configured policies after drift in LiteLLM. Disabling
 the feature leaves upstream teams, budgets, membership, and keys intact; review
 them when retiring the configuration.
 
-LiteGate records a user's root before changing their member allowance or managed
-keys. An unsuccessful response or verification keeps that root binding, so a
+LiteGate records a user's assigned team before changing their managed keys.
+An unsuccessful response or verification keeps that team binding, so a
 later root change still requires migration even when the user has no keys.
-Retrying synchronization within the original root remains supported.
+Retrying synchronization within the original path remains supported.
 
 The personal dashboard shows the allowance LiteLLM currently enforces, with a
 warning for policy drift or removed mappings. Budget lookup outages leave key

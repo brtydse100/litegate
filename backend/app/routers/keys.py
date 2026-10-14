@@ -21,9 +21,9 @@ async def list_keys(current_user: CurrentUser = Depends(get_current_user)):
             {
                 **key,
                 "organization_managed": True,
-                "user_budget": policy["per_user"],
-                "user_spend": policy["spend"],
-                "user_budget_available": policy["budget_available"],
+                "user_budget": key.get("max_budget"),
+                "user_spend": key.get("spend"),
+                "user_budget_available": policy["budget_available"] and "max_budget" in key and "budget_duration" in key,
                 "organization_path": policy["path"],
                 "policy_error": policy["sync_error"],
             }

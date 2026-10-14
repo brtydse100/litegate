@@ -1,7 +1,7 @@
 # Configuration reference
 
-For custom organizational levels, inline identity mappings, inherited per-user
-allowances, and shared pools, see [Organization hierarchy](organization.md).
+For custom organizational levels, lowest-team key assignment, inherited key
+allowances, and ancestor usage tracking, see [Organization hierarchy](organization.md).
 `organizationHierarchy` is a top-level Helm value. Direct deployments accept
 the same YAML block or JSON in `ORGANIZATION_HIERARCHY` (default `{"levels":[]}`).
 
@@ -18,6 +18,7 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | --- | --- | --- |
 | `litellm_url` | `http://localhost:4000` | LiteLLM proxy and management URL |
 | `litellm_master_key` | required | LiteLLM administrator key |
+| `ssl_verify` | `true` | Verify certificates on outgoing LiteLLM and SSO HTTPS connections |
 | `jwt_secret` | required | Portal-session signing secret |
 | `jwt_previous_secrets` | empty | Comma-separated prior session secrets accepted only for verification during rotation |
 | `jwt_algorithm` | `HS256` | Portal-session signing algorithm |
@@ -82,6 +83,7 @@ callback URLs require HTTPS; HTTP is permitted only for localhost development.
 | `generic_user_email_attribute` | `email` | Email field in UserInfo; dot notation supported |
 | `generic_client_use_pkce` | `false` | Enable PKCE with S256 |
 | `generic_include_client_id` | `true` | Send client credentials in the token request body; `false` uses HTTP Basic |
+| `generic_require_verified_email` | `true` | Reject a provided email when UserInfo explicitly reports `email_verified: false`; `false` permits it |
 
 These settings accept their uppercase `GENERIC_*` environment equivalents,
 including LiteLLM's endpoint and user-attribute names. Environment variables
@@ -90,6 +92,16 @@ override YAML. `generic_redirect_uri` is LiteGate's callback override, and
 
 See [generic SSO setup](authentication.md#generic-oauth-sso) for a YAML example,
 provider limitations, and the supported compatibility scope.
+
+### Outgoing HTTPS certificate verification
+
+`ssl_verify` (`SSL_VERIFY`, Helm `config.sslVerify`) defaults to `true` for
+LiteLLM requests and SSO discovery, token, JWKS, and UserInfo requests. Set it
+to `false` to skip server certificate verification. HTTPS remains encrypted,
+but the server's identity is no longer authenticated. Prefer a trusted CA bundle
+(`SSL_CERT_FILE`, or Helm `customCA`) for private certificates. This setting
+does not change the portal's ingress TLS or the HTTPS requirement for generic
+SSO URLs. Restart LiteGate after changing it.
 
 ### Audit-history retention
 
@@ -188,6 +200,22 @@ key_team_id: "team-id"
 | `key_tpm_limit` | unset | Tokens-per-minute limit |
 | `key_rpm_limit` | unset | Requests-per-minute limit |
 | `key_team_id` | unset | Fallback LiteLLM team for generated keys without an SSO-mapped primary team |
+
+For one individual allowance per user, configure `key_max_budget` (and optionally
+`key_budget_duration`) and leave LiteLLM personal-user and team-member budget
+defaults unset. Keep shared team budgets configured as desired. LiteGate does
+not copy the key budget onto the user, but upstream defaults can independently
+introduce user/member caps. Sending an unset budget during user creation does
+not reliably override those defaults.
+
+For existing keys with duplicate individual caps, administrators can explicitly
+select **Use key budget as the individual allowance** in the key editor. It
+requires exactly one key per owner and verifies removal of personal and
+team-member caps while preserving shared team budgets. This also works for
+newly generated keys that inherited an upstream cap. Later external policy or
+default changes may reintroduce those caps; align LiteLLM defaults with the
+per-key policy rather than relying on migration alone. See
+[administrator-only bulk editing](features.md#administrator-only-bulk-editing).
 
 Administrators can override supported settings later with the portal bulk editor
 or `PATCH /api/v1/keys/bulk`. Normal users cannot bulk-edit keys. See

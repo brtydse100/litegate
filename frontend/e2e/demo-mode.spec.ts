@@ -23,7 +23,7 @@ test("organization demo filters usage and protects the admin view", async ({
   await navigation.getByRole("button", { name: /^Platform,/ }).click();
   const policy = page.getByRole("region", { name: "Effective budget policy" });
   await expect(policy.getByText("$100.00", { exact: false })).toBeVisible();
-  await expect(policy.getByText("Engineering shared pool")).toBeVisible();
+  await expect(policy.getByText("Platform tracking target")).toBeVisible();
   await expect(page.getByText("sam@example.com", { exact: true })).toHaveCount(
     0,
   );

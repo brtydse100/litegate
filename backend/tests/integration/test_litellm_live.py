@@ -8,6 +8,8 @@ import pytest
 from app.services import litellm
 from app.organization import OrganizationHierarchy
 from app.services import organization_client as organization
+from app.config import settings
+from app.services import organization_sync, organization_store
 
 
 pytestmark = pytest.mark.skipif(
@@ -83,7 +85,7 @@ async def test_user_team_and_key_contracts_against_litellm():
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(os.environ.get("RUN_LITELLM_ORGANIZATION_INTEGRATION") != "1", reason="requires current LiteLLM member-budget contracts")
-async def test_managed_user_allowance_and_rotation_preserve_the_budget_window():
+async def test_managed_allowance_updates_preserve_windows_and_rotation_carries_spend(monkeypatch, tmp_path):
     suffix = uuid4().hex[:12]
     user_id, team_id = f"organization-{suffix}", f"organization-team-{suffix}"
     tree = OrganizationHierarchy.model_validate(
@@ -98,53 +100,63 @@ async def test_managed_user_allowance_and_rotation_preserve_the_budget_window():
                             ]
                         }
                     ],
-                }
+                },
+                {
+                    "name": "Squad",
+                    "groups": [
+                        {"parent": "Engineering", "members": [{"name": "Platform", "litellmTeamId": f"{team_id}-platform", "userIds": [user_id]}]}
+                    ],
+                },
             ]
         }
     )
     root = tree.roots[0]
+    monkeypatch.setattr(settings, "organization_hierarchy", tree)
+    monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "integration-organization.db"))
+    leaf = tree.resolve(user_id, [])
     keys = []
     try:
         await litellm.create_user(user_id, f"{user_id}@example.invalid")
-        info = await organization.sync_root(root)
-        await organization.sync_member(root, user_id, info)
-        first = organization.membership(await organization.team_info(team_id), user_id)
-        first_budget = first["litellm_budget_table"]
-        assert first_budget["max_budget"] == 50
-        assert first_budget["budget_duration"] == "30d"
-        assert first_budget["budget_reset_at"]
-        generated = await organization.generate_key(user_id, "", team_id)
+        await organization_sync.remember(user_id, "", "explicit", [])
+        generated = await organization_sync.generate_key(user_id, "", team_id)
         keys.append(generated["key"])
-        await litellm.delete_key(keys.pop())
-        replacement = await organization.generate_key(user_id, "", team_id)
-        keys.append(replacement["key"])
-        rotated = organization.membership(await organization.team_info(team_id), user_id)
-        assert rotated["spend"] == first["spend"]
-        assert rotated["litellm_budget_table"]["budget_reset_at"] == first_budget["budget_reset_at"]
+        first = await litellm.get_key_info(keys[0])
+        assert first["team_id"] == leaf.team_id
+        assert first["max_budget"] == 50
+        assert first["budget_duration"] == "30d"
+        assert first["budget_reset_at"]
+        assert (await organization.team_info(team_id))["team_info"]["max_budget"] is None
+        await litellm.update_key(keys[0], {"spend": 12})
         root.member.budget.perUser = 100
         tree = OrganizationHierarchy.model_validate(tree.model_dump(exclude_unset=True))
-        updated_root = tree.roots[0]
-        await organization.sync_member(updated_root, user_id, await organization.team_info(team_id))
-        changed = organization.membership(await organization.team_info(team_id), user_id)
-        assert changed["litellm_budget_table"]["max_budget"] == 100
-        assert changed["litellm_budget_table"]["budget_reset_at"] == first_budget["budget_reset_at"]
-        assert changed["spend"] == first["spend"]
-        # Managed roots must remove a fallback that would cap a null allowance.
-        await litellm.update_team(team_id, {"team_member_budget": 50, "team_member_rpm_limit": 120})
-        verified_root = await organization.sync_root(updated_root)
-        default = verified_root["team_info"]["team_member_budget_table"]
+        monkeypatch.setattr(settings, "organization_hierarchy", tree)
+        await organization_sync.synchronize_user(user_id)
+        changed = await litellm.get_key_info(keys[0])
+        assert changed["max_budget"] == 100
+        assert changed["spend"] == 12
+        assert changed["budget_reset_at"] == first["budget_reset_at"]
+        replacement = await organization_sync.generate_key(user_id, "", team_id, initial_spend=12)
+        keys.append(replacement["key"])
+        rotated = await litellm.get_key_info(replacement["key"])
+        assert rotated["team_id"] == leaf.team_id
+        assert rotated["max_budget"] == 100
+        assert rotated["spend"] == 12
+        await litellm.delete_key(keys.pop(0))
+        await litellm.update_team(leaf.team_id, {"team_member_budget": 50, "team_member_rpm_limit": 120})
+        await organization_sync.synchronize_user(user_id)
+        default = (await organization.team_info(leaf.team_id))["team_info"]["team_member_budget_table"]
         assert default["max_budget"] is None
         assert default["rpm_limit"] == 120
-        updated_root.member.budget.perUser = None
-        unlimited_tree = OrganizationHierarchy.model_validate(tree.model_dump(exclude_unset=True))
-        unlimited = unlimited_tree.roots[0]
-        await organization.sync_member(unlimited, user_id, await organization.team_info(team_id))
-        info = await organization.team_info(team_id)
+        tree.roots[0].member.budget.perUser = None
+        monkeypatch.setattr(settings, "organization_hierarchy", OrganizationHierarchy.model_validate(tree.model_dump(exclude_unset=True)))
+        await organization_sync.synchronize_user(user_id)
+        assert (await litellm.get_key_info(keys[0]))["max_budget"] is None
+        info = await organization.team_info(leaf.team_id)
         assert organization.member_budget(info, user_id)["per_user"] is None
-        assert organization.membership(info, user_id)["spend"] == first["spend"]
-        assert organization.membership(info, user_id)["litellm_budget_table"]["budget_reset_at"] == first_budget["budget_reset_at"]
+        assert organization_store.get(user_id)["team_id"] == leaf.team_id
     finally:
         for key in keys:
             await litellm.delete_key(key)
-        if await litellm.get_team(team_id):
-            await litellm.delete_team(team_id)
+        for node in reversed(list(tree.nodes.values())):
+            if await litellm.get_team(node.team_id):
+                await litellm.delete_team(node.team_id)

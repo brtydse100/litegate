@@ -8,7 +8,7 @@ import pytest
 
 from app.config import settings
 from app.organization import OrganizationHierarchy
-from app.services import litellm, local_users
+from app.services import litellm, local_users, organization_key_policy as key_policy
 from app.services import organization_client as upstream, organization_store as store, organization_sync as sync
 from tests.test_organization_config import example
 
@@ -20,6 +20,18 @@ def hierarchy(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "organization.db"))
     sync._locks.clear()
     local_users.init_db()
+    monkeypatch.setattr(litellm, "add_team_member", AsyncMock())
+    monkeypatch.setattr(
+        upstream,
+        "team_info",
+        AsyncMock(
+            return_value={
+                "team_info": {"max_budget": None, "budget_duration": "30d"},
+                "team_memberships": [{"user_id": owner, "litellm_budget_table": {"max_budget": None}} for owner in ("u", "alice", "bob")],
+            }
+        ),
+    )
+    monkeypatch.setattr(key_policy, "normalize_individual_caps", AsyncMock())
     return tree
 
 
@@ -29,28 +41,23 @@ async def test_reconcile_updates_existing_member_without_resetting_spend(monkeyp
     node = hierarchy.resolve("alice", ["squad1"])
     old_policy = {"node_id": node.id, "per_user": 50, "duration": "30d"}
     store.synced("alice", "engineering", old_policy)
-    info = {"team_memberships": [{"user_id": "alice", "spend": 42, "litellm_budget_table": {"max_budget": 50, "budget_duration": "30d"}}]}
+    info = {
+        "team_info": {},
+        "team_memberships": [{"user_id": "alice", "spend": 42, "litellm_budget_table": {"max_budget": 50, "budget_duration": "30d"}}],
+    }
     root = AsyncMock(return_value=info)
     request = AsyncMock(return_value={})
     monkeypatch.setattr(
         upstream,
         "team_info",
-        AsyncMock(
-            side_effect=[
-                info,
-                {"team_memberships": [{"user_id": "alice", "spend": 42, "litellm_budget_table": {"max_budget": 100, "budget_duration": "30d"}}]},
-            ]
-        ),
+        AsyncMock(return_value=info),
     )
     monkeypatch.setattr(upstream, "sync_root", root)
     monkeypatch.setattr(upstream, "request", request)
     monkeypatch.setattr(litellm, "get_user", AsyncMock(return_value=None))
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
     await sync.reconcile()
-    request.assert_awaited_once_with(
-        "POST", "/team/member_update", payload={"team_id": "engineering", "user_id": "alice", "max_budget_in_team": 100.0}
-    )
-    assert "spend" not in request.call_args.kwargs["payload"]
+    request.assert_not_awaited()  # No key yet: retain the individual caps until a key can be verified.
     assert store.get("alice")["policy"]["per_user"] == 100
     assert info["team_memberships"][0]["spend"] == 42
 
@@ -58,7 +65,7 @@ async def test_reconcile_updates_existing_member_without_resetting_spend(monkeyp
 @pytest.mark.asyncio
 async def test_same_policy_does_not_reset_budget_window(monkeypatch, hierarchy):
     node = hierarchy.resolve("u", ["squad1"])
-    info = {"team_memberships": [{"user_id": "u", "spend": 42, "litellm_budget_table": {"max_budget": 100, "budget_duration": "30d"}}]}
+    info = {"team_memberships": [{"user_id": "u", "spend": 42, "litellm_budget_table": {"max_budget": None, "budget_duration": "30d"}}]}
     request = AsyncMock()
     monkeypatch.setattr(upstream, "request", request)
     await upstream.sync_member(node, "u", info)
@@ -74,7 +81,7 @@ async def test_root_budget_sync_never_writes_spend_or_unrelated_model_policy(mon
     monkeypatch.setattr(litellm, "update_team", update)
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {"max_budget": 5000, "budget_duration": "30d", "spend": 400}}))
     await upstream.sync_root(hierarchy.roots[0])
-    update.assert_awaited_once_with("engineering", {"max_budget": 5000.0})
+    update.assert_not_awaited()  # Provisioning cannot remove a shared cap before keys are protected.
 
 
 @pytest.mark.asyncio
@@ -85,7 +92,7 @@ async def test_missing_root_team_is_created(monkeypatch, hierarchy):
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {"max_budget": 5000, "budget_duration": "30d"}}))
     await upstream.sync_root(hierarchy.roots[0])
     assert create.call_args.args[0]["team_id"] == "engineering"
-    assert create.call_args.args[0]["max_budget"] == 5000
+    assert create.call_args.args[0]["max_budget"] is None
 
 
 @pytest.mark.asyncio
@@ -99,13 +106,14 @@ async def test_unmanaged_existing_key_adopts_person_policy_only_after_member_syn
     async def update(*args):
         order.append("key")
 
-    monkeypatch.setattr(upstream, "sync_member", member)
+    monkeypatch.setattr(key_policy, "normalize_individual_caps", member)
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[{"token": "key-hash", "spend": 42, "max_budget": 50}]))
     monkeypatch.setattr(litellm, "update_key", update)
-    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"team_id": "engineering", "max_budget": None, "budget_duration": None}))
+    node = settings.organization_hierarchy.resolve("u", ["squad1"])
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"team_id": node.team_id, "max_budget": 100, "budget_duration": "30d"}))
     await sync.sync_identity(store.get("u"), {})
-    assert order == ["member", "key"]
-    assert store.get("u")["team_id"] == "engineering"
+    assert order == ["key", "member"]
+    assert store.get("u")["team_id"] == node.team_id
 
 
 @pytest.mark.asyncio
@@ -164,12 +172,17 @@ async def test_upstream_default_key_cap_is_cleared_and_verified(monkeypatch):
     monkeypatch.setattr(
         litellm,
         "get_key_info",
-        AsyncMock(side_effect=[{"user_id": "u", "team_id": "engineering", "max_budget": 5}, {"max_budget": None, "budget_duration": None}]),
+        AsyncMock(
+            side_effect=[
+                {"user_id": "u", "team_id": "engineering", "max_budget": 5},
+                {"user_id": "u", "team_id": "engineering", "max_budget": None, "budget_duration": None},
+            ]
+        ),
     )
     update = AsyncMock()
     monkeypatch.setattr(litellm, "update_key", update)
     await upstream.generate_key("u", "", "engineering")
-    update.assert_awaited_once_with("sk-managed", {"max_budget": None, "budget_duration": None})
+    update.assert_awaited_once_with("sk-managed", {"max_budget": None})
 
 
 @pytest.mark.asyncio
@@ -204,14 +217,14 @@ async def test_slow_reconciliation_does_not_block_another_user_in_the_same_root(
     store.remember("alice", "alice@example.com", "sso", ["squad1"])
     entered, release = asyncio.Event(), asyncio.Event()
 
-    async def member(node, user_id, info):
-        if user_id == "alice":
+    async def provision(node):
+        if node.team_id == settings.organization_hierarchy.resolve("alice", ["squad1"]).team_id:
             entered.set()
             await release.wait()
+        return {}
 
-    monkeypatch.setattr(upstream, "sync_root", AsyncMock(return_value={}))
-    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={}))
-    monkeypatch.setattr(upstream, "sync_member", member)
+    monkeypatch.setattr(upstream, "sync_root", provision)
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {}}))
     monkeypatch.setattr(upstream, "generate_key", AsyncMock(return_value={"key": "sk-bob-test"}))
     monkeypatch.setattr(litellm, "get_user", AsyncMock(return_value=None))
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
@@ -220,7 +233,7 @@ async def test_slow_reconciliation_does_not_block_another_user_in_the_same_root(
         await asyncio.wait_for(entered.wait(), 2)
         node = await asyncio.wait_for(sync.remember("bob", "bob@example.com", "sso", ["squad2"]), 2)
         assert node.per_user == 50
-        assert store.get("bob")["team_id"] == "engineering"
+        assert store.get("bob")["team_id"] == node.team_id
         generated = await asyncio.wait_for(sync.generate_key("bob", "bob@example.com", None), 2)
         assert generated["key"] == "sk-bob-test"
         assert not background.done()
@@ -280,43 +293,43 @@ async def test_queued_key_creation_reads_membership_after_acquiring_the_user_loc
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("failure", ["member response", "member verification", "key verification"])
+@pytest.mark.parametrize("failure", ["key response", "key verification", "cap removal"])
 async def test_partial_sync_retains_root_and_blocks_a_fresh_allowance_in_another_root(monkeypatch, failure):
     values = example()
     values["levels"][0]["groups"][0]["members"][1]["ssoGroups"] = ["marketers"]
     monkeypatch.setattr(settings, "organization_hierarchy", OrganizationHierarchy.model_validate(values))
-    root = AsyncMock(return_value={})
+    verified = {
+        "team_info": {"members_with_roles": [{"user_id": "u"}]},
+        "team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": None}}],
+    }
+    root = AsyncMock(return_value=verified)
     monkeypatch.setattr(upstream, "sync_root", root)
-    keys = AsyncMock(return_value=[{"token": "old-key", "max_budget": 50}] if failure == "key verification" else [])
+    keys = AsyncMock(return_value=[{"token": "old-key", "max_budget": 50}])
     monkeypatch.setattr(litellm, "list_user_keys", keys)
     monkeypatch.setattr(litellm, "add_team_member", AsyncMock())
     monkeypatch.setattr(litellm, "update_key", AsyncMock())
     monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value=None))
     writes = []
 
-    async def write(method, path, *, payload):
-        assert store.get("u")["team_id"] == "engineering"
-        writes.append(payload["team_id"])
-        if failure == "member response":
-            raise HTTPException(status_code=502, detail="Response lost after writing member budget")
-        return {}
+    node = settings.organization_hierarchy.resolve("u", ["squad1"])
 
-    verified = {"team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": 100, "budget_duration": "30d"}}]}
-    monkeypatch.setattr(upstream, "request", write)
+    async def apply(node, key):
+        assert store.get("u")["team_id"] == node.team_id
+        writes.append(node.team_id)
+        if failure != "cap removal":
+            raise HTTPException(status_code=502, detail="Key response or verification unavailable")
+
+    monkeypatch.setattr(key_policy, "apply_key", apply)
     monkeypatch.setattr(
-        upstream,
-        "team_info",
-        AsyncMock(
-            side_effect=HTTPException(status_code=502, detail="Verification unavailable") if failure == "member verification" else None,
-            return_value=verified,
-        ),
+        key_policy, "normalize_individual_caps", AsyncMock(side_effect=HTTPException(status_code=502, detail="Cap removal unavailable"))
     )
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=verified))
     with pytest.raises(HTTPException) as exc:
         await sync.remember("u", "u@example.com", "sso", ["squad1"])
     assert exc.value.status_code == 502
-    assert writes == ["engineering"]
+    assert writes == [node.team_id]
     identity = store.get("u")
-    assert identity["team_id"] == "engineering"
+    assert identity["team_id"] == node.team_id
     assert identity["policy"] is None
     assert identity["sync_error"]
 
@@ -324,12 +337,12 @@ async def test_partial_sync_retains_root_and_blocks_a_fresh_allowance_in_another
     with pytest.raises(HTTPException) as exc:
         await sync.remember("u", "u@example.com", "sso", ["marketers"])
     assert exc.value.status_code == 409
-    assert writes == ["engineering"]
-    assert store.get("u")["team_id"] == "engineering"
+    assert writes == [node.team_id]
+    assert store.get("u")["team_id"] == node.team_id
 
     # Retrying the original root uses its existing allowance rather than making a new one.
     root.return_value = verified
     await sync.remember("u", "u@example.com", "sso", ["squad1"])
-    assert writes == ["engineering"]
+    assert writes == [node.team_id]
     assert store.get("u")["policy"]["per_user"] == 100
     assert store.get("u")["sync_error"] is None

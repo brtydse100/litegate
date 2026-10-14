@@ -71,7 +71,7 @@ describe("organization dashboard contracts", () => {
       name: "Effective budget policy",
     });
     expect(within(policy).getByText("$100.00")).toBeVisible();
-    expect(within(policy).getByText("Engineering shared pool")).toBeVisible();
+    expect(within(policy).getByText("Platform tracking target")).toBeVisible();
     await waitFor(() =>
       expect(api.organizationUsage).toHaveBeenLastCalledWith(
         "platform",

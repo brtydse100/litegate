@@ -64,7 +64,7 @@ def test_closest_budget_wins_and_multiple_matches_resolve_one_path():
     assert node.path == ("Engineering", "Digital", "squad1")
     assert node.per_user == 100
     assert node.duration == "30d"
-    assert node.team_id == "engineering"
+    assert node.team_id == f"litegate-org-{node.id}"
     assert tree.roots[0].member.budget.groupTotal == 5000
     assert tree.resolve("local:alice", []).per_user == 50
 
@@ -90,8 +90,8 @@ def test_incompatible_group_matches_are_rejected():
         lambda v: v["levels"][0]["groups"][0]["members"][1].update(litellmTeamId="engineering"),
         lambda v: v["levels"][0]["groups"][0]["members"][0].pop("litellmTeamId"),
         lambda v: v["levels"][1].update(name="Division"),
-        lambda v: v["levels"][2]["groups"][0]["members"][0]["budget"].update(groupTotal=100),
-        lambda v: v["levels"][2]["groups"][0]["members"][0].update(litellmTeamId="extra-team"),
+        lambda v: v["levels"][2]["groups"][0]["members"][0]["budget"].update(groupTotal=float("inf")),
+        lambda v: v["levels"][2]["groups"][0]["members"][0].update(litellmTeamId="engineering"),
         lambda v: v["levels"][2]["groups"][0]["members"][1].update(name="squad1"),
         lambda v: v["levels"][2]["groups"][0]["members"][1].update(ssoGroups=["squad1"]),
         lambda v: v["levels"][0]["groups"][0]["members"][0]["budget"].update(perUser=-1),

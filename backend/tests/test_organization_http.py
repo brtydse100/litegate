@@ -11,7 +11,7 @@ from app.main import app
 from app.organization import OrganizationHierarchy
 from app.rate_limit import _key_ops, _login_failures
 from app.routers import auth
-from app.services import litellm, local_users, oidc
+from app.services import litellm, local_users, oidc, organization_key_policy as key_policy
 from app.services import organization_client as upstream, organization_store as store, organization_sync as sync
 from tests.test_organization_config import example
 
@@ -28,6 +28,13 @@ def setup(monkeypatch, tmp_path):
     _key_ops.clear()
     _login_failures.clear()
     local_users.init_db()
+    monkeypatch.setattr(litellm, "add_team_member", AsyncMock())
+    monkeypatch.setattr(
+        upstream,
+        "team_info",
+        AsyncMock(return_value={"team_info": {}, "team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": None}}]}),
+    )
+    monkeypatch.setattr(key_policy, "normalize_individual_caps", AsyncMock())
 
 
 def client():
@@ -57,7 +64,7 @@ async def test_admin_reads_hierarchy_and_disabled_configuration(monkeypatch):
         assert response.json()["levels"] == ["Division", "Business Unit", "Squad"]
         squad = next(group for group in response.json()["groups"] if group["name"] == "squad1")
         assert squad["per_user"] == 100
-        assert squad["group_total"] == 5000
+        assert squad["group_total"] is None
         monkeypatch.setattr(settings, "organization_hierarchy", OrganizationHierarchy())
         disabled = await browser.get("/api/v1/organization", headers=token("admin"))
         assert disabled.json()["enabled"] is False
@@ -82,9 +89,9 @@ async def test_sso_mapping_sets_budget_team_before_issuing_a_session(monkeypatch
         response = await browser.get("/api/auth/callback", params={"state": state, "code": "code"})
         assert response.status_code == 307
         me = await browser.get("/api/auth/me")
-        assert me.json()["team_ids"] == ["engineering"]
+        assert me.json()["team_ids"] == [settings.organization_hierarchy.resolve("u", ["squad1"]).team_id]
         assert me.json()["role"] == "user"
-    assert member.call_args.args[0].per_user == 100
+    member.assert_not_awaited()  # No key exists yet, so no user budget is removed.
     assert store.get("u")["policy"]["per_user"] == 100
 
 
@@ -113,7 +120,9 @@ async def test_local_user_id_mapping_and_legacy_session_are_resolved(monkeypatch
     async with client() as browser:
         response = await browser.post("/api/keys", headers=token(user_id="local:alice"))
         assert response.status_code == 201
-    generate.assert_awaited_once_with("local:alice", "u@example.com", "engineering")
+    generate.assert_awaited_once_with(
+        "local:alice", "u@example.com", settings.organization_hierarchy.resolve("local:alice", []).team_id, max_budget=50, budget_duration="30d"
+    )
     assert store.get("local:alice")["policy"]["per_user"] == 50
 
 
@@ -121,7 +130,19 @@ async def test_local_user_id_mapping_and_legacy_session_are_resolved(monkeypatch
 async def test_personal_key_display_uses_member_budget_and_cycle_spend(monkeypatch):
     store.remember("u", "u@example.com", "sso", ["squad1"])
     monkeypatch.setattr(
-        litellm, "list_user_keys", AsyncMock(return_value=[{"token": "hash", "team_id": "engineering", "spend": 2, "max_budget": None}])
+        litellm,
+        "list_user_keys",
+        AsyncMock(
+            return_value=[
+                {
+                    "token": "hash",
+                    "team_id": settings.organization_hierarchy.resolve("u", ["squad1"]).team_id,
+                    "spend": 42,
+                    "max_budget": 100,
+                    "budget_duration": "30d",
+                }
+            ]
+        ),
     )
     monkeypatch.setattr(
         upstream,
@@ -136,6 +157,25 @@ async def test_personal_key_display_uses_member_budget_and_cycle_spend(monkeypat
     assert key["user_budget"] == 100
     assert key["user_spend"] == 42
     assert key["organization_path"] == ["Engineering", "Digital", "squad1"]
+
+
+@pytest.mark.asyncio
+async def test_multiple_key_cards_show_each_keys_own_budget_and_spend(monkeypatch):
+    store.remember("u", "u@example.com", "sso", ["squad1"])
+    team_id = settings.organization_hierarchy.resolve("u", ["squad1"]).team_id
+    monkeypatch.setattr(
+        litellm,
+        "list_user_keys",
+        AsyncMock(
+            return_value=[
+                {"token": "first", "team_id": team_id, "spend": 4, "max_budget": 100, "budget_duration": "30d"},
+                {"token": "second", "team_id": team_id, "spend": 6, "max_budget": 200, "budget_duration": "30d"},
+            ]
+        ),
+    )
+    async with client() as browser:
+        response = await browser.get("/api/keys", headers=token())
+    assert [(key["user_spend"], key["user_budget"]) for key in response.json()["keys"]] == [(4, 100), (6, 200)]
 
 
 @pytest.mark.asyncio
@@ -167,6 +207,25 @@ async def test_bulk_policy_updates_report_managed_key_failure(monkeypatch):
     async with client() as browser:
         response = await browser.patch("/api/v1/keys/bulk", headers=token("admin"), json={"keys": ["hash"], "settings": {"max_budget": 999}})
     assert response.status_code == 200
+    assert response.json()["failed"] == 1
+    assert "organizationHierarchy" in response.json()["results"][0]["error"]
+    update.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("changes", [None, {"key_alias": "renamed"}])
+@pytest.mark.parametrize("owner", ["u", "local:alice"])
+async def test_key_only_migration_cannot_bypass_pending_or_managed_organization_policy(monkeypatch, changes, owner):
+    if owner == "u":
+        store.remember(owner, "u@example.com", "sso", ["squad1"])
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"user_id": owner, "team_id": "manual", "max_budget": 100}))
+    update = AsyncMock()
+    monkeypatch.setattr(litellm, "update_key", update)
+    payload = {"keys": ["hash"], "use_key_budget_only": True}
+    if changes is not None:
+        payload["settings"] = changes
+    async with client() as browser:
+        response = await browser.patch("/api/v1/keys/bulk", headers=token("admin"), json=payload)
     assert response.json()["failed"] == 1
     assert "organizationHierarchy" in response.json()["results"][0]["error"]
     update.assert_not_awaited()

@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from app.organization import OrganizationHierarchy
-from app.services import litellm, organization_client as upstream
+from app.services import litellm, organization_client as upstream, organization_key_policy as key_policy
 from tests.test_organization_config import example
 
 
@@ -39,7 +39,7 @@ async def test_member_budget_patch_leaves_the_active_reset_window_untouched(monk
         "spend": 42,
         "litellm_budget_table": {"max_budget": 50, "budget_duration": "30d", "budget_reset_at": "2026-11-01T00:00:00Z"},
     }
-    new = {**old, "litellm_budget_table": {**old["litellm_budget_table"], "max_budget": 100}}
+    new = {**old, "litellm_budget_table": {**old["litellm_budget_table"], "max_budget": None}}
 
     def response(request):
         if request.method == "POST":
@@ -50,7 +50,7 @@ async def test_member_budget_patch_leaves_the_active_reset_window_untouched(monk
 
     calls = mock_http(monkeypatch, response)
     await upstream.sync_member(node, "u", {"team_memberships": [old]})
-    assert json.loads(calls[0].content) == {"team_id": "engineering", "user_id": "u", "max_budget_in_team": 100}
+    assert json.loads(calls[0].content) == {"team_id": node.team_id, "user_id": "u", "max_budget_in_team": None}
     assert calls[1].url.params["key_limit"] == "1"
 
 
@@ -60,7 +60,7 @@ async def test_ignored_member_fields_fail_verification_before_key_changes(monkey
     old = {"team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": 50, "budget_duration": "30d"}}]}
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=old))
     monkeypatch.setattr(upstream, "request", AsyncMock(return_value={}))
-    with pytest.raises(HTTPException, match="per-user budget") as exc:
+    with pytest.raises(HTTPException, match="team-member budget") as exc:
         await upstream.sync_member(node, "u", old)
     assert exc.value.status_code == 502
 
@@ -72,8 +72,9 @@ async def test_ignored_root_budget_fields_fail_verification(monkeypatch):
     monkeypatch.setattr(litellm, "get_team", AsyncMock(return_value=old))
     monkeypatch.setattr(litellm, "update_team", AsyncMock())
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": old}))
-    with pytest.raises(HTTPException, match="top-level budget"):
-        await upstream.sync_root(root)
+    result = await upstream.sync_root(root)
+    assert result["team_info"]["max_budget"] == 50
+    litellm.update_team.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -104,10 +105,12 @@ async def test_clearing_an_inherited_allowance_sends_explicit_null(monkeypatch):
     patch = AsyncMock(return_value={})
     monkeypatch.setattr(upstream, "request", patch)
     monkeypatch.setattr(
-        upstream, "team_info", AsyncMock(return_value={"team_memberships": [{"user_id": "u", "litellm_budget_table": {"budget_duration": "30d"}}]})
+        upstream,
+        "team_info",
+        AsyncMock(return_value={"team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": None, "budget_duration": "30d"}}]}),
     )
     await upstream.sync_member(node, "u", old)
-    assert patch.call_args.kwargs["payload"] == {"team_id": "engineering", "user_id": "u", "max_budget_in_team": None}
+    assert patch.call_args.kwargs["payload"] == {"team_id": node.team_id, "user_id": "u", "max_budget_in_team": None}
 
 
 @pytest.mark.asyncio
@@ -121,7 +124,7 @@ async def test_null_allowance_cannot_pass_with_a_finite_team_default(monkeypatch
     old = {**info, "team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": 100}}]} if write_needed else info
     monkeypatch.setattr(upstream, "request", AsyncMock(return_value={}))
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=info))
-    with pytest.raises(HTTPException, match="per-user budget"):
+    with pytest.raises(HTTPException, match="team-member budget"):
         await upstream.sync_member(node, "u", old)
 
 
@@ -131,15 +134,16 @@ async def test_root_sync_clears_and_verifies_only_the_default_member_cap(monkeyp
     root = OrganizationHierarchy.model_validate(example()).roots[0]
     team = {"max_budget": 5000, "budget_duration": "30d", "metadata": {"team_member_budget_id": "default"}}
     original = {"team_info": {**team, "team_member_budget_table": {"max_budget": 50, "rpm_limit": 10}}}
-    verified = {"team_info": {**team, "team_member_budget_table": {"max_budget": None, "rpm_limit": 10}}} if applied else original
+    verified = {"team_info": {**team, "max_budget": None, "team_member_budget_table": {"max_budget": None, "rpm_limit": 10}}} if applied else original
     update = AsyncMock()
     monkeypatch.setattr(litellm, "get_team", AsyncMock(return_value=team))
     monkeypatch.setattr(litellm, "update_team", update)
     monkeypatch.setattr(upstream, "team_info", AsyncMock(side_effect=[original, verified]))
+    monkeypatch.setattr(litellm, "list_keys_filtered", AsyncMock(return_value={"keys": [], "total_pages": 1}))
     if applied:
-        result = await upstream.sync_root(root)
+        result = await key_policy.finish_team(root)
         assert result["team_info"]["team_member_budget_table"]["rpm_limit"] == 10
     else:
-        with pytest.raises(HTTPException, match="default member budget"):
-            await upstream.sync_root(root)
-    update.assert_awaited_once_with("engineering", {"team_member_budget": None})
+        with pytest.raises(HTTPException, match="old shared budget"):
+            await key_policy.finish_team(root)
+    update.assert_awaited_once_with("engineering", {"max_budget": None, "team_member_budget": None})

@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from app.config import settings
 from app.models import CurrentUser
 from app.organization import MembershipConflict, OrganizationNode
-from app.services import audit, litellm
+from app.services import audit, key_cleanup, litellm, organization_key_policy as key_policy
 from app.services import organization_client as upstream, organization_store as store
 
 _logger = logging.getLogger(__name__)
@@ -72,9 +72,12 @@ async def synchronize_user(user_id: str) -> OrganizationNode | None:
 
 
 async def sync_root(node: OrganizationNode) -> dict:
-    root = next(root for root in settings.organization_hierarchy.roots if root.team_id == node.team_id)
-    async with lock_for("team", root.team_id):
-        return await upstream.sync_root(root)
+    info = {}
+    for ancestor in settings.organization_hierarchy.nodes.values():
+        if node.path[: len(ancestor.path)] == ancestor.path:
+            async with lock_for("team", ancestor.team_id):
+                info = await upstream.sync_root(ancestor)
+    return info
 
 
 async def synchronize(identity: dict) -> OrganizationNode:
@@ -93,8 +96,11 @@ async def sync_identity(identity: dict, info: dict) -> OrganizationNode:
     if node is None:
         raise HTTPException(status_code=409, detail="Organization mapping was removed; review the user's keys before changing membership")
     existing = await litellm.list_user_keys(identity["user_id"])
+    ancestor_teams = {
+        ancestor.team_id for ancestor in settings.organization_hierarchy.nodes.values() if node.path[: len(ancestor.path)] == ancestor.path
+    }
     previous_team = identity.get("team_id")
-    if previous_team and previous_team != node.team_id:
+    if previous_team and previous_team not in ancestor_teams:
         if upstream.membership(info, identity["user_id"]) is None:
             raise HTTPException(
                 status_code=409, detail="Top-level organization changed; migrate the user's LiteLLM membership before applying its new budget"
@@ -108,26 +114,22 @@ async def sync_identity(identity: dict, info: dict) -> OrganizationNode:
                 status_code=409,
                 detail="Top-level organization changed; an administrator must remove the previous LiteLLM membership after reviewing spend",
             )
-    if any(key.get("team_id") and key["team_id"] != node.team_id for key in existing):
+    if any(key.get("team_id") and key["team_id"] not in ancestor_teams for key in existing):
         raise HTTPException(
             status_code=409, detail="Existing keys belong to another team; migrate them in LiteLLM before changing the top-level organization"
         )
+    await key_policy.guard_ancestor_restrictions(node, identity["user_id"], existing)
     await asyncio.to_thread(store.bind_team, identity["user_id"], node.team_id)
-    await upstream.sync_member(node, identity["user_id"], info)
+    for ancestor in settings.organization_hierarchy.nodes.values():
+        if ancestor.team_id in ancestor_teams:
+            current = info if ancestor.team_id == node.team_id else await upstream.team_info(ancestor.team_id)
+            if upstream.membership(current, identity["user_id"]) is None:
+                await litellm.add_team_member(ancestor.team_id, identity["user_id"])
     for key in existing:
-        identifier = key.get("token") or key.get("api_key") or key.get("key")
-        if not identifier:
-            raise HTTPException(status_code=502, detail="Cannot synchronize a managed key without its identifier")
-        if key.get("team_id") != node.team_id or key.get("max_budget") is not None or key.get("budget_duration") is not None:
-            await litellm.update_key(identifier, {"team_id": node.team_id, "max_budget": None, "budget_duration": None})
-            verified = await litellm.get_key_info(identifier)
-            if (
-                not verified
-                or verified.get("team_id") != node.team_id
-                or verified.get("max_budget") is not None
-                or verified.get("budget_duration") is not None
-            ):
-                raise HTTPException(status_code=502, detail="Could not verify the managed key's budget policy")
+        await key_policy.apply_key(node, key)
+    if existing:
+        async with lock_for("team", node.team_id):
+            await key_policy.normalize_individual_caps(node, identity["user_id"])
     changed = identity.get("policy") != policy(node) or identity.get("team_id") != node.team_id
     await asyncio.to_thread(store.synced, identity["user_id"], node.team_id, policy(node))
     if changed:
@@ -163,7 +165,18 @@ async def generate_key(user_id: str, email: str, team_id: str | None, **options)
         node = await prepare_user(user_id, email)
         if node is None:
             return await litellm.generate_key(user_id, email, team_id, **options)
-        return await upstream.generate_key(user_id, email, node.team_id, **options)
+        if not {"initial_spend", "key_alias"}.intersection(options) and await litellm.list_user_keys(user_id):
+            raise HTTPException(status_code=409, detail="This user already has a key; regenerate it instead")
+        result = await upstream.generate_key(
+            user_id, email, node.team_id, **{**options, "max_budget": node.per_user, "budget_duration": node.duration}
+        )
+        try:
+            async with lock_for("team", node.team_id):
+                await key_policy.normalize_individual_caps(node, user_id)
+        except BaseException:
+            await key_cleanup.revoke_created_key(result["key"])
+            raise
+        return result
 
 
 async def reconcile() -> None:
@@ -177,12 +190,13 @@ async def reconcile() -> None:
     async def prepare_root(root):
         async with semaphore:
             try:
-                await sync_root(root)
+                async with lock_for("team", root.team_id):
+                    await upstream.sync_root(root)
                 ready.add(root.team_id)
             except HTTPException as exc:
                 _logger.warning("Organization root %s synchronization failed: %s", root.team_id, exc.detail)
 
-    await asyncio.gather(*(prepare_root(root) for root in settings.organization_hierarchy.roots))
+    await asyncio.gather(*(prepare_root(root) for root in settings.organization_hierarchy.nodes.values()))
 
     async def sync_one(user_id: str):
         async with semaphore, lock_for("user", user_id):
@@ -215,6 +229,16 @@ async def reconcile() -> None:
     discovered = await asyncio.gather(*(discover(user_id) for user_id in sorted(explicit - known)))
     await asyncio.gather(*(sync_one(user_id) for user_id in discovered if user_id is not None))
 
+    async def finish_team(node):
+        async with semaphore, lock_for("team", node.team_id):
+            if node.team_id in ready:
+                try:
+                    await key_policy.finish_team(node)
+                except HTTPException as exc:
+                    _logger.warning("Organization team %s migration pending: %s", node.team_id, exc.detail)
+
+    await asyncio.gather(*(finish_team(node) for node in settings.organization_hierarchy.nodes.values()))
+
 
 async def run_reconciliation() -> None:
     while True:
@@ -230,17 +254,21 @@ def guard_team(team_id: str, changes: dict | None = None) -> None:
         raise HTTPException(status_code=409, detail="This team's membership and budget are managed by organizationHierarchy")
 
 
-async def guard_key(key: str, changes: dict) -> None:
-    if not settings.organization_hierarchy.levels or not {"team_id", "max_budget", "budget_duration"}.intersection(changes):
+async def guard_key(key: str, changes: dict, *, use_key_budget_only: bool = False) -> None:
+    if not settings.organization_hierarchy.levels or (
+        not use_key_budget_only and not {"team_id", "max_budget", "budget_duration"}.intersection(changes)
+    ):
         return
     info = await litellm.get_key_info(key)
     if not info:
         raise HTTPException(status_code=404, detail="Key not found")
     identity = await asyncio.to_thread(store.get, info.get("user_id") or "")
+    configured = resolve(info.get("user_id") or "", identity["groups"] if identity else []) if use_key_budget_only else None
     if (
         settings.organization_hierarchy.is_managed_team(info.get("team_id"))
         or settings.organization_hierarchy.is_managed_team(changes.get("team_id"))
         or (identity and identity.get("team_id"))
+        or (use_key_budget_only and (identity or configured))
     ):
         raise HTTPException(status_code=409, detail="This key's team and budget are managed by organizationHierarchy")
 
@@ -258,7 +286,7 @@ async def personal_policy(user: CurrentUser, keys: list[dict] | None = None) -> 
     team_id = team_id or (identity.get("team_id") if identity else None) or (node.team_id if node else None)
     if team_id is None:
         return None
-    root = next((root for root in settings.organization_hierarchy.roots if root.team_id == team_id), None)
+    root = next((root for root in settings.organization_hierarchy.nodes.values() if root.team_id == team_id), None)
     valid = node is not None and node.team_id == team_id
     result = {
         "path": list(node.path) if valid else list(root.path) if root else [],
@@ -274,12 +302,12 @@ async def personal_policy(user: CurrentUser, keys: list[dict] | None = None) -> 
         result["sync_error"] = result["sync_error"] or "Your key's team assignment is not synchronized; its user allowance is unavailable"
         return result
     try:
-        actual = upstream.member_budget(await upstream.team_info(team_id), user.user_id)
+        if not keys or any("max_budget" not in key or "budget_duration" not in key for key in keys):
+            raise HTTPException(status_code=502, detail="The key's current allowance is unavailable")
+        actual = {"per_user": keys[0]["max_budget"], "duration": keys[0]["budget_duration"], "spend": litellm.total_key_spend(keys)}
         result.update(actual, budget_available=True)
-        if valid and (actual["per_user"] != node.per_user or actual["duration"] != node.duration):
+        if valid and any(not key_policy.matches(key, node) for key in keys):
             result["sync_error"] = result["sync_error"] or "Your enforced allowance differs from organizationHierarchy; contact an administrator"
-        if any(key.get("max_budget") is not None or key.get("budget_duration") is not None for key in keys or []):
-            result["sync_error"] = result["sync_error"] or "Your key still has an additional LiteLLM budget restriction; contact an administrator"
     except HTTPException as exc:
         result["sync_error"] = result["sync_error"] or str(exc.detail)
     return result

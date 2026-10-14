@@ -29,7 +29,7 @@ securityContext:
 
 image:
   repository: ghcr.io/brtydse100/litegate
-  tag: "2.12.1"  # Pin a specific tag in production.
+  tag: "2.12.2"  # Pin a specific tag in production.
   pullPolicy: IfNotPresent
 
 service:
@@ -48,6 +48,8 @@ ingress:
   tls: []
 
 # Optional organization structure. See docs/organization.md for a complete example.
+# Every group has a real team; keys use the deepest match. perUser is a per-key
+# allowance; groupTotal is a tracking target and does not cap descendant keys.
 # Groups and budgets are managed through these values; labels are chosen by you.
 organizationHierarchy:
   levels: []
@@ -64,6 +66,10 @@ config:
   litellmUrl: "http://litellm:4000"
   # Browser-facing "Open LiteLLM Hub" link; blank hides it.
   litellmUiUrl: ""
+
+  # Verify certificates for outgoing LiteLLM and SSO HTTPS connections.
+  # False skips certificate verification; prefer customCA for private CAs.
+  sslVerify: true
 
   # -- Portal URL and appearance ---------------------------------------------
   rootUrl: "http://litegate.example.com"
@@ -99,6 +105,9 @@ config:
   genericClientUsePkce: false
   # False uses HTTP Basic client authentication at the token endpoint.
   genericIncludeClientId: true
+  # Reject a provided email when UserInfo explicitly reports email_verified: false.
+  # False allows that email; missing email/verification claims remain accepted.
+  genericRequireVerifiedEmail: true
 
   # -- SSO roles and LiteLLM teams -------------------------------------------
   # Group claim supports dotted paths such as realm_access.roles.
@@ -163,11 +172,14 @@ persistence:
   size: 1Gi
 
 # Mount a complete CA bundle from exactly one existing ConfigMap or Secret.
+# mountPath is the destination inside the pod, not a local certificate file.
+# A nonempty customCA requires configMap or secret; key/mountPath alone fail.
 customCA: {}
-#  configMap: corporate-ca
-#  secret: corporate-ca
-#  key: ca-bundle.crt
-#  mountPath: /etc/ssl/certs/litegate-custom-ca.pem
+# Example (replace customCA: {} above; choose only one source):
+# customCA:
+#   configMap: corporate-ca  # Or secret: corporate-ca
+#   key: ca-bundle.crt
+#   mountPath: /etc/ssl/certs/litegate-custom-ca.pem
 
 extraVolumeMounts: []
 extraVolumes: []

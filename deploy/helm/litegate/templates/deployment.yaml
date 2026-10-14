@@ -14,6 +14,9 @@ kind: Deployment
 {{- fail "customCA must specify either configMap or secret, not both" }}
 {{- end }}
 {{- $hasCustomCA := or (hasKey $customCA "configMap") (hasKey $customCA "secret") }}
+{{- if and $customCA (not $hasCustomCA) }}
+{{- fail "customCA requires an existing certificate source: set customCA.configMap or customCA.secret; customCA.mountPath is the destination inside the pod" }}
+{{- end }}
 metadata:
   name: {{ include "litegate.fullname" . }}
   labels:

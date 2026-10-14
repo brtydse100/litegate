@@ -33,7 +33,7 @@ async def test_flat_sso_mappings_cannot_add_another_managed_root(monkeypatch):
         browser.cookies.set("litegate_oidc_state", state, path="/api/auth")
         response = await browser.get("/api/auth/callback", params={"state": state, "code": "code"})
     assert response.status_code == 307
-    assert memberships.await_args.args[2] == ["engineering", "manual-team"]
+    assert memberships.await_args.args[2] == [settings.organization_hierarchy.resolve("u", ["squad1"]).team_id, "manual-team"]
 
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_destination_membership_and_deleted_keys_do_not_approve_migration(
     # A deliberate upstream migration removes the old roster and member row.
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {"members_with_roles": []}, "team_memberships": []}))
     await sync.sync_identity(store.get("u"), destination)
-    update.assert_awaited_once()
+    update.assert_not_awaited()  # No key exists: do not create a new individual allowance.
     assert store.get("u")["team_id"] == "marketing"
 
 
@@ -81,7 +81,7 @@ async def test_discovery_outage_does_not_stop_known_user_policy_updates(monkeypa
     monkeypatch.setattr(litellm, "get_user", discovery)
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
     monkeypatch.setattr(upstream, "sync_root", roots)
-    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={}))
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {}}))
     monkeypatch.setattr(upstream, "sync_member", members)
     for allowance in (80, 90):
         values = example()
@@ -89,8 +89,8 @@ async def test_discovery_outage_does_not_stop_known_user_policy_updates(monkeypa
         monkeypatch.setattr(settings, "organization_hierarchy", OrganizationHierarchy.model_validate(values))
         await sync.reconcile()
         assert store.get("u")["policy"]["per_user"] == allowance
-    assert roots.await_count == 4
-    assert members.await_count == 2
+    assert roots.await_count == 2 * len(settings.organization_hierarchy.nodes)
+    members.assert_not_awaited()  # Pending users without keys keep their existing ceilings.
     assert discovery.await_count == 2
     assert "Discovery unavailable" in caplog.text
 
@@ -164,7 +164,11 @@ async def test_personal_keys_show_enforced_budget_and_policy_errors(monkeypatch,
     store.synced("u", "engineering", {"per_user": 200})
     if mapping == "valid":
         store.failed("u", "Budget update failed")
-    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[{"token": "hash", "team_id": "engineering", "spend": 2}]))
+    monkeypatch.setattr(
+        litellm,
+        "list_user_keys",
+        AsyncMock(return_value=[{"token": "hash", "team_id": "engineering", "spend": 60, "max_budget": 200, "budget_duration": "30d"}]),
+    )
     info = {"team_memberships": [{"user_id": "u", "spend": 60, "litellm_budget_table": {"max_budget": 200, "budget_duration": "30d"}}]}
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=info))
     async with client() as browser:
@@ -181,7 +185,7 @@ async def test_personal_keys_show_enforced_budget_and_policy_errors(monkeypatch,
 @pytest.mark.asyncio
 async def test_budget_lookup_outage_keeps_key_metadata_with_an_unknown_allowance(monkeypatch):
     store.remember("u", "u@example.com", "sso", ["squad1"])
-    metadata = {"token": "hash", "team_id": "engineering", "spend": 12, "models": ["model-a"]}
+    metadata = {"token": "hash", "team_id": settings.organization_hierarchy.resolve("u", ["squad1"]).team_id, "spend": 12, "models": ["model-a"]}
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[metadata]))
     monkeypatch.setattr(upstream, "team_info", AsyncMock(side_effect=HTTPException(status_code=503, detail="Budget service unavailable")))
     async with client() as browser:

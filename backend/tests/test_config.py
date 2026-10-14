@@ -258,3 +258,18 @@ def test_key_storage_defaults_to_disabled_and_environment_overrides_yaml(tmp_pat
     assert cfg_module.Settings().save_api_keys_in_db is True
     monkeypatch.setenv("SAVE_API_KEYS_IN_DB", "false")
     assert cfg_module.Settings().save_api_keys_in_db is False
+
+
+@pytest.mark.parametrize("setting", ["ssl_verify", "generic_require_verified_email"])
+def test_verification_defaults_and_environment_override_yaml(tmp_path, monkeypatch, setting):
+    import app.config as cfg_module
+
+    monkeypatch.setattr(cfg_module, "_BACKEND_DIR", tmp_path)
+    monkeypatch.delenv(setting.upper(), raising=False)
+    assert getattr(cfg_module.Settings(), setting) is True
+    (tmp_path / "config.yaml").write_text(f"{setting}: false\n")
+    assert getattr(cfg_module.Settings(), setting) is False
+    monkeypatch.setenv(setting.upper(), "true")
+    assert getattr(cfg_module.Settings(), setting) is True
+    monkeypatch.setenv(setting.upper(), "false")
+    assert getattr(cfg_module.Settings(), setting) is False

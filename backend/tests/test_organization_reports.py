@@ -9,7 +9,7 @@ import pytest
 
 from app.config import settings
 from app.organization import OrganizationHierarchy
-from app.services import organization_client as upstream, organization_reports as reports, organization_store as store
+from app.services import litellm, organization_client as upstream, organization_reports as reports, organization_store as store
 from tests.test_organization_config import example
 
 
@@ -150,6 +150,7 @@ async def test_range_and_group_validation_happens_before_reading_usage(monkeypat
 async def test_user_pagination_and_cycle_spend_are_independent_of_report_totals(monkeypatch, setup):
     info = {"team_memberships": [{"user_id": "alice", "spend": 42}, {"user_id": "bob", "spend": 20}]}
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=info))
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(side_effect=[[{"spend": 42}], [{"spend": 20}]]))
     first = await reports.users(None, 1, 1)
     second = await reports.users(None, 2, 1)
     assert first["total"] == 2
@@ -184,8 +185,8 @@ async def test_current_litellm_nested_model_metrics_are_used(monkeypatch):
 async def test_ignored_root_budget_writes_are_visible_even_when_team_is_readable(monkeypatch):
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {"max_budget": 10, "budget_duration": "30d", "spend": 4}}))
     result = await reports.overview()
-    assert result["groups"][0]["group_spend"] == 4
-    assert "differs" in result["groups"][0]["sync_error"]
+    assert result["groups"][0]["group_spend"] == 4 * sum(node.path[0] == "Engineering" for node in settings.organization_hierarchy.nodes.values())
+    assert "pending" in result["groups"][0]["sync_error"]
 
 
 @pytest.mark.asyncio

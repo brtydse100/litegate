@@ -129,7 +129,7 @@ function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
       <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
         <div className="px-5 py-4">
           <dt className="text-xs text-slate-500">
-            {managed ? "User spend" : "Spend"}
+            {managed ? "Key spend" : "Spend"}
           </dt>
           <dd className="mt-1 font-semibold text-slate-950">
             {managed && !budgetAvailable
@@ -139,7 +139,7 @@ function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
         </div>
         <div className="px-5 py-4">
           <dt className="text-xs text-slate-500">
-            {managed ? "User budget" : "Budget"}
+            {managed ? "Key budget" : "Budget"}
           </dt>
           <dd className="mt-1 font-semibold text-slate-950">
             {managed && !budgetAvailable

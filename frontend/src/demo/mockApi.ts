@@ -3,6 +3,8 @@ import {
   organizationOverview,
   organizationUsers,
   organizationUsage,
+  organizationKeyPolicy,
+  organizationTeams,
 } from "./organization";
 
 let demoUser: User = {
@@ -67,6 +69,10 @@ let installationKeys: KeyInfo[] = [
   },
 ];
 
+for (const key of installationKeys)
+  Object.assign(key, organizationKeyPolicy(key.user_id ?? ""));
+demoUser.team_ids = [organizationKeyPolicy(demoUser.user_id)!.team_id];
+
 let users: LocalUser[] = [
   {
     username: "contractor",
@@ -98,6 +104,7 @@ let users: LocalUser[] = [
 ];
 
 let teams: TeamInfo[] = [
+  ...organizationTeams(),
   {
     team_id: "platform-engineering",
     team_alias: "Platform Engineering",
@@ -286,12 +293,14 @@ async function mockResponse(request: Request): Promise<Response> {
     const created: KeyInfo = {
       token: key,
       key_alias: "alex-primary",
-      spend: 0,
       max_budget: 100,
       models: ["gpt-5", "claude-sonnet-4", "gemini-2.5-pro"],
       rpm_limit: 120,
       team_id: "platform-engineering",
       user_email: demoUser.email,
+      user_id: demoUser.user_id,
+      ...organizationKeyPolicy(demoUser.user_id),
+      spend: 0,
     };
     personalKeys = [created];
     installationKeys = [
@@ -316,6 +325,11 @@ async function mockResponse(request: Request): Promise<Response> {
       user_id: demoUser.user_id,
       expires: personalKeys[0]?.expires ?? null,
     });
+  }
+  if (path === "/api/v1/models" && method === "GET") {
+    if (demoUser.role !== "admin")
+      return json({ detail: "Administrator access required" }, 403);
+    return json({ models: ["gpt-5", "claude-sonnet-4", "gemini-2.5-pro"] });
   }
   if (path === "/api/v1/keys" && method === "GET") {
     const page = Number(url.searchParams.get("page") ?? 1);

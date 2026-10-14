@@ -7,7 +7,7 @@ from time import monotonic
 from fastapi import HTTPException
 
 from app.config import settings
-from app.services import organization_client as upstream, organization_store as store
+from app.services import litellm, organization_client as upstream, organization_store as store
 from app.services.organization_sync import resolve
 
 _usage_cache: dict[tuple[str, str, str], tuple[float, list[dict]]] = {}
@@ -50,20 +50,23 @@ async def overview() -> dict:
             try:
                 info = await upstream.team_info(root.team_id)
                 team = info.get("team_info", {})
-                policy = {"max_budget": root.member.budget.groupTotal, "budget_duration": root.member.budget.duration}
+                policy = {"max_budget": None, "budget_duration": root.duration}
                 mismatch = any(team.get(key) != value for key, value in policy.items())
                 return root.team_id, {
                     "spend": upstream.finite_number(team.get("spend")),
-                    "error": "LiteLLM's top-level budget differs from organizationHierarchy" if mismatch else None,
+                    "error": "LiteLLM's team policy migration is pending" if mismatch else None,
                 }
             except HTTPException as exc:
                 return root.team_id, {"spend": None, "error": str(exc.detail)}
 
-    roots = dict(await asyncio.gather(*(root_status(root) for root in tree.roots)))
+    roots = dict(await asyncio.gather(*(root_status(node) for node in tree.nodes.values())))
     groups = []
     for node in tree.nodes.values():
-        root = next(root for root in tree.roots if root.team_id == node.team_id)
-        status = roots[node.team_id]
+        statuses = [roots[descendant.team_id] for descendant in tree.nodes.values() if within(descendant, node)]
+        status = {
+            "spend": sum(item["spend"] for item in statuses) if all(item["spend"] is not None for item in statuses) else None,
+            "error": next((item["error"] for item in statuses if item["error"]), None),
+        }
         groups.append(
             {
                 "id": node.id,
@@ -76,7 +79,7 @@ async def overview() -> dict:
                 "per_user": node.per_user,
                 "duration": node.duration,
                 "budget_source": node.budget_source,
-                "group_total": root.member.budget.groupTotal,
+                "group_total": node.member.budget.groupTotal,
                 "group_spend": status["spend"],
                 "sync_error": status["error"],
             }
@@ -97,18 +100,17 @@ async def users(node_id: str | None, page: int, size: int) -> dict:
     batch = selected[(page - 1) * size : page * size]
     semaphore = asyncio.Semaphore(5)
 
-    async def get_info(team_id):
+    async def get_info(user_id):
         async with semaphore:
             try:
-                return team_id, await upstream.team_info(team_id)
+                return user_id, await litellm.list_user_keys(user_id)
             except HTTPException:
-                return team_id, None
+                return user_id, None
 
-    infos = dict(await asyncio.gather(*(get_info(team_id) for team_id in {node.team_id for _, node in batch})))
+    infos = dict(await asyncio.gather(*(get_info(identity["user_id"]) for identity, _ in batch)))
     result = []
     for identity, node in batch:
-        info = infos[node.team_id]
-        member = upstream.membership(info, identity["user_id"]) if info else None
+        keys = infos[identity["user_id"]]
         result.append(
             {
                 "user_id": identity["user_id"],
@@ -116,8 +118,8 @@ async def users(node_id: str | None, page: int, size: int) -> dict:
                 "path": list(node.path),
                 "per_user": node.per_user,
                 "duration": node.duration,
-                "budget_spend": upstream.finite_number(member.get("spend")) if member else None,
-                "sync_error": identity.get("sync_error") or ("Could not read the user's LiteLLM membership" if member is None else None),
+                "budget_spend": litellm.total_key_spend(keys) if keys is not None else None,
+                "sync_error": identity.get("sync_error") or ("Could not read the user's key metadata" if keys is None else None),
             }
         )
     return {"users": result, "page": page, "page_size": size, "total": len(selected), "total_pages": max(1, (len(selected) + size - 1) // size)}

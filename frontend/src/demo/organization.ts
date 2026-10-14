@@ -5,6 +5,7 @@ import type {
   OrganizationUserPage,
   UsageMetrics,
 } from "../types/organization";
+import type { TeamInfo } from "../types";
 
 const groups: OrganizationGroup[] = [
   {
@@ -175,10 +176,53 @@ export function organizationOverview(): OrganizationOverview {
   return {
     enabled: true,
     levels: ["Department", "Branch", "Team"],
-    groups,
+    groups: groups.map((group) => ({
+      ...group,
+      team_id: `demo-${group.id}`,
+      group_total: group.parent_id ? null : group.group_total,
+      group_spend: selectedMembers(group.id).reduce(
+        (total, member) => total + member.budget_spend,
+        0,
+      ),
+    })),
     total_users: members.length,
     issues: [],
   };
+}
+
+export function organizationKeyPolicy(userId: string) {
+  const member = members.find((item) => item.user_id === userId);
+  const group = groups.find((item) => item.id === member?.node);
+  return group && member
+    ? {
+        team_id: `demo-${group.id}`,
+        max_budget: group.per_user,
+        budget_duration: group.duration,
+        spend: member.budget_spend,
+      }
+    : null;
+}
+
+export function organizationTeams(): TeamInfo[] {
+  return organizationOverview().groups.map((group) => ({
+    team_id: group.team_id,
+    team_alias: group.path.join(" / "),
+    max_budget: null,
+    budget_duration: group.duration,
+    spend: members
+      .filter((member) => member.node === group.id)
+      .reduce((total, member) => total + member.budget_spend, 0),
+    models: [],
+    blocked: false,
+    organization_managed: true,
+    members_with_roles: selectedMembers(group.id).map((member) => ({
+      user_id: member.user_id,
+      user_email: member.email,
+      role: "user",
+    })),
+    mapped_groups: [],
+    default_key_team: false,
+  }));
 }
 
 function selectedMembers(nodeId: string | null) {
