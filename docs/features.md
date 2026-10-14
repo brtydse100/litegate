@@ -22,9 +22,10 @@ reveal their own keys and administrators can reveal them from the key list.
 The default remains one-time secret display without key storage. Rotation holds
 the owner lock from the spend snapshot through old-key revocation, preventing
 simultaneous rotations from leaving multiple replacement allowances.
-The personal key summary shows the actual stored secret in its header with copy
-and hide controls. It loads through the authorized reveal endpoint and stays in
-component memory. Hashes are never offered as usable API keys. Without stored
+The personal key summary shows the actual stored secret directly below its name
+in a prominent area with larger text, a labelled copy button, and a hide control.
+It loads through the authorized reveal endpoint and stays in component memory.
+Hashes are never offered as usable API keys. Without stored
 secrets, newly created keys remain copyable until hidden or the page is left.
 
 New keys inherit the installation defaults for models, budget, reset interval,

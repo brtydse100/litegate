@@ -91,9 +91,9 @@ function KeyCard({
   const budgetAvailable = keyInfo.user_budget_available !== false;
   return (
     <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
+      <div className="border-b border-slate-200 px-5 py-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="shrink-0 rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
             <KeyRound size={17} />
           </div>
           <div className="min-w-0 flex-1">
@@ -101,14 +101,16 @@ function KeyCard({
               {keyInfo.key_alias || "API key"}
             </p>
             <p className="text-xs text-slate-500">Virtual key</p>
+            <div className="mt-3">
+              <PersonalKeySecret
+                identifier={keyToken(keyInfo)}
+                canReveal={canReveal}
+                initialSecret={initialSecret}
+                onHide={onHide}
+              />
+            </div>
           </div>
         </div>
-        <PersonalKeySecret
-          identifier={keyToken(keyInfo)}
-          canReveal={canReveal}
-          initialSecret={initialSecret}
-          onHide={onHide}
-        />
       </div>
       <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
         <div className="px-5 py-4">
