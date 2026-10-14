@@ -58,6 +58,9 @@ to another team in a few clicks. The same operations are available to trusted
 automation through the [v1 API](../API.md#teams-admin-only). Normal users cannot
 see the tab or call the team endpoints.
 
+Teams and Organization show four decimal places for spend below one cent, so
+small real charges stay visible. Positive amounts below $0.0001 show **<$0.0001**.
+
 The team editor keeps a **Current team settings** summary visible while you
 edit. It prefills saved values and offers model checkboxes and common
 budget-reset durations. Saved models remain selectable even if they are missing

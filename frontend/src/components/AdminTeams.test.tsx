@@ -47,6 +47,7 @@ describe("team policy editing", () => {
           team_id: "devops",
           team_alias: "DevOps",
           max_budget: 2000,
+          spend: 0.0024,
           budget_duration: "30d",
           models: ["legacy-model"],
           blocked: false,
@@ -73,6 +74,7 @@ describe("team policy editing", () => {
       </QueryClientProvider>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    expect(screen.getByText("$0.0024")).toBeVisible();
     const dialog = screen.getByRole("dialog", { name: "Edit team" });
     const current = within(dialog).getByRole("region", {
       name: "Current team settings",

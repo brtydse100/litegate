@@ -9,9 +9,10 @@ export const metricLabels: Record<UsageMetric, string> = {
 };
 
 export function metricValue(value: number, metric: UsageMetric): string {
-  return metric === "spend"
-    ? `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    : value.toLocaleString();
+  if (metric !== "spend") return value.toLocaleString();
+  if (value > 0 && value < 0.0001) return "<$0.0001";
+  const digits = value !== 0 && Math.abs(value) < 0.01 ? 4 : 2;
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 }
 
 export function SpendTrend({
@@ -59,11 +60,19 @@ export function SpendTrend({
               fill="currentColor"
               className="text-slate-500"
             >
-              {metric === "spend" ? "$" : ""}
-              {(scale * ratio).toLocaleString(undefined, {
-                maximumFractionDigits: 1,
-                notation: "compact",
-              })}
+              {metric === "spend" &&
+              scale * ratio > 0 &&
+              scale * ratio < 0.01 ? (
+                metricValue(scale * ratio, metric)
+              ) : (
+                <>
+                  {metric === "spend" ? "$" : ""}
+                  {(scale * ratio).toLocaleString(undefined, {
+                    maximumFractionDigits: 1,
+                    notation: "compact",
+                  })}
+                </>
+              )}
             </text>
           </g>
         ))}

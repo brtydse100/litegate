@@ -15,6 +15,15 @@ import {
   organizationUsers,
 } from "../demo/organization";
 import AdminOrganization from "./AdminOrganization";
+import { metricValue } from "./OrganizationCharts";
+
+it("distinguishes sub-cent spend from zero while retaining normal currency precision", () => {
+  expect(metricValue(0.0024, "spend")).toBe("$0.0024");
+  expect(metricValue(0.000001, "spend")).toBe("<$0.0001");
+  expect(metricValue(0, "spend")).toBe("$0.00");
+  expect(metricValue(0.01, "spend")).toBe("$0.01");
+  expect(metricValue(1.1, "spend")).toBe("$1.10");
+});
 
 vi.mock("../api/client", () => ({
   api: {

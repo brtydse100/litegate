@@ -20,6 +20,7 @@ import type {
   ModelSelection,
 } from "../types";
 import TeamMembersDialog from "./TeamMembersDialog";
+import { metricValue } from "./OrganizationCharts";
 import {
   CurrentPolicySettings,
   DurationChoices,
@@ -608,7 +609,7 @@ export default function AdminTeams() {
                       <div>
                         <p className="text-gray-600">Usage</p>
                         <p className="mt-0.5 text-gray-300">
-                          ${(team.spend ?? 0).toFixed(2)}
+                          {metricValue(team.spend ?? 0, "spend")}
                         </p>
                       </div>
                       <div>
