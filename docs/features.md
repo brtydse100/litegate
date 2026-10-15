@@ -19,7 +19,17 @@ Signed-in users can:
 Deployments can opt into [API key storage](configuration.md#optional-api-key-storage).
 For saved keys, **Show API key** replaces regeneration in the portal; owners can
 reveal their own keys and administrators can reveal them from the key list.
-The default remains one-time secret display without key storage.
+The default remains one-time secret display without key storage. Rotation holds
+the owner lock from the spend snapshot through old-key revocation, preventing
+simultaneous rotations from leaving multiple replacement allowances.
+The personal key summary shows the actual stored secret in a prominent green
+panel above the information card, with 14px text and an accessible copy icon.
+The full-width **Show API key** / **Hide API key** button uses the same primary
+style as **Create API key** and spans the information card's width. Created and
+revealed secrets share the same green panel and position.
+It loads through the authorized reveal endpoint and stays in component memory.
+Hashes are never offered as usable API keys. Without stored
+secrets, newly created keys remain copyable until hidden or the page is left.
 
 New keys inherit the installation defaults for models, budget, reset interval,
 duration, TPM, RPM, and team. For SSO users, an administrator can map identity
@@ -55,6 +65,21 @@ to another team in a few clicks. The same operations are available to trusted
 automation through the [v1 API](../API.md#teams-admin-only). Normal users cannot
 see the tab or call the team endpoints.
 
+Hierarchy-managed teams carry a **Config managed** tag. This identifies their
+configuration ownership without claiming a Helm installation history.
+
+Teams and Organization show four decimal places for spend below one cent, so
+small real charges stay visible. Positive amounts below $0.0001 show **<$0.0001**.
+
+The team editor keeps a **Current team settings** summary visible while you
+edit. It prefills saved values and offers model checkboxes and common
+budget-reset durations. Saved models remain selectable even if they are missing
+from the current catalog. Custom durations remain supported.
+Numeric budget and rate-limit fields use styled minus/plus buttons alongside
+direct numeric input. Model selections stay readable in light and dark themes.
+Checkboxes follow the selected theme, with muted backgrounds, indigo checks,
+and visible keyboard focus. System high-contrast mode uses native checkboxes.
+
 A move deliberately changes the policy applied to that user's source-team keys.
 LiteGate first adds the destination membership, reassigns and verifies every
 source-team key, and only then removes the source membership. The administrator
@@ -84,6 +109,41 @@ The bulk editor lets an administrator:
 - reset selected keys' accumulated spend to zero after confirmation while
   preserving their budgets, limits, and LiteLLM spend logs; and
 - submit only changed fields so untouched settings remain unchanged.
+
+After selecting keys, **Current key settings** shows each selected key's saved
+budget, reset interval, models, rate limits, status and available expiry metadata
+on the current page. Selections on other pages are explicitly identified;
+their settings are not assumed to match. Inspecting a key does not submit its
+saved settings or overwrite unrelated values.
+**Choose settings to change** appears and opens when keys are selected, and is
+removed when the selection is cleared. It can be collapsed manually; changing
+the selection opens it again. Selection and editing headings are unnumbered.
+Selected rows use one border, with keyboard focus shown around the whole row. Model
+choices appear in a scrollable list with highlighted selections and a count.
+Key selection rows keep their reveal button inside the row beside spend, and
+revealed secrets expand within the same card.
+The row's **Show API key** button switches to **Hide API key** while the secret
+is visible, so the same control hides it again.
+The editable fields themselves are prefilled with the selected key's saved
+values. Key and team fields also use saved values as placeholders, so clearing
+an edit still shows the current setting. When all selected keys are visible, shared values are filled in and
+different values are marked **Mixed values**. When the selection includes keys
+on another page, fields show **Current values unavailable** rather than assuming
+that the visible keys represent the entire selection. Only edited, filled
+fields are submitted; changing the selected keys resets field edits.
+Models are selected using checkboxes, with saved models already checked. Model
+names remain array entries through submission, without comma-separated input.
+Select **All allowed models** explicitly to remove model restrictions; an empty
+selection alone cannot grant unrestricted access. Common reset/lifetime durations
+are available alongside custom duration input.
+
+Select **Use key budget as the individual allowance** to remove a duplicate
+personal user cap and the owner's team-member cap for the key's team. This
+requires one key per owner and a finite key budget; shared team budgets still
+apply. You can migrate an existing key with its saved budget, or enter a new
+key budget at the same time. LiteGate verifies the change and keeps failures
+selected for retry. This is an explicit administrator action, not a change
+performed during ordinary user login or key creation.
 
 The API accepts up to 5,000 keys in a request, updates them with bounded
 concurrency, and returns a result for each key so partial failures remain visible,

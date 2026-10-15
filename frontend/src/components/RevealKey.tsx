@@ -1,13 +1,17 @@
 import { useState } from "react";
-import { Check, Copy, Eye } from "lucide-react";
+import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { api } from "../api/client";
 
 export default function RevealKey({
   identifier,
   buttonClassName,
+  onReveal,
+  compact = false,
 }: {
   identifier: string;
   buttonClassName?: string;
+  onReveal?: (secret: string) => void;
+  compact?: boolean;
 }) {
   const [secret, setSecret] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -20,7 +24,8 @@ export default function RevealKey({
     setCopied(false);
     try {
       const result = await api.revealKey(identifier);
-      setSecret(result.key);
+      if (onReveal) onReveal(result.key);
+      else setSecret(result.key);
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
@@ -34,26 +39,47 @@ export default function RevealKey({
     setCopied(true);
   }
 
+  function toggle() {
+    if (secret) {
+      setSecret(null);
+      setCopied(false);
+      setError("");
+    } else {
+      void reveal();
+    }
+  }
+
   return (
-    <div className="space-y-3">
+    <div className={compact ? "contents" : "space-y-3"}>
       <button
         type="button"
-        onClick={() => void reveal()}
+        onClick={toggle}
+        aria-expanded={!!secret}
         disabled={pending}
         className={
           buttonClassName ??
           "inline-flex items-center gap-2 rounded-md border border-indigo-200 px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
         }
       >
-        <Eye size={18} /> {pending ? "Loading..." : "Show API key"}
+        {secret ? (
+          <EyeOff size={compact ? 14 : 18} />
+        ) : (
+          <Eye size={compact ? 14 : 18} />
+        )}{" "}
+        {pending ? "Loading..." : secret ? "Hide API key" : "Show API key"}
       </button>
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p
+          role="alert"
+          className={`${compact ? "col-span-2 pb-2 " : ""}text-sm text-red-600`}
+        >
           {error}
         </p>
       )}
       {secret && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+        <div
+          className={`${compact ? "col-span-2 mb-2 " : ""}rounded-lg border border-emerald-200 bg-emerald-50 p-4`}
+        >
           <p className="text-sm font-medium text-emerald-900">API key</p>
           <div className="mt-3 flex gap-2">
             <code className="min-w-0 flex-1 break-all text-sm text-emerald-800">
@@ -68,13 +94,6 @@ export default function RevealKey({
               {copied ? <Check size={15} /> : <Copy size={15} />}
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setSecret(null)}
-            className="mt-3 text-xs font-medium text-emerald-700"
-          >
-            Hide API key
-          </button>
         </div>
       )}
     </div>

@@ -8,7 +8,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Copy,
   ExternalLink,
   Gauge,
   KeyRound,
@@ -21,7 +20,8 @@ import {
   Zap,
 } from "lucide-react";
 import AdminKeys from "../components/AdminKeys";
-import RevealKey from "../components/RevealKey";
+import PersonalKeySecret from "../components/PersonalKeySecret";
+import { primaryKeyActionClassName } from "../components/keyActionStyles";
 import { keyToken } from "../components/BulkKeyEditor";
 import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
@@ -41,9 +41,6 @@ interface PortalConfig {
   local_users_enabled: boolean;
   save_api_keys_in_db: boolean;
 }
-
-const primaryKeyActionClassName =
-  "flex min-h-16 w-full items-center justify-center gap-3 rounded-lg bg-indigo-600 px-8 py-5 text-lg font-semibold text-white shadow-lg shadow-indigo-200/60 transition-colors hover:bg-indigo-700 disabled:opacity-50 [html.dark_&]:shadow-indigo-950/50";
 
 async function fetchPortalConfig(): Promise<PortalConfig> {
   const response = await fetch("/api/portal-config");
@@ -77,111 +74,100 @@ function Brand({ logoUrl }: { logoUrl?: string }) {
   );
 }
 
-function KeyCard({ keyInfo }: { keyInfo: KeyInfo }) {
-  const [copied, setCopied] = useState(false);
+function KeyCard({
+  keyInfo,
+  initialSecret,
+  canReveal,
+  onHide,
+}: {
+  keyInfo: KeyInfo;
+  initialSecret?: string | null;
+  canReveal: boolean;
+  onHide: () => void;
+}) {
   const managed = keyInfo.organization_managed || !!keyInfo.organization_path;
   const budgetAvailable = keyInfo.user_budget_available !== false;
-  const token = keyInfo.token ?? "";
-  const display = token
-    ? `${token.slice(0, 9)}${"•".repeat(8)}${token.slice(-4)}`
-    : "Hidden — regenerate to reveal";
-
-  async function copy() {
-    if (!token) return;
-    await navigator.clipboard.writeText(token);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  }
-
   return (
-    <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
-            <KeyRound size={17} />
+    <PersonalKeySecret
+      identifier={keyToken(keyInfo)}
+      canReveal={canReveal}
+      initialSecret={initialSecret}
+      onHide={onHide}
+    >
+      {(action) => (
+        <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 px-5 py-5">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="shrink-0 rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
+                <KeyRound size={17} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-slate-950">
+                  {keyInfo.key_alias || "API key"}
+                </p>
+                <p className="text-xs text-slate-500">Virtual key</p>
+              </div>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-slate-950">
-              {keyInfo.key_alias || "API key"}
-            </p>
-            <p className="text-xs text-slate-500">Virtual key</p>
-          </div>
-        </div>
-        <div className="flex min-w-0 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-          <code className="min-w-0 flex-1 truncate font-mono text-xs text-slate-700">
-            {display}
-          </code>
-          {token && (
-            <button
-              onClick={copy}
-              title="Copy key identifier"
-              className="text-slate-400 hover:text-slate-900"
+          {action && <div className="py-4">{action}</div>}
+          <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+            <div className="px-5 py-4">
+              <dt className="text-xs text-slate-500">
+                {managed ? "Key spend" : "Spend"}
+              </dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {managed && !budgetAvailable
+                  ? "Unavailable"
+                  : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(4)}`}
+              </dd>
+            </div>
+            <div className="px-5 py-4">
+              <dt className="text-xs text-slate-500">
+                {managed ? "Key budget" : "Budget"}
+              </dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {managed && !budgetAvailable
+                  ? "Unavailable"
+                  : (managed ? keyInfo.user_budget : keyInfo.max_budget) != null
+                    ? `$${managed ? keyInfo.user_budget : keyInfo.max_budget}`
+                    : "Unlimited"}
+              </dd>
+            </div>
+            <div className="px-5 py-4">
+              <dt className="text-xs text-slate-500">Models</dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {keyInfo.models?.length ? keyInfo.models.length : "All"}
+              </dd>
+            </div>
+            <div className="px-5 py-4">
+              <dt className="text-xs text-slate-500">Expires</dt>
+              <dd className="mt-1 font-semibold text-slate-950">
+                {keyInfo.expires
+                  ? new Date(keyInfo.expires).toLocaleDateString()
+                  : "Never"}
+              </dd>
+            </div>
+          </dl>
+          {keyInfo.policy_error && (
+            <p
+              role="alert"
+              className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
             >
-              {copied ? (
-                <Check size={15} className="text-emerald-600" />
-              ) : (
-                <Copy size={15} />
-              )}
-            </button>
+              {keyInfo.policy_error}
+            </p>
           )}
-        </div>
-      </div>
-      <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
-        <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">
-            {managed ? "Key spend" : "Spend"}
-          </dt>
-          <dd className="mt-1 font-semibold text-slate-950">
-            {managed && !budgetAvailable
-              ? "Unavailable"
-              : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(4)}`}
-          </dd>
-        </div>
-        <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">
-            {managed ? "Key budget" : "Budget"}
-          </dt>
-          <dd className="mt-1 font-semibold text-slate-950">
-            {managed && !budgetAvailable
-              ? "Unavailable"
-              : (managed ? keyInfo.user_budget : keyInfo.max_budget) != null
-                ? `$${managed ? keyInfo.user_budget : keyInfo.max_budget}`
-                : "Unlimited"}
-          </dd>
-        </div>
-        <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">Models</dt>
-          <dd className="mt-1 font-semibold text-slate-950">
-            {keyInfo.models?.length ? keyInfo.models.length : "All"}
-          </dd>
-        </div>
-        <div className="px-5 py-4">
-          <dt className="text-xs text-slate-500">Expires</dt>
-          <dd className="mt-1 font-semibold text-slate-950">
-            {keyInfo.expires
-              ? new Date(keyInfo.expires).toLocaleDateString()
-              : "Never"}
-          </dd>
-        </div>
-      </dl>
-      {keyInfo.policy_error && (
-        <p
-          role="alert"
-          className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
-        >
-          {keyInfo.policy_error}
-        </p>
+          {keyInfo.team_id && (
+            <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
+              <Building2 size={13} />
+              Assigned through{" "}
+              <span className="font-medium text-slate-800">
+                {keyInfo.organization_path?.join(" → ") ?? keyInfo.team_id}
+              </span>
+            </div>
+          )}
+        </article>
       )}
-      {keyInfo.team_id && (
-        <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
-          <Building2 size={13} />
-          Assigned through{" "}
-          <span className="font-medium text-slate-800">
-            {keyInfo.organization_path?.join(" → ") ?? keyInfo.team_id}
-          </span>
-        </div>
-      )}
-    </article>
+    </PersonalKeySecret>
   );
 }
 
@@ -300,9 +286,14 @@ export default function Home() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const [newKey, setNewKey] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [previousKeyIds, setPreviousKeyIds] = useState<string[]>([]);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [demoRolePending, setDemoRolePending] = useState(false);
+
+  function showKey(secret: string) {
+    setPreviousKeyIds(keyList.map(keyToken));
+    setNewKey(secret);
+  }
 
   const portal = useQuery({
     queryKey: ["portal-config"],
@@ -314,11 +305,17 @@ export default function Home() {
     useOperationLimit();
   const keyList = keys.data?.keys ?? [];
   const hasKey = keyList.length > 0;
+  const newKeyIdentifier =
+    newKey &&
+    keyList.length === 1 &&
+    !previousKeyIds.includes(keyToken(keyList[0]))
+      ? keyToken(keyList[0])
+      : null;
 
   const create = useMutation({
     mutationFn: api.createKey,
     onSuccess: (result) => {
-      setNewKey(result.key);
+      showKey(result.key);
       void queryClient.invalidateQueries({ queryKey: ["keys"] });
     },
     onSettled: refreshOperationLimit,
@@ -326,20 +323,13 @@ export default function Home() {
   const regenerate = useMutation({
     mutationFn: api.regenerateKey,
     onSuccess: (result) => {
-      setNewKey(result.key);
+      showKey(result.key);
       setConfirmRegenerate(false);
       void queryClient.invalidateQueries({ queryKey: ["keys"] });
     },
     onSettled: refreshOperationLimit,
   });
   const mutationError = create.error ?? regenerate.error ?? keys.error;
-
-  async function copyNewKey() {
-    if (!newKey) return;
-    await navigator.clipboard.writeText(newKey);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  }
 
   async function switchDemoRole(role: "admin" | "user") {
     if (import.meta.env.VITE_DEMO_MODE !== "true" || user?.role === role)
@@ -594,30 +584,17 @@ export default function Home() {
                     seconds.
                   </p>
                 )}
-                {newKey && (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
-                    <p className="text-sm font-medium text-emerald-900">
-                      {config?.save_api_keys_in_db
-                        ? "Your API key is ready. You can show it again later."
-                        : "Copy this key now — it will not be shown in full again."}
+                {newKey && !newKeyIdentifier && (
+                  <div>
+                    <p className="mb-3 text-sm text-emerald-900">
+                      Your API key is ready. Copy it before leaving this page.
                     </p>
-                    <div className="mt-3 flex max-w-2xl gap-2">
-                      <code className="min-w-0 flex-1 truncate rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-800">
-                        {newKey}
-                      </code>
-                      <button
-                        onClick={copyNewKey}
-                        className="rounded-md border border-emerald-200 bg-white px-3 text-emerald-700 hover:bg-emerald-100"
-                      >
-                        {copied ? <Check size={15} /> : <Copy size={15} />}
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => setNewKey(null)}
-                      className="mt-3 text-xs font-medium text-emerald-700 hover:text-emerald-900"
-                    >
-                      Dismiss
-                    </button>
+                    <PersonalKeySecret
+                      identifier=""
+                      canReveal={false}
+                      initialSecret={newKey}
+                      onHide={() => setNewKey(null)}
+                    />
                   </div>
                 )}
                 {confirmRegenerate && (
@@ -653,7 +630,18 @@ export default function Home() {
                   <div className="h-44 animate-pulse rounded-lg border border-slate-200 bg-white" />
                 ) : (
                   keyList.map((keyInfo, index) => (
-                    <KeyCard key={keyInfo.token ?? index} keyInfo={keyInfo} />
+                    <KeyCard
+                      key={keyInfo.token ?? index}
+                      keyInfo={keyInfo}
+                      initialSecret={
+                        keyToken(keyInfo) === newKeyIdentifier ? newKey : null
+                      }
+                      canReveal={
+                        !!config?.save_api_keys_in_db &&
+                        !!keyInfo.secret_available
+                      }
+                      onHide={() => setNewKey(null)}
+                    />
                   ))
                 )}
                 {!keys.isLoading && !confirmRegenerate && (
@@ -678,17 +666,7 @@ export default function Home() {
                             : "Create API key"}
                       </button>
                     ) : config?.save_api_keys_in_db &&
-                      keyList.some((key) => key.secret_available) ? (
-                      keyList
-                        .filter((key) => key.secret_available)
-                        .map((key) => (
-                          <RevealKey
-                            key={keyToken(key)}
-                            identifier={keyToken(key)}
-                            buttonClassName={primaryKeyActionClassName}
-                          />
-                        ))
-                    ) : (
+                      keyList.some((key) => key.secret_available) ? null : (
                       <button
                         onClick={() => setConfirmRegenerate(true)}
                         disabled={operationsBlocked}

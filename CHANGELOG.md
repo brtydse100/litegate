@@ -7,6 +7,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-15
+
+### Added
+
+- Configurable organization hierarchy with up to eight levels, real lowest-team
+  key ownership, inherited per-key allowances, ancestor usage tracking, and
+  administrative reports. Helm and Compose support the same policy structure.
+- Explicit administrator migration from duplicate personal/member budgets to a
+  verified sole-key allowance, plus an administrator model-name catalog.
+- Isolated LiteLLM/OpenRouter testing helpers with real requests and artificial
+  local accounting prices for exercising budgets.
+
+### Changed
+
+- Key and team editors show current values, use model checkboxes and themed
+  numeric controls, and reveal editing settings only after key selection.
+- Personal keys use a shared compact green display, an accessible copy icon and
+  a full-width Show/Hide control. Config-managed teams have a visible tag.
+
+### Fixed
+
+- Key rotation and budget migration share the owner lock, preserve recorded
+  spend and finite individual allowances, and revoke unverifiable replacements.
+- Valid roster-only LiteLLM members can migrate without a separate budget row;
+  ownership and hierarchy governance are rechecked before removing user caps.
+- Sub-cent spend remains visible in Teams, Organization and key policies.
+
 ## [2.12.2] - 2026-10-05
 
 ### Added
@@ -324,7 +351,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.12.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/brtydse100/litegate/compare/v2.12.2...v2.13.0
 [2.12.0]: https://github.com/brtydse100/litegate/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/brtydse100/litegate/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/brtydse100/litegate/compare/v2.9.0...v2.10.0

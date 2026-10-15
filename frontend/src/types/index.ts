@@ -16,6 +16,11 @@ export interface LocalUser {
   updated_at: string;
 }
 
+export interface ModelSelection {
+  models: string[];
+  all: boolean;
+}
+
 export interface KeySettingsUpdate {
   key_alias?: string;
   models?: string[];
@@ -46,6 +51,7 @@ export interface KeyInfo {
   policy_error?: string | null;
   user_spend?: number | null;
   organization_path?: string[];
+  blocked?: boolean;
   secret_available?: boolean;
   token?: string;
   key_alias?: string;

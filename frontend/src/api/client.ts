@@ -123,10 +123,15 @@ export const api = {
   bulkUpdateKeys: (
     keys: string[],
     settings: import("../types").KeySettingsUpdate,
+    useKeyBudgetOnly = false,
   ) =>
     request<import("../types").BulkKeyUpdateResponse>("/v1/keys/bulk", {
       method: "PATCH",
-      body: JSON.stringify({ keys, settings }),
+      body: JSON.stringify({
+        keys,
+        ...(Object.keys(settings).length ? { settings } : {}),
+        ...(useKeyBudgetOnly ? { use_key_budget_only: true } : {}),
+      }),
     }),
 
   resetKeySpend: (keys: string[]) =>
@@ -137,6 +142,8 @@ export const api = {
         body: JSON.stringify({ keys }),
       },
     ),
+
+  listModels: () => request<{ models: string[] }>("/v1/models"),
 
   listUsers: () => request<import("../types").LocalUser[]>("/v1/users"),
 
