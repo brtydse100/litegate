@@ -1,12 +1,13 @@
 """Explicit administrator migration from user caps to individual key caps."""
 
+import asyncio
 import math
 
 import httpx
 from fastapi import HTTPException
 
 from app.config import settings
-from app.services import litellm
+from app.services import litellm, organization_client, organization_store, organization_sync
 from app.services.litellm_client import client, headers, transport_error
 
 
@@ -30,21 +31,10 @@ async def _remove_individual_caps(user_id: str, team_id: str | None) -> None:
         await _request("POST", "/team/member_update", json={"team_id": team_id, "user_id": user_id, "max_budget_in_team": None})
         team = await _request("GET", "/team/info", params={"team_id": team_id})
         memberships = team.get("team_memberships")
-        if not isinstance(memberships, list):
+        if not isinstance(memberships, list) or any(not isinstance(member, dict) for member in memberships):
             raise HTTPException(status_code=502, detail="Cannot verify the team-member budget on this LiteLLM version")
-        matched = False
-        for member in memberships:
-            if isinstance(member, dict) and member.get("user_id") == user_id:
-                matched = True
-                budget = member.get("litellm_budget_table")
-                if budget is not None and not isinstance(budget, dict):
-                    raise HTTPException(status_code=502, detail="Cannot verify the team-member budget record")
-                if (isinstance(budget, dict) and budget.get("max_budget") is not None) or (budget is None and member.get("budget_id")):
-                    raise HTTPException(status_code=502, detail="LiteLLM kept the team-member budget")
-                if "litellm_budget_table" not in member or (isinstance(budget, dict) and "max_budget" not in budget):
-                    raise HTTPException(status_code=502, detail="Cannot verify the team-member budget fields")
-        if not matched:
-            raise HTTPException(status_code=502, detail="LiteLLM did not confirm the target team membership")
+        if organization_client.member_budget(team, user_id)["per_user"] is not None:
+            raise HTTPException(status_code=502, detail="LiteLLM kept the team-member budget")
     await _request("POST", "/user/update", json={"user_id": user_id, "max_budget": None})
     user = await litellm.get_user(user_id)
     info = user.get("user_info", user) if isinstance(user, dict) else None
@@ -58,6 +48,15 @@ async def update_key(key: str, changes: dict, *, use_key_budget_only: bool = Fal
     info = await litellm.get_key_info(key)
     if not info or not info.get("user_id"):
         raise HTTPException(status_code=422, detail="The key must have an owner before removing user budgets")
+    async with organization_sync.lock_for("user", info["user_id"]):
+        current = await litellm.get_key_info(key)
+        if not current or current.get("user_id") != info["user_id"]:
+            raise HTTPException(status_code=409, detail="Key ownership changed; retry the migration")
+        await organization_sync.guard_key(key, changes, use_key_budget_only=True)
+        return await _migrate_key(key, changes, current)
+
+
+async def _migrate_key(key: str, changes: dict, info: dict) -> dict:
     budget = changes.get("max_budget", info.get("max_budget"))
     if not isinstance(budget, (int, float)) or not math.isfinite(budget) or budget < 0:
         raise HTTPException(status_code=422, detail="Set a finite key budget before removing separate user budgets")
@@ -79,3 +78,24 @@ async def update_key(key: str, changes: dict, *, use_key_budget_only: bool = Fal
             status_code=exc.status_code, detail=f"Key settings saved; user-budget migration is incomplete. Retry this key. {exc.detail}"
         )
     return result
+
+
+async def preserve_rotation_budget(user_id: str, existing: list[dict], replacement: str) -> None:
+    """Keep a known individual key cap until its replacement is verified."""
+    if len(existing) != 1:
+        return
+    source = existing[0]
+    budget = source.get("max_budget")
+    if not isinstance(budget, (int, float)) or not math.isfinite(budget) or budget < 0:
+        return
+    identity = await asyncio.to_thread(organization_store.get, user_id)
+    if organization_sync.resolve(user_id, identity["groups"] if identity else []) is not None:
+        return
+    info = await litellm.get_key_info(replacement)
+    if not info or info.get("user_id") != user_id:
+        raise HTTPException(status_code=502, detail="Could not verify the replacement key")
+    changes = {"max_budget": budget, "budget_duration": source.get("budget_duration")}
+    await litellm.update_key(replacement, changes)
+    verified = await litellm.get_key_info(replacement)
+    if not verified or verified.get("user_id") != user_id or any(verified.get(field) != value for field, value in changes.items()):
+        raise HTTPException(status_code=502, detail="LiteLLM did not preserve the replacement key budget")

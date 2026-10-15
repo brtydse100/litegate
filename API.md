@@ -202,6 +202,13 @@ that a successful HTTP response cleared a budget. Unsupported LiteLLM versions
 or incomplete verification produce a per-key failure. Key settings and some
 individual caps may already have changed; retry failed keys after resolving the
 reported error. The audit event records whether the migration was requested.
+Migration shares the owner's lifecycle lock with key regeneration and deletion,
+and rechecks ownership and managed-policy restrictions after acquiring it.
+Uncapped roster-only members are accepted only when LiteLLM confirms their
+membership without an unresolved budget record or inherited member cap.
+Regeneration preserves a known finite individual key budget and reset interval
+for unmanaged keys, along with recorded spend. An unverifiable replacement is
+revoked before the old key is deleted. Managed keys retain their hierarchy policy.
 
 `GET /api/v1/models` returns `{"models":["model-name"]}` to administrators only.
 It reads LiteLLM's `/model/info` catalog and exposes unique, sorted model names,

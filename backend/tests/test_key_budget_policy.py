@@ -33,11 +33,23 @@ async def upstream(monkeypatch):
         payload = json.loads(request.content) if request.content else {}
         state["calls"].append((request.method, path, payload))
         if path == "/key/info":
+            if request.url.params.get("key") == "sk-replacement":
+                return httpx.Response(200, json={"info": state["generated"]})
             return httpx.Response(200, json={"info": {"user_id": state["owner"], "team_id": state["team_id"], "max_budget": state["key_budget"]}})
         if path == "/key/update":
+            if payload["key"] == "sk-replacement":
+                if not state.get("ignore_replacement_budget"):
+                    state["generated"].update(payload)
+                return httpx.Response(200, json=payload)
             if not state["ignore_key_update"]:
                 state["key_budget"] = payload.get("max_budget", state["key_budget"])
             return httpx.Response(200, json=payload)
+        if path == "/key/generate":
+            state["generated"] = {"token": "sk-replacement", **payload}
+            return httpx.Response(200, json={"key": "sk-replacement"})
+        if path == "/key/delete":
+            state.setdefault("deleted", []).extend(payload["keys"])
+            return httpx.Response(200, json={})
         if path == "/user/update":
             if not state["ignore_user_clear"]:
                 state["user_budget"] = payload["max_budget"]
@@ -47,7 +59,7 @@ async def upstream(monkeypatch):
                 200,
                 json={
                     "user_info": {"max_budget": state["user_budget"]},
-                    "keys": state.get("owner_keys", [{"token": "key-1", "max_budget": state["key_budget"]}]),
+                    "keys": state.get("owner_keys", [{"token": "key-1", "max_budget": state["key_budget"], "budget_duration": "30d", "spend": 20}]),
                 },
             )
         if path == "/team/member_update":
@@ -60,7 +72,7 @@ async def upstream(monkeypatch):
             return httpx.Response(
                 200,
                 json={
-                    "team_info": {"max_budget": 2000},
+                    "team_info": {"max_budget": 2000, **state.get("team_info", {})},
                     "team_memberships": state.get(
                         "memberships", [{"user_id": "alice", "litellm_budget_table": {"max_budget": state["member_budget"]}}]
                     ),
