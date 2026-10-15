@@ -47,6 +47,13 @@ ingress:
           pathType: Prefix
   tls: []
 
+# Optional organization structure. See docs/organization.md for a complete example.
+# Every group has a real team; keys use the deepest match. perUser is a per-key
+# allowance; groupTotal is a tracking target and does not cap descendant keys.
+# Groups and budgets are managed through these values; labels are chosen by you.
+organizationHierarchy:
+  levels: []
+
 config:
   # -- Required credentials ---------------------------------------------------
   litellmMasterKey: "sk-your-litellm-master-key"

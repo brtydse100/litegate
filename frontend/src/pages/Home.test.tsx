@@ -58,7 +58,13 @@ describe("model access snapshot", () => {
 });
 
 describe("personal key storage", () => {
-  function renderHome(enabled: boolean, available: boolean) {
+  function renderHome(
+    enabled: boolean,
+    available: boolean,
+    policy: Partial<KeyInfo> = {},
+    listError?: Error,
+    cachedEmpty = false,
+  ) {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -66,16 +72,18 @@ describe("personal key storage", () => {
         json: async () => ({ save_api_keys_in_db: enabled }),
       }),
     );
-    vi.spyOn(api, "listKeys").mockResolvedValue({
+    const list = vi.spyOn(api, "listKeys").mockResolvedValue({
       keys: [
         {
           token: "hashed-key",
           spend: 3,
           models: [],
           secret_available: available,
+          ...policy,
         },
       ],
     });
+    if (listError) list.mockRejectedValue(listError);
     vi.spyOn(api, "getOperationLimit").mockResolvedValue({
       limit: 5,
       remaining: 0,
@@ -84,6 +92,7 @@ describe("personal key storage", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
+    if (cachedEmpty) client.setQueryData(["keys"], { keys: [] });
     render(
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={["/my-key"]}>
@@ -121,6 +130,59 @@ describe("personal key storage", () => {
       expect(
         screen.queryByRole("button", { name: "Show API key" }),
       ).not.toBeInTheDocument();
+    },
+  );
+
+  it("shows the enforced user allowance with a synchronization warning", async () => {
+    renderHome(false, false, {
+      organization_managed: true,
+      user_budget_available: true,
+      user_budget: 200,
+      user_spend: 60,
+      policy_error: "Budget update failed",
+    });
+    expect(await screen.findByText("$200")).toBeVisible();
+    expect(screen.getByText("$60.0000")).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("Budget update failed");
+  });
+
+  it("keeps a governed key visible when its budget lookup is unavailable", async () => {
+    renderHome(false, false, {
+      organization_managed: true,
+      user_budget_available: false,
+      user_budget: null,
+      user_spend: null,
+      policy_error: "Budget service unavailable",
+    });
+    expect(
+      await screen.findByRole("button", { name: "Regeneration paused" }),
+    ).toBeVisible();
+    expect(screen.getAllByText("Unavailable")).toHaveLength(2);
+    expect(screen.queryByText("Unlimited")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Budget service unavailable",
+    );
+  });
+
+  it.each([false, true])(
+    "does not offer key creation when listing keys fails (cached empty: %s)",
+    async (cachedEmpty) => {
+      renderHome(
+        false,
+        false,
+        {},
+        new Error("Key service unavailable"),
+        cachedEmpty,
+      );
+      expect(await screen.findByText("Key service unavailable")).toBeVisible();
+      expect(
+        screen.queryByRole("button", {
+          name: /Create API key|Key actions paused/,
+        }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/Retry before creating or replacing a key/),
+      ).toBeVisible();
     },
   );
 });

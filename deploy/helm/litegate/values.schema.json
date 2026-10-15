@@ -1,0 +1,176 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "$defs": {
+    "OrganizationBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "duration": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "groupTotal": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Grouptotal"
+        },
+        "perUser": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Peruser"
+        }
+      },
+      "title": "OrganizationBudget",
+      "type": "object"
+    },
+    "OrganizationBundle": {
+      "additionalProperties": false,
+      "properties": {
+        "parent": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent"
+        },
+        "members": {
+          "items": {
+            "$ref": "#/$defs/OrganizationMember"
+          },
+          "maxItems": 500,
+          "minItems": 1,
+          "title": "Members",
+          "type": "array"
+        }
+      },
+      "required": [
+        "members"
+      ],
+      "title": "OrganizationBundle",
+      "type": "object"
+    },
+    "OrganizationLevel": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "groups": {
+          "items": {
+            "$ref": "#/$defs/OrganizationBundle"
+          },
+          "maxItems": 500,
+          "minItems": 1,
+          "title": "Groups",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "groups"
+      ],
+      "title": "OrganizationLevel",
+      "type": "object"
+    },
+    "OrganizationMember": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "litellmTeamId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Litellmteamid"
+        },
+        "ssoGroups": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "Ssogroups",
+          "type": "array"
+        },
+        "userIds": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "Userids",
+          "type": "array"
+        },
+        "budget": {
+          "$ref": "#/$defs/OrganizationBudget"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "OrganizationMember",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "organizationHierarchy": {
+      "additionalProperties": false,
+      "properties": {
+        "levels": {
+          "items": {
+            "$ref": "#/$defs/OrganizationLevel"
+          },
+          "maxItems": 8,
+          "title": "Levels",
+          "type": "array"
+        }
+      },
+      "title": "OrganizationHierarchy",
+      "type": "object"
+    }
+  }
+}
