@@ -19,7 +19,9 @@ Signed-in users can:
 Deployments can opt into [API key storage](configuration.md#optional-api-key-storage).
 For saved keys, **Show API key** replaces regeneration in the portal; owners can
 reveal their own keys and administrators can reveal them from the key list.
-The default remains one-time secret display without key storage.
+The default remains one-time secret display without key storage. Rotation holds
+the owner lock from the spend snapshot through old-key revocation, preventing
+simultaneous rotations from leaving multiple replacement allowances.
 
 New keys inherit the installation defaults for models, budget, reset interval,
 duration, TPM, RPM, and team. For SSO users, an administrator can map identity
