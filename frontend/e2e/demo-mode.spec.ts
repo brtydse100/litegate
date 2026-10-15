@@ -74,7 +74,7 @@ test("interactive demo keeps its key views consistent and supports local sign-in
   await page.getByRole("button", { name: "Regenerate key" }).click();
   await page.getByRole("button", { name: "Replace key" }).click();
   await expect(page.getByText("sk-litegate-demo-rotated-4d8e")).toBeVisible();
-  await page.getByRole("button", { name: "Dismiss" }).click();
+  await page.getByRole("button", { name: "Hide API key" }).click();
 
   await page.getByRole("link", { name: "Key policies" }).click();
   await expect(
