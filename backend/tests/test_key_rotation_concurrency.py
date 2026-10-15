@@ -42,6 +42,7 @@ async def test_concurrent_http_rotations_leave_one_replacement_and_preserve_spen
     monkeypatch.setattr(litellm, "list_user_keys", list_keys)
     monkeypatch.setattr(litellm, "delete_key", delete)
     monkeypatch.setattr(sync, "prepare_user", AsyncMock(return_value=node))
+    monkeypatch.setattr(sync, "resolve", lambda *_: node)
     monkeypatch.setattr(upstream, "generate_key", generate)
     monkeypatch.setattr(policy, "normalize_individual_caps", AsyncMock())
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
