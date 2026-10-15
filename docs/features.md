@@ -22,6 +22,14 @@ reveal their own keys and administrators can reveal them from the key list.
 The default remains one-time secret display without key storage. Rotation holds
 the owner lock from the spend snapshot through old-key revocation, preventing
 simultaneous rotations from leaving multiple replacement allowances.
+The personal key summary shows the actual stored secret in a prominent green
+panel above the information card, with 14px text and an accessible copy icon.
+The full-width **Show API key** / **Hide API key** button uses the same primary
+style as **Create API key** and spans the information card's width. Created and
+revealed secrets share the same green panel and position.
+It loads through the authorized reveal endpoint and stays in component memory.
+Hashes are never offered as usable API keys. Without stored
+secrets, newly created keys remain copyable until hidden or the page is left.
 
 New keys inherit the installation defaults for models, budget, reset interval,
 duration, TPM, RPM, and team. For SSO users, an administrator can map identity
