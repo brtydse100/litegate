@@ -182,6 +182,16 @@ inspect effective allowances and current-cycle spend, and compare daily spend,
 tokens, logged requests, groups, and models. Ordinary users and LiteLLM-key
 identities cannot access administrative organization reports.
 
+Groups without child groups show **Usage by member**, with each person's email
+or user ID and spending for the selected dates. The metric selector also shows
+individual tokens and logged requests. These totals include all selected members,
+including those with zero usage, and reconcile with the report total. Higher
+levels retain the child-group breakdown. The user table separately displays
+**Budget-period spend / per-key allowance**, which is independent of the chart's
+date filter and can differ after budget resets.
+If an older report omits the member breakdown, the chart retains group totals
+with an explicit unavailable message rather than treating members as zero usage.
+
 Parent groups start collapsed. Use the arrow beside a parent to show or hide its
 children, and select a group name to filter the dashboard. Collapsing a parent
 keeps the current filter; selecting a group through a chart expands its ancestors
@@ -213,4 +223,7 @@ historical membership or replace LiteLLM's budget ledger.
 Verified user IDs, emails, group values, and synchronization status use the
 existing SQLite database. Identity-provider tokens are not stored. Keep the
 existing single-replica deployment and persistent volume. The public demo uses
-synthetic organizations and usage, without a backend or credentials.
+synthetic organizations and usage, without a backend or credentials. Its shared
+30-day UTC dataset reconciles member, group, daily and model reporting totals
+with the displayed demo budget-period spend. Shorter date ranges use that same
+dataset; dates before the demo period have zero usage.

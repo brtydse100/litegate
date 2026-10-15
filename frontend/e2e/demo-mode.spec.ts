@@ -44,6 +44,13 @@ test("organization demo filters usage and protects the admin view", async ({
   await navigation.getByRole("button", { name: /^Cloud,/ }).click();
   await expect(page.getByText("Inherited from Engineering")).toBeVisible();
   await expect(policy.getByText("$50.00", { exact: false })).toBeVisible();
+  await page.getByLabel("Chart metric").selectOption("spend");
+  const memberChart = page
+    .getByRole("heading", { name: "Usage by member" })
+    .locator("..");
+  await expect(memberChart.getByText("priya@example.com")).toBeVisible();
+  await expect(memberChart.getByText("$29.93", { exact: true })).toBeVisible();
+  await expect(memberChart.getByText("Direct members")).toHaveCount(0);
   await page.getByRole("button", { name: "View demo as user" }).click();
   await expect(page).toHaveURL(/\/my-key$/);
   await expect(

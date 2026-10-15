@@ -68,6 +68,9 @@ export default function AdminOrganization() {
     (group) => group.id === selected?.budget_source,
   );
   const nextLevel = overview.data?.levels[(selected?.level ?? -1) + 1];
+  const showMembers =
+    !!selected && !groups.some((group) => group.parent_id === selected.id);
+  const hasMemberUsage = Array.isArray(usage.data?.by_user);
 
   function selectGroup(id: string) {
     setNodeId(id);
@@ -305,7 +308,8 @@ export default function AdminOrganization() {
           <p className="text-xs text-slate-500">
             Reports use current group membership and UTC daily aggregates.
             Logged requests count upstream attempts. Reporting totals are
-            independent of budget resets.
+            independent of budget resets. Member charts use the selected dates;
+            the table shows budget-period spending.
           </p>
           {usage.error && (
             <p
@@ -336,14 +340,28 @@ export default function AdminOrganization() {
                 ))}
               </div>
               <SpendTrend daily={usage.data.daily} metric={metric} />
+              {showMembers && !hasMemberUsage && (
+                <p className="text-sm text-slate-500">
+                  Per-member usage is unavailable in this report. Showing group
+                  totals.
+                </p>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <UsageBars
                   title={
-                    nextLevel ? `Usage by ${nextLevel}` : "Usage in this group"
+                    showMembers && hasMemberUsage
+                      ? "Usage by member"
+                      : !showMembers && nextLevel
+                        ? `Usage by ${nextLevel}`
+                        : "Usage in this group"
                   }
-                  values={usage.data.by_group}
+                  values={
+                    showMembers && hasMemberUsage
+                      ? usage.data.by_user
+                      : usage.data.by_group
+                  }
                   metric={metric}
-                  onSelect={nextLevel ? selectChild : undefined}
+                  onSelect={!showMembers && nextLevel ? selectChild : undefined}
                 />
                 <UsageBars
                   title="Usage by model"
@@ -376,7 +394,7 @@ export default function AdminOrganization() {
                       <th className="px-4 py-3">User</th>
                       <th className="px-4 py-3">Organization</th>
                       <th className="px-4 py-3">
-                        Total key spend / per-key allowance
+                        Budget-period spend / per-key allowance
                       </th>
                     </tr>
                   </thead>

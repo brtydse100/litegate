@@ -10,6 +10,9 @@
 - `GET /api/v1/organization/usage?node=<id>&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`:
   daily/group/model spend, tokens, and logged requests. Defaults to 30 days through
   today. Supports up to 90 days between UTC dates and 500 users per report.
+  The additive `by_user` array contains each selected member's `id` (user ID),
+  `name` (email, or user ID when unavailable), `spend`, `tokens`, and `requests`
+  for the same date range. Inactive members remain included with zero metrics.
 
 Omit `node` for all mapped users. These read-only routes require an administrator
 portal session or management credential; ordinary users and LiteLLM-key identities

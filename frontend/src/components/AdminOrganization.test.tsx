@@ -97,7 +97,11 @@ describe("organization dashboard contracts", () => {
     await waitFor(() =>
       expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1),
     );
-    expect(await screen.findByText("alex@example.com")).toBeVisible();
+    expect(
+      await within(
+        screen.getByRole("heading", { name: /^Users/ }).closest("section")!,
+      ).findByText("alex@example.com"),
+    ).toBeVisible();
     await waitFor(() =>
       expect(screen.queryByText("sam@example.com")).not.toBeInTheDocument(),
     );
@@ -232,6 +236,71 @@ describe("organization dashboard contracts", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("shows each leaf member's selected-period metrics without a Direct members bucket", async () => {
+    renderOrganization();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Engineering" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Infrastructure" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Cloud" }),
+    );
+    const chart = (
+      await screen.findByRole("heading", { name: "Usage by member" })
+    ).closest("section")!;
+    expect(await within(chart).findByText("priya@example.com")).toBeVisible();
+    expect(within(chart).getByText("$29.93")).toBeVisible();
+    expect(within(chart).queryByText("Direct members")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Chart metric"), {
+      target: { value: "requests" },
+    });
+    const calls = vi.mocked(api.organizationUsage).mock.calls;
+    const [node, start, end] = calls[calls.length - 1];
+    const report = organizationUsage(node, start, end);
+    expect(
+      within(chart).getByText(
+        metricValue(report.by_user[0].requests, "requests"),
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText("Budget-period spend / per-key allowance"),
+    ).toBeVisible();
+  });
+
+  it("keeps group totals visible when an older report has no member breakdown", async () => {
+    vi.mocked(api.organizationUsage).mockImplementation(
+      async (node, start, end) => {
+        const report = organizationUsage(node, start, end);
+        Reflect.deleteProperty(report, "by_user");
+        return report;
+      },
+    );
+    renderOrganization();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Engineering" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Infrastructure" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Select Cloud" }),
+    );
+    expect(
+      await screen.findByText(
+        "Per-member usage is unavailable in this report. Showing group totals.",
+      ),
+    ).toBeVisible();
+    const chart = screen
+      .getByRole("heading", { name: "Usage in this group" })
+      .closest("section")!;
+    expect(within(chart).getByText("$29.93")).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Usage by member" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("does not query usage or users when the hierarchy is disabled", async () => {
     vi.mocked(api.organization).mockResolvedValue({
       enabled: false,
@@ -262,7 +331,11 @@ describe("organization dashboard contracts", () => {
     await waitFor(() =>
       expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1),
     );
-    expect(await screen.findByText("alex@example.com")).toBeVisible();
+    expect(
+      await within(
+        screen.getByRole("heading", { name: /^Users/ }).closest("section")!,
+      ).findByText("alex@example.com"),
+    ).toBeVisible();
     const overview = organizationOverview();
     vi.mocked(api.organization).mockResolvedValue({
       ...overview,

@@ -89,6 +89,8 @@ async def test_usage_aggregates_users_by_current_path_and_includes_zero_days(mon
     assert result["daily"][0]["spend"] == 0
     assert {value["name"]: value["spend"] for value in result["by_group"]} == {"squad1": 10, "squad2": 5}
     assert result["by_model"][0]["spend"] == 15
+    assert {value["id"]: value["spend"] for value in result["by_user"]} == {"alice": 10, "bob": 5}
+    assert sum(value["tokens"] for value in result["by_user"]) == result["totals"]["tokens"]
     assert result["attribution"] == "current_membership"
     await reports.usage(node.id, day - timedelta(days=1), day)
     assert fetch.await_count == 2
@@ -104,6 +106,19 @@ async def test_leaf_selection_queries_only_members_in_that_group(monkeypatch, se
     assert result["users"] == 1
     fetch.assert_awaited_once_with("alice", day.isoformat(), day.isoformat())
     assert result["by_group"] == [{"id": None, "name": "Direct members", "spend": 10, "tokens": 100, "requests": 2}]
+    assert result["by_user"] == [{"id": "alice", "name": "alice@example.com", "spend": 10, "tokens": 100, "requests": 2}]
+
+
+@pytest.mark.asyncio
+async def test_member_breakdown_includes_inactive_members_and_falls_back_to_user_id(monkeypatch, setup):
+    store.remember("charlie", "", "sso", ["squad1"])
+    day = datetime.now(timezone.utc).date()
+    monkeypatch.setattr(upstream, "daily_usage", AsyncMock(return_value=[]))
+    result = await reports.usage(setup.resolve("alice", ["squad1"]).id, day, day)
+    assert result["by_user"] == [
+        {"id": "alice", "name": "alice@example.com", "spend": 0, "tokens": 0, "requests": 0},
+        {"id": "charlie", "name": "charlie", "spend": 0, "tokens": 0, "requests": 0},
+    ]
 
 
 @pytest.mark.asyncio
