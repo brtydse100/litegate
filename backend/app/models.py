@@ -162,7 +162,14 @@ class KeyListRequest(BaseModel):
 
 
 class BulkKeyUpdateRequest(KeyListRequest):
-    settings: KeySettingsUpdate
+    settings: Optional[KeySettingsUpdate] = None
+    use_key_budget_only: bool = False
+
+    @model_validator(mode="after")
+    def require_settings_or_budget_migration(self):
+        if self.settings is None and not self.use_key_budget_only:
+            raise ValueError("Settings or an explicit key-budget migration is required")
+        return self
 
 
 class BulkKeyResetSpendRequest(KeyListRequest):

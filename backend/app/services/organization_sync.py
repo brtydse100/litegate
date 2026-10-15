@@ -184,10 +184,13 @@ async def _generate_key(user_id: str, email: str, team_id: str | None, **options
 
 async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias: str) -> dict:
     """Serialize the spend snapshot, replacement, and old-key revocation together."""
+    from app.services import key_budgets
+
     async with lock_for("user", user_id):
         existing = await litellm.list_user_keys(user_id)
         result = await _generate_key(user_id, email, team_id, initial_spend=litellm.total_key_spend(existing), key_alias=key_alias)
         try:
+            await key_budgets.preserve_rotation_budget(user_id, existing, result["key"])
             for key_info in existing:
                 token = key_info.get("token") or key_info.get("api_key") or key_info.get("key")
                 if token:

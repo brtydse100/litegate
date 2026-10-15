@@ -179,6 +179,44 @@ curl -X PATCH https://litegate.example.com/api/v1/keys/bulk \
 
 Supported bulk fields are `key_alias`, `models`, `max_budget`, `budget_duration`, `tpm_limit`, `rpm_limit`, `duration`, and `blocked`. A request can contain up to 5,000 unique keys. Updates run with bounded concurrency and return a result for every key, so partial failures are visible.
 
+To use the key's budget as its owner's individual allowance, explicitly include
+`"use_key_budget_only": true` alongside `keys` and optional `settings`. For example:
+
+```json
+{
+  "keys": ["key-1"],
+  "settings": { "max_budget": 100, "budget_duration": "30d" },
+  "use_key_budget_only": true
+}
+```
+
+This administrator-only migration requires exactly one key for each owner and
+a finite key budget. LiteGate saves and verifies the key budget, then clears
+the owner's personal `max_budget` and the member's `max_budget_in_team` in
+that key's team. Shared team budgets, spend, roles, rate limits and model policy
+are preserved. Omit `settings` to migrate an already-budgeted key without
+changing its settings. Normal edits leave user budgets untouched.
+
+LiteGate verifies the upstream user and membership records rather than assuming
+that a successful HTTP response cleared a budget. Unsupported LiteLLM versions
+or incomplete verification produce a per-key failure. Key settings and some
+individual caps may already have changed; retry failed keys after resolving the
+reported error. The audit event records whether the migration was requested.
+Migration shares the owner's lifecycle lock with key regeneration and deletion,
+and rechecks ownership and managed-policy restrictions after acquiring it.
+Uncapped roster-only members are accepted only when LiteLLM confirms their
+membership without an unresolved budget record or inherited member cap.
+Regeneration preserves a known finite individual key budget and reset interval
+for unmanaged keys, along with recorded spend. An unverifiable replacement is
+revoked before the old key is deleted. Managed keys retain their hierarchy policy.
+
+`GET /api/v1/models` returns `{"models":["model-name"]}` to administrators only.
+It reads LiteLLM's `/model/info` catalog and exposes unique, sorted model names,
+without provider credentials or deployment parameters. The key and team
+editors use these choices as checkboxes and also retain saved model names that
+are absent from the current catalog. Model updates remain arrays; selecting
+**All allowed models** explicitly submits an empty `models` array.
+
 Reset up to 5,000 selected keys' accumulated spend to zero as an administrator.
 The keys stay active, their budgets and limits are unchanged, and LiteLLM
 retains their spend logs. Key identifiers are sent in the request body so
