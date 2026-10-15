@@ -196,7 +196,7 @@ async def usage(node_id: str | None, start: date, end: date) -> dict:
 
     async def fetch(identity, node):
         async with semaphore:
-            return node, await cached_usage(identity["user_id"], start.isoformat(), end.isoformat())
+            return identity, node, await cached_usage(identity["user_id"], start.isoformat(), end.isoformat())
 
     tasks = [asyncio.create_task(fetch(identity, node)) for identity, node in selected]
     try:
@@ -207,8 +207,10 @@ async def usage(node_id: str | None, start: date, end: date) -> dict:
         await asyncio.gather(*tasks, return_exceptions=True)
         raise
     daily = {(start + timedelta(days=offset)).isoformat(): zero_metrics() for offset in range((end - start).days + 1)}
-    total, by_group, by_model = zero_metrics(), {}, {}
-    for node, rows in batches:
+    total, by_group, by_model, by_user = zero_metrics(), {}, {}, []
+    for identity, node, rows in batches:
+        member = {"id": identity["user_id"], "name": identity.get("email") or identity["user_id"], **zero_metrics()}
+        by_user.append(member)
         depth = ancestor.level + 1 if ancestor else 0
         child = node
         while child.level > depth:
@@ -223,7 +225,7 @@ async def usage(node_id: str | None, start: date, end: date) -> dict:
             if day not in daily or not isinstance(row.get("metrics"), dict):
                 raise HTTPException(status_code=502, detail="LiteLLM returned an invalid daily usage aggregate")
             metrics = row["metrics"]
-            for target in (daily[day], total, group):
+            for target in (daily[day], total, group, member):
                 add_metrics(target, metrics)
             breakdown = row.get("breakdown") or {}
             if not isinstance(breakdown, dict):
@@ -241,6 +243,7 @@ async def usage(node_id: str | None, start: date, end: date) -> dict:
         "totals": total,
         "daily": [{"date": day, **values} for day, values in daily.items()],
         "by_group": list(by_group.values()),
+        "by_user": by_user,
         "by_model": [{"name": name, **values} for name, values in by_model.items()],
         "users": len(selected),
         "attribution": "current_membership",

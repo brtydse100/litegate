@@ -261,9 +261,22 @@ export function organizationUsers(
 
 const zero = (): UsageMetrics => ({ spend: 0, requests: 0, tokens: 0 });
 function add(target: UsageMetrics, value: UsageMetrics) {
-  target.spend += value.spend;
+  target.spend = Math.round((target.spend + value.spend) * 100) / 100;
   target.requests += value.requests;
   target.tokens += value.tokens;
+}
+
+function memberDailyUsage(
+  member: (typeof members)[number],
+  time: number,
+): UsageMetrics {
+  const today = Date.parse(new Date().toISOString().slice(0, 10));
+  const index = (time - today) / 86400000 + 29;
+  if (index < 0 || index >= 30) return zero();
+  const cents = Math.round(member.budget_spend * 100);
+  const dailyCents = Math.floor(cents / 30) + (index < cents % 30 ? 1 : 0);
+  const requests = Math.round(dailyCents / 6.5);
+  return { spend: dailyCents / 100, requests, tokens: requests * 1240 };
 }
 
 export function organizationUsage(
@@ -279,14 +292,22 @@ export function organizationUsage(
     OrganizationUsage["by_group"][number]
   >();
   const daily: OrganizationUsage["daily"] = [];
+  const byUser = selected.map((member) => ({
+    id: member.user_id,
+    name: member.email || member.user_id,
+    ...zero(),
+  }));
+  const byModel = [
+    { name: "gpt-5-mini", ...zero() },
+    { name: "claude-sonnet-4", ...zero() },
+  ];
   for (
     let time = Date.parse(start);
     time <= Date.parse(end);
     time += 86400000
   ) {
-    const day = new Date(time);
     const metrics = zero();
-    selected.forEach((member) => {
+    selected.forEach((member, memberIndex) => {
       const group = groups.find((value) => value.id === member.node)!;
       const depth = (ancestor?.level ?? -1) + 1;
       const child = groups.find(
@@ -295,15 +316,20 @@ export function organizationUsage(
           candidate.path.every((name, index) => group.path[index] === name),
       );
       const id = child?.id ?? null;
-      const requests = Math.round(
-        (member.budget_spend / 3) * ((day.getUTCDay() % 6) + 1),
-      );
-      const value = {
-        spend: requests * 0.065,
-        tokens: requests * 1240,
-        requests,
+      const value = memberDailyUsage(member, time);
+      const primary = {
+        spend: Math.round(value.spend * 65) / 100,
+        tokens: Math.round(value.tokens * 0.65),
+        requests: Math.round(value.requests * 0.65),
       };
+      add(byModel[0], primary);
+      add(byModel[1], {
+        spend: Math.round((value.spend - primary.spend) * 100) / 100,
+        tokens: value.tokens - primary.tokens,
+        requests: value.requests - primary.requests,
+      });
       add(metrics, value);
+      add(byUser[memberIndex], value);
       const bucket = byGroup.get(id) ?? {
         id,
         name: child?.name ?? "Direct members",
@@ -313,7 +339,7 @@ export function organizationUsage(
       byGroup.set(id, bucket);
     });
     add(totals, metrics);
-    daily.push({ date: day.toISOString().slice(0, 10), ...metrics });
+    daily.push({ date: new Date(time).toISOString().slice(0, 10), ...metrics });
   }
   return {
     start_date: start,
@@ -321,20 +347,8 @@ export function organizationUsage(
     totals,
     daily,
     by_group: [...byGroup.values()],
-    by_model: [
-      {
-        name: "gpt-5-mini",
-        spend: totals.spend * 0.65,
-        tokens: Math.round(totals.tokens * 0.65),
-        requests: Math.round(totals.requests * 0.65),
-      },
-      {
-        name: "claude-sonnet-4",
-        spend: totals.spend * 0.35,
-        tokens: Math.round(totals.tokens * 0.35),
-        requests: Math.round(totals.requests * 0.35),
-      },
-    ],
+    by_user: byUser,
+    by_model: byModel,
     users: selected.length,
     attribution: "current_membership",
     issues: [],
