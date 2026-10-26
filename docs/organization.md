@@ -140,21 +140,20 @@ LiteLLM's reset scheduling. Lowering a cap below current spend may prevent furth
 requests immediately. Failures are shown in the admin dashboard.
 
 Legacy `KEY_MAX_BUDGET` and `KEY_BUDGET_DURATION` do not apply to managed keys.
-Existing unassigned keys, and keys assigned to an ancestor on the same path,
-adopt the deepest team with the inherited key allowance. Their existing spend is
-preserved. Keys belonging to an unmanaged team or another hierarchy path require
-explicit migration in LiteLLM. Review old and new budget windows; LiteGate does
-not reset spend. Rotation carries accrued key spend into the replacement, whose
+All existing owned keys, including keys assigned to an unmanaged team or another
+hierarchy path, adopt the deepest configured team with the inherited key
+allowance during login and reconciliation. Migration supports at most 500 keys
+per user and preserves existing secrets and spend. Review old and new budget
+windows; LiteGate does not reset spend. Rotation carries accrued key spend into the replacement, whose
 reset schedule is established by LiteLLM for that new key.
 Ancestor model, blocking, permission, and rate policies are not inherited by native
 child teams. LiteGate blocks provisioning or migration when it detects these
 restrictions on an ancestor (including member rate limits on a key's source team).
 An operator must review and explicitly configure the intended controls in LiteLLM
 before removing the ancestor restrictions and retrying synchronization.
-Before changing a user's root, an administrator must remove the old membership
-after reviewing spend, create the destination membership, and migrate or revoke
-old keys. Destination membership alone does not approve a move. LiteGate verifies
-the old roster and member row are absent before applying the destination policy.
+When a user's configured root changes, LiteGate adds the destination memberships
+and moves their keys without removing old memberships or resetting their spend
+records. Administrators can review and remove stale memberships separately.
 
 Managed budgets and membership are read-only in LiteGate. Managed teams cannot
 be deleted or used for manual member moves. Bulk-key budget/team changes report
@@ -164,9 +163,9 @@ the feature leaves upstream teams, budgets, membership, and keys intact; review
 them when retiring the configuration.
 
 LiteGate records a user's assigned team before changing their managed keys.
-An unsuccessful response or verification keeps that team binding, so a
-later root change still requires migration even when the user has no keys.
-Retrying synchronization within the original path remains supported.
+An unsuccessful response or verification keeps that team binding and reports a
+synchronization error. Retrying synchronization resumes the move; a subsequent
+configuration change uses the current mapping without resetting key spend.
 
 The personal dashboard shows the allowance LiteLLM currently enforces, with a
 warning for policy drift or removed mappings. Budget lookup outages leave key

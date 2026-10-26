@@ -13,6 +13,7 @@ from app.rate_limit import check_login_rate_limit, clear_login_failures, record_
 from app.services import litellm as llm
 from app.services import local_users
 from app.services import generic_sso
+from app.services import key_team_migration
 from app.services import oidc as oidc_svc
 from app.services import organization_sync
 
@@ -130,6 +131,8 @@ async def callback(
         team_ids = [node.team_id, *[team for team in team_ids if team != node.team_id]]
     if team_ids:
         await llm.sync_user_team_memberships(user_id, email, team_ids)
+        if node is None:
+            await key_team_migration.migrate_user_keys(user_id, email, team_ids[0])
 
     role = "admin" if settings.is_admin_identity(email, claims) else "user"
     if settings.inherit_litellm_admin and _is_litellm_proxy_admin(provisioned_user):

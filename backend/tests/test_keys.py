@@ -44,7 +44,6 @@ async def test_regenerate_key_preserves_spend_and_uses_primary_sso_team():
             new=AsyncMock(return_value=[{"token": "sk-old", "spend": 7.25}]),
         ),
         patch("app.routers.keys.llm.delete_key", new=AsyncMock()) as delete,
-        patch("app.routers.keys.token_hex", return_value="abcd1234"),
         patch(
             "app.routers.keys.llm.generate_key",
             new=AsyncMock(return_value={"key": "sk-new", "user_id": "user-1"}),
@@ -58,7 +57,7 @@ async def test_regenerate_key_preserves_spend_and_uses_primary_sso_team():
         "user@example.com",
         "team-primary",
         initial_spend=7.25,
-        key_alias="user's rotated key abcd1234",
+        key_alias="user's key",
     )
     delete.assert_awaited_once_with("sk-old")
 
@@ -73,7 +72,6 @@ async def test_regenerate_rolls_back_new_key_when_old_key_delete_fails():
             new=AsyncMock(return_value=[{"token": "sk-old", "spend": "2.5"}]),
         ),
         patch("app.routers.keys.llm.delete_key", new=delete),
-        patch("app.routers.keys.token_hex", return_value="abcd1234"),
         patch(
             "app.routers.keys.llm.generate_key",
             new=AsyncMock(return_value={"key": "sk-new", "user_id": "user-1"}),

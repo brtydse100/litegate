@@ -118,7 +118,7 @@ function KeyCard({
               <dd className="mt-1 font-semibold text-slate-950">
                 {managed && !budgetAvailable
                   ? "Unavailable"
-                  : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(4)}`}
+                  : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(6)}`}
               </dd>
             </div>
             <div className="px-5 py-4">

@@ -117,16 +117,22 @@ async def test_unmanaged_existing_key_adopts_person_policy_only_after_member_syn
 
 
 @pytest.mark.asyncio
-async def test_cross_department_mapping_does_not_reset_member_allowance(monkeypatch):
+async def test_cross_department_mapping_moves_keys_without_resetting_spend(monkeypatch):
     store.remember("u", "u@example.com", "sso", ["squad1"])
-    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[{"token": "key-hash", "team_id": "marketing"}]))
+    existing = {"token": "key-hash", "team_id": "marketing", "spend": 42, "models": ["model-a"]}
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[existing]))
     member = AsyncMock()
     monkeypatch.setattr(upstream, "sync_member", member)
-    with pytest.raises(HTTPException) as exc:
-        await sync.sync_identity(store.get("u"), {})
-    assert exc.value.status_code == 409
+    update = AsyncMock()
+    monkeypatch.setattr(litellm, "update_key", update)
+    node = settings.organization_hierarchy.resolve("u", ["squad1"])
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"team_id": node.team_id, "max_budget": 100, "budget_duration": "30d"}))
+    await sync.sync_identity(store.get("u"), {})
+    update.assert_awaited_once_with("key-hash", {"team_id": node.team_id, "max_budget": 100, "budget_duration": "30d"})
     member.assert_not_awaited()
-    assert store.get("u")["team_id"] is None
+    assert existing["spend"] == 42
+    assert existing["models"] == ["model-a"]
+    assert store.get("u")["team_id"] == node.team_id
 
 
 @pytest.mark.asyncio
@@ -294,7 +300,7 @@ async def test_queued_key_creation_reads_membership_after_acquiring_the_user_loc
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure", ["key response", "key verification", "cap removal"])
-async def test_partial_sync_retains_root_and_blocks_a_fresh_allowance_in_another_root(monkeypatch, failure):
+async def test_partial_sync_can_follow_new_mapping_without_recreating_an_allowance(monkeypatch, failure):
     values = example()
     values["levels"][0]["groups"][0]["members"][1]["ssoGroups"] = ["marketers"]
     monkeypatch.setattr(settings, "organization_hierarchy", OrganizationHierarchy.model_validate(values))
@@ -334,13 +340,11 @@ async def test_partial_sync_retains_root_and_blocks_a_fresh_allowance_in_another
     assert identity["sync_error"]
 
     keys.return_value = []
-    with pytest.raises(HTTPException) as exc:
-        await sync.remember("u", "u@example.com", "sso", ["marketers"])
-    assert exc.value.status_code == 409
+    await sync.remember("u", "u@example.com", "sso", ["marketers"])
     assert writes == [node.team_id]
-    assert store.get("u")["team_id"] == node.team_id
+    assert store.get("u")["team_id"] == "marketing"
 
-    # Retrying the original root uses its existing allowance rather than making a new one.
+    # With no keys, switching back also leaves all individual ceilings untouched.
     root.return_value = verified
     await sync.remember("u", "u@example.com", "sso", ["squad1"])
     assert writes == [node.team_id]

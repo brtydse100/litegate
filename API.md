@@ -73,6 +73,15 @@ returns 400. Set that option to `false` to permit unverified email in generic SS
 Generic UserInfo role fields never grant administrator privileges. See
 [authentication setup](docs/authentication.md#generic-oauth-sso).
 
+After SSO membership synchronization, existing owned keys move in place to the
+primary mapped/default team, including keys already in another team. Already
+primary keys are skipped and old memberships are retained. Secrets and spend
+are preserved. Hierarchy-managed users instead use the deepest configured team
+and its verified key allowance. Migration supports at most 500 existing keys
+per user (409 above the limit). Upstream or verification failures prevent a new
+session; retrying login resumes a partial move. See
+[team mapping](docs/authentication.md#mapping-sso-groups-to-litellm-teams).
+
 Check the active identity:
 
 ```bash

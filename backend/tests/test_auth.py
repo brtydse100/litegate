@@ -12,6 +12,11 @@ from app.config import settings
 from app.routers import auth
 
 
+@pytest.fixture(autouse=True)
+def key_migration(monkeypatch):
+    monkeypatch.setattr(auth.key_team_migration, "migrate_user_keys", AsyncMock())
+
+
 def _response_cookie(response, name: str) -> str:
     cookies = SimpleCookie()
     for header_name, value in response.raw_headers:

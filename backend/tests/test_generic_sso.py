@@ -12,6 +12,11 @@ from app.routers import auth
 from app.services import generic_sso, oidc
 
 
+@pytest.fixture(autouse=True)
+def key_migration(monkeypatch):
+    monkeypatch.setattr(auth.key_team_migration, "migrate_user_keys", AsyncMock())
+
+
 @pytest.fixture
 def provider(monkeypatch):
     configured = auth.settings

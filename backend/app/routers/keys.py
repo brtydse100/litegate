@@ -1,5 +1,4 @@
 import asyncio
-from secrets import token_hex
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from app.config import settings
@@ -87,7 +86,7 @@ async def regenerate_key(current_user: CurrentUser = Depends(get_current_user)):
         current_user.user_id,
         current_user.email,
         team_id,
-        key_alias=f"{name}'s rotated key {token_hex(4)}",
+        key_alias=f"{name}'s key",
     )
     return KeyCreateResponse(
         key=result["key"],
