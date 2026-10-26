@@ -240,7 +240,7 @@ describe("personal key storage", () => {
       policy_error: "Budget update failed",
     });
     expect(await screen.findByText("$200")).toBeVisible();
-    expect(screen.getByText("$60.0000")).toBeVisible();
+    expect(screen.getByText("$60.000000")).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent("Budget update failed");
   });
 

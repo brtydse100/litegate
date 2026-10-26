@@ -188,8 +188,18 @@ At each successful SSO login, LiteGate additively syncs membership for every
 matched team. If more than one group matches, the first team in configuration
 order becomes the user's primary team. That team is applied to newly created or
 regenerated keys so LiteLLM can enforce its model and budget policy. Existing
-keys are not silently reassigned: regenerate the key or have an administrator
-update it.
+owned keys also move to that primary team at login, including keys already in
+another team. Their secrets, spend, names, and other key settings are preserved.
+Keys already in the primary team are skipped; old memberships are retained.
+For hierarchy-managed users, the deepest configured team takes priority and
+the verified inherited key allowance applies instead. See
+[organization migration](organization.md#budgets).
+
+Flat SSO migration applies to OIDC and generic OAuth, including
+`sso_default_team_id` (Helm `config.ssoDefaultTeamId`). It supports at most 500
+existing keys per user and audits successful moves without recording secrets.
+A failed migration prevents a new session from being issued; signing in again
+resumes a partial move without replacing credentials.
 
 LiteGate does not automatically remove team memberships when an SSO group is
 removed, because removing a LiteLLM team member can also delete that member's

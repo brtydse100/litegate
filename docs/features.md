@@ -31,6 +31,10 @@ It loads through the authorized reveal endpoint and stays in component memory.
 Hashes are never offered as usable API keys. Without stored
 secrets, newly created keys remain copyable until hidden or the page is left.
 
+Personal spend is displayed to six decimal places. Regeneration uses the normal
+`name's key` name without a rotation suffix while retaining spend and verified
+key allowances.
+
 New keys inherit the installation defaults for models, budget, reset interval,
 duration, TPM, RPM, and team. For SSO users, an administrator can map identity
 provider groups to existing LiteLLM teams so new or regenerated keys use the

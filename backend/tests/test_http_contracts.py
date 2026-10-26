@@ -20,6 +20,11 @@ from app.rate_limit import _key_ops, _login_failures
 from app.routers import auth
 
 
+@pytest.fixture(autouse=True)
+def key_migration(monkeypatch):
+    monkeypatch.setattr(auth.key_team_migration, "migrate_user_keys", AsyncMock())
+
+
 def _client(*, address: str = "192.0.2.10") -> httpx.AsyncClient:
     transport = httpx.ASGITransport(app=app, client=(address, 12345))
     return httpx.AsyncClient(

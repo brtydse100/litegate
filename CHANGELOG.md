@@ -7,6 +7,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-10-26
+
+### Changed
+
+- Existing owned keys move into the configured primary or deepest organization
+  team at login/reconciliation, including keys already in another team, while
+  retaining secrets, spend, and old memberships. Managed allowance verification
+  and ancestor-restriction safeguards remain in force.
+- Personal key spend shows six decimal places, and rotation retains the normal
+  key name with alias-safe replacement and failure recovery.
+- Leaf organization groups show each member's selected-period spending.
+
+### Documentation
+
+- Highlight the requirement to upgrade the Helm chart and image together when
+  enabling organization hierarchy.
+
 ## [2.13.0] - 2026-10-15
 
 ### Added

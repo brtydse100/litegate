@@ -38,7 +38,7 @@ async def test_flat_sso_mappings_cannot_add_another_managed_root(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("old_member_row", [True, False])
-async def test_destination_membership_and_deleted_keys_do_not_approve_migration(monkeypatch, old_member_row):
+async def test_root_change_preserves_old_membership_and_spend(monkeypatch, old_member_row):
     values = example()
     values["levels"][0]["groups"][0]["members"][1]["ssoGroups"] = ["marketers"]
     monkeypatch.setattr(settings, "organization_hierarchy", OrganizationHierarchy.model_validate(values))
@@ -53,17 +53,12 @@ async def test_destination_membership_and_deleted_keys_do_not_approve_migration(
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
     update = AsyncMock()
     monkeypatch.setattr(upstream, "sync_member", update)
-    with pytest.raises(HTTPException) as exc:
-        await sync.sync_identity(store.get("u"), destination)
-    assert exc.value.status_code == 409
-    update.assert_not_awaited()
-    assert store.get("u")["team_id"] == "engineering"
-
-    # A deliberate upstream migration removes the old roster and member row.
-    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {"members_with_roles": []}, "team_memberships": []}))
     await sync.sync_identity(store.get("u"), destination)
     update.assert_not_awaited()  # No key exists: do not create a new individual allowance.
     assert store.get("u")["team_id"] == "marketing"
+    assert old["team_info"]["members_with_roles"] == [{"user_id": "u", "role": "user"}]
+    if old_member_row:
+        assert old["team_memberships"][0]["spend"] == 100
 
 
 @pytest.mark.asyncio

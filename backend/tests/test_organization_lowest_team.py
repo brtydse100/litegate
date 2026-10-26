@@ -143,13 +143,14 @@ async def test_key_budget_must_be_verified_before_individual_user_caps_are_remov
 
 
 @pytest.mark.asyncio
-async def test_unmanaged_sibling_credential_blocks_automatic_allowance_removal(native):
-    _, state = native
+async def test_unmanaged_sibling_credential_is_protected_before_allowance_removal(native):
+    tree, state = native
     state["keys"]["foreign"] = {"token": "foreign", "user_id": "alice", "team_id": "manual", "max_budget": None, "spend": 0}
-    with pytest.raises(HTTPException):
-        await sync.remember("alice", "alice@example.com", "sso", ["squad1"])
-    assert state["user_budget"] == 25
-    assert state["keys"]["key-old"]["max_budget"] is None
+    await sync.remember("alice", "alice@example.com", "sso", ["squad1"])
+    destination = tree.resolve("alice", ["squad1"]).team_id
+    assert all(key["team_id"] == destination and key["max_budget"] == 100 for key in state["keys"].values())
+    assert state["keys"]["key-old"]["spend"] == 42
+    assert state["user_budget"] is None
 
 
 @pytest.mark.asyncio

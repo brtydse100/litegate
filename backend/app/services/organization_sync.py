@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from secrets import token_hex
 from weakref import WeakValueDictionary
 
 from fastapi import HTTPException
@@ -99,25 +100,8 @@ async def sync_identity(identity: dict, info: dict) -> OrganizationNode:
     ancestor_teams = {
         ancestor.team_id for ancestor in settings.organization_hierarchy.nodes.values() if node.path[: len(ancestor.path)] == ancestor.path
     }
-    previous_team = identity.get("team_id")
-    if previous_team and previous_team not in ancestor_teams:
-        if upstream.membership(info, identity["user_id"]) is None:
-            raise HTTPException(
-                status_code=409, detail="Top-level organization changed; migrate the user's LiteLLM membership before applying its new budget"
-            )
-        previous = await upstream.team_info(previous_team)
-        roster = (previous.get("team_info") or {}).get("members_with_roles")
-        if not isinstance(roster, list):
-            raise HTTPException(status_code=502, detail="Could not verify the user's previous LiteLLM membership")
-        if upstream.membership(previous, identity["user_id"]) or any(member.get("user_id") == identity["user_id"] for member in roster):
-            raise HTTPException(
-                status_code=409,
-                detail="Top-level organization changed; an administrator must remove the previous LiteLLM membership after reviewing spend",
-            )
-    if any(key.get("team_id") and key["team_id"] not in ancestor_teams for key in existing):
-        raise HTTPException(
-            status_code=409, detail="Existing keys belong to another team; migrate them in LiteLLM before changing the top-level organization"
-        )
+    if len(existing) > 500:
+        raise HTTPException(status_code=409, detail="User has more than the safe migration limit of 500 keys")
     await key_policy.guard_ancestor_restrictions(node, identity["user_id"], existing)
     await asyncio.to_thread(store.bind_team, identity["user_id"], node.team_id)
     for ancestor in settings.organization_hierarchy.nodes.values():
@@ -188,16 +172,30 @@ async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias
 
     async with lock_for("user", user_id):
         existing = await litellm.list_user_keys(user_id)
-        result = await _generate_key(user_id, email, team_id, initial_spend=litellm.total_key_spend(existing), key_alias=key_alias)
+        renamed_key = None
         try:
-            await key_budgets.preserve_rotation_budget(user_id, existing, result["key"])
             for key_info in existing:
                 token = key_info.get("token") or key_info.get("api_key") or key_info.get("key")
-                if token:
-                    await litellm.delete_key(token)
-        except BaseException:
-            await key_cleanup.revoke_created_key(result["key"])
-            raise
+                if token and key_info.get("key_alias") == key_alias:
+                    # Free the unique alias while retaining the live old credential.
+                    renamed_key = token
+                    await litellm.update_key(token, {"key_alias": f"litegate-rotation-{token_hex(16)}"})
+                    break
+            result = await _generate_key(user_id, email, team_id, initial_spend=litellm.total_key_spend(existing), key_alias=key_alias)
+            try:
+                await key_budgets.preserve_rotation_budget(user_id, existing, result["key"])
+                for key_info in existing:
+                    token = key_info.get("token") or key_info.get("api_key") or key_info.get("key")
+                    if token:
+                        await litellm.delete_key(token)
+                        if token == renamed_key:
+                            renamed_key = None
+            except BaseException:
+                await key_cleanup.revoke_created_key(result["key"])
+                raise
+        finally:
+            if renamed_key:
+                await litellm.update_key(renamed_key, {"key_alias": key_alias})
         return result
 
 
