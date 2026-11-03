@@ -107,7 +107,7 @@ jobs:
       - name: Start pinned LiteLLM integration stack
         run: docker compose -f deploy/docker-compose/docker-compose.integration.yml up -d --wait --wait-timeout 180
       - name: Check LiteLLM service contracts
-        run: python -m pytest tests/integration/test_litellm_live.py -v
+        run: python -m pytest tests/integration -v
         working-directory: backend
         env:
           RUN_LITELLM_INTEGRATION: "1"
@@ -148,7 +148,7 @@ jobs:
       - run: python -m unittest scripts/test_release_policy.py
       - run: python -m unittest scripts/test_release_notes.py
       - run: helm lint deploy/helm/litegate
-      - run: python -m unittest scripts/test_generic_sso_helm.py
+      - run: python -m unittest scripts/test_generic_sso_helm.py scripts/test_organization_mapping_helm.py
       - run: python -m unittest scripts/test_organization_helm.py
       - name: Render externally managed data volume
         shell: bash
