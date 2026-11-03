@@ -8,6 +8,8 @@ services:
       - "80:8080"
     volumes:
       - ./config.yaml:/app/backend/config.yaml:ro
+      # Optional: set organization_mapping_file in config.yaml before enabling.
+      # - ./organization.json:/app/backend/organization.json:ro
       - litegate-data:/app/backend/data
     extra_hosts:
       - "host.docker.internal:host-gateway"

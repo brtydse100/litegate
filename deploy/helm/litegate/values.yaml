@@ -95,10 +95,29 @@ config:
   #     - "team-platform"
   #     - "team-shared-services"
 
-  # False permits valid SSO users without a group mapping. True rejects them.
+  # Optional email hierarchy; use inline data OR a UTF-8 JSON file, not both.
+  # Teams must already exist. Memberships are additive; no keys are created.
+  organizationMapping: {}
+  # organizationMapping:
+  #   groups:
+  #     company:
+  #       team_id: team-company
+  #       members: [jordan@example.com]
+  #     engineering:
+  #       team_id: team-engineering
+  #       parent: company
+  #       members: [sam@example.com]
+  #     platform:
+  #       team_id: team-platform
+  #       parent: engineering
+  #       members: [alice@example.com, bob@example.com]
+  # Mount external JSON with extraVolumes/extraVolumeMounts; restart after edits.
+  organizationMappingFile: ""
+
+  # True requires an SSO group or organization email mapping match.
   ssoRequireTeamMapping: false
   # Existing team added to every SSO user in addition to group-mapped teams.
-  # A group-mapped team is primary; otherwise this team is primary.
+  # An SSO/email-mapped team is primary; otherwise this team is primary.
   ssoDefaultTeamId: ""
 
   # LiteGate admin access is separate from LiteLLM team membership.

@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     generic_include_client_id: bool = True
     oidc_groups_claim: str = "groups"
     oidc_group_team_mapping: dict[str, str | list[str]] = Field(default_factory=dict)
+    organization_mapping: dict = Field(default_factory=dict)
+    organization_mapping_file: str = ""
     oidc_require_team_mapping: bool = False
     sso_default_team_id: str = ""
     inherit_litellm_admin: bool = False

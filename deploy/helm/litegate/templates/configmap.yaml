@@ -16,6 +16,9 @@
 {{- fail "Configure either generic SSO or OIDC, not both" -}}
 {{- end -}}
 {{- $requireTeamMapping := .Values.config.ssoRequireTeamMapping -}}
+{{- if and .Values.config.organizationMapping .Values.config.organizationMappingFile -}}
+{{- fail "Configure config.organizationMapping or config.organizationMappingFile, not both" -}}
+{{- end -}}
 {{- if hasKey .Values.config "oidcRequireTeamMapping" -}}
 {{- $requireTeamMapping = or $requireTeamMapping .Values.config.oidcRequireTeamMapping -}}
 {{- end -}}
@@ -41,6 +44,12 @@ data:
   INHERIT_LITELLM_ADMIN: {{ .Values.config.inheritLitellmAdmin | quote }}
   SSO_DEFAULT_TEAM_ID: {{ .Values.config.ssoDefaultTeamId | quote }}
   OIDC_REQUIRE_TEAM_MAPPING: {{ $requireTeamMapping | quote }}
+  {{- if .Values.config.organizationMapping }}
+  ORGANIZATION_MAPPING: {{ .Values.config.organizationMapping | toJson | quote }}
+  {{- end }}
+  {{- if .Values.config.organizationMappingFile }}
+  ORGANIZATION_MAPPING_FILE: {{ .Values.config.organizationMappingFile | quote }}
+  {{- end }}
   {{- if .Values.config.localAuthUsername }}
   LOCAL_AUTH_USERNAME: {{ .Values.config.localAuthUsername | quote }}
   {{- end }}
