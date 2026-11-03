@@ -42,6 +42,16 @@ matched team's model and budget policy. See
 [SSO team mapping](authentication.md#mapping-sso-groups-to-litellm-teams) and
 the [configuration guide](configuration.md#key-defaults).
 
+An optional [email organization hierarchy](configuration.md#email-organization-mapping)
+assigns users to existing LiteLLM teams and their ancestors even when SSO groups
+are outdated. Startup can pre-create users and memberships without keys or
+local passwords; first SSO login binds the authenticated identity to its
+canonical account. Existing SSO primary teams take precedence. Memberships are
+additive and never infer administrator access. Pending existing accounts need
+authenticated legacy-subject proof; superseded reservations remain visible in
+LiteLLM and may count toward user limits. See the
+[identity lifecycle](authentication.md#email-organization-mapping-and-identity).
+
 The portal disables key, local-account, team, and bulk-edit controls when the
 server-side mutation limit is exhausted and shows the live cooldown. This
 prevents repeated clicks while retaining the backend rate limit as the

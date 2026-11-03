@@ -2,14 +2,15 @@ import asyncio
 from contextlib import asynccontextmanager
 from time import perf_counter
 
-from fastapi import FastAPI
-from fastapi import Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.config import settings
+from fastapi.responses import JSONResponse
+
 from app import observability
-from app.routers import api_v1, auth, keys, logs, users, organization
-from app.services import litellm, local_users, organization_sync
+from app.config import settings
+from app.routers import api_v1, auth, keys, logs, organization, users
+from app.services import litellm, local_users, organization_provisioning, organization_sync
+from app.services.organization_mapping import get_mapping
 from app.version import VERSION
 
 
@@ -17,8 +18,11 @@ from app.version import VERSION
 async def lifespan(_: FastAPI):
     local_users.init_db()
     await litellm.start_client()
-    organization_task = asyncio.create_task(organization_sync.run_reconciliation()) if settings.organization_hierarchy.levels else None
+    organization_task = None
     try:
+        await organization_provisioning.provision_members(get_mapping())
+        if settings.organization_hierarchy.levels:
+            organization_task = asyncio.create_task(organization_sync.run_reconciliation())
         yield
     finally:
         if organization_task:

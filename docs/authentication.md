@@ -208,20 +208,75 @@ keys. A mapping or membership error fails the login instead of allowing a user
 to continue without the intended team controls.
 
 Set `oidc_require_team_mapping: true` to deny SSO login when none of the user's
-groups has a configured team. Leave it `false` while rolling the feature out or
+groups or configured organization email assignments has a team. Leave it `false` while rolling the feature out or
 when unmapped SSO users should retain the global key defaults.
 
 Set `sso_default_team_id` to add every SSO user to one existing LiteLLM team.
 This membership is added alongside all group-mapped teams. The first mapped
 team is primary for generated keys; when no group matches, the default team is
 primary. The default team does not satisfy `oidc_require_team_mapping: true`,
-which deliberately continues to require an explicit group mapping.
+which requires an explicit SSO-group or organization-email mapping.
 
 To reuse LiteLLM's platform-owner assignment, set `inherit_litellm_admin: true`.
 LiteGate then grants its admin role only when the matching LiteLLM user has the
 full `proxy_admin` role. It does not promote `proxy_admin_viewer`, organization
 admins, or team admins because LiteGate admin operations are installation-wide
 and can modify data.
+
+## Email organization mapping and identity
+
+The optional [organization hierarchy](configuration.md#email-organization-mapping)
+adds direct email assignments and their ancestors to either SSO flow. Existing
+SSO group mappings keep primary-team precedence; otherwise the deepest directly
+email-assigned group is primary, with declaration order breaking depth ties.
+Existing automatic key migration at login uses that primary team and the
+selected canonical LiteLLM user ID. Team membership never grants administrator
+access, and this feature does not change existing administrator rules.
+
+Startup validates the mapping and existing teams, then provisions configured
+emails and memberships without generating a key (`auto_create_key=False`).
+LiteGate automatically initializes identity bookkeeping in the existing SQLite
+database at `local_users_db_path`; retain and back up its persistent volume.
+It records reservation ownership and binds authenticated provider authority
+and subject to a canonical LiteLLM user ID. This is identity bookkeeping;
+LiteLLM continues to own users, memberships, keys, and budgets.
+
+Email lookup alone never proves account ownership. A single existing ordinary
+account with a matching email stays pending until authenticated SSO login
+proves that its ID is the legacy subject ID. LiteGate makes no remote changes
+to that account while it is pending. Recorded pending confirmations permit
+startup and are reported separately from provisioned users so their owners can
+log in. Local or administrative accounts cannot be adopted through email
+alone. Established administrative SSO identities keep their existing behavior.
+Ambiguous matches, ownership conflicts, incomplete lookups, missing teams, and
+failed remote writes fail the startup provisioning pass. Correct the reported
+configuration or identity conflict and restart to retry; do not merge accounts
+or move keys based only on an email match.
+
+For a new identity, LiteGate reserves an owned user before first login and
+binds the authenticated subject at login. If an existing legacy subject account
+takes precedence, it keeps its keys and history. Any feature-owned reservation
+is retained and marked superseded only in LiteGate bookkeeping: its remote
+memberships, keys, budget, and history remain untouched. Such records stay
+visible in LiteLLM and may count toward user limits or licensing. Superseded
+bookkeeping does not disable the LiteLLM account or its credentials. LiteGate
+never deletes user records or transfers key ownership during this process.
+Subsequent restarts do not recreate superseded reservations.
+
+Trust email only from the configured authenticated provider. Explicitly
+unverified email is rejected for organization mapping; providers omitting
+`email_verified` retain the existing trusted-provider behavior. A different
+subject cannot claim a bound identity by reusing its email, and an established
+binding never silently switches accounts. Bindings survive removal of the
+mapping, preserving access to the canonical account and its keys. Without a
+mapping or existing binding, existing subject-based login behavior is unchanged.
+Removing assignments never automatically removes LiteLLM memberships; review
+revocation deliberately in LiteLLM.
+
+When `organizationHierarchy` also manages the user, its key policy and deepest
+primary team continue to apply. New email mappings must use separate team IDs.
+An explicit hierarchy user-ID assignment must match the canonical identity;
+LiteGate rejects a change that would silently drop that managed path.
 
 ## API credentials
 
