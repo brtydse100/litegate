@@ -7,6 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-11-03
+
+### Added
+
+- Email-based organization mapping from inline Helm/Compose configuration or a
+  JSON file, with named levels, parent membership inheritance, and compatibility
+  with the original flat mapping format. Existing SSO mappings and managed
+  organization budget policies retain their precedence.
+- Keyless provisioning before first SSO login, durable provider/subject identity
+  binding, pending confirmation for existing accounts, and safe retention of
+  superseded reservations. Membership synchronization remains additive.
+- Per-PR immutable preview Git/image tags and verified publication guidance.
+
 ## [2.14.0] - 2026-10-26
 
 ### Changed
