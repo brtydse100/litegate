@@ -35,7 +35,7 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `oidc_jwks_uri` | empty | Manual signing-key endpoint; set with the authorization and token endpoints |
 | `oidc_groups_claim` | `groups` | Group path in the verified ID token or generic UserInfo; dot notation supported |
 | `oidc_group_team_mapping` | `{}` | SSO group to existing LiteLLM team ID or team-ID list |
-| `organization_mapping` | `{}` | Optional email-to-team hierarchy with a `groups` root; use this or a file |
+| `organization_mapping` | `{}` | Optional email-to-team hierarchy with a `levels` root; use this or a file |
 | `organization_mapping_file` | empty | UTF-8 JSON hierarchy file; relative paths resolve against the backend directory |
 | `oidc_require_team_mapping` | `false` | Deny SSO login when no configured team matches |
 | `sso_default_team_id` | empty | Existing LiteLLM team added to every SSO user in addition to group-mapped teams |
@@ -160,18 +160,24 @@ In Docker Compose's `config.yaml`:
 
 ```yaml
 organization_mapping:
-  groups:
-    company:
-      team_id: team-company
-      members: [jordan@example.com]
-    engineering:
-      team_id: team-engineering
-      parent: company
-      members: [sam@example.com]
-    platform:
-      team_id: team-platform
-      parent: engineering
-      members: [alice@example.com, bob@example.com]
+  levels:
+    - name: companies
+      groups:
+        company:
+          team_id: team-company
+          members: [jordan@example.com]
+    - name: departments
+      groups:
+        engineering:
+          team_id: team-engineering
+          parent: company
+          members: [sam@example.com]
+    - name: teams
+      groups:
+        platform:
+          team_id: team-platform
+          parent: engineering
+          members: [alice@example.com, bob@example.com]
 ```
 
 Multiline YAML member lists are also accepted. Alice and Bob join Platform,
@@ -181,26 +187,47 @@ are trimmed and matched case-insensitively. Group names are configuration
 identifiers, independent of SSO group names. Each group has one `team_id`, at
 most one `parent`, and an optional `members` list, which defaults to empty.
 
-Alternatively, put the same `groups` object in a UTF-8 JSON file:
+Levels organize groups for readability; `parent` defines inheritance. Each level
+has a unique, nonempty `name` and a `groups` object. Group names must be unique
+across all levels so parent references are unambiguous. Levels do not themselves
+grant membership. The original flat `groups` root remains supported; choose one
+root format per mapping.
+
+Alternatively, put the same `levels` object in a UTF-8 JSON file:
 
 ```json
 {
-  "groups": {
-    "company": {
-      "team_id": "team-company",
-      "members": ["jordan@example.com"]
+  "levels": [
+    {
+      "name": "companies",
+      "groups": {
+        "company": {
+          "team_id": "team-company",
+          "members": ["jordan@example.com"]
+        }
+      }
     },
-    "engineering": {
-      "team_id": "team-engineering",
-      "parent": "company",
-      "members": ["sam@example.com"]
+    {
+      "name": "departments",
+      "groups": {
+        "engineering": {
+          "team_id": "team-engineering",
+          "parent": "company",
+          "members": ["sam@example.com"]
+        }
+      }
     },
-    "platform": {
-      "team_id": "team-platform",
-      "parent": "engineering",
-      "members": ["alice@example.com", "bob@example.com"]
+    {
+      "name": "teams",
+      "groups": {
+        "platform": {
+          "team_id": "team-platform",
+          "parent": "engineering",
+          "members": ["alice@example.com", "bob@example.com"]
+        }
+      }
     }
-  }
+  ]
 }
 ```
 
@@ -214,12 +241,13 @@ parents, cycles, malformed JSON, and unreadable files are rejected.
 Existing SSO group mappings keep their primary team and gain ancestors for
 mapped teams that appear in the hierarchy. Without an SSO group match, the
 deepest directly email-assigned group becomes primary; equal-depth ties use
-group declaration order. Remaining memberships are deduplicated and the
+level order followed by group declaration order. Remaining memberships are deduplicated and the
 configured `sso_default_team_id` is appended last if absent. The default team
 alone does not satisfy `oidc_require_team_mapping`; either explicit mapping
 source can satisfy it. Helm serializes map keys in sorted order, so inline
-Helm ties follow that rendered order; use a JSON file when declaration order
-must be preserved.
+Helm ties within a level follow that rendered order; the `levels` array always
+preserves level order. Use a JSON file when within-level declaration order must
+be preserved.
 
 The separate budget-managed `organizationHierarchy` remains authoritative for
 users it manages: its deepest team and key allowance take precedence over the

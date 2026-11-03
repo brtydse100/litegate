@@ -88,3 +88,58 @@ def test_missing_and_malformed_files_are_rejected(tmp_path):
     path.write_text("{broken", encoding="utf-8")
     with pytest.raises(ValueError):
         load_mapping({}, str(path))
+
+
+def test_levels_json_and_inline_match_flat_resolution(tmp_path):
+    data = {
+        "levels": [
+            {"name": "companies", "groups": {"company": DATA["groups"]["company"]}},
+            {"name": "departments", "groups": {"engineering": DATA["groups"]["engineering"]}},
+            {
+                "name": "teams",
+                "groups": {
+                    "platform": DATA["groups"]["platform"],
+                    "support": {"team_id": "support", "parent": "engineering", "members": ["support@example.com"]},
+                },
+            },
+        ]
+    }
+    path = tmp_path / "levels.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    for mapping in (load_mapping(data, ""), load_mapping({}, str(path))):
+        assert mapping.team_ids("alice@example.com", []) == ["p", "e", "c"]
+        assert mapping.team_ids("alice@example.com", ["outside", "e"]) == ["outside", "e", "p", "c"]
+        assert mapping.team_ids("support@example.com", []) == ["support", "e", "c"]
+        assert mapping.member_emails() == ["alice@example.com", "support@example.com"]
+        assert mapping.referenced_team_ids() == ["c", "e", "p", "support"]
+
+
+def test_levels_keep_array_order_for_equal_depth_assignments():
+    data = {
+        "levels": [
+            {"name": "z-first", "groups": {"first": {"team_id": "first", "members": ["both@example.com"]}}},
+            {"name": "a-second", "groups": {"second": {"team_id": "second", "members": ["both@example.com"]}}},
+        ]
+    }
+    assert load_mapping(data, "").team_ids("both@example.com", []) == ["first", "second"]
+    assert load_mapping({"levels": []}, "").referenced_team_ids() == []
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {"levels": {}},
+        {"levels": [None]},
+        {"levels": [{"groups": {}}]},
+        {"levels": [{"name": " ", "groups": {}}]},
+        {"levels": [{"name": "teams", "groups": []}]},
+        {"levels": [{"name": "teams", "groups": {}, "extra": True}]},
+        {"levels": [{"name": "Teams", "groups": {}}, {"name": " teams ", "groups": {}}]},
+        {"levels": [{"name": "one", "groups": {"a": {"team_id": "a"}}}, {"name": "two", "groups": {"a": {"team_id": "b"}}}]},
+        {"levels": [], "groups": {}},
+        {"groups": {"levels": []}},
+    ],
+)
+def test_invalid_or_ambiguous_levels_are_rejected(data):
+    with pytest.raises(ValueError):
+        load_mapping(data, "")

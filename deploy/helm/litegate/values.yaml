@@ -124,18 +124,24 @@ config:
   # Teams must already exist. Memberships are additive; no keys are created.
   organizationMapping: {}
   # organizationMapping:
-  #   groups:
-  #     company:
-  #       team_id: team-company
-  #       members: [jordan@example.com]
-  #     engineering:
-  #       team_id: team-engineering
-  #       parent: company
-  #       members: [sam@example.com]
-  #     platform:
-  #       team_id: team-platform
-  #       parent: engineering
-  #       members: [alice@example.com, bob@example.com]
+  #   levels:
+  #     - name: companies
+  #       groups:
+  #         company:
+  #           team_id: team-company
+  #           members: [jordan@example.com]
+  #     - name: departments
+  #       groups:
+  #         engineering:
+  #           team_id: team-engineering
+  #           parent: company
+  #           members: [sam@example.com]
+  #     - name: teams
+  #       groups:
+  #         platform:
+  #           team_id: team-platform
+  #           parent: engineering
+  #           members: [alice@example.com, bob@example.com]
   # Mount external JSON with extraVolumes/extraVolumeMounts; restart after edits.
   organizationMappingFile: ""
 

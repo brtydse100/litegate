@@ -11,19 +11,21 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 MAPPING = {
-    "groups": {
+    "levels": [{"name": "companies", "groups": {
         "company": {"team_id": "team-company", "members": ["jordan@example.com"]},
+    }}, {"name": "departments", "groups": {
         "engineering": {
             "team_id": "team-engineering",
             "parent": "company",
             "members": ["sam@example.com"],
         },
+    }}, {"name": "teams", "groups": {
         "platform": {
             "team_id": "team-platform",
             "parent": "engineering",
             "members": ["alice@example.com", "bob@example.com"],
         },
-    }
+    }}]
 }
 
 
@@ -88,9 +90,9 @@ class OrganizationMappingHelmTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "values.yaml"
             path.write_text(
-                "config:\n  organizationMapping:\n    groups:\n      platform:\n"
-                "        team_id: team-platform\n        members:\n"
-                "          - alice@example.com\n          - bob@example.com\n",
+                "config:\n  organizationMapping:\n    levels:\n      - name: teams\n        groups:\n          platform:\n"
+                "            team_id: team-platform\n            members:\n"
+                "              - alice@example.com\n              - bob@example.com\n",
                 encoding="utf-8",
             )
             result = subprocess.run(
@@ -110,12 +112,12 @@ class OrganizationMappingHelmTests(unittest.TestCase):
         self.assertEqual(
             json.loads(env_value(result.stdout, "ORGANIZATION_MAPPING")),
             {
-                "groups": {
+                "levels": [{"name": "teams", "groups": {
                     "platform": {
                         "team_id": "team-platform",
                         "members": ["alice@example.com", "bob@example.com"],
                     }
-                }
+                }}]
             },
         )
 
@@ -168,7 +170,7 @@ class OrganizationMappingHelmTests(unittest.TestCase):
     def test_inline_edit_changes_pod_checksum(self):
         original = render({"config": {"organizationMapping": MAPPING}})
         changed_mapping = copy.deepcopy(MAPPING)
-        changed_mapping["groups"]["platform"]["members"].append("carol@example.com")
+        changed_mapping["levels"][2]["groups"]["platform"]["members"].append("carol@example.com")
         changed = render({"config": {"organizationMapping": changed_mapping}})
         for result in (original, changed):
             self.assertEqual(result.returncode, 0, result.stderr)

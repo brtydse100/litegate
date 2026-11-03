@@ -55,7 +55,20 @@ async def callback(monkeypatch, generic):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("generic", [False, True])
-async def test_email_hierarchy_uses_canonical_identity_and_migrates(monkeypatch, login, generic):
+@pytest.mark.parametrize("layout", ["flat", "levels"])
+async def test_email_hierarchy_uses_canonical_identity_and_migrates(monkeypatch, login, generic, layout):
+    if layout == "levels":
+        groups = auth.settings.organization_mapping["groups"]
+        monkeypatch.setattr(
+            auth.settings,
+            "organization_mapping",
+            {
+                "levels": [
+                    {"name": "divisions", "groups": {name: groups[name] for name in ("company", "engineering")}},
+                    {"name": "teams", "groups": {"platform": groups["platform"]}},
+                ]
+            },
+        )
     _, resolver, ensure, sync, migrate = login
     response = await callback(monkeypatch, generic)
     assert resolver.await_args.args == ("provider", "subject", "Alice@Example.com")

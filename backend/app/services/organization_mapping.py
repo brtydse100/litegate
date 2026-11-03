@@ -65,6 +65,33 @@ class OrganizationMapping:
         return result
 
 
+def _group_definitions(data: dict) -> dict:
+    """Normalize named levels without changing parent-based inheritance."""
+    if not isinstance(data, dict):
+        raise ValueError("Organization mapping must be an object")
+    if "levels" not in data:
+        if set(data) - {"groups"} or not isinstance(data.get("groups", {}), dict):
+            raise ValueError("Invalid organization mapping")
+        return data.get("groups", {})
+    if set(data) != {"levels"} or not isinstance(data["levels"], list):
+        raise ValueError("Use levels or legacy groups, not both")
+    groups = {}
+    level_names = set()
+    for level in data["levels"]:
+        if not isinstance(level, dict) or set(level) != {"name", "groups"}:
+            raise ValueError("Each organization level requires name and groups")
+        name = level["name"]
+        if not isinstance(name, str) or not name.strip() or name.strip().casefold() in level_names:
+            raise ValueError("Organization level names must be nonempty and unique")
+        if not isinstance(level["groups"], dict):
+            raise ValueError("Organization level groups must be an object")
+        if groups.keys() & level["groups"].keys():
+            raise ValueError("Organization group names must be unique across levels")
+        level_names.add(name.strip().casefold())
+        groups.update(level["groups"])
+    return groups
+
+
 def load_mapping(inline, filename):
     if not isinstance(inline, dict):
         raise ValueError("Organization mapping must be an object")
@@ -78,11 +105,10 @@ def load_mapping(inline, filename):
             inline = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise ValueError("Cannot read organization mapping JSON") from exc
-    if not isinstance(inline, dict) or set(inline) - {"groups"} or not isinstance(inline.get("groups", {}), dict):
-        raise ValueError("Invalid organization mapping")
+    definitions = _group_definitions(inline)
     groups = {}
     teams = set()
-    for name, raw in inline.get("groups", {}).items():
+    for name, raw in definitions.items():
         if not isinstance(name, str) or not name.strip() or not isinstance(raw, dict) or set(raw) - {"team_id", "parent", "members"}:
             raise ValueError("Invalid organization group")
         team = raw.get("team_id")

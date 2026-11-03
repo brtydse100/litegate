@@ -57,8 +57,13 @@ Do not commit, push, or overwrite them.
 
 ## Approaches
 
-Use a flat `groups` object with optional `parent`, `members`, and required
-`team_id`. This was the recommended structure discussed with the user. Nested
+The user approved a top-level `levels` array, each entry containing `name` and
+`groups`, with no redundant outer `groups`. Each group retains optional
+`parent`, `members`, and required `team_id`. Levels organize the configuration;
+parent links define inheritance. Preserve the original flat `groups` format for
+compatibility, but reject mixed roots. Level names must be nonempty and unique
+(trimmed, case-insensitive); group names must be unique across levels. Equal-depth
+ties follow level-array order, then group order within a level. Nested
 `children` expresses the tree visually but makes deep Helm edits harder. A
 separate email-to-groups object separates related data and adds configuration
 indirection. Neither alternative is needed.
@@ -76,7 +81,8 @@ This is a compatibility constraint; it does not replace the new mapping schema.
 - Backend settings: `organization_mapping` (default empty object) and
   `organization_mapping_file` (default empty string).
 - Helm values: `config.organizationMapping` and `config.organizationMappingFile`.
-- Inline mapping and file content have exactly the same `groups` schema.
+- Inline mapping and file content have exactly the same `levels` schema; the
+  original flat `groups` root remains supported for compatibility.
 - Configure one nonempty source only; reject conflicting sources rather than
   silently merging. An empty inline mapping does not conflict with a file.
 - JSON files are UTF-8; relative paths resolve against the backend directory,

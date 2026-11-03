@@ -355,18 +355,24 @@ Use inline values to assign emails to existing LiteLLM teams and their ancestors
 ```yaml
 config:
   organizationMapping:
-    groups:
-      company:
-        team_id: team-company
-        members: [jordan@example.com]
-      engineering:
-        team_id: team-engineering
-        parent: company
-        members: [sam@example.com]
-      platform:
-        team_id: team-platform
-        parent: engineering
-        members: [alice@example.com, bob@example.com]
+    levels:
+      - name: companies
+        groups:
+          company:
+            team_id: team-company
+            members: [jordan@example.com]
+      - name: departments
+        groups:
+          engineering:
+            team_id: team-engineering
+            parent: company
+            members: [sam@example.com]
+      - name: teams
+        groups:
+          platform:
+            team_id: team-platform
+            parent: engineering
+            members: [alice@example.com, bob@example.com]
 ```
 
 Multiline member lists work too. Alice and Bob join Platform, Engineering, and

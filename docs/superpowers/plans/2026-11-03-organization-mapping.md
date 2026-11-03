@@ -4,13 +4,17 @@
 
 **Goal:** Add optional email-based team hierarchy provisioning to existing SSO, including keyless creation before first login and automatic identity linking.
 
-**Architecture:** A validated flat group mapping resolves email and existing SSO team assignments into direct and ancestor memberships. Focused services provision LiteLLM users and store only identity/reservation bookkeeping in the existing SQLite database. Existing membership and key migration services remain the execution path.
+**Architecture:** A validated `levels` array organizes named groups and resolves email and existing SSO team assignments into direct and ancestor memberships. Normalize it into the same resolver as the original supported flat format. Focused services provision LiteLLM users and store only identity/reservation bookkeeping in the existing SQLite database. Existing membership and key migration services remain the execution path.
 
 **Tech Stack:** Existing FastAPI, Pydantic settings, Python standard-library JSON/SQLite, HTTPX, pytest, Docker Compose, Helm. No new dependency.
 
 **Spec:** [Organization mapping design](../specs/2026-11-03-organization-mapping-design.md).
 
 ## Global Constraints
+
+- User-approved schema update: use `levels -> groups`, without an outer `groups`.
+  Add normalization/validation tests and update JSON, YAML, Helm, and PR examples.
+  Keep flat mappings compatible; parent links and all identity behavior remain unchanged.
 
 - Original implementation and the spec's identity revision approved; the revision supersedes conflicting task steps below.
 - User requested agents, an independent reviewer, and a PR. Use the prepared isolated branch, review before opening the PR, and commit/push only feature work.
@@ -165,22 +169,37 @@ JSON file `organization.json`:
 
 ```json
 {
-  "groups": {
-    "company": {
-      "team_id": "team-company",
-      "members": ["jordan@example.com"]
+  "levels": [
+    {
+      "name": "companies",
+      "groups": {
+        "company": {
+          "team_id": "team-company",
+          "members": ["jordan@example.com"]
+        }
+      }
     },
-    "engineering": {
-      "team_id": "team-engineering",
-      "parent": "company",
-      "members": ["sam@example.com"]
+    {
+      "name": "departments",
+      "groups": {
+        "engineering": {
+          "team_id": "team-engineering",
+          "parent": "company",
+          "members": ["sam@example.com"]
+        }
+      }
     },
-    "platform": {
-      "team_id": "team-platform",
-      "parent": "engineering",
-      "members": ["alice@example.com", "bob@example.com"]
+    {
+      "name": "teams",
+      "groups": {
+        "platform": {
+          "team_id": "team-platform",
+          "parent": "engineering",
+          "members": ["alice@example.com", "bob@example.com"]
+        }
+      }
     }
-  }
+  ]
 }
 ```
 
@@ -189,18 +208,24 @@ Equivalent inline Helm values:
 ```yaml
 config:
   organizationMapping:
-    groups:
-      company:
-        team_id: team-company
-        members: [jordan@example.com]
-      engineering:
-        team_id: team-engineering
-        parent: company
-        members: [sam@example.com]
-      platform:
-        team_id: team-platform
-        parent: engineering
-        members: [alice@example.com, bob@example.com]
+    levels:
+      - name: companies
+        groups:
+          company:
+            team_id: team-company
+            members: [jordan@example.com]
+      - name: departments
+        groups:
+          engineering:
+            team_id: team-engineering
+            parent: company
+            members: [sam@example.com]
+      - name: teams
+        groups:
+          platform:
+            team_id: team-platform
+            parent: engineering
+            members: [alice@example.com, bob@example.com]
 ```
 
 Alice and Bob join Platform, Engineering, and Company. Sam joins Engineering

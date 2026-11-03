@@ -57,18 +57,24 @@ oidc_group_team_mapping: {}
 # Referenced teams must already exist; memberships are additive, without keys.
 organization_mapping: {}
 # organization_mapping:
-#   groups:
-#     company:
-#       team_id: team-company
-#       members: [jordan@example.com]
-#     engineering:
-#       team_id: team-engineering
-#       parent: company
-#       members: [sam@example.com]
-#     platform:
-#       team_id: team-platform
-#       parent: engineering
-#       members: [alice@example.com, bob@example.com]
+#   levels:
+#     - name: companies
+#       groups:
+#         company:
+#           team_id: team-company
+#           members: [jordan@example.com]
+#     - name: departments
+#       groups:
+#         engineering:
+#           team_id: team-engineering
+#           parent: company
+#           members: [sam@example.com]
+#     - name: teams
+#       groups:
+#         platform:
+#           team_id: team-platform
+#           parent: engineering
+#           members: [alice@example.com, bob@example.com]
 # Optional read-only organization.json mount; see DEPLOYMENT.md.
 organization_mapping_file: ""
 # Deny SSO login without an SSO-group or organization-email mapping match.
