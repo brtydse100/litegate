@@ -120,6 +120,19 @@ is available.
 
 ## Release notes and publication
 
+- Every PR must have an immutable preview Git tag and published Docker image
+  named `test-pr-<PR number>-<short commit SHA>` before merge. Commit and push
+  all PR changes first, then tag the final validated PR head, push the tag, and
+  dispatch `publish-container.yml` from that tag with `version` set to the same
+  preview tag and `publish_latest=false`. Verify publication succeeds and the
+  image's `org.opencontainers.image.revision` matches the full PR head SHA;
+  include the Docker pull command in the PR description. If the PR head changes,
+  create and verify a new preview tag/image; never move or overwrite an old tag.
+- Every merged PR must be followed by a new stable version and official release
+  tag on validated `main`, using the version/release preparation process below.
+  Verify its Docker image and shared release aliases are published before
+  reporting release completion. Preview images do not update `latest` and do not
+  replace the post-merge release requirement.
 - Use the structure of [IceGraph v0.19.4](https://github.com/YanivZalach/IceGraph/releases/tag/v0.19.4)
   for `docs/releases/vX.Y.Z.md` and the corresponding GitHub release body:
   1. `# LiteGate vX.Y.Z` in the Markdown file (the GitHub release title provides
