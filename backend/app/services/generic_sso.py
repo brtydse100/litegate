@@ -51,7 +51,7 @@ async def get_user_claims(code: str, state: str) -> dict:
         data["code_verifier"] = oidc.state_pkce_verifier(state)
 
     try:
-        async with httpx.AsyncClient(follow_redirects=False) as client:
+        async with httpx.AsyncClient(follow_redirects=False, verify=settings.ssl_verify) as client:
             response = await client.post(settings.generic_token_endpoint, data=data, auth=auth, timeout=10)
             response.raise_for_status()
             tokens = response.json()
@@ -79,6 +79,6 @@ async def get_user_claims(code: str, state: str) -> dict:
         raise HTTPException(status_code=502, detail="SSO UserInfo is missing a usable user ID")
     if email is not None and (not isinstance(email, str) or not email.strip()):
         raise HTTPException(status_code=502, detail="SSO UserInfo contains an invalid email")
-    if userinfo.get("email_verified") is False and email:
+    if settings.generic_require_verified_email and userinfo.get("email_verified") is False and email:
         raise HTTPException(status_code=403, detail="SSO provider has not verified the email address")
     return {**userinfo, "sub": user_id, "email": email or ""}

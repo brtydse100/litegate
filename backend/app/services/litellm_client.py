@@ -18,6 +18,7 @@ async def start_client() -> None:
     global _shared_client
     if _shared_client is None:
         _shared_client = httpx.AsyncClient(
+            verify=settings.ssl_verify,
             base_url=settings.litellm_url.rstrip("/"),
             headers=headers(),
             timeout=httpx.Timeout(15.0, connect=5.0),
@@ -38,7 +39,7 @@ async def client():
     if _shared_client is not None:
         yield _shared_client
         return
-    async with httpx.AsyncClient() as isolated:
+    async with httpx.AsyncClient(verify=settings.ssl_verify) as isolated:
         yield isolated
 
 

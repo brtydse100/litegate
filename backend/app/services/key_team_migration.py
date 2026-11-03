@@ -4,12 +4,18 @@ import asyncio
 
 from fastapi import HTTPException
 
-from app.services import audit
+from app.services import audit, organization_sync
 from app.services import litellm as llm
 
 
-async def migrate_user_keys(user_id: str, email: str, team_id: str, keys: list[dict | str]) -> int:
+async def migrate_user_keys(user_id: str, email: str, team_id: str) -> int:
     """Move owned keys to the configured team; repeated logins resume partial moves."""
+    async with organization_sync.lock_for("user", user_id):
+        keys = await llm.list_user_keys(user_id)
+        return await _migrate_user_keys(user_id, email, team_id, keys)
+
+
+async def _migrate_user_keys(user_id: str, email: str, team_id: str, keys: list[dict | str]) -> int:
     if len(keys) > 500:
         raise HTTPException(status_code=409, detail="User has more than the safe migration limit of 500 keys")
     moved = 0

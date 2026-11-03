@@ -223,6 +223,50 @@ docker push your-registry.io/litegate:2.6.1
 
 ### Step 2 — Install
 
+The bundled [`values.yaml`](deploy/helm/litegate/values.yaml) is the complete
+reference and contains the chart defaults. Copy it to your own `values.yaml`
+outside the chart directory, replace the deployment-specific values, and delete
+any optional settings you do not need to override. Keep the bundled file intact.
+Helm merges your file with the chart defaults, including nested settings.
+
+For example, this small file uses mock credentials and local administrator login:
+
+```yaml
+config:
+  litellmUrl: "http://litellm-svc:4000"
+  litellmMasterKey: "sk-mock-replace-me"
+  jwtSecret: "mock-session-secret-at-least-32-characters"
+  rootUrl: "https://portal.example.com"
+  localAuthUsername: "portal-admin"
+  localAuthPassword: "mock-password-replace-me"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: portal.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+```
+
+Install or upgrade using your file:
+
+```bash
+helm upgrade --install litegate ./deploy/helm/litegate --values values.yaml
+```
+
+Omitted options retain their bundled defaults: one replica, the pinned release
+image, a ClusterIP Service on port 80, non-root security contexts, and a 1 Gi PVC.
+Omitting a setting restores its default rather than disabling it. To disable
+the bootstrap administrator when using SSO, explicitly set
+`config.localAuthUsername: ""` and `config.localAuthPassword: ""`; removing those
+keys would retain the bundled bootstrap credentials. Use explicit `false` or
+empty strings for other settings you want to disable. Delete unused keys or
+whole sections rather than leaving them as YAML `null` values. Lists such as
+`ingress.hosts` replace the default list, so include their required nested fields.
+
+You can also supply individual overrides with `--set`:
+
 ```bash
 helm install litegate ./deploy/helm/litegate \
   --set image.repository=your-registry.io/litegate \
@@ -242,10 +286,18 @@ helm install litegate ./deploy/helm/litegate \
 ### Step 3 — Upgrade after changes
 
 ```bash
-helm upgrade litegate ./deploy/helm/litegate --reuse-values --set image.tag=2.10.0
+helm upgrade litegate ./deploy/helm/litegate --values values.yaml
 ```
 
+Keep your custom file as the source of your overrides on upgrades. Avoid
+`--reuse-values` when you want deleted settings to return to chart defaults,
+because it retains overrides from the previous release.
+
 ### SSO roles and LiteLLM teams in Helm
+
+For custom organizational levels and inherited budgets, configure the top-level
+`organizationHierarchy` value. See [Organization hierarchy](docs/organization.md)
+for inline SSO/local mappings, parent bundles, synchronization, and usage graphs.
 
 The chart keeps application settings together under `config`. Discovery is the
 normal SSO mode; the three manual endpoints are only needed for providers whose
@@ -289,9 +341,10 @@ promote a matching full LiteLLM `proxy_admin`; read-only, organization, and team
 administrator roles are deliberately not promoted.
 
 For upgrade compatibility, the chart still accepts the deprecated
-`config.oidcRequireTeamMapping` and `config.managementApiKey` fields even though
-they are not shown in the default values file. If either the old or new
-team-mapping field is `true`, mapping remains required so conflicting upgrade
+`config.oidcRequireTeamMapping` field, shown as a commented option in the
+reference values file. The optional `config.managementApiKey` field supplies
+an administrator credential for `/api/v1` and defaults to empty. If either the
+old or new team-mapping field is `true`, mapping remains required so conflicting upgrade
 values cannot weaken login restrictions. Migrate to
 `config.ssoRequireTeamMapping`, then remove the old field.
 
@@ -392,19 +445,54 @@ configuration fails Helm rendering and backend startup. For Docker Compose,
 use the root-level snake_case equivalents in `config.yaml`.
 See [generic SSO](docs/authentication.md#generic-oauth-sso) for provider details.
 
+To allow generic SSO users whose provider explicitly reports an unverified
+email, set `config.genericRequireVerifiedEmail: false` (default: `true`). A
+missing email or `email_verified` claim remains accepted. OIDC email handling
+is unchanged. When disabled, email-based administrator matching can use that
+unverified email; configure a provider-controlled email attribute or trusted
+administrator groups.
+
 ### Custom CAs and additional resources
 
-Mount a complete CA bundle from an existing ConfigMap or Secret. Choose exactly
-one source; `key` defaults to `ca-bundle.crt`:
+Mount a complete CA bundle from an existing ConfigMap or Secret in LiteGate's
+namespace. For a local bundle, create the source first (use your namespace and
+file path):
+
+```bash
+kubectl create configmap corporate-ca --namespace <namespace> \
+  --from-file=ca-bundle.crt=/path/to/ca-bundle.crt
+```
+
+Choose exactly one source; `key` defaults to `ca-bundle.crt`:
 
 ```yaml
 customCA:
   configMap: corporate-ca
   key: ca-bundle.crt
+  mountPath: /etc/ssl/certs/litegate-custom-ca.pem
 ```
 
-The chart sets `SSL_CERT_FILE` to the mounted bundle. Include public roots in
-that file when LiteGate also connects to public HTTPS endpoints.
+Use `secret: corporate-ca` instead of `configMap` for an existing Secret. The
+chart creates the pod volume and read-only file mount, and sets `SSL_CERT_FILE`
+to `mountPath`. This path is the destination inside the pod; it does not read a
+file from your computer or create the source ConfigMap/Secret. Setting only
+`key` or `mountPath` fails Helm rendering with a source-required error. Leave
+`customCA: {}` to disable the mount. Include public roots in the bundle when
+LiteGate also connects to public HTTPS endpoints.
+
+To skip certificate verification for outgoing LiteLLM and SSO HTTPS requests:
+
+```yaml
+config:
+  sslVerify: false
+```
+
+The default is `true`. This covers SSO discovery, token, JWKS, and UserInfo
+requests as well as LiteLLM requests. Disabling verification removes server
+identity checks; prefer `customCA` for private certificates. The setting does
+not change ingress TLS or generic SSO's HTTPS URL requirement. After applying
+either verification setting with Helm, restart the LiteGate Deployment so the
+pod picks up the updated ConfigMap environment variables.
 
 Use `extraObjects` for arbitrary cluster resources. For example, an OpenShift
 Route can target the chart's Service without a dedicated Route option:

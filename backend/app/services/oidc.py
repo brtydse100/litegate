@@ -45,7 +45,7 @@ async def get_discovery() -> dict:
     now = time.monotonic()
     if _discovery_cache is not None and now - _discovery_cache_time < _DISCOVERY_TTL:
         return _discovery_cache
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(verify=settings.ssl_verify) as client:
         r = await client.get(
             f"{settings.oidc_issuer_url}/.well-known/openid-configuration",
             timeout=10,
@@ -123,7 +123,7 @@ async def get_authorization_url(state: str) -> str:
 
 async def exchange_code(code: str) -> dict:
     metadata = await get_provider_metadata()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(verify=settings.ssl_verify) as client:
         r = await client.post(
             metadata["token_endpoint"],
             data={
@@ -145,7 +145,7 @@ async def get_jwks(force_refresh: bool = False) -> dict:
     if not force_refresh and _jwks_cache is not None and now - _jwks_cache_time < _DISCOVERY_TTL:
         return _jwks_cache
     metadata = await get_provider_metadata()
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(verify=settings.ssl_verify) as client:
         r = await client.get(metadata["jwks_uri"], timeout=10)
         r.raise_for_status()
         _jwks_cache = r.json()

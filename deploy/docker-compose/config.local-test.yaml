@@ -1,0 +1,26 @@
+# Copy to backend/config.yaml for manual testing. Never use these team IDs in production.
+organizationHierarchy:
+  levels:
+    - name: Department
+      groups:
+        - members:
+            - name: Engineering
+              litellmTeamId: local-engineering
+              userIds: ["local:carol"]
+              budget: {duration: 30d, groupTotal: 2000, perUser: 50}
+    - name: Group
+      groups:
+        - parent: Engineering
+          members:
+            - name: DevOps
+              litellmTeamId: local-devops
+              userIds: ["local:bob"]
+              budget: {groupTotal: 200, perUser: 20}
+    - name: Team
+      groups:
+        - parent: DevOps
+          members:
+            - name: Platform
+              litellmTeamId: local-platform
+              userIds: ["local:alice"]
+              budget: {perUser: 5}

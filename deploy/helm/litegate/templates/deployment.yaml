@@ -14,6 +14,9 @@ kind: Deployment
 {{- fail "customCA must specify either configMap or secret, not both" }}
 {{- end }}
 {{- $hasCustomCA := or (hasKey $customCA "configMap") (hasKey $customCA "secret") }}
+{{- if and $customCA (not $hasCustomCA) }}
+{{- fail "customCA requires an existing certificate source: set customCA.configMap or customCA.secret; customCA.mountPath is the destination inside the pod" }}
+{{- end }}
 metadata:
   name: {{ include "litegate.fullname" . }}
   labels:
@@ -27,10 +30,11 @@ spec:
       {{- include "litegate.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- if or .Values.config.organizationMapping .Values.config.organizationMappingFile }}
       annotations:
+        checksum/organization: {{ .Values.organizationHierarchy | default (dict "levels" (list)) | toJson | sha256sum | quote }}
+        {{- if or .Values.config.organizationMapping .Values.config.organizationMappingFile }}
         checksum/organization-mapping: {{ dict "inline" .Values.config.organizationMapping "file" .Values.config.organizationMappingFile | toJson | sha256sum | quote }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "litegate.selectorLabels" . | nindent 8 }}
     spec:

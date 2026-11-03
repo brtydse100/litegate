@@ -36,13 +36,16 @@ export default function TeamMembersDialog({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
-  const protectedTeam = team.mapped_groups.length > 0 || team.default_key_team;
+  const protectedTeam =
+    team.organization_managed ||
+    team.mapped_groups.length > 0 ||
+    team.default_key_team;
   const destinations = useQuery({
     queryKey: ["team-move-destinations", search],
     queryFn: () => api.listTeams(1, 100, search),
   });
   const options = (destinations.data?.teams ?? []).filter(
-    (item) => item.team_id !== team.team_id,
+    (item) => item.team_id !== team.team_id && !item.organization_managed,
   );
   const members = team.members_with_roles ?? [];
 

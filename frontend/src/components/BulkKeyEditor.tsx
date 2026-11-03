@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
+  ChevronDown,
   Download,
   KeyRound,
   RotateCcw,
@@ -12,8 +13,16 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import RevealKey from "./RevealKey";
+import {
+  CurrentPolicySettings,
+  DurationChoices,
+  ModelChoices,
+  NumericPolicyInput,
+} from "./PolicySettings";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
+import { metricValue } from "./OrganizationCharts";
+import { useKeySettingsForm } from "../hooks/useKeySettingsForm";
 import type {
   AdminKeyFilters,
   BulkKeySpendResetResponse,
@@ -57,14 +66,8 @@ export default function BulkKeyEditor({
   const [teamFilter, setTeamFilter] = useState("");
   const [blockedFilter, setBlockedFilter] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
-  const [alias, setAlias] = useState("");
-  const [models, setModels] = useState("");
-  const [budget, setBudget] = useState("");
-  const [budgetDuration, setBudgetDuration] = useState("");
-  const [tpm, setTpm] = useState("");
-  const [rpm, setRpm] = useState("");
-  const [duration, setDuration] = useState("");
-  const [blockedSetting, setBlockedSetting] = useState("");
+  const [useKeyBudgetOnly, setUseKeyBudgetOnly] = useState(false);
+  const [lastUseKeyBudgetOnly, setLastUseKeyBudgetOnly] = useState(false);
   const [localError, setLocalError] = useState("");
   const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const [lastSettings, setLastSettings] = useState<KeySettingsUpdate | null>(
@@ -97,10 +100,15 @@ export default function BulkKeyEditor({
     mutationFn: ({
       targetKeys,
       settings,
+      keyBudgetOnly = false,
     }: {
       targetKeys: string[];
       settings: KeySettingsUpdate;
-    }) => api.bulkUpdateKeys(targetKeys, settings),
+      keyBudgetOnly?: boolean;
+    }) =>
+      keyBudgetOnly
+        ? api.bulkUpdateKeys(targetKeys, settings, true)
+        : api.bulkUpdateKeys(targetKeys, settings),
     onSuccess: (data) => {
       const failedKeys = data.results
         .filter((result) => !result.updated)
@@ -132,6 +140,21 @@ export default function BulkKeyEditor({
 
   const visibleKeys = adminKeys.data?.keys ?? [];
   const visibleTokens = visibleKeys.map(keyToken).filter(Boolean);
+  const selectedVisibleKeys = visibleKeys.filter((key) =>
+    selected.includes(keyToken(key)),
+  );
+  const {
+    values,
+    setValue,
+    isChanged,
+    placeholder,
+    modelSelection,
+    setModels,
+    modelsChanged,
+    modelStatus,
+  } = useKeySettingsForm(selected, selectedVisibleKeys);
+  const { alias, budget, budgetDuration, tpm, rpm, duration, blockedSetting } =
+    values;
   const allVisibleSelected =
     visibleTokens.length > 0 &&
     visibleTokens.every((token) => selected.includes(token));
@@ -149,18 +172,19 @@ export default function BulkKeyEditor({
 
   function settingsFromForm(): KeySettingsUpdate {
     const settings: KeySettingsUpdate = {};
-    if (alias.trim()) settings.key_alias = alias.trim();
-    if (models.trim())
-      settings.models = models
-        .split(/[\n,]/)
-        .map((value) => value.trim())
-        .filter(Boolean);
-    if (budget !== "") settings.max_budget = Number(budget);
-    if (budgetDuration.trim()) settings.budget_duration = budgetDuration.trim();
-    if (tpm !== "") settings.tpm_limit = Number(tpm);
-    if (rpm !== "") settings.rpm_limit = Number(rpm);
-    if (duration.trim()) settings.duration = duration.trim();
-    if (blockedSetting !== "") settings.blocked = blockedSetting === "true";
+    if (isChanged("alias") && alias.trim()) settings.key_alias = alias.trim();
+    if (modelsChanged)
+      settings.models = modelSelection.all ? [] : modelSelection.models;
+    if (isChanged("budget") && budget !== "")
+      settings.max_budget = Number(budget);
+    if (isChanged("budgetDuration") && budgetDuration.trim())
+      settings.budget_duration = budgetDuration.trim();
+    if (isChanged("tpm") && tpm !== "") settings.tpm_limit = Number(tpm);
+    if (isChanged("rpm") && rpm !== "") settings.rpm_limit = Number(rpm);
+    if (isChanged("duration") && duration.trim())
+      settings.duration = duration.trim();
+    if (isChanged("blockedSetting") && blockedSetting !== "")
+      settings.blocked = blockedSetting === "true";
     return settings;
   }
 
@@ -172,13 +196,18 @@ export default function BulkKeyEditor({
       setLocalError("Select at least one key to update.");
       return;
     }
+    if (modelsChanged && !modelSelection.all && !modelSelection.models.length) {
+      setLocalError("Select at least one model or allow all models.");
+      return;
+    }
     const settings = settingsFromForm();
-    if (!Object.keys(settings).length) {
+    if (!Object.keys(settings).length && !useKeyBudgetOnly) {
       setLocalError("Choose at least one setting to change.");
       return;
     }
     setLastSettings(settings);
-    update.mutate({ targetKeys, settings });
+    setLastUseKeyBudgetOnly(useKeyBudgetOnly);
+    update.mutate({ targetKeys, settings, keyBudgetOnly: useKeyBudgetOnly });
   }
 
   function applySearch() {
@@ -235,6 +264,7 @@ export default function BulkKeyEditor({
     update.mutate({
       targetKeys: failedResults.map((result) => result.key),
       settings: lastSettings,
+      keyBudgetOnly: lastUseKeyBudgetOnly,
     });
   }
 
@@ -301,11 +331,13 @@ export default function BulkKeyEditor({
         onSubmit={submit}
         className="grid gap-4 border-t border-[#2A2E42] p-4 sm:grid-cols-2"
       >
+        <DurationChoices id="key-budget-durations" />
+        <DurationChoices id="key-lifetime-durations" />
         <div className="space-y-3 sm:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-gray-200">
-                1. Find and choose keys
+                Find and choose keys
               </p>
               <p className="mt-0.5 text-[11px] text-gray-600">
                 Search runs across the installation. Selections persist across
@@ -446,9 +478,12 @@ export default function BulkKeyEditor({
                       key.key_alias ||
                       `Key ${(adminKeys.data?.page ?? page) * 25 - 24 + index}`;
                     return (
-                      <div key={token || index}>
+                      <div
+                        key={token || index}
+                        className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border px-2 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-indigo-500/50 ${!token ? "opacity-40" : isSelected ? "border-indigo-500/55 bg-indigo-500/10" : "border-transparent bg-[#151822] hover:border-[#353A52] hover:bg-[#1A1D27]"}`}
+                      >
                         <label
-                          className={`group flex items-center gap-3 rounded-lg border p-3 transition focus-within:ring-2 focus-within:ring-indigo-500/50 ${!token ? "cursor-not-allowed border-transparent opacity-40" : isSelected ? "cursor-pointer border-indigo-500/55 bg-indigo-500/10" : "cursor-pointer border-transparent bg-[#151822] hover:border-[#353A52] hover:bg-[#1A1D27]"}`}
+                          className={`group flex min-w-0 items-center gap-2 py-2 transition ${!token ? "cursor-not-allowed" : "cursor-pointer"}`}
                         >
                           <input
                             className="sr-only"
@@ -487,7 +522,7 @@ export default function BulkKeyEditor({
                           </span>
                           <span className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
                             <span className="rounded bg-[#22263A] px-2 py-0.5 text-[10px] text-gray-400">
-                              ${(key.spend ?? 0).toFixed(2)} spent
+                              {metricValue(key.spend ?? 0, "spend")} spent
                             </span>
                             {key.team_id && (
                               <span
@@ -500,9 +535,11 @@ export default function BulkKeyEditor({
                           </span>
                         </label>
                         {saveApiKeysInDb && key.secret_available && (
-                          <div className="px-3 pb-3">
-                            <RevealKey identifier={token} />
-                          </div>
+                          <RevealKey
+                            identifier={token}
+                            compact
+                            buttonClassName="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+                          />
                         )}
                       </div>
                     );
@@ -612,98 +649,176 @@ export default function BulkKeyEditor({
           )}
         </div>
 
-        <div className="sm:col-span-2">
-          <p className="text-xs font-semibold text-gray-200">
-            2. Choose settings to change
-          </p>
-          <p className="mt-0.5 text-[11px] text-gray-600">
-            Only filled fields are changed. Empty fields leave existing values
-            untouched.
-          </p>
-        </div>
-        <label className={fieldClass}>
-          <span>Alias</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={alias}
-            onChange={(event) => setAlias(event.target.value)}
-            placeholder="No change"
-          />
-        </label>
-        <label className={fieldClass}>
-          <span>Allowed models</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={models}
-            onChange={(event) => setModels(event.target.value)}
-            placeholder="Comma-separated; no change when empty"
-          />
-        </label>
-        <label className={fieldClass}>
-          <span>Maximum budget</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={budget}
-            onChange={(event) => setBudget(event.target.value)}
-            type="number"
-            min="0"
-            step="any"
-            placeholder="No change"
-          />
-        </label>
-        <label className={fieldClass}>
-          <span>Budget reset</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={budgetDuration}
-            onChange={(event) => setBudgetDuration(event.target.value)}
-            placeholder="For example 30d"
-          />
-        </label>
-        <label className={fieldClass}>
-          <span>TPM limit</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={tpm}
-            onChange={(event) => setTpm(event.target.value)}
-            type="number"
-            min="0"
-            placeholder="No change"
-          />
-        </label>
-        <label className={fieldClass}>
-          <span>RPM limit</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={rpm}
-            onChange={(event) => setRpm(event.target.value)}
-            type="number"
-            min="0"
-            placeholder="No change"
-          />
-        </label>
-        <label className={fieldClass}>
-          <span>New duration</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={duration}
-            onChange={(event) => setDuration(event.target.value)}
-            placeholder="For example 90d"
-          />
-        </label>
-        <label className={fieldClass}>
-          <span>Blocked state</span>
-          <select
-            className={`${inputClass} w-full`}
-            value={blockedSetting}
-            onChange={(event) => setBlockedSetting(event.target.value)}
+        {targetCount > 0 && (
+          <section
+            aria-label="Current key settings"
+            className="space-y-3 rounded-lg border border-[#2A2E42] p-3 sm:col-span-2"
           >
-            <option value="">No change</option>
-            <option value="false">Unblock</option>
-            <option value="true">Block</option>
-          </select>
-        </label>
+            <h3 className="text-sm font-semibold text-gray-200">
+              Current key settings
+            </h3>
+            {visibleKeys
+              .filter((key) => selected.includes(keyToken(key)))
+              .map((key) => (
+                <div
+                  key={keyToken(key)}
+                  className="space-y-2 border-t border-[#2A2E42] pt-2"
+                >
+                  <p className="text-xs font-medium text-gray-300">
+                    {key.key_alias || maskedToken(keyToken(key))}
+                  </p>
+                  <CurrentPolicySettings settings={key} />
+                </div>
+              ))}
+            {targetCount >
+              visibleTokens.filter((token) => selected.includes(token))
+                .length && (
+              <p className="text-xs text-amber-600">
+                {targetCount -
+                  visibleTokens.filter((token) => selected.includes(token))
+                    .length}{" "}
+                selected{" "}
+                {targetCount -
+                  visibleTokens.filter((token) => selected.includes(token))
+                    .length ===
+                1
+                  ? "key is"
+                  : "keys are"}{" "}
+                on another page. View that page to inspect their current
+                settings.
+              </p>
+            )}
+          </section>
+        )}
+        {targetCount > 0 && (
+          <details
+            key={JSON.stringify(selected)}
+            open={targetCount > 0}
+            className="group rounded-lg border border-slate-200 sm:col-span-2"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-xs font-semibold text-slate-700">
+              <span>Choose settings to change</span>
+              <ChevronDown
+                size={16}
+                aria-hidden="true"
+                className="transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <div className="grid gap-4 border-t border-slate-200 p-3 sm:grid-cols-2">
+              <p className="text-[11px] text-slate-500 sm:col-span-2">
+                Saved values are filled in below. Only edited, filled fields are
+                changed. Mixed values differ between selected keys. Changing the
+                selection resets edits.
+              </p>
+              <label className={fieldClass}>
+                <span>Alias</span>
+                <input
+                  className={`${inputClass} w-full`}
+                  value={alias}
+                  onChange={(event) => setValue("alias", event.target.value)}
+                  placeholder={placeholder("alias")}
+                />
+              </label>
+              <ModelChoices
+                value={modelSelection}
+                onChange={setModels}
+                knownModels={selectedVisibleKeys.flatMap(
+                  (key) => key.models ?? [],
+                )}
+                status={modelStatus}
+              />
+              <NumericPolicyInput
+                label="Maximum budget"
+                value={budget}
+                onValueChange={(value) => setValue("budget", value)}
+                step="any"
+                placeholder={placeholder("budget")}
+              />
+              <label className={fieldClass}>
+                <span>Budget reset</span>
+                <input
+                  className={`${inputClass} w-full`}
+                  value={budgetDuration}
+                  list="key-budget-durations"
+                  onChange={(event) =>
+                    setValue("budgetDuration", event.target.value)
+                  }
+                  placeholder={placeholder("budgetDuration")}
+                />
+              </label>
+              <NumericPolicyInput
+                label="TPM limit"
+                value={tpm}
+                onValueChange={(value) => setValue("tpm", value)}
+                placeholder={placeholder("tpm")}
+              />
+              <NumericPolicyInput
+                label="RPM limit"
+                value={rpm}
+                onValueChange={(value) => setValue("rpm", value)}
+                placeholder={placeholder("rpm")}
+              />
+              <label className={fieldClass}>
+                <span>New duration</span>
+                <input
+                  className={`${inputClass} w-full`}
+                  value={duration}
+                  list="key-lifetime-durations"
+                  onChange={(event) => setValue("duration", event.target.value)}
+                  placeholder="For example 90d"
+                />
+              </label>
+              <label className={fieldClass}>
+                <span>Blocked state</span>
+                <select
+                  className={`${inputClass} w-full`}
+                  value={blockedSetting}
+                  onChange={(event) =>
+                    setValue("blockedSetting", event.target.value)
+                  }
+                >
+                  <option value="">{placeholder("blockedSetting")}</option>
+                  <option value="false">Unblock</option>
+                  <option value="true">Block</option>
+                </select>
+              </label>
 
+              <div className="space-y-1 sm:col-span-2">
+                <label className="flex items-center gap-2 text-xs text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={useKeyBudgetOnly}
+                    onChange={(event) =>
+                      setUseKeyBudgetOnly(event.target.checked)
+                    }
+                  />
+                  Use key budget as the individual allowance
+                </label>
+                <p className="text-xs text-gray-500">
+                  Requires one key per owner with a finite budget. Removes the
+                  owner's separate personal budget and member budget in this
+                  key's team. Shared team budgets remain in force. Key settings
+                  may be saved even if removing a user budget fails; failures
+                  can be retried.
+                </p>
+              </div>
+              <button
+                disabled={
+                  update.isPending || operationsBlocked || targetCount === 0
+                }
+                className="rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-950/30 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+              >
+                {update.isPending
+                  ? "Updating..."
+                  : operationsBlocked
+                    ? "Bulk updates paused"
+                    : targetCount
+                      ? `Apply settings to ${targetCount} ${targetCount === 1 ? "key" : "keys"}`
+                      : "Select keys to continue"}
+              </button>
+            </div>
+          </details>
+        )}
         {error && <p className="text-xs text-red-400 sm:col-span-2">{error}</p>}
         {operationsBlocked && (
           <p className="text-xs text-amber-300 sm:col-span-2">
@@ -754,18 +869,6 @@ export default function BulkKeyEditor({
             )}
           </div>
         )}
-        <button
-          disabled={update.isPending || operationsBlocked || targetCount === 0}
-          className="rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-950/30 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
-        >
-          {update.isPending
-            ? "Updating..."
-            : operationsBlocked
-              ? "Bulk updates paused"
-              : targetCount
-                ? `Apply settings to ${targetCount} ${targetCount === 1 ? "key" : "keys"}`
-                : "Select keys to continue"}
-        </button>
       </form>
       {resetTarget && (
         <ResetSpendDialog

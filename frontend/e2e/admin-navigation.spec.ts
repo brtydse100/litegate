@@ -257,7 +257,16 @@ test("administrator can create, edit, move a member, and delete a team", async (
   const research = page.locator("article").filter({ hasText: "Research" });
   await research.getByRole("button", { name: "Edit" }).click();
   const editDialog = page.getByRole("dialog", { name: "Edit team" });
-  await editDialog.getByLabel("Maximum budget (USD)").fill("50");
+  const budget = editDialog.getByLabel("Maximum budget (USD)", { exact: true });
+  await budget.fill("50");
+  await editDialog
+    .getByRole("button", { name: "Increase Maximum budget (USD)", exact: true })
+    .click();
+  await expect(budget).toHaveValue("51");
+  await editDialog
+    .getByRole("button", { name: "Decrease Maximum budget (USD)", exact: true })
+    .click();
+  await expect(budget).toHaveValue("50");
   await editDialog.getByRole("button", { name: "Save changes" }).click();
   await expect(research.getByText("$50")).toBeVisible();
 
