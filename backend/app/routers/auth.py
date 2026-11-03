@@ -16,6 +16,9 @@ from app.services import generic_sso
 from app.services import key_team_migration
 from app.services import oidc as oidc_svc
 from app.services import organization_sync
+from app.services.organization_mapping import get_mapping
+from app.services.organization_provisioning import resolve_sso_user_id
+from app.services.sso_identity import provider_authority
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 _OIDC_STATE_COOKIE = "litegate_oidc_state"
@@ -114,8 +117,25 @@ async def callback(
             raise HTTPException(status_code=400, detail="No id_token in response")
         claims = await oidc_svc.verify_id_token(id_token, expected_nonce=nonce)
     user_id, email = claims["sub"], claims.get("email", "")
+    if not isinstance(user_id, str) or not user_id.strip() or not isinstance(email, str):
+        raise HTTPException(status_code=400, detail="SSO provider returned an invalid identity")
+    mapping = get_mapping()
+    if email.strip().casefold() in mapping.member_emails() and claims.get("email_verified") is False:
+        raise HTTPException(status_code=403, detail="SSO provider has not verified the mapped email address")
     group_team_ids = [team for team in settings.mapped_team_ids(claims) if not settings.organization_hierarchy.is_managed_team(team)]
+    group_team_ids = mapping.team_ids(email, group_team_ids)
+    # Established organization budget policy remains authoritative.
+    try:
+        legacy_node = organization_sync.resolve(user_id, settings.oidc_groups(claims))
+    except HTTPException:
+        # Persist rejected verified claims so existing sessions cannot retain
+        # a previous managed organization path after a conflicting login.
+        await organization_sync.record_identity(user_id, email, "sso", settings.oidc_groups(claims))
+        raise
+    user_id = await resolve_sso_user_id(provider_authority(), user_id, email)
     node = await organization_sync.record_identity(user_id, email, "sso", settings.oidc_groups(claims))
+    if legacy_node and node != legacy_node:
+        raise HTTPException(status_code=409, detail="The canonical SSO identity must retain its organizationHierarchy path")
     if settings.oidc_require_team_mapping and not group_team_ids and node is None:
         raise HTTPException(status_code=403, detail="Your SSO groups are not mapped to a LiteLLM team")
     team_ids = list(group_team_ids)

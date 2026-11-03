@@ -273,6 +273,11 @@ mapping or existing binding, existing subject-based login behavior is unchanged.
 Removing assignments never automatically removes LiteLLM memberships; review
 revocation deliberately in LiteLLM.
 
+When `organizationHierarchy` also manages the user, its key policy and deepest
+primary team continue to apply. New email mappings must use separate team IDs.
+An explicit hierarchy user-ID assignment must match the canonical identity;
+LiteGate rejects a change that would silently drop that managed path.
+
 ## API credentials
 
 | Credential | Header | Authorization |

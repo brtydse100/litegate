@@ -50,16 +50,32 @@ async def find_users_by_email(email: str) -> list[dict]:
     matches: dict[str, dict] = {}
     expected_total = None
     scanned = 0
+    seen_ids: set[str] = set()
     page = 1
     while True:
-        data = _check(await _request("GET", "/user/list", params={
-            "user_email": email, "page": page, "page_size": PAGE_SIZE, "sort_by": "user_id", "sort_order": "asc",
-        }))
+        data = _check(
+            await _request(
+                "GET",
+                "/user/list",
+                params={
+                    "user_email": email,
+                    "page": page,
+                    "page_size": PAGE_SIZE,
+                    "sort_by": "user_id",
+                    "sort_order": "asc",
+                },
+            )
+        )
         total, total_pages, users = data.get("total"), data.get("total_pages"), data.get("users")
         if (
-            type(total) is not int or total < 0 or total > MAX_LOOKUP_USERS
-            or type(total_pages) is not int or total_pages != (total + PAGE_SIZE - 1) // PAGE_SIZE
-            or data.get("page") != page or data.get("page_size") != PAGE_SIZE or not isinstance(users, list)
+            type(total) is not int
+            or total < 0
+            or total > MAX_LOOKUP_USERS
+            or type(total_pages) is not int
+            or total_pages != (total + PAGE_SIZE - 1) // PAGE_SIZE
+            or data.get("page") != page
+            or data.get("page_size") != PAGE_SIZE
+            or not isinstance(users, list)
             or len(users) != min(PAGE_SIZE, max(0, total - scanned))
             or (expected_total is not None and total != expected_total)
         ):
@@ -68,6 +84,9 @@ async def find_users_by_email(email: str) -> list[dict]:
         for user in users:
             if not isinstance(user, dict) or not isinstance(user.get("user_id"), str):
                 raise HTTPException(502, "LiteLLM email lookup returned an invalid user")
+            if user["user_id"] in seen_ids:
+                raise HTTPException(502, "LiteLLM email lookup repeated records; retry the complete scan")
+            seen_ids.add(user["user_id"])
             if str(user.get("user_email") or "").strip().casefold() == email:
                 matches[user["user_id"]] = user
         scanned += len(users)
@@ -77,7 +96,16 @@ async def find_users_by_email(email: str) -> list[dict]:
 
 
 async def create_reserved_user(user_id: str, email: str, ownership_token: str) -> None:
-    _check(await _request("POST", "/user/new", json={
-        "user_id": user_id, "user_email": email, "auto_create_key": False,
-        "user_role": "internal_user", "metadata": {OWNER_FIELD: ownership_token},
-    }))
+    _check(
+        await _request(
+            "POST",
+            "/user/new",
+            json={
+                "user_id": user_id,
+                "user_email": email,
+                "auto_create_key": False,
+                "user_role": "internal_user",
+                "metadata": {OWNER_FIELD: ownership_token},
+            },
+        )
+    )

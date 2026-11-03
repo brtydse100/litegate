@@ -12,13 +12,17 @@ from app.routers import auth
 
 @pytest.fixture
 def login(monkeypatch):
-    monkeypatch.setattr(auth.settings, "organization_mapping", {
-        "groups": {
-            "company": {"team_id": "company"},
-            "engineering": {"team_id": "engineering", "parent": "company"},
-            "platform": {"team_id": "platform", "parent": "engineering", "members": ["alice@example.com"]},
-        }
-    })
+    monkeypatch.setattr(
+        auth.settings,
+        "organization_mapping",
+        {
+            "groups": {
+                "company": {"team_id": "company"},
+                "engineering": {"team_id": "engineering", "parent": "company"},
+                "platform": {"team_id": "platform", "parent": "engineering", "members": ["alice@example.com"]},
+            }
+        },
+    )
     monkeypatch.setattr(auth.settings, "organization_mapping_file", "")
     monkeypatch.setattr(auth.settings, "oidc_group_team_mapping", {})
     monkeypatch.setattr(auth.settings, "oidc_require_team_mapping", True)
@@ -35,6 +39,7 @@ def login(monkeypatch):
     monkeypatch.setattr(auth.llm, "sync_user_team_memberships", sync)
     # Assigned once the migration module is included by this feature.
     from app.services import key_team_migration
+
     monkeypatch.setattr(key_team_migration, "migrate_user_keys", migrate)
     monkeypatch.setattr(auth.oidc_svc, "exchange_code", AsyncMock(return_value={"id_token": "verified-token"}))
     monkeypatch.setattr(auth.oidc_svc, "verify_id_token", AsyncMock(return_value=claims))
@@ -56,7 +61,7 @@ async def test_email_hierarchy_uses_canonical_identity_and_migrates(monkeypatch,
     resolver.assert_awaited_once_with("provider", "subject", "Alice@Example.com")
     ensure.assert_awaited_once_with("canonical", "Alice@Example.com")
     sync.assert_awaited_once_with("canonical", "Alice@Example.com", ["platform", "engineering", "company", "default"])
-    migrate.assert_awaited_once_with("canonical", "Alice@Example.com", "platform", [{"token": "owned-hash"}])
+    migrate.assert_awaited_once_with("canonical", "Alice@Example.com", "platform")
     cookie = SimpleCookie(response.headers.getlist("set-cookie")[0])
     user = decode_portal_token(cookie["litegate_session"].value)
     assert user.user_id == "canonical"
@@ -78,7 +83,6 @@ async def test_default_alone_does_not_satisfy_required_mapping(monkeypatch, logi
     with pytest.raises(HTTPException) as error:
         await callback(monkeypatch, False)
     assert error.value.status_code == 403
-    login[1].assert_not_awaited()
     login[2].assert_not_awaited()
 
 
@@ -106,3 +110,37 @@ async def test_mapping_removed_still_resolves_established_identity(monkeypatch, 
     monkeypatch.setattr(auth.settings, "oidc_require_team_mapping", False)
     await callback(monkeypatch, False)
     login[2].assert_awaited_once_with("canonical", "Alice@Example.com")
+
+
+@pytest.mark.asyncio
+async def test_existing_budget_hierarchy_keeps_primary_and_key_policy(monkeypatch, login):
+    from app.organization import OrganizationHierarchy
+
+    hierarchy = OrganizationHierarchy.model_validate(
+        {
+            "levels": [
+                {"name": "division", "groups": [{"members": [{"name": "managed", "litellmTeamId": "governed", "ssoGroups": ["existing-group"]}]}]}
+            ]
+        }
+    )
+    monkeypatch.setattr(auth.settings, "organization_hierarchy", hierarchy)
+    node = hierarchy.resolve("canonical", ["existing-group"])
+    monkeypatch.setattr(auth.organization_sync, "record_identity", AsyncMock(return_value=node))
+    monkeypatch.setattr(auth.organization_sync, "synchronize_user", AsyncMock(return_value=node))
+    await callback(monkeypatch, False)
+    assert login[3].await_args.args[2] == ["governed", "platform", "engineering", "company", "default"]
+    login[4].assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_canonical_binding_cannot_silently_drop_explicit_hierarchy_path(monkeypatch, login):
+    from app.organization import OrganizationHierarchy
+
+    hierarchy = OrganizationHierarchy.model_validate(
+        {"levels": [{"name": "division", "groups": [{"members": [{"name": "managed", "litellmTeamId": "governed", "userIds": ["subject"]}]}]}]}
+    )
+    monkeypatch.setattr(auth.settings, "organization_hierarchy", hierarchy)
+    with pytest.raises(HTTPException) as error:
+        await callback(monkeypatch, False)
+    assert error.value.status_code == 409
+    login[2].assert_not_awaited()

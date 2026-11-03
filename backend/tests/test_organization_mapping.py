@@ -46,7 +46,8 @@ def test_conflicting_sources_are_rejected(tmp_path):
 
 def test_file_snapshot_does_not_reload_without_restart(tmp_path, monkeypatch):
     from app.services import organization_mapping as service
-    from app.config import settings
+
+    settings = service.settings
 
     path = tmp_path / "snapshot.json"
     path.write_text(json.dumps(DATA), encoding="utf-8")
@@ -60,11 +61,16 @@ def test_file_snapshot_does_not_reload_without_restart(tmp_path, monkeypatch):
 
 
 def test_root_members_never_inherit_children_and_equal_depth_uses_order():
-    mapping = load_mapping({"groups": {
-        "root": {"team_id": "root", "members": ["root@example.com"]},
-        "z-first": {"team_id": "first", "parent": "root", "members": ["both@example.com"]},
-        "a-second": {"team_id": "second", "parent": "root", "members": ["both@example.com"]},
-    }}, "")
+    mapping = load_mapping(
+        {
+            "groups": {
+                "root": {"team_id": "root", "members": ["root@example.com"]},
+                "z-first": {"team_id": "first", "parent": "root", "members": ["both@example.com"]},
+                "a-second": {"team_id": "second", "parent": "root", "members": ["both@example.com"]},
+            }
+        },
+        "",
+    )
     assert mapping.team_ids("root@example.com", []) == ["root"]
     assert mapping.team_ids("both@example.com", []) == ["first", "second", "root"]
 

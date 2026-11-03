@@ -65,6 +65,14 @@ indirection. Neither alternative is needed.
 
 ## Configuration contract
 
+Integration ruling after fetching current `main` (v2.14): the already-shipped
+`organizationHierarchy` budget/key policy remains authoritative and its
+reconciliation is preserved. Reject overlapping managed team IDs before new
+provisioning writes. For a user managed by both configurations, the existing
+budget hierarchy chooses the primary team and key allowance. Reject canonical
+identity changes that would silently discard an explicit legacy hierarchy path.
+This is a compatibility constraint; it does not replace the new mapping schema.
+
 - Backend settings: `organization_mapping` (default empty object) and
   `organization_mapping_file` (default empty string).
 - Helm values: `config.organizationMapping` and `config.organizationMappingFile`.

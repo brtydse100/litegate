@@ -5,6 +5,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from app.config import settings
+
 _EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _BACKEND = Path(__file__).resolve().parents[2]
 
@@ -16,8 +18,6 @@ def _snapshot(inline_json: str, filename: str):
 
 def get_mapping():
     """Share the validated file snapshot between startup and login."""
-    from app.config import settings
-
     return _snapshot(json.dumps(settings.organization_mapping), settings.organization_mapping_file)
 
 

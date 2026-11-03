@@ -1,3 +1,4 @@
+import asyncio
 from copy import deepcopy
 from unittest.mock import AsyncMock
 
@@ -9,7 +10,6 @@ from app.services import local_users, organization_mapping
 from app.services import organization_provisioning as provisioning
 from app.services import sso_identity as store
 
-
 EMAIL = "alice@example.com"
 
 
@@ -18,10 +18,11 @@ def setup(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "identity.db"))
     monkeypatch.setattr(settings, "oidc_issuer_url", "https://idp.example.invalid")
     monkeypatch.setattr(settings, "oidc_client_id", "portal")
-    monkeypatch.setattr(settings, "organization_mapping", {
-        "groups": {"company": {"team_id": "company"}, "engineering": {
-            "team_id": "engineering", "parent": "company", "members": [EMAIL]}}
-    })
+    monkeypatch.setattr(
+        settings,
+        "organization_mapping",
+        {"groups": {"company": {"team_id": "company"}, "engineering": {"team_id": "engineering", "parent": "company", "members": [EMAIL]}}},
+    )
     monkeypatch.setattr(settings, "organization_mapping_file", "")
     mapping = organization_mapping.load_mapping(settings.organization_mapping, "")
     monkeypatch.setattr(provisioning, "get_mapping", lambda: mapping)
@@ -38,8 +39,7 @@ def setup(tmp_path, monkeypatch):
     async def create(user_id, email, token):
         assert store.reservation(store.provider_authority(), email)["ownership_token"] == token
         mutations.append(("create", user_id))
-        users[user_id] = {"user_id": user_id, "user_email": email, "user_role": "internal_user",
-                          "metadata": {"litegate_organization_owner": token}}
+        users[user_id] = {"user_id": user_id, "user_email": email, "user_role": "internal_user", "metadata": {"litegate_organization_owner": token}}
 
     monkeypatch.setattr(provisioning.remote, "get_user", get_user)
     monkeypatch.setattr(provisioning.remote, "find_users_by_email", find)
@@ -133,8 +133,7 @@ async def test_crash_after_remote_creation_recovers_by_marker(setup, monkeypatch
 async def test_marker_mismatch_and_ambiguous_email_fail_without_writes(setup):
     mapping, users, mutations = setup
     reservation = store.reserve(store.provider_authority(), EMAIL)
-    users[reservation["user_id"]] = {"user_id": reservation["user_id"], "user_email": EMAIL,
-                                   "user_role": "internal_user", "metadata": {}}
+    users[reservation["user_id"]] = {"user_id": reservation["user_id"], "user_email": EMAIL, "user_role": "internal_user", "metadata": {}}
     with pytest.raises(HTTPException):
         await provisioning.provision_members(mapping)
     users.clear()
@@ -146,13 +145,27 @@ async def test_marker_mismatch_and_ambiguous_email_fail_without_writes(setup):
 
 
 @pytest.mark.asyncio
+async def test_interrupted_creation_and_new_email_candidate_are_ambiguous(setup):
+    mapping, users, mutations = setup
+    reservation = store.reserve(store.provider_authority(), EMAIL)
+    await provisioning.remote.create_reserved_user(reservation["user_id"], EMAIL, reservation["ownership_token"])
+    users["unrelated"] = {"user_id": "unrelated", "user_email": EMAIL, "user_role": "internal_user"}
+    with pytest.raises(HTTPException):
+        await provisioning.provision_members(mapping)
+    assert len(mutations) == 1
+    provisioning.litellm.sync_user_team_memberships.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_binding_survives_mapping_removal_and_email_change(setup, monkeypatch):
-    mapping, users, _ = setup
+    mapping, _, _ = setup
     await provisioning.provision_members(mapping)
     canonical = await provisioning.resolve_sso_user_id(store.provider_authority(), "subject", EMAIL)
     monkeypatch.setattr(provisioning, "get_mapping", lambda: organization_mapping.load_mapping({}, ""))
     assert await provisioning.resolve_sso_user_id(store.provider_authority(), "subject", "changed@example.com") == canonical
     assert await provisioning.resolve_sso_user_id(store.provider_authority(), "other", "") == "other"
+    with pytest.raises(HTTPException):
+        await provisioning.resolve_sso_user_id(store.provider_authority(), "other", EMAIL)
 
 
 @pytest.mark.asyncio
@@ -162,3 +175,87 @@ async def test_competing_subject_cannot_claim_bound_email(setup):
     await provisioning.resolve_sso_user_id(store.provider_authority(), "subject", EMAIL)
     with pytest.raises(HTTPException):
         await provisioning.resolve_sso_user_id(store.provider_authority(), "other", EMAIL)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("round", [1, 2])
+async def test_concurrent_subjects_select_only_one_canonical_identity(setup, monkeypatch, round):
+    mapping, _, _ = setup
+    await provisioning.provision_members(mapping)
+    original = provisioning.remote.get_user
+
+    async def yielding_read(*args):
+        await asyncio.sleep(0)
+        return await original(*args)
+
+    monkeypatch.setattr(provisioning.remote, "get_user", yielding_read)
+    results = await asyncio.gather(
+        provisioning.resolve_sso_user_id(store.provider_authority(), "one", EMAIL),
+        provisioning.resolve_sso_user_id(store.provider_authority(), "two", EMAIL),
+        return_exceptions=True,
+    )
+    assert sum(isinstance(result, str) for result in results) == 1
+    assert sum(isinstance(result, HTTPException) for result in results) == 1
+
+
+@pytest.mark.asyncio
+async def test_membership_failure_retries_without_creating_another_user(setup):
+    mapping, users, mutations = setup
+    provisioning.litellm.sync_user_team_memberships.side_effect = HTTPException(502, "team write failed")
+    with pytest.raises(HTTPException):
+        await provisioning.provision_members(mapping)
+    provisioning.litellm.sync_user_team_memberships.side_effect = None
+    await provisioning.provision_members(mapping)
+    assert len(users) == len(mutations) == 1
+
+
+@pytest.mark.asyncio
+async def test_existing_admin_subject_can_bind_but_startup_email_cannot_adopt(setup):
+    _, users, mutations = setup
+    users["admin-subject"] = {"user_id": "admin-subject", "user_email": EMAIL, "user_role": "proxy_admin"}
+    assert await provisioning.resolve_sso_user_id(store.provider_authority(), "admin-subject", EMAIL) == "admin-subject"
+    assert not mutations
+
+
+@pytest.mark.asyncio
+async def test_governed_budget_team_overlap_fails_before_writes(setup, monkeypatch):
+    from types import SimpleNamespace
+
+    mapping, _, mutations = setup
+    hierarchy = SimpleNamespace(is_managed_team=lambda team_id: team_id == "company")
+    monkeypatch.setattr(settings, "organization_hierarchy", hierarchy)
+    with pytest.raises(HTTPException):
+        await provisioning.provision_members(mapping)
+    assert not mutations
+    provisioning.litellm.get_team.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_manual_members_need_configured_sso_authority(setup, monkeypatch):
+    mapping, _, mutations = setup
+    monkeypatch.setattr(settings, "oidc_issuer_url", "")
+    monkeypatch.setattr(settings, "generic_client_id", "")
+    with pytest.raises(HTTPException):
+        await provisioning.provision_members(mapping)
+    assert not mutations
+    provisioning.litellm.get_team.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_binding_checkpoint_precedes_login_membership_writes(setup):
+    _, _, _ = setup
+    canonical = await provisioning.resolve_sso_user_id(store.provider_authority(), "subject", EMAIL)
+    assert store.lookup_binding(store.provider_authority(), "subject")["user_id"] == canonical
+    provisioning.litellm.sync_user_team_memberships.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_no_mapping_keeps_legacy_login_without_database_or_remote_lookup(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "absent.db"))
+    mapping = organization_mapping.load_mapping({}, "")
+    monkeypatch.setattr(provisioning, "get_mapping", lambda: mapping)
+    lookup = AsyncMock(side_effect=AssertionError("unexpected remote lookup"))
+    monkeypatch.setattr(provisioning.remote, "get_user", lookup)
+    await provisioning.provision_members(mapping)
+    assert await provisioning.resolve_sso_user_id("authority", "legacy", EMAIL) == "legacy"
+    assert not local_users._db_path().exists()

@@ -221,6 +221,14 @@ source can satisfy it. Helm serializes map keys in sorted order, so inline
 Helm ties follow that rendered order; use a JSON file when declaration order
 must be preserved.
 
+The separate budget-managed `organizationHierarchy` remains authoritative for
+users it manages: its deepest team and key allowance take precedence over the
+email mapping's primary team. Email mapping cannot reference its managed team
+IDs; startup rejects overlaps before provisioning. Use SSO groups or the
+canonical user ID for existing hierarchy membership. A canonical identity change
+that would drop an explicit hierarchy path is rejected rather than bypassing
+that policy.
+
 Membership changes are additive. Removing an email or group does not revoke
 memberships or delete users. Restart LiteGate after editing YAML, environment
 variables, or JSON; there is no file watcher. Inline Helm edits trigger a pod

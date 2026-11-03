@@ -2,14 +2,26 @@
 
 import asyncio
 import logging
+from weakref import WeakValueDictionary
 
 from fastapi import HTTPException
 
-from app.services import audit, litellm, litellm_identity as remote, sso_identity as store
+from app.config import settings
+from app.services import audit, litellm
+from app.services import litellm_identity as remote
+from app.services import sso_identity as store
 from app.services.organization_mapping import OrganizationMapping, get_mapping
 
 _logger = logging.getLogger(__name__)
-_identity_lock = asyncio.Lock()
+_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
+
+
+def _identity_lock() -> asyncio.Lock:
+    lock = _locks.get("identity")
+    if lock is None:
+        lock = asyncio.Lock()
+        _locks["identity"] = lock
+    return lock
 
 
 def _conflict(message: str) -> None:
@@ -74,7 +86,8 @@ async def _provision_email(provider: str, email: str) -> str | None:
     reservation = store.reservation(provider, email)
     candidates = await remote.find_users_by_email(email)
     ordinary = [user for user in candidates if not reservation or user["user_id"] != reservation["user_id"]]
-    if len(ordinary) > 1 or (ordinary and reservation and reservation["status"] == "reserved"):
+    reserved_match = reservation and any(user["user_id"] == reservation["user_id"] for user in candidates)
+    if len(ordinary) > 1 or (ordinary and (reserved_match or (reservation and reservation["status"] == "reserved"))):
         _conflict("Configured email has ambiguous LiteLLM accounts; authenticate the legacy SSO identity first")
     if ordinary:
         _ordinary_candidate(ordinary[0], email)
@@ -89,6 +102,10 @@ async def _provision_email(provider: str, email: str) -> str | None:
 async def provision_members(mapping: OrganizationMapping) -> None:
     if not mapping.member_emails() and not mapping.referenced_team_ids():
         return
+    if mapping.member_emails() and not settings.sso_enabled:
+        _conflict("Email organization mapping requires a configured SSO provider before provisioning")
+    if any(settings.organization_hierarchy.is_managed_team(team_id) for team_id in mapping.referenced_team_ids()):
+        _conflict("Email organization mapping must not reference teams governed by organization_hierarchy")
     store.initialize_identity_store()
     provider = store.provider_authority()
     pending = provisioned = 0
@@ -97,7 +114,7 @@ async def provision_members(mapping: OrganizationMapping) -> None:
         for team_id in mapping.referenced_team_ids():
             if await litellm.get_team(team_id) is None:
                 raise HTTPException(409, f"Organization mapping references missing LiteLLM team: {team_id}")
-        async with _identity_lock:
+        async with _identity_lock():
             for email in mapping.member_emails():
                 user_id = await _provision_email(provider, email)
                 if user_id is None:
@@ -117,9 +134,11 @@ async def resolve_sso_user_id(provider: str, subject: str, email: str) -> str:
     if binding:
         return await _bound_user(binding)
     email = email.strip().casefold()
+    if email and store.binding_for_email(provider, email):
+        _conflict("Configured email is already bound to a different SSO subject")
     if not email or email not in get_mapping().member_emails():
         return subject
-    async with _identity_lock:
+    async with _identity_lock():
         try:
             binding = store.lookup_binding(provider, subject)
             if binding:
@@ -132,8 +151,7 @@ async def resolve_sso_user_id(provider: str, subject: str, email: str) -> str:
             existing = await remote.get_user(subject)
             reservation = store.reservation(provider, email)
             candidates = await remote.find_users_by_email(email)
-            unrelated = [u for u in candidates if u["user_id"] != subject and (
-                not reservation or u["user_id"] != reservation["user_id"])]
+            unrelated = [u for u in candidates if u["user_id"] != subject and (not reservation or u["user_id"] != reservation["user_id"])]
             if existing:
                 if unrelated:
                     _conflict("Configured email also belongs to an unrelated LiteLLM account")
