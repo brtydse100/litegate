@@ -58,7 +58,7 @@ async def callback(monkeypatch, generic):
 async def test_email_hierarchy_uses_canonical_identity_and_migrates(monkeypatch, login, generic):
     _, resolver, ensure, sync, migrate = login
     response = await callback(monkeypatch, generic)
-    resolver.assert_awaited_once_with("provider", "subject", "Alice@Example.com")
+    assert resolver.await_args.args == ("provider", "subject", "Alice@Example.com")
     ensure.assert_awaited_once_with("canonical", "Alice@Example.com")
     sync.assert_awaited_once_with("canonical", "Alice@Example.com", ["platform", "engineering", "company", "default"])
     migrate.assert_awaited_once_with("canonical", "Alice@Example.com", "platform")

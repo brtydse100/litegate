@@ -18,7 +18,7 @@ from app.services import oidc as oidc_svc
 from app.services import organization_sync
 from app.services.organization_mapping import get_mapping
 from app.services.organization_provisioning import resolve_sso_user_id
-from app.services.sso_identity import provider_authority
+from app.services.sso_identity import lookup_binding, provider_authority
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 _OIDC_STATE_COOKIE = "litegate_oidc_state"
@@ -125,14 +125,23 @@ async def callback(
     group_team_ids = [team for team in settings.mapped_team_ids(claims) if not settings.organization_hierarchy.is_managed_team(team)]
     group_team_ids = mapping.team_ids(email, group_team_ids)
     # Established organization budget policy remains authoritative.
+    provider = provider_authority()
+    binding = lookup_binding(provider, user_id)
+    previous_user_id = binding["user_id"] if binding else user_id
     try:
         legacy_node = organization_sync.resolve(user_id, settings.oidc_groups(claims))
     except HTTPException:
         # Persist rejected verified claims so existing sessions cannot retain
         # a previous managed organization path after a conflicting login.
-        await organization_sync.record_identity(user_id, email, "sso", settings.oidc_groups(claims))
+        await organization_sync.record_identity(previous_user_id, email, "sso", settings.oidc_groups(claims))
         raise
-    user_id = await resolve_sso_user_id(provider_authority(), user_id, email)
+
+    def validate_user_id(canonical_id: str) -> None:
+        proposed_node = organization_sync.resolve(canonical_id, settings.oidc_groups(claims))
+        if legacy_node and proposed_node != legacy_node:
+            raise HTTPException(status_code=409, detail="The canonical SSO identity must retain its organizationHierarchy path")
+
+    user_id = await resolve_sso_user_id(provider, user_id, email, validate_user_id=validate_user_id)
     node = await organization_sync.record_identity(user_id, email, "sso", settings.oidc_groups(claims))
     if legacy_node and node != legacy_node:
         raise HTTPException(status_code=409, detail="The canonical SSO identity must retain its organizationHierarchy path")

@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections.abc import Callable
 from weakref import WeakValueDictionary
 
 from fastapi import HTTPException
@@ -129,7 +130,7 @@ async def provision_members(mapping: OrganizationMapping) -> None:
     _logger.info("Organization provisioning completed: %s provisioned, %s pending identity confirmation", provisioned, pending)
 
 
-async def resolve_sso_user_id(provider: str, subject: str, email: str) -> str:
+async def resolve_sso_user_id(provider: str, subject: str, email: str, *, validate_user_id: Callable[[str], None] | None = None) -> str:
     binding = store.lookup_binding(provider, subject)
     if binding:
         return await _bound_user(binding)
@@ -160,6 +161,8 @@ async def resolve_sso_user_id(provider: str, subject: str, email: str) -> str:
                 if unrelated:
                     _conflict("Existing email candidate requires its authenticated legacy SSO subject")
                 canonical = await _ensure_owned(reservation or store.reserve(provider, email))
+            if validate_user_id is not None:
+                validate_user_id(canonical)
             store.bind(provider, subject, email, canonical)
             _audit("organization.identity_bound", canonical)
             return canonical
