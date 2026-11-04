@@ -35,8 +35,6 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | `oidc_jwks_uri` | empty | Manual signing-key endpoint; set with the authorization and token endpoints |
 | `oidc_groups_claim` | `groups` | Group path in the verified ID token or generic UserInfo; dot notation supported |
 | `oidc_group_team_mapping` | `{}` | SSO group to existing LiteLLM team ID or team-ID list |
-| `organization_mapping` | `{}` | Optional email-to-team hierarchy with a `levels` root; use this or a file |
-| `organization_mapping_file` | empty | UTF-8 JSON hierarchy file; relative paths resolve against the backend directory |
 | `oidc_require_team_mapping` | `false` | Deny SSO login when no configured team matches |
 | `sso_default_team_id` | empty | Existing LiteLLM team added to every SSO user in addition to group-mapped teams |
 | `inherit_litellm_admin` | `false` | Grant LiteGate admin access to a matching full LiteLLM `proxy_admin` |
@@ -153,115 +151,37 @@ for lifecycle and removal behavior.
 
 ### Email organization mapping
 
-Use this optional hierarchy when SSO group claims do not express the desired
-organization. All referenced LiteLLM teams must already exist. This feature
-does not create teams, budgets, keys, local passwords, or administrator roles.
-In Docker Compose's `config.yaml`:
+Use the existing `organizationHierarchy` (`organization_hierarchy` or
+`ORGANIZATION_HIERARCHY` for backend configuration). Each member's `userIds`
+accepts exact existing user IDs and SSO email addresses. Email matching trims
+whitespace and ignores case; existing ID matching remains exact. Only identities
+from SSO can match by email: local accounts retain explicit ID assignments.
 
-```yaml
-organization_mapping:
-  levels:
-    - name: companies
-      groups:
-        company:
-          team_id: team-company
-          members: [jordan@example.com]
-    - name: departments
-      groups:
-        engineering:
-          team_id: team-engineering
-          parent: company
-          members: [sam@example.com]
-    - name: teams
-      groups:
-        platform:
-          team_id: team-platform
-          parent: engineering
-          members: [alice@example.com, bob@example.com]
-```
+Email and `ssoGroups` matches use the same single-path resolver. Compatible
+ancestor matches select the deepest team and its inherited budget. Conflicting
+paths reject access rather than selecting one by order. Ancestor membership,
+key migration, and enforced allowances use the existing hierarchy lifecycle.
 
-Multiline YAML member lists are also accepted. Alice and Bob join Platform,
-Engineering, and Company; Sam joins Engineering and Company; Jordan joins
-Company only. Inheritance goes upward, never to children or siblings. Emails
-are trimmed and matched case-insensitively. Group names are configuration
-identifiers, independent of SSO group names. Each group has one `team_id`, at
-most one `parent`, and an optional `members` list, which defaults to empty.
+Emails remain configuration only until first authenticated SSO login. The actual
+provider subject is provisioned with `auto_create_key=False`; startup does no
+remote email lookup and creates no placeholder users or reservations. Existing
+explicit ID discovery is unchanged.
 
-Levels organize groups for readability; `parent` defines inheritance. Each level
-has a unique, nonempty `name` and a `groups` object. Group names must be unique
-across all levels so parent references are unambiguous. Levels do not themselves
-grant membership. The original flat `groups` root remains supported; choose one
-root format per mapping.
+In 2.15.1, `organization_mapping`, `organization_mapping_file`,
+`config.organizationMapping`, and `config.organizationMappingFile` are removed.
+Remove those options and optional JSON mounts. Move old `members` emails into
+`userIds` of the corresponding hierarchy member; move `team_id` to
+`litellmTeamId`, and express parent links through the existing `groups` bundles.
+The old flat/object-based groups schema is not accepted. Nonempty removed
+options fail with a migration message. Preserve the SQLite volume: existing
+2.15.0 provider/subject bindings keep their canonical users, keys, spend, and
+memberships. Unbound reservations require durable remote ownership evidence;
+unproven pending candidates require their authenticated existing subject.
+No users are deleted and no key ownership is transferred.
 
-Alternatively, put the same `levels` object in a UTF-8 JSON file:
-
-```json
-{
-  "levels": [
-    {
-      "name": "companies",
-      "groups": {
-        "company": {
-          "team_id": "team-company",
-          "members": ["jordan@example.com"]
-        }
-      }
-    },
-    {
-      "name": "departments",
-      "groups": {
-        "engineering": {
-          "team_id": "team-engineering",
-          "parent": "company",
-          "members": ["sam@example.com"]
-        }
-      }
-    },
-    {
-      "name": "teams",
-      "groups": {
-        "platform": {
-          "team_id": "team-platform",
-          "parent": "engineering",
-          "members": ["alice@example.com", "bob@example.com"]
-        }
-      }
-    }
-  ]
-}
-```
-
-Set `organization_mapping_file: /app/backend/organization.json` and leave
-`organization_mapping: {}` when using this file in a container. Environment
-equivalents are `ORGANIZATION_MAPPING` (the JSON object on one line) and
-`ORGANIZATION_MAPPING_FILE`. Configure only one nonempty source; they are not
-merged. Unknown fields, invalid emails, blank/repeated team IDs, missing
-parents, cycles, malformed JSON, and unreadable files are rejected.
-
-Existing SSO group mappings keep their primary team and gain ancestors for
-mapped teams that appear in the hierarchy. Without an SSO group match, the
-deepest directly email-assigned group becomes primary; equal-depth ties use
-level order followed by group declaration order. Remaining memberships are deduplicated and the
-configured `sso_default_team_id` is appended last if absent. The default team
-alone does not satisfy `oidc_require_team_mapping`; either explicit mapping
-source can satisfy it. Helm serializes map keys in sorted order, so inline
-Helm ties within a level follow that rendered order; the `levels` array always
-preserves level order. Use a JSON file when within-level declaration order must
-be preserved.
-
-The separate budget-managed `organizationHierarchy` remains authoritative for
-users it manages: its deepest team and key allowance take precedence over the
-email mapping's primary team. Email mapping cannot reference its managed team
-IDs; startup rejects overlaps before provisioning. Use SSO groups or the
-canonical user ID for existing hierarchy membership. A canonical identity change
-that would drop an explicit hierarchy path is rejected rather than bypassing
-that policy.
-
-Membership changes are additive. Removing an email or group does not revoke
-memberships or delete users. Restart LiteGate after editing YAML, environment
-variables, or JSON; there is no file watcher. Inline Helm edits trigger a pod
-rollout. See [deployment examples](../DEPLOYMENT.md#email-organization-mapping-in-helm)
-and [identity lifecycle](authentication.md#email-organization-mapping-and-identity).
+See [YAML example](examples/organization-hierarchy.yaml) and
+[JSON hierarchy value](examples/organization-hierarchy.json). JSON is the value
+of `ORGANIZATION_HIERARCHY`, not a separately mounted mapping file.
 
 ## Key defaults
 

@@ -96,7 +96,12 @@ async def finish_team(node: OrganizationNode) -> dict:
                 owner = key.get("user_id") or ""
                 identity = await asyncio.to_thread(store.get, owner)
                 try:
-                    assigned = settings.organization_hierarchy.resolve(owner, identity["groups"] if identity else [])
+                    assigned = settings.organization_hierarchy.resolve(
+                        owner,
+                        identity["groups"] if identity else [],
+                        email=identity["email"] if identity else "",
+                        source=identity["auth_source"] if identity else "",
+                    )
                 except MembershipConflict as exc:
                     raise HTTPException(status_code=409, detail="Resolve conflicting team memberships before removing a shared cap") from exc
                 if not assigned or assigned.team_id != node.team_id or not matches(key, assigned):

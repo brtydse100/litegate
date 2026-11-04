@@ -1,0 +1,44 @@
+{
+  "levels": [
+    {
+      "name": "Division",
+      "groups": [
+        {
+          "members": [
+            {
+              "name": "Engineering",
+              "litellmTeamId": "engineering",
+              "ssoGroups": [
+                "engineers"
+              ],
+              "budget": {
+                "perUser": 100,
+                "duration": "30d"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Team",
+      "groups": [
+        {
+          "parent": "Engineering",
+          "members": [
+            {
+              "name": "Platform",
+              "userIds": [
+                "alice@example.com",
+                "local:operator"
+              ],
+              "budget": {
+                "perUser": 50
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -16,8 +16,7 @@ from app.services import generic_sso
 from app.services import key_team_migration
 from app.services import oidc as oidc_svc
 from app.services import organization_sync
-from app.services.organization_mapping import get_mapping
-from app.services.organization_provisioning import resolve_sso_user_id
+from app.services.sso_legacy import resolve_sso_user_id
 from app.services.sso_identity import lookup_binding, provider_authority
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -119,17 +118,14 @@ async def callback(
     user_id, email = claims["sub"], claims.get("email", "")
     if not isinstance(user_id, str) or not user_id.strip() or not isinstance(email, str):
         raise HTTPException(status_code=400, detail="SSO provider returned an invalid identity")
-    mapping = get_mapping()
-    if email.strip().casefold() in mapping.member_emails() and claims.get("email_verified") is False:
-        raise HTTPException(status_code=403, detail="SSO provider has not verified the mapped email address")
+    email = email.strip().casefold()
     group_team_ids = [team for team in settings.mapped_team_ids(claims) if not settings.organization_hierarchy.is_managed_team(team)]
-    group_team_ids = mapping.team_ids(email, group_team_ids)
     # Established organization budget policy remains authoritative.
     provider = provider_authority()
     binding = lookup_binding(provider, user_id)
     previous_user_id = binding["user_id"] if binding else user_id
     try:
-        legacy_node = organization_sync.resolve(user_id, settings.oidc_groups(claims))
+        legacy_node = organization_sync.resolve(user_id, settings.oidc_groups(claims), email=email, source="sso")
     except HTTPException:
         # Persist rejected verified claims so existing sessions cannot retain
         # a previous managed organization path after a conflicting login.
@@ -137,7 +133,7 @@ async def callback(
         raise
 
     def validate_user_id(canonical_id: str) -> None:
-        proposed_node = organization_sync.resolve(canonical_id, settings.oidc_groups(claims))
+        proposed_node = organization_sync.resolve(canonical_id, settings.oidc_groups(claims), email=email, source="sso")
         if legacy_node and proposed_node != legacy_node:
             raise HTTPException(status_code=409, detail="The canonical SSO identity must retain its organizationHierarchy path")
 

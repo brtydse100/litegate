@@ -226,3 +226,37 @@ synthetic organizations and usage, without a backend or credentials. Its shared
 30-day UTC dataset reconciles member, group, daily and model reporting totals
 with the displayed demo budget-period spend. Shorter date ranges use that same
 dataset; dates before the demo period have zero usage.
+
+## Individual SSO email assignments
+
+Use the existing `organizationHierarchy` (`organization_hierarchy` or
+`ORGANIZATION_HIERARCHY` for backend configuration). Each member's `userIds`
+accepts exact existing user IDs and SSO email addresses. Email matching trims
+whitespace and ignores case; existing ID matching remains exact. Only identities
+from SSO can match by email: local accounts retain explicit ID assignments.
+
+Email and `ssoGroups` matches use the same single-path resolver. Compatible
+ancestor matches select the deepest team and its inherited budget. Conflicting
+paths reject access rather than selecting one by order. Ancestor membership,
+key migration, and enforced allowances use the existing hierarchy lifecycle.
+
+Emails remain configuration only until first authenticated SSO login. The actual
+provider subject is provisioned with `auto_create_key=False`; startup does no
+remote email lookup and creates no placeholder users or reservations. Existing
+explicit ID discovery is unchanged.
+
+In 2.15.1, `organization_mapping`, `organization_mapping_file`,
+`config.organizationMapping`, and `config.organizationMappingFile` are removed.
+Remove those options and optional JSON mounts. Move old `members` emails into
+`userIds` of the corresponding hierarchy member; move `team_id` to
+`litellmTeamId`, and express parent links through the existing `groups` bundles.
+The old flat/object-based groups schema is not accepted. Nonempty removed
+options fail with a migration message. Preserve the SQLite volume: existing
+2.15.0 provider/subject bindings keep their canonical users, keys, spend, and
+memberships. Unbound reservations require durable remote ownership evidence;
+unproven pending candidates require their authenticated existing subject.
+No users are deleted and no key ownership is transferred.
+
+See [YAML example](examples/organization-hierarchy.yaml) and
+[JSON hierarchy value](examples/organization-hierarchy.json). JSON is the value
+of `ORGANIZATION_HIERARCHY`, not a separately mounted mapping file.

@@ -7,6 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.15.1] - 2026-11-04
+
+### Fixed
+
+- Honor generic SSO email verification opt-out consistently through login.
+- Resolve normalized SSO emails in existing hierarchy `userIds` with the same
+  single-path membership and inherited budget policy as SSO groups.
+
+### Changed
+
+- Remove standalone organization mapping/file options. Migrate email assignments
+  to hierarchy members' `userIds`. Provision actual subjects at first login
+  without keys, remote email lookup at startup, or new reservations.
+- Preserve 2.15.0 canonical bindings and ownership-proven legacy claims without
+  deleting users or transferring keys. Persist SSO email/source for policy checks.
+
 ## [2.15.0] - 2026-11-03
 
 ### Added

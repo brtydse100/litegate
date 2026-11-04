@@ -225,58 +225,32 @@ and can modify data.
 
 ## Email organization mapping and identity
 
-The optional [organization hierarchy](configuration.md#email-organization-mapping)
-adds direct email assignments and their ancestors to either SSO flow. Existing
-SSO group mappings keep primary-team precedence; otherwise the deepest directly
-email-assigned group is primary, with declaration order breaking depth ties.
-Existing automatic key migration at login uses that primary team and the
-selected canonical LiteLLM user ID. Team membership never grants administrator
-access, and this feature does not change existing administrator rules.
+SSO email assignments belong in hierarchy members' `userIds`, alongside exact
+user IDs. Both email and group assignments resolve one compatible path using
+the existing hierarchy policy. Local logins never match SSO emails. New users
+are created only at first authenticated SSO login without a key.
 
-Startup validates the mapping and existing teams, then provisions configured
-emails and memberships without generating a key (`auto_create_key=False`).
-LiteGate automatically initializes identity bookkeeping in the existing SQLite
-database at `local_users_db_path`; retain and back up its persistent volume.
-It records reservation ownership and binds authenticated provider authority
-and subject to a canonical LiteLLM user ID. This is identity bookkeeping;
-LiteLLM continues to own users, memberships, keys, and budgets.
+`generic_require_verified_email` is the sole generic OAuth email policy,
+including hierarchy assignments. When true, explicit `email_verified: false`
+with an email rejects login; when false it is allowed. Missing claims retain
+the trusted-provider behavior. The flag does not change OIDC token validation
+or OIDC email behavior. Use a provider that controls the email attribute.
 
-Email lookup alone never proves account ownership. A single existing ordinary
-account with a matching email stays pending until authenticated SSO login
-proves that its ID is the legacy subject ID. LiteGate makes no remote changes
-to that account while it is pending. Recorded pending confirmations permit
-startup and are reported separately from provisioned users so their owners can
-log in. Local or administrative accounts cannot be adopted through email
-alone. Established administrative SSO identities keep their existing behavior.
-Ambiguous matches, ownership conflicts, incomplete lookups, missing teams, and
-failed remote writes fail the startup provisioning pass. Correct the reported
-configuration or identity conflict and restart to retry; do not merge accounts
-or move keys based only on an email match.
+Verified claims, including claims that conflict with or remove an assignment,
+are persisted against the canonical identity to block stale managed sessions.
+Reconciliation, key creation/regeneration, policy displays and admin guards
+use that persisted email and authentication source.
 
-For a new identity, LiteGate reserves an owned user before first login and
-binds the authenticated subject at login. If an existing legacy subject account
-takes precedence, it keeps its keys and history. Any feature-owned reservation
-is retained and marked superseded only in LiteGate bookkeeping: its remote
-memberships, keys, budget, and history remain untouched. Such records stay
-visible in LiteLLM and may count toward user limits or licensing. Superseded
-bookkeeping does not disable the LiteLLM account or its credentials. LiteGate
-never deletes user records or transfers key ownership during this process.
-Subsequent restarts do not recreate superseded reservations.
+Retain the SQLite volume when upgrading from 2.15.0. Existing provider/subject
+bindings keep the same canonical account even after old mapping removal.
+Unbound feature reservations can be claimed only with their stored ownership
+token verified against the remote account. A pending email candidate is never
+adopted by email alone; its existing authenticated subject must match. No new
+reservations are created, no users are deleted, and no keys are transferred.
+Removing assignments does not automatically revoke LiteLLM memberships; review
+revocation in LiteLLM. Managed operations fail safely until policy is valid.
 
-Trust email only from the configured authenticated provider. Explicitly
-unverified email is rejected for organization mapping; providers omitting
-`email_verified` retain the existing trusted-provider behavior. A different
-subject cannot claim a bound identity by reusing its email, and an established
-binding never silently switches accounts. Bindings survive removal of the
-mapping, preserving access to the canonical account and its keys. Without a
-mapping or existing binding, existing subject-based login behavior is unchanged.
-Removing assignments never automatically removes LiteLLM memberships; review
-revocation deliberately in LiteLLM.
-
-When `organizationHierarchy` also manages the user, its key policy and deepest
-primary team continue to apply. New email mappings must use separate team IDs.
-An explicit hierarchy user-ID assignment must match the canonical identity;
-LiteGate rejects a change that would silently drop that managed path.
+See [configuration migration](configuration.md#email-organization-mapping).
 
 ## API credentials
 

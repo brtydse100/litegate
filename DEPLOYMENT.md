@@ -74,43 +74,15 @@ docker compose up --build
 
 The portal opens at **http://localhost**.
 
-### Optional organization JSON file in Docker Compose
+### Organization assignments in Docker Compose
 
-Both the source-build `docker-compose.yml` and published-image
-`docker-compose.image.yml` support the same optional read-only file mount.
-Create `deploy/docker-compose/organization.json` using the
-[organization schema](docs/configuration.md#email-organization-mapping), then
-add this entry under the existing `services.litegate.volumes` list in whichever
-Compose file you use:
+Set `organizationHierarchy` directly in `config.yaml`; see the
+[YAML example](docs/examples/organization-hierarchy.yaml). Put SSO emails in
+members' `userIds`. `organization_mapping` and `organization_mapping_file`
+were removed in 2.15.1: remove their optional mounts and migrate to the existing
+hierarchy schema. Keep the SQLite volume for existing identity bindings.
+Users are provisioned without keys at first authenticated SSO login.
 
-```yaml
-- ./organization.json:/app/backend/organization.json:ro
-```
-
-In the adjacent `config.yaml`, select the file and leave inline mapping empty:
-
-```yaml
-organization_mapping: {}
-organization_mapping_file: /app/backend/organization.json
-```
-
-No file or mount is required by default. Referenced teams must already exist in
-LiteLLM. Keep the existing writable data volume: durable SSO identity bindings
-are initialized there automatically. Recreate the service after changing the
-mount or configuration:
-
-```bash
-# Source build
-docker compose up -d --build --force-recreate
-# Published image
-docker compose -f docker-compose.image.yml up -d --force-recreate
-```
-
-After editing only JSON content, restart the service to reload it. A configured
-missing or invalid file fails startup rather than silently ignoring the mapping.
-Provisioning is keyless and additive; pending identity confirmation and retained
-reservations are described in the
-[authentication guide](docs/authentication.md#email-organization-mapping-and-identity).
 
 ### Step 3 — Stopping and updating
 
@@ -350,75 +322,16 @@ values cannot weaken login restrictions. Migrate to
 
 ### Email organization mapping in Helm
 
-Use inline values to assign emails to existing LiteLLM teams and their ancestors:
+Use top-level `organizationHierarchy`, as in the
+[YAML example](docs/examples/organization-hierarchy.yaml). `userIds` accepts
+SSO emails and exact user IDs. Both email and SSO group matches must resolve
+one path. The existing hierarchy checksum triggers rollout after changes.
+`config.organizationMapping` and `config.organizationMappingFile` were removed;
+nonempty values fail rendering with migration guidance. Remove the old JSON
+mounts. Preserve the SQLite volume for 2.15.0 canonical bindings; startup no
+longer creates reservations or looks up emails. See the
+[migration guide](docs/configuration.md#email-organization-mapping).
 
-```yaml
-config:
-  organizationMapping:
-    levels:
-      - name: companies
-        groups:
-          company:
-            team_id: team-company
-            members: [jordan@example.com]
-      - name: departments
-        groups:
-          engineering:
-            team_id: team-engineering
-            parent: company
-            members: [sam@example.com]
-      - name: teams
-        groups:
-          platform:
-            team_id: team-platform
-            parent: engineering
-            members: [alice@example.com, bob@example.com]
-```
-
-Multiline member lists work too. Alice and Bob join Platform, Engineering, and
-Company; Jordan joins Company only. Existing SSO group mappings keep their
-primary team. With email-only assignments the deepest direct group is primary.
-See [ordering and validation](docs/configuration.md#email-organization-mapping)
-for depth ties and additive removal semantics. Helm serializes the inline
-mapping as JSON in the ConfigMap. Its pod-template checksum changes with inline
-edits, so `helm upgrade` rolls out the new snapshot automatically.
-
-Alternatively, create a ConfigMap containing the same UTF-8 JSON schema and
-mount it with the existing volume extension points:
-
-```bash
-kubectl -n litegate create configmap organization-members \
-  --from-file=organization.json=./organization.json
-```
-
-```yaml
-config:
-  organizationMapping: {}
-  organizationMappingFile: /etc/litegate/organization.json
-extraVolumes:
-  - name: organization
-    configMap:
-      name: organization-members
-extraVolumeMounts:
-  - name: organization
-    mountPath: /etc/litegate
-    readOnly: true
-```
-
-Configure one nonempty inline or file source; Helm rejects both together. The
-chart does not checksum an externally managed ConfigMap's contents. After
-updating that ConfigMap, explicitly restart the Deployment:
-
-```bash
-kubectl -n litegate rollout restart deployment/litegate
-```
-
-Keep persistence enabled for durable identity binding. Startup provisions
-keyless users and memberships; existing unproven ordinary accounts may remain
-pending until their owners authenticate. Superseded reservations are never
-deleted or disabled and may count toward LiteLLM user limits. See the
-[identity lifecycle](docs/authentication.md#email-organization-mapping-and-identity)
-before rollout.
 
 ### Generic OAuth SSO in Helm
 

@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
@@ -37,11 +38,19 @@ class YamlConfigSettingsSource(PydanticBaseSettingsSource):
 
     def __call__(self) -> dict:
         data = _load_yaml_config()
+        _reject_removed_mapping(data)
         if isinstance(data.get("key_models"), list):
             data["key_models"] = json.dumps(data["key_models"])
         if "organizationHierarchy" in data:
             data["organization_hierarchy"] = data.pop("organizationHierarchy")
         return data
+
+
+def _reject_removed_mapping(data: dict) -> None:
+    for key in ("organization_mapping", "organization_mapping_file"):
+        value = data.get(key) or os.environ.get(key.upper())
+        if value and value != "{}":
+            raise ValueError(f"{key} was removed in 2.15.1; migrate email assignments to organizationHierarchy.levels[].groups[].members[].userIds")
 
 
 class Settings(BaseSettings):
@@ -72,8 +81,6 @@ class Settings(BaseSettings):
     generic_require_verified_email: bool = True
     oidc_groups_claim: str = "groups"
     oidc_group_team_mapping: dict[str, str | list[str]] = Field(default_factory=dict)
-    organization_mapping: dict = Field(default_factory=dict)
-    organization_mapping_file: str = ""
     oidc_require_team_mapping: bool = False
     sso_default_team_id: str = ""
     organization_hierarchy: OrganizationHierarchy = Field(default_factory=OrganizationHierarchy)
@@ -109,6 +116,12 @@ class Settings(BaseSettings):
     support_ticket_url: str = ""
     logo_url: str = ""
     litellm_ui_url: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_removed_mapping(cls, data):
+        _reject_removed_mapping(data)
+        return data
 
     @classmethod
     def settings_customise_sources(

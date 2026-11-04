@@ -13,7 +13,7 @@ HIERARCHY = {
         {"name": "Division", "groups": [{"members": [{"name": "Engineering", "litellmTeamId": "engineering", "budget": {"perUser": 50, "groupTotal": 5000}}]}]},
         {"name": "Squad", "groups": [{"parent": "Engineering", "members": [
             {"name": "Platform", "ssoGroups": ["platform", "platform-external"], "budget": {"perUser": 100}},
-            {"name": "Cloud", "userIds": ["local:alice"], "budget": {"perUser": 0}},
+            {"name": "Cloud", "userIds": ["local:alice", " Alice@Example.com "], "budget": {"perUser": 0}},
             {"name": "Research", "budget": {"perUser": None}},
         ]}]},
     ]
@@ -36,6 +36,15 @@ class OrganizationHelmTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         field = next(line for line in result.stdout.splitlines() if line.startswith("  ORGANIZATION_HIERARCHY:"))
         self.assertEqual(json.loads(json.loads(field.split(":", 1)[1].strip())), HIERARCHY)
+
+    def test_removed_options_fail_with_migration_guidance(self):
+        for key, value in (("organizationMapping", {"groups": {"old": {}}}), ("organizationMappingFile", "organization.json")):
+            with tempfile.TemporaryDirectory() as directory:
+                values = Path(directory) / "values.json"
+                values.write_text(json.dumps({"config": {key: value}}))
+                result = subprocess.run(["helm", "template", "organization", str(ROOT / "deploy/helm/litegate"), "-f", str(values)], text=True, capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("migrate emails to organizationHierarchy", result.stderr)
 
     def test_configuration_change_updates_deployment_checksum(self):
         before = render(HIERARCHY)

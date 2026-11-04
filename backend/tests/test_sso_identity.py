@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+from tests.legacy_identity import reserve
 from app.config import settings
 from app.services import local_users
 from app.services import sso_identity as store
@@ -20,12 +21,12 @@ def test_unconfigured_lookup_does_not_create_database():
 def test_initialization_preserves_local_rows_and_reservations():
     local_users.init_db()
     local = local_users.create_user("existing", "existing@example.com", "test-password")
-    reservation = store.reserve("provider", " Alice@Example.com ")
+    reservation = reserve("provider", " Alice@Example.com ")
     store.initialize_identity_store()
-    assert store.reserve("provider", "alice@example.com") == reservation
+    assert reserve("provider", "alice@example.com") == reservation
     assert reservation["user_id"].startswith("litegate-org:")
     assert reservation["ownership_token"]
-    assert store.reserve("other-provider", "alice@example.com")["user_id"] != reservation["user_id"]
+    assert reserve("other-provider", "alice@example.com")["user_id"] != reservation["user_id"]
     assert local_users.get_user("existing") == local
 
 
@@ -57,7 +58,7 @@ def test_concurrent_claims_select_one_subject():
 
 
 def test_superseded_reservation_remains_durable():
-    reservation = store.reserve("provider", "alice@example.com")
+    reservation = reserve("provider", "alice@example.com")
     store.bind("provider", "subject", "alice@example.com", "subject")
     assert store.reservation("provider", "alice@example.com")["status"] == "superseded"
-    assert store.reserve("provider", "alice@example.com")["user_id"] == reservation["user_id"]
+    assert reserve("provider", "alice@example.com")["user_id"] == reservation["user_id"]

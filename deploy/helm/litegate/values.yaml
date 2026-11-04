@@ -29,7 +29,7 @@ securityContext:
 
 image:
   repository: ghcr.io/brtydse100/litegate
-  tag: "2.15.0"  # Pin a specific tag in production.
+  tag: "2.15.1"  # Pin a specific tag in production.
   pullPolicy: IfNotPresent
 
 service:
@@ -119,31 +119,6 @@ config:
   #   AI-Platform:
   #     - "team-platform"
   #     - "team-shared-services"
-
-  # Optional email hierarchy; use inline data OR a UTF-8 JSON file, not both.
-  # Teams must already exist. Memberships are additive; no keys are created.
-  organizationMapping: {}
-  # organizationMapping:
-  #   levels:
-  #     - name: companies
-  #       groups:
-  #         company:
-  #           team_id: team-company
-  #           members: [jordan@example.com]
-  #     - name: departments
-  #       groups:
-  #         engineering:
-  #           team_id: team-engineering
-  #           parent: company
-  #           members: [sam@example.com]
-  #     - name: teams
-  #       groups:
-  #         platform:
-  #           team_id: team-platform
-  #           parent: engineering
-  #           members: [alice@example.com, bob@example.com]
-  # Mount external JSON with extraVolumes/extraVolumeMounts; restart after edits.
-  organizationMappingFile: ""
 
   # True requires an SSO group or organization email mapping match.
   ssoRequireTeamMapping: false
