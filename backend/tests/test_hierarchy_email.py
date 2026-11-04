@@ -83,6 +83,13 @@ async def test_generic_policy_through_callback(monkeypatch, tmp_path, required, 
             await auth.callback("code", state, state_cookie=state)
         assert error.value.status_code == 403
         ensure.assert_not_awaited()
+        if required and verified is False:
+            assert store.get("subject") is None
+            from app.services import sso_identity
+
+            assert sso_identity.lookup_binding(sso_identity.provider_authority(), "subject") is None
+            auth.llm.sync_user_team_memberships.assert_not_awaited()
+            sync.synchronize_user.assert_not_awaited()
     else:
         response = await auth.callback("code", state, state_cookie=state)
         assert response.status_code == 307
@@ -91,10 +98,27 @@ async def test_generic_policy_through_callback(monkeypatch, tmp_path, required, 
         assert (identity is not None) == (assignment != "none")
         if identity:
             assert sync.resolve_identity(identity).path[-1] == "squad1"
+        if not required and verified is False and assignment == "individual":
+            # Continue the accepted provider login through real stored-policy
+            # resolution for creation and rotation. No downstream hardcoded
+            # verification requirement may override the provider setting.
+            node = sync.resolve_identity(identity)
+            monkeypatch.setattr(sync, "synchronize", AsyncMock(return_value=node))
+            monkeypatch.setattr(sync.litellm, "list_user_keys", AsyncMock(return_value=[]))
+            generate = AsyncMock(return_value={"key": "test-replacement-key"})
+            monkeypatch.setattr(sync.upstream, "generate_key", generate)
+            monkeypatch.setattr(sync.key_policy, "normalize_individual_caps", AsyncMock())
+            await sync.generate_key("subject", email.strip().casefold(), None)
+            from app.services import key_budgets
+
+            monkeypatch.setattr(key_budgets, "preserve_rotation_budget", AsyncMock())
+            await sync.rotate_key("subject", email.strip().casefold(), None, key_alias="subject's key")
+            assert generate.await_count == 2
+            assert all(call.args[:3] == ("subject", "alice@example.com", node.team_id) for call in generate.await_args_list)
 
 
 @pytest.mark.asyncio
-async def test_reconciliation_does_not_lookup_configured_emails(monkeypatch, tmp_path):
+async def test_reconciliation_does_not_create_users_from_email_assignments(monkeypatch, tmp_path):
     from unittest.mock import AsyncMock
 
     monkeypatch.setattr(settings, "organization_hierarchy", hierarchy())
@@ -104,8 +128,37 @@ async def test_reconciliation_does_not_lookup_configured_emails(monkeypatch, tmp
     monkeypatch.setattr(sync.upstream, "sync_root", AsyncMock())
     monkeypatch.setattr(sync.key_policy, "finish_team", AsyncMock())
     await sync.reconcile()
-    assert {call.args[0] for call in lookup.await_args_list} == {"Exact-ID", "local:alice"}
+    assert {call.args[0] for call in lookup.await_args_list} == {"Alice@Example.com", "Exact-ID", "local:alice"}
     assert store.get("alice@example.com") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("remote_id", ["Alice@Example.com", "unrelated", None])
+async def test_discovery_preserves_exact_ids_containing_at_without_email_adoption(monkeypatch, tmp_path, remote_id):
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr(settings, "organization_hierarchy", hierarchy())
+    monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "discovery.db"))
+
+    async def lookup(user_id):
+        if user_id == "Alice@Example.com":
+            return {"user_info": {"user_id": remote_id, "user_email": "alice@example.com"} if remote_id else None}
+        return None
+
+    monkeypatch.setattr(sync.litellm, "get_user", lookup)
+    monkeypatch.setattr(sync.upstream, "sync_root", AsyncMock(return_value={}))
+    monkeypatch.setattr(sync.upstream, "team_info", AsyncMock(return_value={}))
+    monkeypatch.setattr(sync.key_policy, "finish_team", AsyncMock())
+    synchronize = AsyncMock()
+    monkeypatch.setattr(sync, "sync_identity", synchronize)
+    await sync.reconcile()
+    if remote_id == "Alice@Example.com":
+        assert store.get(remote_id)["auth_source"] == "explicit"
+        assert synchronize.await_count == 1
+        assert synchronize.await_args.args[0]["user_id"] == remote_id
+    else:
+        assert store.get("Alice@Example.com") is None
+        synchronize.assert_not_awaited()
 
 
 @pytest.mark.parametrize("key,value", [("organization_mapping", {"groups": {"old": {}}}), ("organization_mapping_file", "organization.json")])

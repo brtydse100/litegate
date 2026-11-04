@@ -247,13 +247,15 @@ async def reconcile() -> None:
                     if not existing:
                         return None
                     user = existing.get("user_info", existing)
+                    if not isinstance(user, dict) or user.get("user_id") != user_id:
+                        return None
                     await asyncio.to_thread(store.remember, user_id, user.get("user_email") or "", "explicit", [])
                 return user_id
             except HTTPException as exc:
                 _logger.warning("Organization user %s discovery failed: %s", user_id, exc.detail)
                 return None
 
-    explicit = {user_id for node in settings.organization_hierarchy.nodes.values() for user_id in node.member.userIds if "@" not in user_id}
+    explicit = {user_id for node in settings.organization_hierarchy.nodes.values() for user_id in node.member.userIds}
     discovered = await asyncio.gather(*(discover(user_id) for user_id in sorted(explicit - known)))
     await asyncio.gather(*(sync_one(user_id) for user_id in discovered if user_id is not None))
 
