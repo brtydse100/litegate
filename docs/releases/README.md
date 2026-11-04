@@ -6,6 +6,7 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.15.1](v2.15.1.md) | Unified hierarchy SSO email assignments, deferred provisioning, and consistent email verification (prepared) |
 | [2.15.0](v2.15.0.md) | Email organization mapping with named levels, inherited memberships, and keyless SSO provisioning |
 | [2.14.0](v2.14.0.md) | Automatic configured-team key migration, stable rotation names, and detailed personal spend (prepared) |
 | [2.13.0](v2.13.0.md) | Organization hierarchy, per-key allowances, current policy editors, safe regeneration, and local budget testing |

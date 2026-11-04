@@ -73,16 +73,15 @@ returns 400. Set that option to `false` to permit unverified email in generic SS
 Generic UserInfo role fields never grant administrator privileges. See
 [authentication setup](docs/authentication.md#generic-oauth-sso).
 
-Optional organization email mapping uses the same SSO endpoints. When
-`oidc_require_team_mapping` is enabled (`config.ssoRequireTeamMapping` in Helm),
-either an SSO-group or organization-email assignment satisfies the requirement;
-the default team alone does not. Ancestor memberships are additive and never
-grant administrator access. The session and `/api/v1/me` use the selected
-canonical LiteLLM user ID: an existing proven legacy subject account takes
-precedence, otherwise a securely bound provisioned account is used. Email
-alone cannot adopt an existing local/admin account. No provisioning endpoints
-or credentials are added. See
-[identity binding and pending confirmation](docs/authentication.md#email-organization-mapping-and-identity).
+Organization hierarchy members' `userIds` accept exact user IDs and normalized
+SSO emails. Email and group matches must share one organizational path.
+`oidc_require_team_mapping` accepts either assignment; a default team alone
+does not satisfy it. Local identities never inherit policy by SSO email.
+First SSO login provisions the actual subject without a key. Existing 2.15.0
+canonical bindings remain valid; no provisioning endpoints are added.
+Generic OAuth uses `generic_require_verified_email` consistently for every
+assignment. Missing claims retain existing behavior; OIDC is unchanged.
+See [identity and upgrade behavior](docs/authentication.md#email-organization-mapping-and-identity).
 
 After SSO membership synchronization, existing owned keys move in place to the
 primary mapped/default team, including keys already in another team. Already

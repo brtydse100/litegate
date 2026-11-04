@@ -9,8 +9,7 @@ from fastapi.responses import JSONResponse
 from app import observability
 from app.config import settings
 from app.routers import api_v1, auth, keys, logs, organization, users
-from app.services import litellm, local_users, organization_provisioning, organization_sync
-from app.services.organization_mapping import get_mapping
+from app.services import litellm, local_users, organization_sync
 from app.version import VERSION
 
 
@@ -20,7 +19,6 @@ async def lifespan(_: FastAPI):
     await litellm.start_client()
     organization_task = None
     try:
-        await organization_provisioning.provision_members(get_mapping())
         if settings.organization_hierarchy.levels:
             organization_task = asyncio.create_task(organization_sync.run_reconciliation())
         yield

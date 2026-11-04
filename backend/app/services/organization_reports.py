@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from app.config import settings
 from app.services import litellm, organization_client as upstream, organization_store as store
-from app.services.organization_sync import resolve
+from app.services.organization_sync import resolve_identity
 
 _usage_cache: dict[tuple[str, str, str], tuple[float, list[dict]]] = {}
 
@@ -17,7 +17,7 @@ async def identities() -> tuple[list[tuple[dict, object]], list[dict]]:
     values, errors = [], []
     for identity in await asyncio.to_thread(store.list_identities):
         try:
-            node = resolve(identity["user_id"], identity["groups"])
+            node = resolve_identity(identity)
             if node:
                 values.append((identity, node))
             else:

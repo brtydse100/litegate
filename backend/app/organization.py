@@ -119,7 +119,7 @@ class OrganizationHierarchy(BaseModel):
         for node in self.nodes.values():
             for kind, values in (("group", node.member.ssoGroups), ("user", node.member.userIds)):
                 for value in values:
-                    matches.setdefault((kind, value.casefold() if kind == "group" else value), []).append(node)
+                    matches.setdefault((kind, value.casefold() if kind == "group" or "@" in value else value), []).append(node)
         for nodes in matches.values():
             self._compatible(nodes)
         return self
@@ -133,13 +133,16 @@ class OrganizationHierarchy(BaseModel):
             raise MembershipConflict("Organization mappings conflict; each user must belong to one organizational path")
         return deepest
 
-    def resolve(self, user_id: str, groups: list[str]) -> OrganizationNode | None:
+    def resolve(self, user_id: str, groups: list[str], *, email: str = "", source: str = "") -> OrganizationNode | None:
         claimed = {group.strip().casefold() for group in groups}
+        email = email.strip().casefold() if source == "sso" else ""
         return self._compatible(
             [
                 node
                 for node in self.nodes.values()
-                if user_id in node.member.userIds or claimed.intersection(group.casefold() for group in node.member.ssoGroups)
+                if user_id in node.member.userIds
+                or (email and any("@" in value and value.casefold() == email for value in node.member.userIds))
+                or claimed.intersection(group.casefold() for group in node.member.ssoGroups)
             ]
         )
 

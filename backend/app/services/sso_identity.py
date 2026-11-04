@@ -1,8 +1,6 @@
 """Durable SSO ownership intent; LiteLLM remains the user and membership store."""
 
-import hashlib
 import json
-import secrets
 import sqlite3
 
 from app.config import settings
@@ -56,27 +54,6 @@ def binding_for_email(provider: str, email: str) -> dict | None:
 
 def reservation(provider: str, email: str) -> dict | None:
     return _existing_row("SELECT * FROM sso_reservations WHERE provider=? AND email=?", (provider, email.strip().casefold()))
-
-
-def reserve(provider: str, email: str) -> dict:
-    initialize_identity_store()
-    email = email.strip().casefold()
-    digest = hashlib.sha256(json.dumps([provider, email], separators=(",", ":")).encode()).hexdigest()
-    with local_users.connect() as db:
-        db.execute(
-            "INSERT OR IGNORE INTO sso_reservations(provider,email,user_id,ownership_token) VALUES (?,?,?,?)",
-            (provider, email, f"litegate-org:{digest}", secrets.token_urlsafe(32)),
-        )
-        row = db.execute("SELECT * FROM sso_reservations WHERE provider=? AND email=?", (provider, email)).fetchone()
-        return dict(row)
-
-
-def mark_reservation(provider: str, email: str, status: str, candidate_id: str = "") -> None:
-    with local_users.connect() as db:
-        db.execute(
-            "UPDATE sso_reservations SET status=?, candidate_id=? WHERE provider=? AND email=? AND status!='superseded'",
-            (status, candidate_id, provider, email.strip().casefold()),
-        )
 
 
 def bind(provider: str, subject: str, email: str, user_id: str) -> None:

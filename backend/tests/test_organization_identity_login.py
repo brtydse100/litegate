@@ -6,10 +6,11 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
+from tests.legacy_identity import reserve, mark_reservation
 from app.organization import OrganizationHierarchy
 from app.routers import auth
 from app.services import local_users, organization_store, organization_sync
-from app.services import organization_provisioning as provisioning, sso_identity as identities
+from app.services import sso_legacy as provisioning, sso_identity as identities
 
 
 @pytest.fixture
@@ -20,15 +21,10 @@ def identity_login(monkeypatch, tmp_path):
     monkeypatch.setattr(auth.settings, "oidc_require_team_mapping", False)
     monkeypatch.setattr(auth.settings, "oidc_group_team_mapping", {})
     monkeypatch.setattr(auth.settings, "sso_default_team_id", "")
-    monkeypatch.setattr(auth.settings, "organization_mapping_file", "")
-    monkeypatch.setattr(
-        auth.settings, "organization_mapping", {"groups": {"email-team": {"team_id": "email-team", "members": ["alice@example.com"]}}}
-    )
     local_users.init_db()
     identities.initialize_identity_store()
     users = {}
     monkeypatch.setattr(provisioning.remote, "get_user", AsyncMock(side_effect=lambda user_id: deepcopy(users.get(user_id))))
-    monkeypatch.setattr(provisioning.remote, "find_users_by_email", AsyncMock(side_effect=lambda email: list(deepcopy(users).values())))
     monkeypatch.setattr(auth.llm, "ensure_user_exists", AsyncMock(return_value={}))
     claims = {"sub": "subject", "email": "alice@example.com", "groups": []}
     monkeypatch.setattr(auth.oidc_svc, "exchange_code", AsyncMock(return_value={"id_token": "token"}))
@@ -38,14 +34,14 @@ def identity_login(monkeypatch, tmp_path):
 
 
 def reserve_user(users, provider):
-    reservation = identities.reserve(provider, "alice@example.com")
+    reservation = reserve(provider, "alice@example.com")
     users[reservation["user_id"]] = {
         "user_id": reservation["user_id"],
         "user_email": "alice@example.com",
         "user_role": "internal_user",
         "metadata": {provisioning.remote.OWNER_FIELD: reservation["ownership_token"]},
     }
-    identities.mark_reservation(provider, "alice@example.com", "reserved")
+    mark_reservation(provider, "alice@example.com", "reserved")
     return reservation["user_id"]
 
 
@@ -108,3 +104,56 @@ async def test_explicit_path_rejection_does_not_commit_canonical_binding(monkeyp
     assert identities.lookup_binding(provider, "subject") is None
     assert organization_store.get("subject") is None
     auth.llm.ensure_user_exists.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_owned_unbound_reservation_claim_preserves_account(identity_login):
+    claims, users = identity_login
+    provider = identities.provider_authority()
+    canonical = reserve_user(users, provider)
+    users[canonical]["spend"] = 17
+    before = deepcopy(users)
+    assert await provisioning.resolve_sso_user_id(provider, "subject", claims["email"]) == canonical
+    assert identities.lookup_binding(provider, "subject")["user_id"] == canonical
+    assert users == before
+
+
+@pytest.mark.asyncio
+async def test_pending_candidate_requires_authenticated_exact_subject(identity_login):
+    claims, users = identity_login
+    provider = identities.provider_authority()
+    reserve_user(users, provider)
+    mark_reservation(provider, claims["email"], "pending", "existing")
+    users["existing"] = {"user_id": "existing", "user_email": claims["email"], "user_role": "internal_user"}
+    with pytest.raises(HTTPException):
+        await provisioning.resolve_sso_user_id(provider, "subject", claims["email"])
+    assert identities.lookup_binding(provider, "subject") is None
+    assert await provisioning.resolve_sso_user_id(provider, "existing", claims["email"]) == "existing"
+
+
+@pytest.mark.asyncio
+async def test_unproven_reservation_cannot_be_claimed(identity_login):
+    claims, users = identity_login
+    provider = identities.provider_authority()
+    canonical = reserve_user(users, provider)
+    users[canonical]["metadata"] = {}
+    with pytest.raises(HTTPException):
+        await provisioning.resolve_sso_user_id(provider, "subject", claims["email"])
+    assert identities.lookup_binding(provider, "subject") is None
+
+
+@pytest.mark.asyncio
+async def test_established_binding_survives_mapping_removal_and_email_change(monkeypatch, identity_login):
+    claims, users = identity_login
+    provider = identities.provider_authority()
+    canonical = reserve_user(users, provider)
+    identities.bind(provider, "subject", claims["email"], canonical)
+    users[canonical]["keys"] = ["owned-test-key"]
+    users[canonical]["spend"] = 23
+    before = deepcopy(users)
+    monkeypatch.setattr(auth.settings, "organization_hierarchy", OrganizationHierarchy())
+    assert await provisioning.resolve_sso_user_id(provider, "subject", "changed@example.com") == canonical
+    assert identities.lookup_binding(provider, "subject")["user_id"] == canonical
+    assert users == before
+    with pytest.raises(HTTPException):
+        await provisioning.resolve_sso_user_id(provider, "different-subject", claims["email"])

@@ -26,11 +26,15 @@ def lock_for(kind: str, identifier: str) -> asyncio.Lock:
     return lock
 
 
-def resolve(user_id: str, groups: list[str]) -> OrganizationNode | None:
+def resolve(user_id: str, groups: list[str], *, email: str = "", source: str = "") -> OrganizationNode | None:
     try:
-        return settings.organization_hierarchy.resolve(user_id, groups)
+        return settings.organization_hierarchy.resolve(user_id, groups, email=email, source=source)
     except MembershipConflict as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+def resolve_identity(identity: dict) -> OrganizationNode | None:
+    return resolve(identity["user_id"], identity["groups"], email=identity["email"], source=identity["auth_source"])
 
 
 def policy(node: OrganizationNode) -> dict:
@@ -41,10 +45,11 @@ async def record_identity(user_id: str, email: str, source: str, groups: list[st
     """Persist verified claims even when they invalidate an existing membership."""
     if not settings.organization_hierarchy.levels:
         return None
+    email = email.strip().casefold() if source == "sso" else email
     async with lock_for("user", user_id):
         previous = await asyncio.to_thread(store.get, user_id)
         try:
-            node = resolve(user_id, groups)
+            node = resolve(user_id, groups, email=email, source=source)
             if node is not None or previous:
                 await asyncio.to_thread(store.remember, user_id, email, source, groups)
             if node is None and previous:
@@ -83,7 +88,7 @@ async def sync_root(node: OrganizationNode) -> dict:
 
 async def synchronize(identity: dict) -> OrganizationNode:
     try:
-        node = resolve(identity["user_id"], identity["groups"])
+        node = resolve_identity(identity)
         if node is None:
             raise HTTPException(status_code=403, detail="Your organization mapping is no longer valid")
         return await sync_identity(identity, await sync_root(node))
@@ -93,7 +98,7 @@ async def synchronize(identity: dict) -> OrganizationNode:
 
 
 async def sync_identity(identity: dict, info: dict) -> OrganizationNode:
-    node = resolve(identity["user_id"], identity["groups"])
+    node = resolve_identity(identity)
     if node is None:
         raise HTTPException(status_code=409, detail="Organization mapping was removed; review the user's keys before changing membership")
     existing = await litellm.list_user_keys(identity["user_id"])
@@ -138,7 +143,7 @@ async def prepare_user(user_id: str, email: str) -> OrganizationNode | None:
             return None
         await asyncio.to_thread(store.remember, user_id, email, "explicit", [])
         identity = await asyncio.to_thread(store.get, user_id)
-    node = resolve(user_id, identity["groups"])
+    node = resolve_identity(identity)
     if node is None:
         raise HTTPException(status_code=403, detail="Your organization mapping is no longer valid")
     return await synchronize(identity)
@@ -154,6 +159,9 @@ async def _generate_key(user_id: str, email: str, team_id: str | None, **options
     node = await prepare_user(user_id, email)
     if node is None:
         return await litellm.generate_key(user_id, email, team_id, **options)
+    identity = await asyncio.to_thread(store.get, user_id)
+    if identity and identity["auth_source"] == "sso":
+        email = identity["email"].strip().casefold()
     if not {"initial_spend", "key_alias"}.intersection(options) and await litellm.list_user_keys(user_id):
         raise HTTPException(status_code=409, detail="This user already has a key; regenerate it instead")
     result = await upstream.generate_key(user_id, email, node.team_id, **{**options, "max_budget": node.per_user, "budget_duration": node.duration})
@@ -222,7 +230,7 @@ async def reconcile() -> None:
         async with semaphore, lock_for("user", user_id):
             try:
                 identity = await asyncio.to_thread(store.get, user_id)
-                node = resolve(user_id, identity["groups"])
+                node = resolve_identity(identity)
                 if node is None or node.team_id not in ready:
                     raise HTTPException(status_code=409, detail="Organization mapping or its LiteLLM team is unavailable")
                 await sync_identity(identity, await upstream.team_info(node.team_id))
@@ -245,7 +253,7 @@ async def reconcile() -> None:
                 _logger.warning("Organization user %s discovery failed: %s", user_id, exc.detail)
                 return None
 
-    explicit = {user_id for node in settings.organization_hierarchy.nodes.values() for user_id in node.member.userIds}
+    explicit = {user_id for node in settings.organization_hierarchy.nodes.values() for user_id in node.member.userIds if "@" not in user_id}
     discovered = await asyncio.gather(*(discover(user_id) for user_id in sorted(explicit - known)))
     await asyncio.gather(*(sync_one(user_id) for user_id in discovered if user_id is not None))
 
@@ -283,7 +291,7 @@ async def guard_key(key: str, changes: dict, *, use_key_budget_only: bool = Fals
     if not info:
         raise HTTPException(status_code=404, detail="Key not found")
     identity = await asyncio.to_thread(store.get, info.get("user_id") or "")
-    configured = resolve(info.get("user_id") or "", identity["groups"] if identity else []) if use_key_budget_only else None
+    configured = (resolve_identity(identity) if identity else resolve(info.get("user_id") or "", [])) if use_key_budget_only else None
     if (
         settings.organization_hierarchy.is_managed_team(info.get("team_id"))
         or settings.organization_hierarchy.is_managed_team(changes.get("team_id"))
@@ -299,7 +307,7 @@ async def personal_policy(user: CurrentUser, keys: list[dict] | None = None) -> 
     identity = await asyncio.to_thread(store.get, user.user_id)
     error = identity.get("sync_error") if identity else None
     try:
-        node = resolve(user.user_id, identity["groups"] if identity else [])
+        node = resolve_identity(identity) if identity else resolve(user.user_id, [])
     except HTTPException as exc:
         node, error = None, str(exc.detail)
     team_id = next((key["team_id"] for key in keys or [] if settings.organization_hierarchy.is_managed_team(key.get("team_id"))), None)

@@ -89,7 +89,7 @@ async def preserve_rotation_budget(user_id: str, existing: list[dict], replaceme
     if not isinstance(budget, (int, float)) or not math.isfinite(budget) or budget < 0:
         return
     identity = await asyncio.to_thread(organization_store.get, user_id)
-    if organization_sync.resolve(user_id, identity["groups"] if identity else []) is not None:
+    if (organization_sync.resolve_identity(identity) if identity else organization_sync.resolve(user_id, [])) is not None:
         return
     info = await litellm.get_key_info(replacement)
     if not info or info.get("user_id") != user_id:
