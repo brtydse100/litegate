@@ -97,6 +97,7 @@ class Settings(BaseSettings):
     key_models: str = "[]"
     key_tpm_limit: Optional[int] = None
     key_rpm_limit: Optional[int] = None
+    key_max_parallel_requests: Optional[int] = Field(default=None, ge=1)
     key_duration: Optional[str] = None
     key_team_id: Optional[str] = None
     save_api_keys_in_db: bool = False

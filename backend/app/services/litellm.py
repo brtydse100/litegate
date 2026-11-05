@@ -390,6 +390,8 @@ async def generate_key(
         payload["tpm_limit"] = settings.key_tpm_limit
     if settings.key_rpm_limit is not None:
         payload["rpm_limit"] = settings.key_rpm_limit
+    if settings.key_max_parallel_requests is not None:
+        payload["max_parallel_requests"] = settings.key_max_parallel_requests
     if settings.key_duration:
         payload["duration"] = settings.key_duration
     effective_team_id = team_id or settings.key_team_id

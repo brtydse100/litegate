@@ -39,6 +39,17 @@ def render(config, **chart_values):
 
 
 class GenericSSOHelmTests(unittest.TestCase):
+    def test_optional_key_parallel_default_is_rendered(self):
+        result = render({})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("KEY_MAX_PARALLEL_REQUESTS", result.stdout)
+
+        for limit in (1, 10, "10", 0):
+            with self.subTest(limit=limit):
+                result = render({"keyMaxParallelRequests": limit})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f'  KEY_MAX_PARALLEL_REQUESTS: "{limit}"', result.stdout.splitlines())
+
     def test_custom_ca_requires_a_certificate_source(self):
         for custom_ca in ({"mountPath": "/etc/ssl/certs/custom.pem"}, {"key": "custom.pem"}, {"key": "custom.pem", "mountPath": "/tmp/custom.pem"}):
             with self.subTest(custom_ca=custom_ca):

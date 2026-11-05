@@ -99,6 +99,9 @@ data:
   {{- if .Values.config.keyRpmLimit }}
   KEY_RPM_LIMIT: {{ .Values.config.keyRpmLimit | quote }}
   {{- end }}
+  {{- if hasKey .Values.config "keyMaxParallelRequests" }}
+  KEY_MAX_PARALLEL_REQUESTS: {{ .Values.config.keyMaxParallelRequests | quote }}
+  {{- end }}
   {{- if .Values.config.keyTeamId }}
   KEY_TEAM_ID: {{ .Values.config.keyTeamId | quote }}
   {{- end }}
