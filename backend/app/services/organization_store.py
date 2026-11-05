@@ -65,3 +65,9 @@ def bind_team(user_id: str, team_id: str) -> None:
 def failed(user_id: str, message: str) -> None:
     with connect() as db:
         db.execute("UPDATE organization_identities SET sync_error=? WHERE user_id=?", (message[:300], user_id))
+
+
+def validated(user_id: str) -> None:
+    """Clear a discovery failure only after fresh remote assignment validation."""
+    with connect() as db:
+        db.execute("UPDATE organization_identities SET sync_error=NULL WHERE user_id=?", (user_id,))

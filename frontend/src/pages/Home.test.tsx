@@ -72,6 +72,8 @@ describe("personal key storage", () => {
     listError?: Error,
     cachedEmpty = false,
     initiallyEmpty = false,
+    configState?: "pending" | "error",
+    keyPending = false,
   ) {
     vi.stubGlobal(
       "fetch",
@@ -80,6 +82,10 @@ describe("personal key storage", () => {
         json: async () => ({ save_api_keys_in_db: enabled }),
       }),
     );
+    if (configState === "pending")
+      vi.mocked(fetch).mockReturnValue(new Promise(() => {}));
+    if (configState === "error")
+      vi.mocked(fetch).mockRejectedValue(new Error("Config unavailable"));
     const list = vi.spyOn(api, "listKeys").mockResolvedValue({
       keys: [
         {
@@ -91,6 +97,7 @@ describe("personal key storage", () => {
         },
       ],
     });
+    if (keyPending) list.mockReturnValue(new Promise(() => {}));
     if (listError) list.mockRejectedValue(listError);
     if (initiallyEmpty) list.mockResolvedValueOnce({ keys: [] });
     vi.spyOn(api, "getOperationLimit").mockResolvedValue({
@@ -111,6 +118,43 @@ describe("personal key storage", () => {
     );
     return { list, client };
   }
+
+  it("offers no replacement after key lookup fails with a cached key", async () => {
+    const { list, client } = renderHome(false, false);
+    await screen.findByText("Virtual key");
+    list.mockRejectedValue(new Error("Lookup unavailable"));
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: ["keys"] });
+    });
+    await screen.findByText(/Key information is unavailable/);
+    expect(
+      screen.queryByRole("button", { name: /regenerat|create API key/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers no replacement while key lookup is pending", async () => {
+    renderHome(true, false, {}, undefined, false, false, undefined, true);
+    await screen.findByText(/Saved keys can be shown again/);
+    expect(
+      screen.queryByRole("button", { name: /regenerat|create API key/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each(["pending", "error"] as const)(
+    "does not advise regeneration while configuration is %s",
+    async (state) => {
+      renderHome(true, false, {}, undefined, false, false, state);
+      await screen.findByText(
+        state === "pending"
+          ? /Loading portal configuration/
+          : /Portal configuration is unavailable/,
+      );
+      expect(
+        screen.queryByRole("button", { name: /regenerat/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/only shown once/i)).not.toBeInTheDocument();
+    },
+  );
 
   it("retains a one-time rotated secret if multiple cached cards remain after refresh fails", async () => {
     vi.spyOn(api, "regenerateKey").mockResolvedValue({

@@ -36,6 +36,8 @@ class OrganizationHelmTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         field = next(line for line in result.stdout.splitlines() if line.startswith("  ORGANIZATION_HIERARCHY:"))
         self.assertEqual(json.loads(json.loads(field.split(":", 1)[1].strip())), HIERARCHY)
+        self.assertIn("startupProbe:", result.stdout)
+        self.assertIn("failureThreshold: 180", result.stdout)
 
     def test_removed_options_fail_with_migration_guidance(self):
         for key, value in (("organizationMapping", {"groups": {"old": {}}}), ("organizationMappingFile", "organization.json")):

@@ -567,9 +567,13 @@ export default function Home() {
                   </h1>
                   <p className="mt-1 max-w-2xl text-sm text-slate-500">
                     Create and manage your governed LiteLLM key.{" "}
-                    {config?.save_api_keys_in_db
-                      ? "Saved keys can be shown again when you need them."
-                      : "Secrets are only shown once when created or regenerated."}
+                    {portal.isPending
+                      ? "Loading portal configuration..."
+                      : portal.isError
+                        ? "Portal configuration is unavailable. Retry before creating or replacing a key."
+                        : config?.save_api_keys_in_db
+                          ? "Saved keys can be shown again when you need them."
+                          : "Secrets are only shown once when created or regenerated."}
                   </p>
                 </div>
 
@@ -646,7 +650,8 @@ export default function Home() {
                 )}
                 {!keys.isLoading && !confirmRegenerate && (
                   <div className="w-full">
-                    {keys.isPending || (keys.isError && !hasKey) ? (
+                    {portal.isPending ||
+                    portal.isError ? null : keys.isPending || keys.isError ? (
                       <p className="text-sm text-slate-500">
                         {keys.isPending
                           ? "Loading key information…"

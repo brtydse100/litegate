@@ -95,6 +95,8 @@ async def finish_team(node: OrganizationNode) -> dict:
             for key in result["keys"]:
                 owner = key.get("user_id") or ""
                 identity = await asyncio.to_thread(store.get, owner)
+                if identity and identity["auth_source"] == "configured_email" and identity.get("sync_error"):
+                    raise HTTPException(status_code=409, detail="Revalidate configured email assignments before removing shared caps")
                 try:
                     assigned = settings.organization_hierarchy.resolve(
                         owner,

@@ -239,3 +239,49 @@ async def test_failed_save_still_revokes_new_key_when_database_cleanup_fails():
 
     assert exc.value.status_code == 503
     assert deleted == [SECRET]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["token", "api_key", "key"])
+@pytest.mark.parametrize("replacement", [None, "masked-key", "replacement-key"])
+async def test_reopened_storage_list_and_reveal_preserve_identifier(field, replacement):
+    key_secrets.save(SECRET, OWNER.user_id)
+    local_users.init_db()  # Reopen the same persisted database, not an in-memory cache.
+    app.dependency_overrides[get_current_user] = lambda: OWNER
+    try:
+        with (
+            patch.object(litellm, "list_user_keys", AsyncMock(return_value=[{field: IDENTIFIER}])),
+            patch.object(litellm, "get_key_info", AsyncMock(return_value={field: replacement, "user_id": OWNER.user_id, "spend": 42})),
+        ):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+                listed = await client.get("/api/keys")
+                assert listed.status_code == 200
+                info = listed.json()["keys"][0]
+                assert info[field] == IDENTIFIER
+                assert info["secret_available"] is True
+                assert SECRET not in listed.text
+                revealed = await client.post("/api/keys/reveal", json={"key": info[field]})
+                assert revealed.status_code == 200
+                assert revealed.json() == {"key": SECRET}
+        assert key_secrets.get(IDENTIFIER, "changed-owner") is None
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.mark.asyncio
+async def test_storage_written_by_previous_process_is_revealed():
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    environment = {**os.environ, "LOCAL_USERS_DB_PATH": key_secrets.settings.local_users_db_path, "SAVE_API_KEYS_IN_DB": "true"}
+    subprocess.run(
+        [sys.executable, "-c", "from app.services import key_secrets; key_secrets.save('sk-synthetic-storage-test', 'owner')"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=environment,
+        check=True,
+    )
+    assert key_secrets.get(IDENTIFIER, OWNER.user_id) == SECRET
+    with patch.object(litellm, "get_key_info", AsyncMock(return_value={"user_id": OWNER.user_id})):
+        assert await keys.reveal_key(KeyDeleteRequest(key=IDENTIFIER), Response(), OWNER) == {"key": SECRET}

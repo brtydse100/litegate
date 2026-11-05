@@ -60,6 +60,9 @@ per-key budgets, unchanged spend/reset windows during allowance edits, and carri
 spend during key replacement. Teams and keys are removed afterward; test users
 remain for inspection. The pinned CI stack also runs this management contract;
 it checks budget persistence and reset windows without requiring a license.
+The disposable Compose stack loads `litellm-integration.yaml` with a synthetic
+mock model so LiteLLM initializes its router, which is required for changing an
+existing key's team. The mock uses no real provider credentials or external API.
 Enterprise request enforcement and analytics access still require validation on
 a licensed deployment. Never run this against a production proxy.
 
@@ -156,3 +159,21 @@ zero `usage.cost`. Refresh the portal after sending requests to load updated spe
 rates; successful inference and spend enforcement still require a valid provider
 credential and available provider quota. The disposable management integration
 tests above also cover controlled spend and budget transitions.
+
+## Startup assignments and stored-key upgrade regressions
+
+`test_key_storage.py` covers SQLite reopen and a separate writer process plus
+real list/reveal routes with null, masked and replaced metadata identifiers.
+`test_organization_discovery.py` covers no-login existing-user migration,
+pagination/exactness, late duplicate matches, incomplete/malformed scans, changed
+emails, local/admin conflicts, bounded batches and startup awaiting/retry order.
+The Home tests cover unresolved configuration/key lookup without replacement
+advice. These synthetic reproductions do not establish the cause of a deployment
+incident.
+
+The opt-in pinned LiteLLM identity suite also checks `/user/list` pagination and
+case-insensitive matching, then reconciles an existing user's same key by email
+without a login callback. Run it with the existing integration Compose stack and
+`RUN_LITELLM_INTEGRATION=1`; a working Docker daemon is required. Startup attempts
+can report per-user failures even when the application becomes ready. The Helm
+startup probe allows 30 minutes for the initial pass before liveness enforcement.

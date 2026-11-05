@@ -6,6 +6,7 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.15.4](v2.15.4.md) | Stored-key identifier preservation and no-login startup hierarchy migration (prepared) |
 | [2.15.3](v2.15.3.md) | Dynamic small-spend charts and verified spend counters during regeneration (prepared) |
 | [2.15.2](v2.15.2.md) | JSON file input for the existing organization hierarchy and ConfigMap file mounts (prepared) |
 | [2.15.1](v2.15.1.md) | Unified hierarchy SSO email assignments, deferred provisioning, and consistent email verification (prepared) |

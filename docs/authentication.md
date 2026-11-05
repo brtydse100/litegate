@@ -239,7 +239,12 @@ or OIDC email behavior. Use a provider that controls the email attribute.
 Verified claims, including claims that conflict with or remove an assignment,
 are persisted against the canonical identity to block stale managed sessions.
 Reconciliation, key creation/regeneration, policy displays and admin guards
-use that persisted email and authentication source.
+use that persisted email and authentication source. Startup also discovers existing
+remote accounts for unresolved configured emails as operator assignments, using a
+distinct `configured_email` source. These assignments are revalidated each pass
+and never create SSO bindings, prove login ownership, overwrite verified claims,
+or adopt a different canonical identity. Local/admin email-only matches require
+an explicit ID instead. Missing remote users remain unprovisioned until login.
 
 Retain the SQLite volume when upgrading from 2.15.0. Existing provider/subject
 bindings keep the same canonical account even after old mapping removal.

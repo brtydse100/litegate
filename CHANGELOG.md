@@ -7,6 +7,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.15.4] - 2026-11-05
+
+### Fixed
+
+- Preserve original owned-key identifiers during metadata refresh so saved
+  secrets remain discoverable; defer replacement advice during unresolved lookups.
+- Await initial hierarchy reconciliation and discover existing accounts by exact
+  ID or configured email without login, preserving keys and spend. Revalidate
+  remote email assignments every pass without changing SSO ownership checks.
+
 ## [2.15.3] - 2026-11-05
 
 ### Fixed

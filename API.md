@@ -407,3 +407,19 @@ targets. Public probes are `GET /api/health/live` for process liveness and
 HTTP 503 when either dependency is unavailable and uses a generic LiteLLM
 failure detail. Authenticated administrators can use the status API for detailed
 dependency diagnostics.
+
+### Startup hierarchy reconciliation and stored keys
+
+When hierarchy policy is configured, startup awaits its first reconciliation
+attempt and retries every 60 seconds. Existing accounts may be discovered by an
+unresolved configured email after complete paginated exact-match validation.
+This is an operator assignment, not proof of an SSO login identity; unknown users
+are skipped. Ambiguity, local/admin conflicts and failed revalidation block
+assignment writes and appear in synchronization errors. Endpoint authorization
+and subject-based login do not change.
+
+Personal key listing preserves the original owned-key identifier fields while
+refreshing metadata and counters. Stored-secret availability still uses the
+persisted SQLite copy; reveal checks current upstream ownership and stored owner.
+Keep the same database volume during upgrades. Null or masked metadata identifiers
+do not require regenerating an otherwise stored key.

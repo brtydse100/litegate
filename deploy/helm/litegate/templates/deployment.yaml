@@ -74,6 +74,12 @@ spec:
             - name: SSL_CERT_FILE
               value: {{ default "/etc/ssl/certs/litegate-custom-ca.pem" $customCA.mountPath | quote }}
           {{- end }}
+          startupProbe:
+            httpGet:
+              path: /api/health/live
+              port: http
+            periodSeconds: 10
+            failureThreshold: 180
           livenessProbe:
             httpGet:
               path: /api/health/live

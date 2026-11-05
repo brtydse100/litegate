@@ -135,7 +135,7 @@ class OrganizationHierarchy(BaseModel):
 
     def resolve(self, user_id: str, groups: list[str], *, email: str = "", source: str = "") -> OrganizationNode | None:
         claimed = {group.strip().casefold() for group in groups}
-        email = email.strip().casefold() if source == "sso" else ""
+        email = email.strip().casefold() if source in {"sso", "configured_email"} else ""
         return self._compatible(
             [
                 node
