@@ -25,6 +25,13 @@ def user_info(value, user_id: str) -> dict | None:
     return user
 
 
+async def existing_user(user_id: str) -> dict | None:
+    try:
+        return user_info(await litellm.get_user(user_id), user_id)
+    except ValueError as exc:
+        raise HTTPException(502, "Organization discovery returned invalid user JSON; assignment skipped") from exc
+
+
 async def email_match(email: str) -> dict | None:
     """Read the complete substring search with stable ordering, then match exactly."""
     rows, seen = [], set()
@@ -87,6 +94,14 @@ async def refresh(identities: list[dict], lock_for, resolve) -> set[str]:
     semaphore = asyncio.Semaphore(5)
     local = await asyncio.to_thread(local_users.list_users)
     exact = set()
+    # Fail closed while remote validation is in flight, including an interrupted pass.
+    for user_id in list(blocked):
+        async with lock_for("user", user_id):
+            current = await asyncio.to_thread(store.get, user_id)
+            if current and current["auth_source"] == "configured_email":
+                await asyncio.to_thread(store.failed, user_id, "Configured email assignment is awaiting remote revalidation")
+            else:
+                blocked.discard(user_id)
 
     async def discover_id(selector):
         async with semaphore:
@@ -94,7 +109,7 @@ async def refresh(identities: list[dict], lock_for, resolve) -> set[str]:
                 exact.add(selector)
                 return
             try:
-                user = user_info(await litellm.get_user(selector), selector)
+                user = await existing_user(selector)
                 if user is not None:
                     async with lock_for("user", selector):
                         previous = await asyncio.to_thread(store.get, selector)
@@ -120,7 +135,7 @@ async def refresh(identities: list[dict], lock_for, resolve) -> set[str]:
                     raise HTTPException(409, "Configured organization email has no existing LiteLLM user; retrying later")
                 user_id = candidate["user_id"]
                 async with lock_for("user", user_id):
-                    user = user_info(await litellm.get_user(user_id), user_id)
+                    user = await existing_user(user_id)
                     if user is None or email_of(user) != email:
                         raise HTTPException(409, "Organization email changed during discovery; assignment skipped")
                     previous = await asyncio.to_thread(store.get, user_id)
@@ -140,7 +155,10 @@ async def refresh(identities: list[dict], lock_for, resolve) -> set[str]:
                 _logger.warning("Organization email %s discovery failed: %s", email, exc.detail)
                 for identity in identities:
                     if identity["auth_source"] == "configured_email" and identity["email"] == email:
-                        await asyncio.to_thread(store.failed, identity["user_id"], str(exc.detail))
+                        async with lock_for("user", identity["user_id"]):
+                            current = await asyncio.to_thread(store.get, identity["user_id"])
+                            if current and current["auth_source"] == "configured_email":
+                                await asyncio.to_thread(store.failed, identity["user_id"], str(exc.detail))
 
     emails = {value.strip().casefold() for value in selectors - exact if "@" in value}
     await asyncio.gather(*(discover_email(email) for email in sorted(emails)))

@@ -311,3 +311,19 @@ async def test_rejected_sso_conflicting_email_path_stays_rejected(monkeypatch):
     assert identity["auth_source"] == "sso" and identity["groups"] == ["other"]
     assert "conflict" in identity["sync_error"]
     assert identity["team_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_inflight_revalidation_blocks_old_policy_even_if_pass_aborts(monkeypatch):
+    await sync.reconcile()
+
+    async def broken_lookup(uid):
+        # Once validation starts, the old assignment cannot authorize writes.
+        with pytest.raises(HTTPException):
+            sync.resolve_identity(store.get("subject"))
+        raise ValueError("invalid upstream JSON")
+
+    monkeypatch.setattr(litellm, "get_user", broken_lookup)
+    await sync.reconciliation_attempt()
+    with pytest.raises(HTTPException):
+        sync.resolve_identity(store.get("subject"))
