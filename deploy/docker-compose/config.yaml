@@ -87,9 +87,9 @@ root_url: "http://localhost"
 # To use a local file: place it in frontend/public/ then set: /logo.svg
 logo_url: ""
 
-# URL of the LiteLLM web UI - adds an "Open LiteLLM Hub" button.
-# Typically the same host as litellm_url but accessible from the browser.
-litellm_ui_url: "http://localhost:4000"
+# Full browser-facing destination for the "Open LiteLLM Hub" button.
+# Used exactly as configured; blank hides the button.
+litellm_ui_url: "http://localhost:4000/ui/model_hub"
 
 # Key defaults (applied to every generated key)
 # Store full keys in SQLite so owners and administrators can reveal them.

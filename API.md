@@ -1,5 +1,11 @@
 # LiteGate API v1
 
+## Public portal configuration
+
+`GET /api/portal-config` requires no authentication. Its `litellm_ui_url` field
+returns the configured full destination unchanged, or an empty string when the
+Model Hub button is disabled. LiteGate does not append a Model Hub path.
+
 ## Organization reporting
 
 - `GET /api/v1/organization`: configured levels/groups, effective allowances,

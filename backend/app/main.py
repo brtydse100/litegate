@@ -96,11 +96,10 @@ app.include_router(organization.router, prefix="/api")
 @app.get("/api/portal-config")
 async def portal_config():
     """Public config the frontend reads on load — no auth required."""
-    hub_url = (settings.litellm_ui_url.rstrip("/") + "/ui/model_hub_table") if settings.litellm_ui_url else ""
     return {
         "support_ticket_url": settings.support_ticket_url,
         "logo_url": settings.logo_url,
-        "litellm_ui_url": hub_url,
+        "litellm_ui_url": settings.litellm_ui_url,
         "api_docs_url": "/api/docs",
         "local_users_enabled": settings.local_users_enabled,
         "save_api_keys_in_db": settings.save_api_keys_in_db,
