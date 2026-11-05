@@ -32,7 +32,9 @@ async def current_keys(user_id: str, keys: list[dict] | None = None) -> list[dic
             info = await litellm.get_key_info(identifier)
         if not info or info.get("user_id") != user_id:
             raise HTTPException(status_code=502, detail="Could not verify key ownership")
-        return {**key, **info, "spend": counter(info)}
+        # Live metadata must not replace (or introduce) lookup identifiers.
+        metadata = {name: value for name, value in info.items() if name not in {"token", "api_key", "key"}}
+        return {**key, **metadata, "spend": counter(info)}
 
     return await asyncio.gather(*(read(key) for key in keys))
 
