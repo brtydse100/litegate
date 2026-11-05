@@ -29,7 +29,11 @@ metadata:
   labels:
     {{- include "litegate.labels" . | nindent 4 }}
 data:
+  {{- if .Values.organizationHierarchyFile }}
+  ORGANIZATION_HIERARCHY_FILE: {{ default "/etc/litegate/organization.json" .Values.organizationHierarchyFile.mountPath | quote }}
+  {{- else }}
   ORGANIZATION_HIERARCHY: {{ .Values.organizationHierarchy | default (dict "levels" (list)) | toJson | quote }}
+  {{- end }}
   LITELLM_URL: {{ .Values.config.litellmUrl | quote }}
   LITELLM_UI_URL: {{ .Values.config.litellmUiUrl | quote }}
   SSL_VERIFY: {{ .Values.config.sslVerify | quote }}

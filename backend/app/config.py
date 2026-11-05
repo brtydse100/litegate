@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     oidc_require_team_mapping: bool = False
     sso_default_team_id: str = ""
     organization_hierarchy: OrganizationHierarchy = Field(default_factory=OrganizationHierarchy)
+    organization_hierarchy_file: str = ""
     inherit_litellm_admin: bool = False
 
     jwt_secret: str
@@ -122,6 +123,22 @@ class Settings(BaseSettings):
     def reject_removed_mapping(cls, data):
         _reject_removed_mapping(data)
         return data
+
+    @model_validator(mode="after")
+    def load_organization_hierarchy_file(self):
+        if not self.organization_hierarchy_file:
+            return self
+        if self.organization_hierarchy.levels:
+            raise ValueError("Configure either organization_hierarchy or organization_hierarchy_file, not both")
+        path = Path(self.organization_hierarchy_file)
+        if not path.is_absolute():
+            path = _BACKEND_DIR / path
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+            self.organization_hierarchy = OrganizationHierarchy.model_validate(value)
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"Invalid organization_hierarchy_file {path}: {exc}") from exc
+        return self
 
     @classmethod
     def settings_customise_sources(

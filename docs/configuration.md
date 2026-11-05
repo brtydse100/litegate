@@ -4,6 +4,15 @@ For custom organizational levels, lowest-team key assignment, inherited key
 allowances, and ancestor usage tracking, see [Organization hierarchy](organization.md).
 `organizationHierarchy` is a top-level Helm value. Direct deployments accept
 the same YAML block or JSON in `ORGANIZATION_HIERARCHY` (default `{"levels":[]}`).
+Alternatively, set `organization_hierarchy_file` / `ORGANIZATION_HIERARCHY_FILE`
+(default empty) to a UTF-8 JSON file containing that same hierarchy value.
+Relative paths resolve against `backend/`, not the working directory. Files load
+once during startup; restart after editing. Missing, unreadable, malformed, or
+invalid files fail startup with the path and validation error. Nonempty inline
+`levels` and a file path cannot be combined; the default empty hierarchy is allowed.
+Settings precedence remains constructor values, environment, YAML, then file secrets.
+An empty file setting preserves inline YAML and environment JSON behavior.
+For Helm, use top-level `organizationHierarchyFile`; see [file setup](organization.md#json-file-input).
 
 LiteGate reads `config.yaml` and environment variables. Environment variables
 take precedence and use uppercase names; for example, `management_api_key`
@@ -181,7 +190,8 @@ No users are deleted and no key ownership is transferred.
 
 See [YAML example](examples/organization-hierarchy.yaml) and
 [JSON hierarchy value](examples/organization-hierarchy.json). JSON is the value
-of `ORGANIZATION_HIERARCHY`, not a separately mounted mapping file.
+of `ORGANIZATION_HIERARCHY` or the contents of `organization_hierarchy_file`;
+it uses the existing hierarchy schema, not the removed standalone mapping schema.
 
 ## Key defaults
 
