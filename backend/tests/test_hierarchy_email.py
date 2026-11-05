@@ -112,6 +112,7 @@ async def test_generic_policy_through_callback(monkeypatch, tmp_path, required, 
             from app.services import key_budgets
 
             monkeypatch.setattr(key_budgets, "preserve_rotation_budget", AsyncMock())
+            monkeypatch.setattr(sync.litellm, "get_key_info", AsyncMock(return_value={"user_id": "subject", "spend": 0}))
             await sync.rotate_key("subject", email.strip().casefold(), None, key_alias="subject's key")
             assert generate.await_count == 2
             assert all(call.args[:3] == ("subject", "alice@example.com", node.team_id) for call in generate.await_args_list)

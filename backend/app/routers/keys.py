@@ -6,14 +6,14 @@ from app.dependencies import get_current_user
 from app.models import CurrentUser, KeyCreateResponse, KeyDeleteRequest
 from app.rate_limit import check_key_rate_limit, key_rate_limit_status
 from app.services import litellm as llm
-from app.services import audit, key_secrets, organization_sync
+from app.services import audit, key_secrets, key_spend, organization_sync
 
 router = APIRouter(prefix="/keys", tags=["keys"])
 
 
 @router.get("")
 async def list_keys(current_user: CurrentUser = Depends(get_current_user)):
-    keys = await llm.list_user_keys(current_user.user_id)
+    keys = await key_spend.current_keys(current_user.user_id)
     policy = await organization_sync.personal_policy(current_user, keys)
     if policy:
         keys = [

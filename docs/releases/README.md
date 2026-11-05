@@ -6,6 +6,7 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.15.3](v2.15.3.md) | Dynamic small-spend charts and verified spend counters during regeneration (prepared) |
 | [2.15.2](v2.15.2.md) | JSON file input for the existing organization hierarchy and ConfigMap file mounts (prepared) |
 | [2.15.1](v2.15.1.md) | Unified hierarchy SSO email assignments, deferred provisioning, and consistent email verification (prepared) |
 | [2.15.0](v2.15.0.md) | Email organization mapping with named levels, inherited memberships, and keyless SSO provisioning |

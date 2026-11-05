@@ -209,6 +209,9 @@ allowance during login and reconciliation. Migration supports at most 500 keys
 per user and preserves existing secrets and spend. Review old and new budget
 windows; LiteGate does not reset spend. Rotation carries accrued key spend into the replacement, whose
 reset schedule is established by LiteLLM for that new key.
+Rotation verifies live owned-key counters after replacement policy updates and
+before deleting originals. If LiteLLM cannot confirm carried spend, LiteGate
+rejects the rotation and revokes the replacement, retaining the original key.
 Ancestor model, blocking, permission, and rate policies are not inherited by native
 child teams. LiteGate blocks provisioning or migration when it detects these
 restrictions on an ancestor (including member rate limits on a key's source team).
@@ -251,6 +254,10 @@ including those with zero usage, and reconcile with the report total. Higher
 levels retain the child-group breakdown. The user table separately displays
 **Budget-period spend / per-key allowance**, which is independent of the chart's
 date filter and can differ after budget resets.
+Spend chart labels adjust their precision for small amounts, and usage bars
+scale to the largest value in the selected results. The personal dashboard reads
+live key counters; historical chart totals do not overwrite current budget
+counters or reconstruct counters that have already been reset.
 If an older report omits the member breakdown, the chart retains group totals
 with an explicit unavailable message rather than treating members as zero usage.
 

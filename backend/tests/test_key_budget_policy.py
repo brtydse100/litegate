@@ -35,7 +35,18 @@ async def upstream(monkeypatch):
         if path == "/key/info":
             if request.url.params.get("key") == "sk-replacement":
                 return httpx.Response(200, json={"info": state["generated"]})
-            return httpx.Response(200, json={"info": {"user_id": state["owner"], "team_id": state["team_id"], "max_budget": state["key_budget"]}})
+            return httpx.Response(
+                200,
+                json={
+                    "info": {
+                        "user_id": state["owner"],
+                        "team_id": state["team_id"],
+                        "spend": 20,
+                        "budget_duration": "30d",
+                        "max_budget": state["key_budget"],
+                    }
+                },
+            )
         if path == "/key/update":
             if payload["key"] == "sk-replacement":
                 if not state.get("ignore_replacement_budget"):

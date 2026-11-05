@@ -231,6 +231,14 @@ membership without an unresolved budget record or inherited member cap.
 Regeneration preserves a known finite individual key budget and reset interval
 for unmanaged keys, along with recorded spend. An unverifiable replacement is
 revoked before the old key is deleted. Managed keys retain their hierarchy policy.
+The personal key list and regeneration read current owned-key counters from
+LiteLLM `/key/info` with at most five concurrent reads, rather than trusting
+cached `/user/info` spend. Missing, invalid, or unverifiable counters return an
+upstream error. Regeneration rechecks source and replacement counters after all
+budget-policy writes and before revoking originals. If LiteLLM ignores the seed
+or changes the counter, regeneration fails with `502`, revokes the replacement,
+and restores the original alias. It does not repair spend from historical usage.
+Current key budget counters can cover a different period from historical charts.
 
 `GET /api/v1/models` returns `{"models":["model-name"]}` to administrators only.
 It reads LiteLLM's `/model/info` catalog and exposes unique, sorted model names,
