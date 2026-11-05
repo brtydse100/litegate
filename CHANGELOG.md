@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.15.3] - 2026-11-05
+
 ### Fixed
 
 - Display distinct sub-dollar and microdollar chart labels and scale usage bars
@@ -14,6 +16,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Read live owned-key spend for the homepage and verify carried spend after
   regeneration policy updates; retain original keys if LiteLLM cannot confirm
   the replacement counter.
+
+## [2.15.2] - 2026-11-05
+
+### Added
+
+- Load the existing organization hierarchy from a UTF-8 JSON file at startup
+  using `organization_hierarchy_file` / `ORGANIZATION_HIERARCHY_FILE`.
+- Mount an existing ConfigMap hierarchy file through top-level Helm
+  `organizationHierarchyFile`, with validation and rollout checksums.
 
 ## [2.15.1] - 2026-11-04
 

@@ -9,6 +9,8 @@ services:
     volumes:
       - ./config.yaml:/app/backend/config.yaml:ro
       - litegate-data:/app/backend/data
+      # Optional: set organization_hierarchy_file in config.yaml and leave levels empty.
+      # - ./organization.json:/app/backend/organization.json:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # To override a single value without editing config.yaml, use:

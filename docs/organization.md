@@ -67,6 +67,69 @@ Direct and Compose deployments accept the same `organizationHierarchy` block
 in `config.yaml`, or its contents as JSON in `ORGANIZATION_HIERARCHY`. Helm
 serializes the block into that variable and rolls out configuration changes.
 
+## JSON file input
+
+Instead of inline configuration, save the [JSON hierarchy value](examples/organization-hierarchy.json)
+as `organization.json`. Its root is `{"levels": [...]}` without an
+`organizationHierarchy` wrapper. `userIds`, `ssoGroups`, parent links, and budgets
+use exactly the same validation and resolution as inline hierarchy configuration.
+The [YAML sample](examples/organization-hierarchy.yaml) includes the inline wrapper;
+do not save that wrapper in the JSON file.
+
+For direct deployment, set `organization_hierarchy_file: organization.json` in
+`config.yaml`, or `ORGANIZATION_HIERARCHY_FILE=organization.json`. Relative paths
+resolve against `backend/`. Leave inline levels empty or omit the inline setting.
+Nonempty inline levels plus a nonempty file path fail startup. Environment values
+retain precedence over YAML. The file must be readable UTF-8 JSON and is validated
+at startup; missing, unreadable, malformed, and invalid files stop startup with an
+actionable error. There is no file watcher; restart after editing.
+
+For Docker Compose, set this in `config.yaml`:
+
+```yaml
+organization_hierarchy_file: /app/backend/organization.json
+```
+
+Add `./organization.json:/app/backend/organization.json:ro` to the service's
+existing `volumes` list. Keep the existing config and SQLite mounts.
+
+For Helm, create a ConfigMap in the release namespace:
+
+```bash
+kubectl create configmap litegate-hierarchy --from-file=organization.json=docs/examples/organization-hierarchy.json
+```
+
+Then set this **top-level** values block:
+
+```yaml
+organizationHierarchyFile:
+  configMap: litegate-hierarchy
+  key: organization.json
+  mountPath: /etc/litegate/organization.json
+```
+
+The default is `organizationHierarchyFile: {}` (off). With a ConfigMap selected,
+`key` defaults to `organization.json` and `mountPath` to
+`/etc/litegate/organization.json`. The destination must be an absolute file path.
+The chart mounts the selected key read-only using `subPath` and sets
+`ORGANIZATION_HIERARCHY_FILE` automatically. Nonempty inline hierarchy levels
+cannot be combined with the file. A key or path without a nonempty `configMap`
+is rejected. No Secret or additional enable toggle is required.
+
+Inline configuration keeps its existing rollout checksum. File option changes
+also trigger rollout, but edits to the external ConfigMap's contents do not.
+Because `subPath` mounts and startup loading do not refresh automatically, restart
+the deployment after updating the ConfigMap:
+
+```bash
+kubectl rollout restart deployment/<release-name>-litegate
+```
+
+Use your deployment's actual name (a name override may change it). This file input
+adds no new authentication, email-verification, identity-binding, or budget policy.
+The removed `organization_mapping_file` setting and its standalone schema remain
+unsupported.
+
 ## Membership
 
 `ssoGroups` matches any listed group name or ID from the verified login provider,

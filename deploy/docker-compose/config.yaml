@@ -110,3 +110,6 @@ support_ticket_url: ""
 # Optional organization hierarchy; see docs/organization.md for examples.
 organizationHierarchy:
   levels: []
+
+# Optional alternative to nonempty inline levels: mount a UTF-8 JSON hierarchy.
+# organization_hierarchy_file: /app/backend/organization.json
