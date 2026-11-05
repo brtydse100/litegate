@@ -266,3 +266,22 @@ async def test_reopened_storage_list_and_reveal_preserve_identifier(field, repla
         assert key_secrets.get(IDENTIFIER, "changed-owner") is None
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.mark.asyncio
+async def test_storage_written_by_previous_process_is_revealed():
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    environment = {**os.environ, "LOCAL_USERS_DB_PATH": key_secrets.settings.local_users_db_path, "SAVE_API_KEYS_IN_DB": "true"}
+    subprocess.run(
+        [sys.executable, "-c", "from app.services import key_secrets; key_secrets.save('sk-synthetic-storage-test', 'owner')"],
+        cwd=Path(__file__).resolve().parents[1],
+        env=environment,
+        check=True,
+    )
+    assert key_secrets.get(IDENTIFIER, OWNER.user_id) == SECRET
+    with patch.object(litellm, "get_key_info", AsyncMock(return_value={"user_id": OWNER.user_id})):
+        assert await keys.reveal_key(KeyDeleteRequest(key=IDENTIFIER), Response(), OWNER) == {"key": SECRET}

@@ -163,18 +163,39 @@ for lifecycle and removal behavior.
 Use the existing `organizationHierarchy` (`organization_hierarchy` or
 `ORGANIZATION_HIERARCHY` for backend configuration). Each member's `userIds`
 accepts exact existing user IDs and SSO email addresses. Email matching trims
-whitespace and ignores case; existing ID matching remains exact. Only identities
-from SSO can match by email: local accounts retain explicit ID assignments.
+whitespace and ignores case; existing ID matching remains exact. Authenticated SSO claims can match by email. Startup can also discover an
+existing remote account as an operator assignment; local accounts require exact IDs.
 
 Email and `ssoGroups` matches use the same single-path resolver. Compatible
 ancestor matches select the deepest team and its inherited budget. Conflicting
 paths reject access rather than selecting one by order. Ancestor membership,
 key migration, and enforced allowances use the existing hierarchy lifecycle.
 
-Emails remain configuration only until first authenticated SSO login. The actual
-provider subject is provisioned with `auto_create_key=False`; startup does no
-remote email lookup and creates no placeholder users or reservations. Existing
-explicit ID discovery is unchanged.
+Startup awaits the first hierarchy reconciliation attempt before serving requests,
+then retries every 60 seconds. Exact existing user IDs take precedence, including
+IDs containing `@`. Unresolved email selectors search all matching LiteLLM pages
+(case-insensitive substring search), then require one normalized exact match and
+a fresh lookup by actual user ID. Discovery uses at most five concurrent lookups,
+100 pages of 100 users per email, a 60-second scan deadline, and existing request
+timeouts. Missing users are skipped and retried; no users, keys, SSO bindings or
+reservations are created by this pass.
+
+Email discovery is an operator-configured organization assignment
+(`configured_email`), not SSO identity proof. Local/admin email-only matches,
+ambiguous or incomplete results, changed emails and incompatible paths are
+skipped with actionable errors. Remote-derived assignments are revalidated before
+every reconciliation pass; failed validation blocks policy writes and never
+silently reuses the previous team. Verified SSO/local claims, including rejected
+claims, remain authoritative. Subject-based login, email verification and existing
+bindings are unchanged; new SSO users are provisioned keylessly only at login.
+
+Existing keys keep their secrets, aliases, model access and spend during policy
+migration. Per-user errors remain visible; finishing the startup attempt does
+not guarantee every remote write succeeded. Review synchronization errors and
+retry after correcting upstream availability or conflicting assignments.
+The Helm startup probe allows 30 minutes before liveness checks begin; installations
+with larger migrations must allow more startup time. No new backend setting is
+required.
 
 In 2.15.1, `organization_mapping`, `organization_mapping_file`,
 `config.organizationMapping`, and `config.organizationMappingFile` are removed.
