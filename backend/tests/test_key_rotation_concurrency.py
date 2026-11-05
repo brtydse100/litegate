@@ -40,6 +40,7 @@ async def test_concurrent_http_rotations_leave_one_replacement_and_preserve_spen
     _key_ops.clear()
     monkeypatch.setitem(app.dependency_overrides, get_current_user, lambda: owner)
     monkeypatch.setattr(litellm, "list_user_keys", list_keys)
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(side_effect=lambda key: {**active[key], "user_id": owner.user_id}))
     monkeypatch.setattr(litellm, "delete_key", delete)
     monkeypatch.setattr(sync, "prepare_user", AsyncMock(return_value=node))
     monkeypatch.setattr(sync, "resolve", lambda *_: node)

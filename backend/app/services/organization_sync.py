@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from app.config import settings
 from app.models import CurrentUser
 from app.organization import MembershipConflict, OrganizationNode
-from app.services import audit, key_cleanup, litellm, organization_key_policy as key_policy
+from app.services import audit, key_cleanup, key_spend, litellm, organization_key_policy as key_policy
 from app.services import organization_client as upstream, organization_store as store
 
 _logger = logging.getLogger(__name__)
@@ -179,7 +179,7 @@ async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias
     from app.services import key_budgets
 
     async with lock_for("user", user_id):
-        existing = await litellm.list_user_keys(user_id)
+        existing = await key_spend.current_keys(user_id)
         renamed_key = None
         try:
             for key_info in existing:
@@ -192,6 +192,7 @@ async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias
             result = await _generate_key(user_id, email, team_id, initial_spend=litellm.total_key_spend(existing), key_alias=key_alias)
             try:
                 await key_budgets.preserve_rotation_budget(user_id, existing, result["key"])
+                await key_spend.verify_replacement(user_id, existing, result["key"])
                 for key_info in existing:
                     token = key_info.get("token") or key_info.get("api_key") or key_info.get("key")
                     if token:

@@ -36,6 +36,7 @@ async def test_rotation_handles_unique_aliases_and_restores_old_name_on_failure(
 
     with (
         patch("app.routers.keys.llm.list_user_keys", new=AsyncMock(return_value=[dict(records["sk-old"])])),
+        patch("app.routers.keys.llm.get_key_info", new=AsyncMock(side_effect=lambda key: {**records[key], "user_id": "owner"})),
         patch("app.routers.keys.llm.update_key", new=AsyncMock(side_effect=update)),
         patch("app.routers.keys.llm.generate_key", new=AsyncMock(side_effect=generate)),
         patch("app.routers.keys.llm.delete_key", new=AsyncMock(side_effect=delete)),

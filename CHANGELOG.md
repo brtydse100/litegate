@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Display distinct sub-dollar and microdollar chart labels and scale usage bars
+  to the actual maximum, including spend below one dollar.
+- Read live owned-key spend for the homepage and verify carried spend after
+  regeneration policy updates; retain original keys if LiteLLM cannot confirm
+  the replacement counter.
+
 ## [2.15.1] - 2026-11-04
 
 ### Fixed

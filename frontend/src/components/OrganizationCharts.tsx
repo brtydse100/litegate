@@ -10,9 +10,8 @@ export const metricLabels: Record<UsageMetric, string> = {
 
 export function metricValue(value: number, metric: UsageMetric): string {
   if (metric !== "spend") return value.toLocaleString();
-  if (value > 0 && value < 0.0001) return "<$0.0001";
-  const digits = value !== 0 && Math.abs(value) < 0.01 ? 4 : 2;
-  return `$${value.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+  if (value > 0 && value < 0.000001) return `$${value.toExponential(1)}`;
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
 }
 
 export function SpendTrend({
@@ -60,19 +59,9 @@ export function SpendTrend({
               fill="currentColor"
               className="text-slate-500"
             >
-              {metric === "spend" &&
-              scale * ratio > 0 &&
-              scale * ratio < 0.01 ? (
-                metricValue(scale * ratio, metric)
-              ) : (
-                <>
-                  {metric === "spend" ? "$" : ""}
-                  {(scale * ratio).toLocaleString(undefined, {
-                    maximumFractionDigits: 1,
-                    notation: "compact",
-                  })}
-                </>
-              )}
+              {max * ratio >= 1000
+                ? `${metric === "spend" ? "$" : ""}${(max * ratio).toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 6 })}`
+                : metricValue(max * ratio, metric)}
             </text>
           </g>
         ))}
@@ -159,7 +148,7 @@ export function UsageBars({
   onSelect?: (id: string) => void;
 }) {
   const sorted = [...values].sort((a, b) => b[metric] - a[metric]);
-  const max = Math.max(...sorted.map((row) => row[metric]), 1);
+  const max = Math.max(...sorted.map((row) => row[metric]), 0) || 1;
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-slate-950">{title}</h2>

@@ -114,6 +114,8 @@ async def test_reveal_keeps_cookie_csrf_protection():
 
 
 def mock_litellm(request):
+    if request.url.path == "/key/info":
+        return httpx.Response(200, json={"info": {"user_id": OWNER.user_id, "spend": 2}})
     if request.url.path == "/key/generate":
         return httpx.Response(200, json={"key": SECRET, "user_id": OWNER.user_id})
     return httpx.Response(200, json={"deleted": True})

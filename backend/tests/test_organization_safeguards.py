@@ -102,7 +102,9 @@ async def test_cancelled_key_operations_finish_revoking_undelivered_keys(monkeyp
         active.add("sk-new")
         return {"key": "sk-new"}
 
-    async def verify(*args):
+    async def verify(key):
+        if key == "sk-old" or stage == "old key deletion":
+            return {"user_id": "u", "spend": 3}
         entered.set()
         await asyncio.Event().wait()
 
@@ -164,6 +166,7 @@ async def test_personal_keys_show_enforced_budget_and_policy_errors(monkeypatch,
         "list_user_keys",
         AsyncMock(return_value=[{"token": "hash", "team_id": "engineering", "spend": 60, "max_budget": 200, "budget_duration": "30d"}]),
     )
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"user_id": "u", "spend": 60}))
     info = {"team_memberships": [{"user_id": "u", "spend": 60, "litellm_budget_table": {"max_budget": 200, "budget_duration": "30d"}}]}
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=info))
     async with client() as browser:
@@ -182,6 +185,7 @@ async def test_budget_lookup_outage_keeps_key_metadata_with_an_unknown_allowance
     store.remember("u", "u@example.com", "sso", ["squad1"])
     metadata = {"token": "hash", "team_id": settings.organization_hierarchy.resolve("u", ["squad1"]).team_id, "spend": 12, "models": ["model-a"]}
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[metadata]))
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={**metadata, "user_id": "u"}))
     monkeypatch.setattr(upstream, "team_info", AsyncMock(side_effect=HTTPException(status_code=503, detail="Budget service unavailable")))
     async with client() as browser:
         response = await browser.get("/api/keys", headers=token())
@@ -200,6 +204,7 @@ async def test_a_failed_key_adoption_does_not_show_an_inapplicable_member_allowa
     store.failed("u", "Key team update failed")
     metadata = {"token": "hash", "team_id": None, "spend": 12, "max_budget": 50}
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[metadata]))
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={**metadata, "user_id": "u"}))
     lookup = AsyncMock(return_value={"team_memberships": [{"user_id": "u", "litellm_budget_table": {"max_budget": 100}}]})
     monkeypatch.setattr(upstream, "team_info", lookup)
     async with client() as browser:

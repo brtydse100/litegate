@@ -128,6 +128,7 @@ async def test_local_user_id_mapping_and_legacy_session_are_resolved(monkeypatch
 
 @pytest.mark.asyncio
 async def test_personal_key_display_uses_member_budget_and_cycle_spend(monkeypatch):
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"user_id": "u", "spend": 42}))
     store.remember("u", "u@example.com", "sso", ["squad1"])
     monkeypatch.setattr(
         litellm,
@@ -173,6 +174,7 @@ async def test_multiple_key_cards_show_each_keys_own_budget_and_spend(monkeypatc
             ]
         ),
     )
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(side_effect=lambda key: {"user_id": "u", "spend": {"first": 4, "second": 6}[key]}))
     async with client() as browser:
         response = await browser.get("/api/keys", headers=token())
     assert [(key["user_spend"], key["user_budget"]) for key in response.json()["keys"]] == [(4, 100), (6, 200)]

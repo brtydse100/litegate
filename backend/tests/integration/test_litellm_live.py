@@ -135,13 +135,16 @@ async def test_managed_allowance_updates_preserve_windows_and_rotation_carries_s
         assert changed["max_budget"] == 100
         assert changed["spend"] == 12
         assert changed["budget_reset_at"] == first["budget_reset_at"]
-        replacement = await organization_sync.generate_key(user_id, "", team_id, initial_spend=12, key_alias=f"rotated-{suffix}")
+        replacement = await organization_sync.rotate_key(user_id, "", team_id, key_alias=f"rotated-{suffix}")
         keys.append(replacement["key"])
         rotated = await litellm.get_key_info(replacement["key"])
         assert rotated["team_id"] == leaf.team_id
         assert rotated["max_budget"] == 100
         assert rotated["spend"] == 12
-        await litellm.delete_key(keys.pop(0))
+        keys.pop(0)
+        replacement = await organization_sync.rotate_key(user_id, "", team_id, key_alias=f"rotated-{suffix}")
+        keys[:] = [replacement["key"]]
+        assert (await litellm.get_key_info(keys[0]))["spend"] == 12
         await litellm.update_team(leaf.team_id, {"team_member_budget": 50, "team_member_rpm_limit": 120})
         await organization_sync.synchronize_user(user_id)
         default = (await organization.team_info(leaf.team_id))["team_info"]["team_member_budget_table"]

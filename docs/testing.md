@@ -63,6 +63,22 @@ it checks budget persistence and reset windows without requiring a license.
 Enterprise request enforcement and analytics access still require validation on
 a licensed deployment. Never run this against a production proxy.
 
+## Spend lifecycle regressions
+
+`python -m pytest tests/test_spend_lifecycle.py` exercises creation, simulated
+usage, team moves before and after regeneration, successive rotations, stale
+list metadata, ignored generation seeds, and counter loss during replacement
+policy updates through a stateful HTTP transport. Failures must retain the
+original credential, spend, and alias without leaving replacement duplicates.
+Additional checks cover live ownership, bounded reads, missing/invalid counters,
+and legitimate period resets. The opt-in managed integration test above uses the
+production rotation path twice and verifies actual carried counters.
+
+Historical chart usage and current key budget counters may cover different
+periods. Existing zero counters cannot be reconstructed safely from all-time
+usage without proving the applicable budget period. Unsupported carry-spend
+behavior fails regeneration rather than inventing or overwriting spend.
+
 ## Manual local testing
 
 With Docker Desktop running and the backend/frontend dependencies installed, run
