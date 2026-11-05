@@ -150,6 +150,8 @@ jobs:
       - run: helm lint deploy/helm/litegate
       - run: python -m unittest scripts/test_generic_sso_helm.py
       - run: python -m unittest scripts/test_organization_helm.py
+      - run: python -m pip install -r backend/requirements.txt
+      - run: python -m unittest scripts/test_hierarchy_file_helm.py
       - name: Render externally managed data volume
         shell: bash
         run: |

@@ -83,6 +83,12 @@ were removed in 2.15.1: remove their optional mounts and migrate to the existing
 hierarchy schema. Keep the SQLite volume for existing identity bindings.
 Users are provisioned without keys at first authenticated SSO login.
 
+Alternatively, set `organization_hierarchy_file: /app/backend/organization.json`
+in `config.yaml`, leave inline levels empty, and add
+`./organization.json:/app/backend/organization.json:ro` to the existing service
+volumes. Use the [JSON hierarchy sample](docs/examples/organization-hierarchy.json),
+whose root is `{"levels": [...]}`. Restart after edits; invalid files fail startup.
+
 
 ### Step 3 — Stopping and updating
 
@@ -319,6 +325,26 @@ an administrator credential for `/api/v1` and defaults to empty. If either the
 old or new team-mapping field is `true`, mapping remains required so conflicting upgrade
 values cannot weaken login restrictions. Migrate to
 `config.ssoRequireTeamMapping`, then remove the old field.
+
+### JSON hierarchy file in Helm
+
+Use an existing ConfigMap in the release namespace:
+
+```yaml
+organizationHierarchyFile:
+  configMap: litegate-hierarchy
+  key: organization.json
+  mountPath: /etc/litegate/organization.json
+```
+
+The default `{}` disables file input. With `configMap` set, `key` and `mountPath`
+can be omitted to use the values shown above. The chart mounts the key read-only
+with `subPath` and sets `ORGANIZATION_HIERARCHY_FILE`; leave inline hierarchy
+levels empty. The mount path is an absolute file destination. File options trigger
+rollout when changed. External ConfigMap content changes require an explicit
+`kubectl rollout restart deployment/<deployment-name>`; no watcher reloads them.
+See [JSON file input](docs/organization.md#json-file-input) for creation commands
+and validation behavior. This uses the existing hierarchy schema and policies.
 
 ### Email organization mapping in Helm
 

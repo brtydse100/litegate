@@ -17,6 +17,20 @@ kind: Deployment
 {{- if and $customCA (not $hasCustomCA) }}
 {{- fail "customCA requires an existing certificate source: set customCA.configMap or customCA.secret; customCA.mountPath is the destination inside the pod" }}
 {{- end }}
+{{- $hierarchyFile := .Values.organizationHierarchyFile }}
+{{- $hasHierarchyFile := not (empty $hierarchyFile) }}
+{{- if $hasHierarchyFile }}
+{{- if .Values.organizationHierarchy.levels }}
+{{- fail "Configure either organizationHierarchy or organizationHierarchyFile, not both" }}
+{{- end }}
+{{- $mountPath := default "/etc/litegate/organization.json" $hierarchyFile.mountPath }}
+{{- if ne (clean $mountPath) $mountPath }}
+{{- fail "organizationHierarchyFile.mountPath must be an absolute file destination without dot segments" }}
+{{- end }}
+{{- if has (default "organization.json" $hierarchyFile.key) (list "." "..") }}
+{{- fail "organizationHierarchyFile.key must name a ConfigMap file key" }}
+{{- end }}
+{{- end }}
 metadata:
   name: {{ include "litegate.fullname" . }}
   labels:
@@ -32,6 +46,9 @@ spec:
     metadata:
       annotations:
         checksum/organization: {{ .Values.organizationHierarchy | default (dict "levels" (list)) | toJson | sha256sum | quote }}
+        {{- if $hasHierarchyFile }}
+        checksum/organization-file: {{ $hierarchyFile | toJson | sha256sum | quote }}
+        {{- end }}
       labels:
         {{- include "litegate.selectorLabels" . | nindent 8 }}
     spec:
@@ -71,8 +88,14 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if or .Values.persistence.enabled .Values.extraVolumeMounts $hasCustomCA }}
+          {{- if or .Values.persistence.enabled .Values.extraVolumeMounts $hasCustomCA $hasHierarchyFile }}
           volumeMounts:
+            {{- if $hasHierarchyFile }}
+            - name: organization-hierarchy
+              mountPath: {{ default "/etc/litegate/organization.json" $hierarchyFile.mountPath | quote }}
+              subPath: {{ default "organization.json" $hierarchyFile.key | quote }}
+              readOnly: true
+            {{- end }}
             {{- if .Values.persistence.enabled }}
             - name: data
               mountPath: /app/backend/data
@@ -87,8 +110,13 @@ spec:
               readOnly: true
             {{- end }}
           {{- end }}
-      {{- if or .Values.persistence.enabled .Values.extraVolumes $hasCustomCA }}
+      {{- if or .Values.persistence.enabled .Values.extraVolumes $hasCustomCA $hasHierarchyFile }}
       volumes:
+        {{- if $hasHierarchyFile }}
+        - name: organization-hierarchy
+          configMap:
+            name: {{ $hierarchyFile.configMap | quote }}
+        {{- end }}
         {{- if .Values.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
