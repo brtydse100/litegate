@@ -61,8 +61,11 @@ async def test_email_search_pagination_and_no_login_migration(monkeypatch, tmp_p
         monkeypatch.setattr(litellm, "ensure_user_exists", AsyncMock(side_effect=AssertionError("no user creation")))
         monkeypatch.setattr(litellm, "generate_key", AsyncMock(side_effect=AssertionError("no key creation")))
         await sync.reconcile()
+        identity = store.get(subject)
+        assert identity is not None
+        assert identity["sync_error"] is None, identity["sync_error"]
         after = await litellm.get_key_info(key)
-        assert store.get(subject)["auth_source"] == "configured_email"
+        assert identity["auth_source"] == "configured_email"
         assert after["team_id"] == team and after["max_budget"] == 100 and after["spend"] == 42
         assert after["key_alias"] == before["key_alias"] and after["models"] == before["models"]
         assert len(await litellm.list_user_keys(subject)) == 1

@@ -60,6 +60,9 @@ per-key budgets, unchanged spend/reset windows during allowance edits, and carri
 spend during key replacement. Teams and keys are removed afterward; test users
 remain for inspection. The pinned CI stack also runs this management contract;
 it checks budget persistence and reset windows without requiring a license.
+The disposable Compose stack loads `litellm-integration.yaml` with a synthetic
+mock model so LiteLLM initializes its router, which is required for changing an
+existing key's team. The mock uses no real provider credentials or external API.
 Enterprise request enforcement and analytics access still require validation on
 a licensed deployment. Never run this against a production proxy.
 

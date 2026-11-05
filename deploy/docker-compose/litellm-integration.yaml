@@ -1,0 +1,8 @@
+# Disposable CI stack only: initialize the router without an external provider.
+model_list:
+  - model_name: litegate-integration-mock
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: sk-synthetic-integration-placeholder
+      api_base: http://127.0.0.1:9
+      mock_response: "Synthetic LiteGate integration response"
