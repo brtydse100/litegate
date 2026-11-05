@@ -2,6 +2,7 @@
 
 import asyncio
 import math
+from datetime import datetime, timezone
 from fastapi import HTTPException
 from app.services import litellm
 
@@ -36,12 +37,21 @@ async def current_keys(user_id: str, keys: list[dict] | None = None) -> list[dic
     return await asyncio.gather(*(read(key) for key in keys))
 
 
+def _period_advanced(before: dict, after: dict) -> bool:
+    try:
+        timestamps = [datetime.fromisoformat(info["budget_reset_at"]) for info in (before, after)]
+    except (KeyError, TypeError, ValueError):
+        return False
+    earlier, later = [value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value for value in timestamps]
+    return later > earlier
+
+
 async def verify_replacement(user_id: str, existing: list[dict], replacement: str) -> None:
     # Read again after policy writes. A real period reset must not be undone by
     # copying an earlier snapshot or historical user usage into a current counter.
     source = await current_keys(user_id, existing)
     for before, after in zip(existing, source):
-        if counter(after) < counter(before) and (not before.get("budget_reset_at") or before.get("budget_reset_at") == after.get("budget_reset_at")):
+        if counter(after) < counter(before) and not _period_advanced(before, after):
             raise HTTPException(status_code=502, detail="Source key spend decreased without a verified period reset; original keys were kept")
     info = await litellm.get_key_info(replacement)
     expected = sum(counter(key) for key in source)

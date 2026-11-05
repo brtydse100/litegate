@@ -24,7 +24,7 @@ export function SpendTrend({
   const max = Math.max(...daily.map((day) => day[metric]), 0);
   const scale = max || 1;
   const x = (index: number) =>
-    48 + (index / Math.max(1, daily.length - 1)) * 584;
+    88 + (index / Math.max(1, daily.length - 1)) * 544;
   const y = (value: number) => 176 - (value / scale) * 144;
   const points = daily
     .map((day, index) => `${x(index)},${y(day[metric])}`)
@@ -44,7 +44,7 @@ export function SpendTrend({
         {[0, 0.5, 1].map((ratio) => (
           <g key={ratio}>
             <line
-              x1="48"
+              x1="88"
               x2="632"
               y1={y(scale * ratio)}
               y2={y(scale * ratio)}
@@ -52,7 +52,7 @@ export function SpendTrend({
               className="text-slate-200"
             />
             <text
-              x="42"
+              x="82"
               y={y(scale * ratio) + 4}
               textAnchor="end"
               fontSize="10"
@@ -85,7 +85,7 @@ export function SpendTrend({
           </circle>
         ))}
         <text
-          x="48"
+          x="88"
           y="203"
           fontSize="11"
           fill="currentColor"

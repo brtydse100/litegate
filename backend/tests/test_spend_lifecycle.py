@@ -147,3 +147,13 @@ async def test_ambiguous_source_counter_decrease_cannot_approve_zero_replacement
     monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"user_id": "owner", "spend": 0}))
     with pytest.raises(HTTPException, match="decreased"):
         await key_spend.verify_replacement("owner", [{"token": "old", "spend": 0.04}], "new")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reset", [None, "", "invalid", "2026-11-01", "2026-12-01"])
+async def test_source_decrease_requires_valid_advancing_reset_timestamp(monkeypatch, reset):
+    from app.services import key_spend
+
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"user_id": "owner", "spend": 0, "budget_reset_at": reset}))
+    with pytest.raises(HTTPException, match="decreased"):
+        await key_spend.verify_replacement("owner", [{"token": "old", "spend": 0.04, "budget_reset_at": "2026-12-01"}], "new")
