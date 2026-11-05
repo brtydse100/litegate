@@ -11,7 +11,7 @@ from app.config import settings
 from app.models import CurrentUser
 from app.organization import MembershipConflict, OrganizationNode
 from app.services import audit, key_cleanup, key_spend, litellm, organization_key_policy as key_policy
-from app.services import organization_client as upstream, organization_store as store
+from app.services import organization_client as upstream, organization_store as store, organization_discovery as discovery
 
 _logger = logging.getLogger(__name__)
 _locks: WeakValueDictionary[tuple[str, str], asyncio.Lock] = WeakValueDictionary()
@@ -34,6 +34,8 @@ def resolve(user_id: str, groups: list[str], *, email: str = "", source: str = "
 
 
 def resolve_identity(identity: dict) -> OrganizationNode | None:
+    if identity["auth_source"] == "configured_email" and identity.get("sync_error"):
+        raise HTTPException(status_code=409, detail=identity["sync_error"])
     return resolve(identity["user_id"], identity["groups"], email=identity["email"], source=identity["auth_source"])
 
 
@@ -212,7 +214,8 @@ async def reconcile() -> None:
     if not settings.organization_hierarchy.levels:
         return
     identities = await asyncio.to_thread(store.list_identities)
-    known = {identity["user_id"] for identity in identities}
+    blocked = await discovery.refresh(identities, lock_for, resolve)
+    identities = await asyncio.to_thread(store.list_identities)
     ready: set[str] = set()
     semaphore = asyncio.Semaphore(5)
 
@@ -238,27 +241,7 @@ async def reconcile() -> None:
             except HTTPException as exc:
                 await asyncio.to_thread(store.failed, user_id, str(exc.detail))
 
-    await asyncio.gather(*(sync_one(identity["user_id"]) for identity in identities))
-
-    async def discover(user_id: str):
-        async with semaphore, lock_for("user", user_id):
-            try:
-                if await asyncio.to_thread(store.get, user_id) is None:
-                    existing = await litellm.get_user(user_id)
-                    if not existing:
-                        return None
-                    user = existing.get("user_info", existing)
-                    if not isinstance(user, dict) or user.get("user_id") != user_id:
-                        return None
-                    await asyncio.to_thread(store.remember, user_id, user.get("user_email") or "", "explicit", [])
-                return user_id
-            except HTTPException as exc:
-                _logger.warning("Organization user %s discovery failed: %s", user_id, exc.detail)
-                return None
-
-    explicit = {user_id for node in settings.organization_hierarchy.nodes.values() for user_id in node.member.userIds}
-    discovered = await asyncio.gather(*(discover(user_id) for user_id in sorted(explicit - known)))
-    await asyncio.gather(*(sync_one(user_id) for user_id in discovered if user_id is not None))
+    await asyncio.gather(*(sync_one(identity["user_id"]) for identity in identities if identity["user_id"] not in blocked))
 
     async def finish_team(node):
         async with semaphore, lock_for("team", node.team_id):
@@ -271,13 +254,17 @@ async def reconcile() -> None:
     await asyncio.gather(*(finish_team(node) for node in settings.organization_hierarchy.nodes.values()))
 
 
+async def reconciliation_attempt() -> None:
+    try:
+        await reconcile()
+    except Exception:
+        _logger.exception("Organization synchronization failed")
+
+
 async def run_reconciliation() -> None:
     while True:
-        try:
-            await reconcile()
-        except Exception:
-            _logger.exception("Organization synchronization failed")
         await asyncio.sleep(60)
+        await reconciliation_attempt()
 
 
 def guard_team(team_id: str, changes: dict | None = None) -> None:

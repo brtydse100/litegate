@@ -20,6 +20,7 @@ async def lifespan(_: FastAPI):
     organization_task = None
     try:
         if settings.organization_hierarchy.levels:
+            await organization_sync.reconciliation_attempt()
             organization_task = asyncio.create_task(organization_sync.run_reconciliation())
         yield
     finally:
