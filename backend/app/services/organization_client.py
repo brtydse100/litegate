@@ -114,7 +114,7 @@ async def generate_key(user_id: str, email: str, team_id: str, **options) -> dic
         "max_budget": options.get("max_budget"),
         "budget_duration": options.get("budget_duration"),
     }
-    for field in ("tpm_limit", "rpm_limit", "duration"):
+    for field in ("tpm_limit", "rpm_limit", "max_parallel_requests", "duration"):
         value = getattr(settings, f"key_{field}")
         if value is not None:
             payload[field] = value

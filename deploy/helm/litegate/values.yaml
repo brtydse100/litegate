@@ -169,6 +169,8 @@ config:
   # keyDuration: "90d"
   # keyTpmLimit: "100000"
   # keyRpmLimit: "1000"
+  # Positive integer; omit to keep LiteLLM's concurrency default.
+  # keyMaxParallelRequests: "10"
   # Fallback for local users or SSO users without a mapped/default team.
   # keyTeamId: "team-default"
 

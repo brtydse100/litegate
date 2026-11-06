@@ -102,6 +102,7 @@ save_api_keys_in_db: false
 # key_duration: "90d"
 # key_tpm_limit: 100000
 # key_rpm_limit: 1000
+# key_max_parallel_requests: 10
 # Fallback for local or unmapped users; an SSO-mapped primary team takes precedence.
 # key_team_id: "team-default"
 

@@ -253,6 +253,7 @@ key_models:
 key_duration: "90d"
 key_tpm_limit: 100000
 key_rpm_limit: 100
+key_max_parallel_requests: 10
 key_team_id: "team-id"
 ```
 
@@ -264,7 +265,17 @@ key_team_id: "team-id"
 | `key_duration` | unset | Generated key lifetime, such as `90d` |
 | `key_tpm_limit` | unset | Tokens-per-minute limit |
 | `key_rpm_limit` | unset | Requests-per-minute limit |
+| `key_max_parallel_requests` | unset | Positive integer limiting simultaneous requests per generated key |
 | `key_team_id` | unset | Fallback LiteLLM team for generated keys without an SSO-mapped primary team |
+
+Set `key_max_parallel_requests` in YAML, `KEY_MAX_PARALLEL_REQUESTS` in the
+environment, or `config.keyMaxParallelRequests` in Helm. It applies to newly
+created and regenerated keys, including organization-managed keys. Omit it to
+leave LiteLLM's default in effect; zero and negative values are invalid. Existing
+keys are unchanged until regenerated. LiteLLM enforces the limit; this is a
+per-key concurrency setting, separate from requests per minute. For a
+deployment-wide policy, LiteLLM also supports
+[key-generation defaults and upper bounds](https://docs.litellm.ai/docs/proxy/virtual_keys#default-keygenerate-params).
 
 For one individual allowance per user, configure `key_max_budget` (and optionally
 `key_budget_duration`) and leave LiteLLM personal-user and team-member budget
