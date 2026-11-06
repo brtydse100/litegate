@@ -296,8 +296,14 @@ as an additional shared ceiling when a person may own keys outside LiteGate.
 | Setting | Default | Purpose |
 | --- | --- | --- |
 | `logo_url` | empty | Header logo URL or served path |
-| `litellm_ui_url` | empty | Browser-accessible LiteLLM model-hub link |
+| `litellm_ui_url` | empty | Full browser-accessible LiteLLM model-hub URL; used as configured |
 | `support_ticket_url` | empty | Support button destination |
+
+Set `litellm_ui_url` to the complete destination, for example
+`https://litellm.example.com/ui/model_hub` (Helm: `config.litellmUiUrl`).
+LiteGate does not append a path or change query strings or fragments. Leave it
+empty to hide the button. When upgrading from a version that appended
+`/ui/model_hub_table`, replace any base-only URL with your desired full link.
 
 To use a repository-hosted logo, place it in `frontend/public/` and set a served
 path such as:

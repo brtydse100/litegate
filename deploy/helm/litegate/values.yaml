@@ -72,7 +72,8 @@ config:
   # -- LiteLLM connection -----------------------------------------------------
   # Backend URL reachable from inside the LiteGate pod.
   litellmUrl: "http://litellm:4000"
-  # Browser-facing "Open LiteLLM Hub" link; blank hides it.
+  # Full browser-facing "Open LiteLLM Hub" URL; used as-is, blank hides it.
+  # Example: "https://litellm.example.com/ui/model_hub"
   litellmUiUrl: ""
 
   # Verify certificates for outgoing LiteLLM and SSO HTTPS connections.
