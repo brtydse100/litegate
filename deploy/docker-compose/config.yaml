@@ -82,10 +82,13 @@ admin_groups: ""
 # Root URL of the portal (used for SSO redirect after login)
 root_url: "http://localhost"
 
-# Logo shown in the header and above the main content.
-# Can be an external URL or a path served by nginx (e.g. /logo.svg).
-# To use a local file: place it in frontend/public/ then set: /logo.svg
+# Logo shared by the login page and portal.
+# Use an HTTPS image URL or a path served by nginx (e.g. /logo.svg).
+# To bundle a local file: place it in frontend/public/ and rebuild the image.
 logo_url: ""
+# Plain text below the login title. Blank keeps the default sign-in text.
+# Multiline text is supported with YAML's | block syntax; HTML is not rendered.
+login_text: ""
 
 # Full browser-facing destination for the "Open LiteLLM Hub" button.
 # Used exactly as configured; blank hides the button.

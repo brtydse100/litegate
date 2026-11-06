@@ -6,6 +6,25 @@
 returns the configured full destination unchanged, or an empty string when the
 Model Hub button is disabled. LiteGate does not append a Model Hub path.
 
+`GET /api/auth/config` also requires no authentication and returns only the
+available sign-in methods and public login appearance:
+
+```json
+{
+  "sso_enabled": true,
+  "local_enabled": true,
+  "login_text": "Welcome to Example. Use your work account.",
+  "logo_url": "https://images.example.com/logo.svg"
+}
+```
+
+`login_text` and `logo_url` default to empty strings. The login page uses its
+default subtitle for empty or whitespace-only text and its default icon for an
+empty logo URL. Custom text is plain text, including line breaks; HTML and
+Markdown are not interpreted. `logo_url` is shared with `/api/portal-config` and
+used as an image URL. These values are visible before sign-in; do not include
+secrets. See [login-page customization](docs/configuration.md#login-page-customization).
+
 ## Organization reporting
 
 - `GET /api/v1/organization`: configured levels/groups, effective allowances,

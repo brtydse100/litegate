@@ -7,6 +7,8 @@ import { useAuth } from "../hooks/useAuth";
 interface AuthConfig {
   sso_enabled: boolean;
   local_enabled: boolean;
+  login_text: string;
+  logo_url: string;
 }
 
 export async function fetchAuthConfig(): Promise<AuthConfig> {
@@ -78,27 +80,37 @@ export default function Login() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-indigo-50 to-transparent" />
       <div className="relative flex w-full max-w-sm flex-col items-center gap-6 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-10">
         {/* Logo */}
-        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-lg shadow-indigo-200">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="white"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
-        </div>
+        {cfg?.logo_url ? (
+          <img
+            src={cfg.logo_url}
+            alt="Organization logo"
+            className="h-11 max-w-full object-contain"
+          />
+        ) : (
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-lg shadow-indigo-200">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </div>
+        )}
 
-        <div className="text-center">
+        <div className="w-full text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
             LiteGate
           </h1>
-          <p className="mt-1.5 text-sm text-slate-500">
-            Sign in to your LiteLLM access portal
+          <p className="mt-1.5 whitespace-pre-line break-words text-sm text-slate-500">
+            {cfg?.login_text?.trim()
+              ? cfg.login_text
+              : "Sign in to your LiteLLM access portal"}
           </p>
         </div>
 

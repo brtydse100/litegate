@@ -306,7 +306,8 @@ as an additional shared ceiling when a person may own keys outside LiteGate.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `logo_url` | empty | Header logo URL or served path |
+| `logo_url` | empty | Shared login-page and portal logo: HTTPS image URL or served path |
+| `login_text` | empty | Plain text below the login title; empty keeps the default subtitle |
 | `litellm_ui_url` | empty | Full browser-accessible LiteLLM model-hub URL; used as configured |
 | `support_ticket_url` | empty | Support button destination |
 
@@ -316,12 +317,80 @@ LiteGate does not append a path or change query strings or fragments. Leave it
 empty to hide the button. When upgrading from a version that appended
 `/ui/model_hub_table`, replace any base-only URL with your desired full link.
 
-To use a repository-hosted logo, place it in `frontend/public/` and set a served
-path such as:
+### Login-page customization
+
+Set `login_text` to replace the subtitle below the **LiteGate** login title and
+`logo_url` to replace the login icon. The same logo also appears in the signed-in
+portal. Both settings are optional: an empty or whitespace-only `login_text`
+keeps **Sign in to your LiteLLM access portal**, and an empty `logo_url` keeps the
+default lightning icon. The page title, sign-in methods, and access rules stay
+the same.
+
+Use these backend settings in `config.yaml` (for Docker Compose, edit
+`deploy/docker-compose/config.yaml`):
 
 ```yaml
-logo_url: "/logo.svg"
+login_text: |
+  Welcome to Example's AI portal.
+  Sign in with your work account to manage your API keys.
+logo_url: "https://images.example.com/logo.svg"
 ```
+
+Text is rendered as plain text, with line breaks preserved and long lines
+wrapped. HTML and Markdown appear literally; links in the text are not made
+clickable. Login customization is public through `GET /api/auth/config`, so use
+only information appropriate for unauthenticated visitors.
+
+Environment variables take precedence over YAML. For a single-line message:
+
+```dotenv
+LOGIN_TEXT="Welcome to Example's AI portal. Sign in with your work account."
+LOGO_URL=https://images.example.com/logo.svg
+```
+
+Set environment variables in the backend process or container; these are runtime
+settings and require no frontend rebuild. An explicitly empty `LOGIN_TEXT` or
+`LOGO_URL` overrides a YAML value and restores that setting's default appearance.
+Restart the backend after changing configuration, then reload the login page.
+For the repository's Compose deployment, recreate the container to apply changes:
+
+```bash
+docker compose -f deploy/docker-compose/docker-compose.yml up -d --force-recreate
+```
+
+For Helm, place the values in your override file and use your usual upgrade
+command. The chart injects them as `LOGIN_TEXT` and `LOGO_URL`:
+
+```yaml
+config:
+  loginText: |
+    Welcome to Example's AI portal.
+    Sign in with your work account.
+  logoUrl: "https://images.example.com/logo.svg"
+```
+
+Restart the deployment after the upgrade so the backend reads the updated
+ConfigMap environment. For a release named `litegate` in the current namespace:
+
+```bash
+helm upgrade --install litegate deploy/helm/litegate -f values-custom.yaml
+kubectl rollout restart deployment/litegate
+```
+
+The logo must be an image that the visitor's browser can fetch before sign-in.
+Use HTTPS or a same-origin served path such as `/logo.svg`; the shipped content
+security policy allows same-origin, HTTPS, and data images, and blocks external
+HTTP images. Use a trusted image host because browsers request external images
+directly. A filesystem path on the server is not a browser URL.
+
+To bundle a logo in a source build, put the image at
+`frontend/public/logo.svg`, set `logo_url: "/logo.svg"`, and rebuild the frontend
+or Docker image. For a prebuilt container, serve the image from an HTTPS host or
+mount it read-only into the image's nginx static directory, for example
+`./logo.svg:/usr/share/nginx/html/logo.svg:ro` in the Compose service's `volumes`.
+Set `logo_url: "/logo.svg"` and recreate the container. Keep the image available
+at that path; configuring a URL does not upload or copy a file. See the
+[deployment guide](../DEPLOYMENT.md) for the deployment workflows.
 
 ## Minimal production-shaped example
 

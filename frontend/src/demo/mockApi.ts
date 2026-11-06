@@ -258,7 +258,12 @@ async function mockResponse(request: Request): Promise<Response> {
   }
 
   if (path === "/api/auth/config")
-    return json({ sso_enabled: false, local_enabled: true });
+    return json({
+      sso_enabled: false,
+      local_enabled: true,
+      login_text: "",
+      logo_url: "",
+    });
   if (path === "/api/demo/role" && method === "POST") {
     const payload = await body(request);
     if (payload.role !== "admin" && payload.role !== "user")

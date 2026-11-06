@@ -39,6 +39,7 @@ data:
   SSL_VERIFY: {{ .Values.config.sslVerify | quote }}
   ROOT_URL: {{ .Values.config.rootUrl | quote }}
   LOGO_URL: {{ .Values.config.logoUrl | quote }}
+  LOGIN_TEXT: {{ .Values.config.loginText | quote }}
   SUPPORT_TICKET_URL: {{ .Values.config.supportTicketUrl | quote }}
   LOCAL_USERS_ENABLED: {{ .Values.config.localUsersEnabled | quote }}
   LOCAL_USERS_DB_PATH: {{ .Values.config.localUsersDbPath | quote }}

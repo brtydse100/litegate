@@ -117,6 +117,7 @@ class Settings(BaseSettings):
 
     support_ticket_url: str = ""
     logo_url: str = ""
+    login_text: str = ""
     litellm_ui_url: str = ""
 
     @model_validator(mode="before")
