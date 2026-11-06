@@ -7,6 +7,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-11-06
+
+### Added
+
+- Optional positive `key_max_parallel_requests` default for newly created and
+  regenerated keys, including organization-managed keys, with environment and
+  Helm configuration support.
+
+### Fixed
+
+- Preserve the configured full Model Hub URL without appending a path. Existing
+  base-only links should be updated to their desired complete destination.
+
 ## [2.15.4] - 2026-11-05
 
 ### Fixed
