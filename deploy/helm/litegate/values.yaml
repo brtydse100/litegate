@@ -86,6 +86,8 @@ config:
   logoUrl: ""
   # Plain text below the login title. Blank keeps the default sign-in text.
   loginText: ""
+  # Plain text beneath the My key actions. Blank hides the message.
+  myKeyText: ""
   supportTicketUrl: ""
 
   # -- SSO: simple discovery mode --------------------------------------------

@@ -284,6 +284,7 @@ async function mockResponse(request: Request): Promise<Response> {
   if (path === "/api/portal-config")
     return json({
       support_ticket_url: "https://github.com/brtydse100/litegate/issues",
+      my_key_text: "",
       logo_url: "",
       litellm_ui_url: "",
       api_docs_url: "https://github.com/brtydse100/litegate/blob/main/API.md",

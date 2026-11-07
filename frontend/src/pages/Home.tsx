@@ -36,6 +36,7 @@ import type { KeyInfo } from "../types";
 interface PortalConfig {
   support_ticket_url: string;
   logo_url: string;
+  my_key_text?: string;
   litellm_ui_url: string;
   api_docs_url: string;
   local_users_enabled: boolean;
@@ -684,6 +685,14 @@ export default function Home() {
                       </button>
                     )}
                   </div>
+                )}
+                {config?.my_key_text?.trim() && (
+                  <p
+                    aria-label="My key guidance"
+                    className="w-full whitespace-pre-wrap break-words text-sm text-slate-500"
+                  >
+                    {config.my_key_text}
+                  </p>
                 )}
                 {hasKey && <AccessSnapshot keys={keyList} />}
                 {(config?.litellm_ui_url || config?.support_ticket_url) && (

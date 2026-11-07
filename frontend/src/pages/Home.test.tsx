@@ -74,12 +74,16 @@ describe("personal key storage", () => {
     initiallyEmpty = false,
     configState?: "pending" | "error",
     keyPending = false,
+    myKeyText?: string,
   ) {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ save_api_keys_in_db: enabled }),
+        json: async () => ({
+          save_api_keys_in_db: enabled,
+          my_key_text: myKeyText,
+        }),
       }),
     );
     if (configState === "pending")
@@ -118,6 +122,95 @@ describe("personal key storage", () => {
     );
     return { list, client };
   }
+
+  it("keeps plain multiline guidance beneath the action before and after key creation", async () => {
+    const message = 'Keep this key safe.\n<img src=x onerror="alert(1)">';
+    vi.spyOn(api, "createKey").mockResolvedValue({
+      key: "sk-synthetic-guidance",
+      user_id: "owner",
+    });
+    renderHome(
+      false,
+      false,
+      {},
+      undefined,
+      false,
+      true,
+      undefined,
+      false,
+      message,
+    );
+    const action = await screen.findByRole("button", {
+      name: "Create API key",
+    });
+    const guidance = screen.getByText(/Keep this key safe/);
+    expect(guidance.textContent).toBe(message);
+    expect(guidance).toHaveClass("whitespace-pre-wrap", "break-words");
+    expect(guidance.querySelector("img")).toBeNull();
+    expect(
+      action.compareDocumentPosition(guidance) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(action);
+    await screen.findByText("sk-synthetic-guidance");
+    const regenerate = await screen.findByRole("button", {
+      name: "Regenerate key",
+    });
+    expect(guidance).toBeVisible();
+    expect(
+      regenerate.compareDocumentPosition(guidance) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    const models = screen.getByRole("button", { name: /model access/i });
+    expect(
+      guidance.compareDocumentPosition(models) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("retains guidance when stored-key mode hides regeneration", async () => {
+    vi.spyOn(api, "revealKey").mockResolvedValue({ key: "sk-synthetic-saved" });
+    renderHome(
+      true,
+      true,
+      {},
+      undefined,
+      false,
+      false,
+      undefined,
+      false,
+      "Ask your administrator for help.",
+    );
+    const guidance = await screen.findByText(
+      "Ask your administrator for help.",
+    );
+    await screen.findByText("sk-synthetic-saved");
+    expect(guidance).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: /regenerat/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([undefined, "", "  \n "])(
+    "hides empty My key guidance (%j)",
+    async (message) => {
+      renderHome(
+        false,
+        false,
+        {},
+        undefined,
+        false,
+        false,
+        undefined,
+        false,
+        message,
+      );
+      await screen.findByText("Virtual key");
+      expect(
+        screen.queryByLabelText("My key guidance"),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   it("offers no replacement after key lookup fails with a cached key", async () => {
     const { list, client } = renderHome(false, false);

@@ -308,6 +308,7 @@ as an additional shared ceiling when a person may own keys outside LiteGate.
 | --- | --- | --- |
 | `logo_url` | empty | Shared login-page and portal logo: HTTPS image URL or served path |
 | `login_text` | empty | Plain text below the login title; empty keeps the default subtitle |
+| `my_key_text` | empty | Independent plain text below My key actions; empty hides it |
 | `litellm_ui_url` | empty | Full browser-accessible LiteLLM model-hub URL; used as configured |
 | `support_ticket_url` | empty | Support button destination |
 
@@ -391,6 +392,42 @@ mount it read-only into the image's nginx static directory, for example
 Set `logo_url: "/logo.svg"` and recreate the container. Keep the image available
 at that path; configuring a URL does not upload or copy a file. See the
 [deployment guide](../DEPLOYMENT.md) for the deployment workflows.
+
+### My key guidance
+
+Set `my_key_text` to display guidance below the **Create API key** button on
+**My key**. The message remains below the action area after key creation and
+when stored-key mode hides regeneration. It is independent of `login_text`,
+which appears only on the login page.
+
+In Docker Compose's `config.yaml`:
+
+```yaml
+my_key_text: |
+  Keep this key private and use it only for approved work.
+  Contact the platform team if you need help.
+```
+
+The environment equivalent is `MY_KEY_TEXT`; environment values override YAML.
+For Helm, use:
+
+```yaml
+config:
+  myKeyText: |
+    Keep this key private and use it only for approved work.
+    Contact the platform team if you need help.
+```
+
+Empty or whitespace-only values hide the message, and an explicitly empty
+environment value overrides YAML. Text preserves line breaks and wraps long
+lines; HTML and Markdown are displayed literally. The setting is returned by
+the public `GET /api/portal-config` endpoint, so keep its contents suitable for
+unauthenticated visitors even though My key requires sign-in. It does not
+change any key policy or permission.
+
+Restart the backend or recreate the Compose container, then reload the page.
+For Helm, upgrade your values and restart the deployment as described above.
+No frontend rebuild is needed to change the message.
 
 ## Minimal production-shaped example
 

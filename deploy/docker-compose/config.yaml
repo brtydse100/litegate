@@ -89,6 +89,9 @@ logo_url: ""
 # Plain text below the login title. Blank keeps the default sign-in text.
 # Multiline text is supported with YAML's | block syntax; HTML is not rendered.
 login_text: ""
+# Independent plain text beneath the My key actions, before and after creation.
+# Blank hides the message; multiline YAML is supported and HTML is not rendered.
+my_key_text: ""
 
 # Full browser-facing destination for the "Open LiteLLM Hub" button.
 # Used exactly as configured; blank hides the button.

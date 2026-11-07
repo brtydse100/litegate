@@ -99,6 +99,7 @@ async def portal_config():
     return {
         "support_ticket_url": settings.support_ticket_url,
         "logo_url": settings.logo_url,
+        "my_key_text": settings.my_key_text,
         "litellm_ui_url": settings.litellm_ui_url,
         "api_docs_url": "/api/docs",
         "local_users_enabled": settings.local_users_enabled,

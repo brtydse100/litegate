@@ -13,14 +13,16 @@ ROOT = Path(__file__).resolve().parents[1]
 class LoginCustomizationHelmTests(unittest.TestCase):
     def test_login_values_are_rendered_as_environment_strings(self):
         for config, expected in (
-            ({}, {"LOGIN_TEXT": "", "LOGO_URL": ""}),
+            ({}, {"LOGIN_TEXT": "", "MY_KEY_TEXT": "", "LOGO_URL": ""}),
             (
                 {
                     "loginText": 'Welcome "Example"\nUse <b>work</b> account',
+                    "myKeyText": 'Keep "Example" keys safe\n<b>Contact support</b>',
                     "logoUrl": "https://images.example.com/logo.svg",
                 },
                 {
                     "LOGIN_TEXT": 'Welcome "Example"\nUse <b>work</b> account',
+                    "MY_KEY_TEXT": 'Keep "Example" keys safe\n<b>Contact support</b>',
                     "LOGO_URL": "https://images.example.com/logo.svg",
                 },
             ),

@@ -6,6 +6,13 @@
 returns the configured full destination unchanged, or an empty string when the
 Model Hub button is disabled. LiteGate does not append a Model Hub path.
 
+The response also includes `my_key_text` (default `""`), independent of
+`login_text`. My key displays this plain text beneath the key action area,
+before and after key creation, including when stored-key mode hides regeneration.
+Line breaks are preserved; HTML and Markdown are displayed literally. Empty or
+whitespace-only values hide the message. The value is public, so do not put
+secrets in it. See [My key guidance](docs/configuration.md#my-key-guidance).
+
 `GET /api/auth/config` also requires no authentication and returns only the
 available sign-in methods and public login appearance:
 
