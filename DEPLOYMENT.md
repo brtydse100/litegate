@@ -74,21 +74,66 @@ docker compose up --build
 
 The portal opens at **http://localhost**.
 
-### Organization assignments in Docker Compose
+### Organization hierarchy and budgets in Docker Compose
 
-Set `organizationHierarchy` directly in `config.yaml`; see the
-[YAML example](docs/examples/organization-hierarchy.yaml). Put SSO emails in
-members' `userIds`. `organization_mapping` and `organization_mapping_file`
-were removed in 2.15.1: remove their optional mounts and migrate to the existing
-hierarchy schema. Keep the SQLite volume for existing identity bindings.
-Users are provisioned without keys at first authenticated SSO login.
+Docker supports the same hierarchy, membership mappings, inherited key allowances,
+and administrative usage graphs as Helm. Add `organizationHierarchy` at the top
+level of `deploy/docker-compose/config.yaml`, alongside `litellm_url`:
 
-Alternatively, set `organization_hierarchy_file: /app/backend/organization.json`
-in `config.yaml`, leave inline levels empty, and add
-`./organization.json:/app/backend/organization.json:ro` to the existing service
-volumes. Use the [JSON hierarchy sample](docs/examples/organization-hierarchy.json),
-whose root is `{"levels": [...]}`. Restart after edits; invalid files fail startup.
+```yaml
+organizationHierarchy:
+  levels:
+    - name: Division
+      groups:
+        - members:
+            - name: Engineering
+              litellmTeamId: engineering
+              ssoGroups: [engineers]
+              budget: { perUser: 100, duration: "30d", groupTotal: 5000 }
+    - name: Team
+      groups:
+        - parent: Engineering
+          members:
+            - name: Platform
+              userIds: [alice@example.com, "local:operator"]
+              budget: { perUser: 50 }
+```
 
+Both supplied Compose files already mount this config read-only at
+`/app/backend/config.yaml`. This example assigns matching SSO users to Engineering
+with a $100 per-key allowance every 30 days; Platform members inherit the duration
+and override the allowance to $50. `groupTotal` tracks Engineering's combined
+spend, without enforcing a shared cap. RPM, TPM, and concurrent request limits
+are separate controls; they are not inherited hierarchy budgets. See
+[Organization hierarchy](docs/organization.md) for full policy details and the
+complete [YAML](docs/examples/organization-hierarchy.yaml) and
+[JSON](docs/examples/organization-hierarchy.json) examples.
+
+You can instead supply `ORGANIZATION_HIERARCHY` as JSON in the service's
+`environment` block, or use a separate JSON file with
+`organization_hierarchy_file: /app/backend/organization.json` and an additional
+read-only mount. The JSON root is `{"levels": [...]}`. See the runnable
+[environment example](docs/organization.md#docker-and-compose) and
+[file-mount example](docs/organization.md#json-file-input). Environment settings
+override YAML; a nonempty file path together with nonempty inline levels fails
+startup. Paths in settings refer to the container filesystem; relative hierarchy
+file paths resolve against `/app/backend`.
+
+Configuration loads at startup. After editing hierarchy settings, JSON files, or
+service mounts/environment, apply the release-image deployment with:
+
+```bash
+docker compose -f docker-compose.image.yml up -d --force-recreate
+```
+
+For the local-build file, use `docker compose up -d --force-recreate` after
+building the image. Invalid hierarchy input stops startup; periodic policy
+reconciliation does not reload files.
+
+`organization_mapping` and `organization_mapping_file` were removed in 2.15.1:
+remove their optional mounts and migrate to the hierarchy schema. Keep the SQLite
+volume for existing identity bindings. Users are provisioned without keys at first
+authenticated SSO login.
 
 ### Step 3 — Stopping and updating
 

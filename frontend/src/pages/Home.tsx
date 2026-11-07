@@ -36,6 +36,7 @@ import type { KeyInfo } from "../types";
 interface PortalConfig {
   support_ticket_url: string;
   logo_url: string;
+  my_key_text?: string;
   litellm_ui_url: string;
   api_docs_url: string;
   local_users_enabled: boolean;
@@ -95,77 +96,81 @@ function KeyCard({
       onHide={onHide}
     >
       {(action) => (
-        <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-5">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="shrink-0 rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
-                <KeyRound size={17} />
+        <>
+          <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="border-b border-slate-200 px-5 py-5">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="shrink-0 rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
+                  <KeyRound size={17} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-950">
+                    {keyInfo.key_alias || "API key"}
+                  </p>
+                  <p className="text-xs text-slate-500">Virtual key</p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-950">
-                  {keyInfo.key_alias || "API key"}
-                </p>
-                <p className="text-xs text-slate-500">Virtual key</p>
+            </div>
+            {canReveal && action && <div className="py-4">{action}</div>}
+            <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+              <div className="px-5 py-4">
+                <dt className="text-xs text-slate-500">
+                  {managed ? "Key spend" : "Spend"}
+                </dt>
+                <dd className="mt-1 font-semibold text-slate-950">
+                  {managed && !budgetAvailable
+                    ? "Unavailable"
+                    : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(6)}`}
+                </dd>
               </div>
-            </div>
-          </div>
-          {action && <div className="py-4">{action}</div>}
-          <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
-            <div className="px-5 py-4">
-              <dt className="text-xs text-slate-500">
-                {managed ? "Key spend" : "Spend"}
-              </dt>
-              <dd className="mt-1 font-semibold text-slate-950">
-                {managed && !budgetAvailable
-                  ? "Unavailable"
-                  : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(6)}`}
-              </dd>
-            </div>
-            <div className="px-5 py-4">
-              <dt className="text-xs text-slate-500">
-                {managed ? "Key budget" : "Budget"}
-              </dt>
-              <dd className="mt-1 font-semibold text-slate-950">
-                {managed && !budgetAvailable
-                  ? "Unavailable"
-                  : (managed ? keyInfo.user_budget : keyInfo.max_budget) != null
-                    ? `$${managed ? keyInfo.user_budget : keyInfo.max_budget}`
-                    : "Unlimited"}
-              </dd>
-            </div>
-            <div className="px-5 py-4">
-              <dt className="text-xs text-slate-500">Models</dt>
-              <dd className="mt-1 font-semibold text-slate-950">
-                {keyInfo.models?.length ? keyInfo.models.length : "All"}
-              </dd>
-            </div>
-            <div className="px-5 py-4">
-              <dt className="text-xs text-slate-500">Expires</dt>
-              <dd className="mt-1 font-semibold text-slate-950">
-                {keyInfo.expires
-                  ? new Date(keyInfo.expires).toLocaleDateString()
-                  : "Never"}
-              </dd>
-            </div>
-          </dl>
-          {keyInfo.policy_error && (
-            <p
-              role="alert"
-              className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
-            >
-              {keyInfo.policy_error}
-            </p>
-          )}
-          {keyInfo.team_id && (
-            <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
-              <Building2 size={13} />
-              Assigned through{" "}
-              <span className="font-medium text-slate-800">
-                {keyInfo.organization_path?.join(" → ") ?? keyInfo.team_id}
-              </span>
-            </div>
-          )}
-        </article>
+              <div className="px-5 py-4">
+                <dt className="text-xs text-slate-500">
+                  {managed ? "Key budget" : "Budget"}
+                </dt>
+                <dd className="mt-1 font-semibold text-slate-950">
+                  {managed && !budgetAvailable
+                    ? "Unavailable"
+                    : (managed ? keyInfo.user_budget : keyInfo.max_budget) !=
+                        null
+                      ? `$${managed ? keyInfo.user_budget : keyInfo.max_budget}`
+                      : "Unlimited"}
+                </dd>
+              </div>
+              <div className="px-5 py-4">
+                <dt className="text-xs text-slate-500">Models</dt>
+                <dd className="mt-1 font-semibold text-slate-950">
+                  {keyInfo.models?.length ? keyInfo.models.length : "All"}
+                </dd>
+              </div>
+              <div className="px-5 py-4">
+                <dt className="text-xs text-slate-500">Expires</dt>
+                <dd className="mt-1 font-semibold text-slate-950">
+                  {keyInfo.expires
+                    ? new Date(keyInfo.expires).toLocaleDateString()
+                    : "Never"}
+                </dd>
+              </div>
+            </dl>
+            {keyInfo.policy_error && (
+              <p
+                role="alert"
+                className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
+              >
+                {keyInfo.policy_error}
+              </p>
+            )}
+            {keyInfo.team_id && (
+              <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
+                <Building2 size={13} />
+                Assigned through{" "}
+                <span className="font-medium text-slate-800">
+                  {keyInfo.organization_path?.join(" → ") ?? keyInfo.team_id}
+                </span>
+              </div>
+            )}
+          </article>
+          {!canReveal && action}
+        </>
       )}
     </PersonalKeySecret>
   );
@@ -648,7 +653,7 @@ export default function Home() {
                     />
                   ))
                 )}
-                {!keys.isLoading && !confirmRegenerate && (
+                {!keys.isLoading && !confirmRegenerate && !newKey && (
                   <div className="w-full">
                     {portal.isPending ||
                     portal.isError ? null : keys.isPending || keys.isError ? (
@@ -684,6 +689,14 @@ export default function Home() {
                       </button>
                     )}
                   </div>
+                )}
+                {config?.my_key_text?.trim() && (
+                  <p
+                    aria-label="My key guidance"
+                    className="w-full whitespace-pre-wrap break-words text-sm text-slate-500"
+                  >
+                    {config.my_key_text}
+                  </p>
                 )}
                 {hasKey && <AccessSnapshot keys={keyList} />}
                 {(config?.litellm_ui_url || config?.support_ticket_url) && (

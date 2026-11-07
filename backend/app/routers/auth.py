@@ -217,6 +217,8 @@ async def auth_config():
     return {
         "sso_enabled": settings.sso_enabled,
         "local_enabled": settings.local_auth_enabled or settings.local_users_enabled,
+        "login_text": settings.login_text,
+        "logo_url": settings.logo_url,
     }
 
 
