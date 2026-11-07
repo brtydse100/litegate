@@ -30,6 +30,10 @@ revealed secrets share the same green panel and position.
 It loads through the authorized reveal endpoint and stays in component memory.
 Hashes are never offered as usable API keys. Without stored
 secrets, newly created keys remain copyable until hidden or the page is left.
+After creating or regenerating a one-time key, the action below the information
+card switches to **Hide API key**. Hiding the secret restores the regeneration
+action, subject to the existing cooldown. The page does not show separate hide
+and regeneration buttons while that secret is visible.
 
 Personal spend is displayed to six decimal places. Regeneration uses the normal
 `name's key` name without a rotation suffix while retaining spend and verified

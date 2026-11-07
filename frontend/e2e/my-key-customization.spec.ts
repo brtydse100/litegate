@@ -5,6 +5,7 @@ test("@smoke My key guidance remains below actions after creation", async ({
 }) => {
   const message = 'Keep your key private.\n<img src=x onerror="alert(1)">';
   let created = false;
+  let regenerated = false;
   await page.setViewportSize({ width: 375, height: 812 });
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -20,6 +21,9 @@ test("@smoke My key guidance remains below actions after creation", async ({
       body = { my_key_text: message, save_api_keys_in_db: false };
     } else if (path === "/api/keys/operation-limit") {
       body = { limit: 5, remaining: 5, retry_after: 0 };
+    } else if (path === "/api/keys/regenerate") {
+      regenerated = true;
+      body = { key: "sk-synthetic-regenerated", user_id: "owner" };
     } else if (path === "/api/keys") {
       if (route.request().method() === "POST") {
         created = true;
@@ -27,7 +31,13 @@ test("@smoke My key guidance remains below actions after creation", async ({
       } else {
         body = {
           keys: created
-            ? [{ token: "hashed-guidance", spend: 0, models: [] }]
+            ? [
+                {
+                  token: regenerated ? "hashed-regenerated" : "hashed-guidance",
+                  spend: 0,
+                  models: [],
+                },
+              ]
             : [],
         };
       }
@@ -47,11 +57,31 @@ test("@smoke My key guidance remains below actions after creation", async ({
     page.getByText("sk-synthetic-guidance", { exact: true }),
   ).toBeVisible();
   const regenerate = page.getByRole("button", { name: "Regenerate key" });
-  await expect(regenerate).toBeVisible();
+  const hide = page.getByRole("button", { name: "Hide API key" });
+  await expect(hide).toHaveCount(1);
+  await expect(regenerate).toHaveCount(0);
   await expect(guidance).toHaveText(message);
   expect((await guidance.boundingBox())!.y).toBeGreaterThan(
-    (await regenerate.boundingBox())!.y,
+    (await hide.boundingBox())!.y,
   );
+  await hide.click();
+  await expect(
+    page.getByText("sk-synthetic-guidance", { exact: true }),
+  ).toHaveCount(0);
+  await expect(regenerate).toBeVisible();
+  await regenerate.click();
+  await page.getByRole("button", { name: "Replace key", exact: true }).click();
+  await expect(
+    page.getByText("sk-synthetic-regenerated", { exact: true }),
+  ).toBeVisible();
+  await expect(hide).toHaveCount(1);
+  await expect(regenerate).toHaveCount(0);
+  await expect(guidance).toHaveText(message);
+  await hide.click();
+  await expect(
+    page.getByText("sk-synthetic-regenerated", { exact: true }),
+  ).toHaveCount(0);
+  await expect(regenerate).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

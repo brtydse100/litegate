@@ -153,19 +153,69 @@ describe("personal key storage", () => {
     ).toBeTruthy();
     fireEvent.click(action);
     await screen.findByText("sk-synthetic-guidance");
-    const regenerate = await screen.findByRole("button", {
-      name: "Regenerate key",
-    });
+    const hide = screen.getByRole("button", { name: "Hide API key" });
+    expect(
+      screen.queryByRole("button", { name: /regenerat/i }),
+    ).not.toBeInTheDocument();
+    expect(hide.closest("article")).toBeNull();
     expect(guidance).toBeVisible();
     expect(
-      regenerate.compareDocumentPosition(guidance) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      hide.compareDocumentPosition(guidance) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+    fireEvent.click(hide);
+    expect(screen.queryByText("sk-synthetic-guidance")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Regenerate key" }),
+    ).toBeVisible();
     const models = screen.getByRole("button", { name: /model access/i });
     expect(
       guidance.compareDocumentPosition(models) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("uses one action to hide a regenerated secret and then restores regeneration", async () => {
+    vi.spyOn(api, "regenerateKey").mockResolvedValue({
+      key: "sk-synthetic-regenerated",
+      user_id: "owner",
+    });
+    const { list, client } = renderHome(false, false);
+    await screen.findByRole("button", { name: "Regeneration paused" });
+    vi.mocked(api.getOperationLimit).mockResolvedValue({
+      limit: 5,
+      remaining: 5,
+      retry_after: 0,
+    });
+    act(() => {
+      client.setQueryData(["key-operation-limit"], {
+        limit: 5,
+        remaining: 5,
+        retry_after: 0,
+      });
+    });
+    list.mockResolvedValue({
+      keys: [{ token: "rotated-hash", spend: 3, models: [] }],
+    });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Regenerate key" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Replace key" }));
+    await screen.findByText("sk-synthetic-regenerated");
+    const hide = screen.getByRole("button", { name: "Hide API key" });
+    expect(
+      screen.getAllByRole("button", { name: "Hide API key" }),
+    ).toHaveLength(1);
+    expect(
+      screen.queryByRole("button", { name: /regenerat/i }),
+    ).not.toBeInTheDocument();
+    expect(hide.closest("article")).toBeNull();
+    fireEvent.click(hide);
+    expect(
+      screen.queryByText("sk-synthetic-regenerated"),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Regenerate key" }),
+    ).toBeVisible();
   });
 
   it("retains guidance when stored-key mode hides regeneration", async () => {
