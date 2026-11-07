@@ -11,8 +11,11 @@ LiteGate verifies the applied budgets rather than accepting ignored API fields.
 
 ## Configuration
 
-Declare `organizationHierarchy` at the **top level** of Helm values. The default
-`levels: []` disables the feature. You can configure up to eight levels. A complete example:
+The hierarchy is available in Docker/Compose, direct backend deployments, and
+Helm with the same schema and policies. Declare `organizationHierarchy` at the
+**top level** of `config.yaml` for Docker/direct deployments, or at the **top
+level** of Helm values (outside `config`). The default `levels: []` disables
+the feature. You can configure up to eight levels. A complete inline example:
 
 ```yaml
 organizationHierarchy:
@@ -63,9 +66,58 @@ Use explicit child IDs when group names may change: renaming a path changes an
 automatically generated ID and requires reviewing existing key assignments.
 Renaming a group also requires updating its children's `parent` names.
 
-Direct and Compose deployments accept the same `organizationHierarchy` block
-in `config.yaml`, or its contents as JSON in `ORGANIZATION_HIERARCHY`. Helm
-serializes the block into that variable and rolls out configuration changes.
+### Docker and Compose
+
+Add the block above to `deploy/docker-compose/config.yaml`, alongside settings
+such as `litellm_url`. Both supplied Compose files mount that host file read-only
+at `/app/backend/config.yaml`; no extra mount is needed for inline YAML. The
+[smaller YAML example](examples/organization-hierarchy.yaml) is also ready to
+merge into that file.
+
+Alternatively, add an `environment` block to the existing `litegate` service in
+your Compose file. `ORGANIZATION_HIERARCHY` takes a JSON object with `levels` at
+its root, without the `organizationHierarchy` wrapper:
+
+```yaml
+services:
+  litegate:
+    environment:
+      ORGANIZATION_HIERARCHY: >-
+        {"levels":[
+          {"name":"Division","groups":[{"members":[
+            {"name":"Engineering","litellmTeamId":"engineering",
+             "ssoGroups":["engineers"],"budget":{"perUser":100,"duration":"30d"}}
+          ]}]},
+          {"name":"Team","groups":[{"parent":"Engineering","members":[
+            {"name":"Platform","userIds":["alice@example.com","local:operator"],
+             "budget":{"perUser":50}}
+          ]}]}
+        ]}
+```
+
+This is the same hierarchy as the complete [JSON example](examples/organization-hierarchy.json).
+For plain Docker, pass the same JSON with `-e 'ORGANIZATION_HIERARCHY=<JSON>'`.
+Environment variables override YAML settings; choose one inline source to avoid
+stale overrides. Leave `organization_hierarchy_file` / `ORGANIZATION_HIERARCHY_FILE`
+empty when using inline levels. A nonempty file path and nonempty inline levels,
+even from different sources, fail startup rather than selecting one.
+
+Settings and hierarchy files load at startup. From `deploy/docker-compose`, apply
+changes to the release-image deployment with:
+
+```bash
+docker compose -f docker-compose.image.yml up -d --force-recreate
+```
+
+Use `docker compose up -d --force-recreate` for the local-build Compose file
+after building its image. Recreating applies changed service environment and
+mounts as well as changed file contents. Reconciliation updates configured team
+and key policy periodically; it does not reload configuration from disk.
+
+For a direct backend deployment, LiteGate reads `backend/config.yaml`, falling
+back to the repository-root `config.yaml` only when the first file is absent.
+Restart the backend after changes. Helm serializes top-level
+`organizationHierarchy` into `ORGANIZATION_HIERARCHY` and rolls out inline changes.
 
 ## JSON file input
 
@@ -84,14 +136,31 @@ retain precedence over YAML. The file must be readable UTF-8 JSON and is validat
 at startup; missing, unreadable, malformed, and invalid files stop startup with an
 actionable error. There is no file watcher; restart after editing.
 
-For Docker Compose, set this in `config.yaml`:
+For Docker Compose, save `organization.json` beside `deploy/docker-compose/config.yaml`
+and set this in that config file:
 
 ```yaml
 organization_hierarchy_file: /app/backend/organization.json
 ```
 
-Add `./organization.json:/app/backend/organization.json:ro` to the service's
-existing `volumes` list. Keep the existing config and SQLite mounts.
+Add the read-only file mount to the existing `litegate` service in the Compose
+file you run, keeping the config and SQLite mounts:
+
+```yaml
+services:
+  litegate:
+    volumes:
+      - ./config.yaml:/app/backend/config.yaml:ro
+      - litegate-data:/app/backend/data
+      - ./organization.json:/app/backend/organization.json:ro
+```
+
+The host file must exist and be readable by the container's UID/GID `10001`.
+The setting uses the destination **inside the container**, not the host path;
+relative file settings resolve against `/app/backend` there. Recreate the service
+with the command above after adding a mount or changing the file. For plain
+Docker, use `--mount type=bind,src=<absolute-host-path>,dst=/app/backend/organization.json,readonly`
+and `-e ORGANIZATION_HIERARCHY_FILE=/app/backend/organization.json`.
 
 For Helm, create a ConfigMap in the release namespace:
 
@@ -201,6 +270,15 @@ update requests. Changing
 only an allowance retains its existing reset window; changing the duration uses
 LiteLLM's reset scheduling. Lowering a cap below current spend may prevent further paid
 requests immediately. Failures are shown in the admin dashboard.
+
+**Rate limits:** Hierarchy budgets are USD spending allowances, not request or token rate limits.
+`perUser` sets each managed key's spend allowance; `groupTotal` only tracks
+aggregate spend. Neither field sets requests per minute (RPM), tokens per minute
+(TPM), or concurrent request limits, and the hierarchy has no inherited rate-limit
+fields. For newly generated keys, use root-level `key_rpm_limit`, `key_tpm_limit`,
+and `key_max_parallel_requests` in `config.yaml` (or their uppercase environment
+variables). Configure team and existing-key rate limits in LiteLLM. These controls
+are independent of budget duration and are not aggregate hierarchy limits.
 
 Legacy `KEY_MAX_BUDGET` and `KEY_BUDGET_DURATION` do not apply to managed keys.
 All existing owned keys, including keys assigned to an unmanaged team or another

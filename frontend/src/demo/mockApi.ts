@@ -258,7 +258,12 @@ async function mockResponse(request: Request): Promise<Response> {
   }
 
   if (path === "/api/auth/config")
-    return json({ sso_enabled: false, local_enabled: true });
+    return json({
+      sso_enabled: false,
+      local_enabled: true,
+      login_text: "",
+      logo_url: "",
+    });
   if (path === "/api/demo/role" && method === "POST") {
     const payload = await body(request);
     if (payload.role !== "admin" && payload.role !== "user")
@@ -279,6 +284,7 @@ async function mockResponse(request: Request): Promise<Response> {
   if (path === "/api/portal-config")
     return json({
       support_ticket_url: "https://github.com/brtydse100/litegate/issues",
+      my_key_text: "",
       logo_url: "",
       litellm_ui_url: "",
       api_docs_url: "https://github.com/brtydse100/litegate/blob/main/API.md",
