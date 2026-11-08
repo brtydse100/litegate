@@ -7,6 +7,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-11-08
+
+### Added
+
+- Independent runtime `login_text` and `my_key_text` settings with environment
+  and Helm equivalents, and the existing shared logo on the login page.
+- Docker/Compose organization hierarchy examples covering YAML, JSON environment
+  input, file mounts, precedence, and restarts alongside Helm documentation.
+
+### Changed
+
+- Use one action after one-time key creation or regeneration: **Hide API key**
+  replaces regeneration until the secret is hidden, then regeneration returns.
+
+### Fixed
+
+- Correct the truncated Node setup action SHA that prevented Nightly E2E from
+  starting dependency installation and browser tests.
+
 ## [2.16.0] - 2026-11-06
 
 ### Added
@@ -439,7 +458,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.13.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.17.0...HEAD
+[2.17.0]: https://github.com/brtydse100/litegate/compare/v2.16.0...v2.17.0
 [2.13.0]: https://github.com/brtydse100/litegate/compare/v2.12.2...v2.13.0
 [2.12.0]: https://github.com/brtydse100/litegate/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/brtydse100/litegate/compare/v2.10.0...v2.11.0
