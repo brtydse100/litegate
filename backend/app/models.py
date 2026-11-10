@@ -122,6 +122,11 @@ class LocalUserInfo(BaseModel):
     updated_at: str
 
 
+class ModelBudget(BaseModel):
+    budget_limit: float = Field(gt=0, allow_inf_nan=False)
+    time_period: str = Field(pattern=r"^[1-9][0-9]*(s|m|h|d)$", max_length=32)
+
+
 class KeySettingsUpdate(BaseModel):
     key_alias: Optional[str] = Field(default=None, max_length=128)
     models: Optional[List[str]] = None
@@ -131,6 +136,14 @@ class KeySettingsUpdate(BaseModel):
     rpm_limit: Optional[int] = Field(default=None, ge=0)
     duration: Optional[str] = Field(default=None, max_length=32)
     blocked: Optional[bool] = None
+    model_max_budget: dict[str, ModelBudget] = Field(default_factory=dict, max_length=100)
+
+    @field_validator("model_max_budget")
+    @classmethod
+    def validate_model_budget_names(cls, value: dict[str, ModelBudget]) -> dict[str, ModelBudget]:
+        if any(not name or name != name.strip() or len(name) > 256 for name in value):
+            raise ValueError("Model names must contain 1 to 256 characters without surrounding whitespace")
+        return value
 
     @field_validator("models")
     @classmethod

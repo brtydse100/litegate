@@ -289,6 +289,8 @@ async function mockResponse(request: Request): Promise<Response> {
       litellm_ui_url: "",
       api_docs_url: "https://github.com/brtydse100/litegate/blob/main/API.md",
       local_users_enabled: true,
+      // Synthetic budgets only; demo mode never connects to a LiteLLM proxy.
+      litellm_enterprise_enabled: true,
     });
   if (path === "/api/keys/operation-limit")
     return json({ limit: 10, remaining: 10, retry_after: 0 });

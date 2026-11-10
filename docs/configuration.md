@@ -27,6 +27,7 @@ for Docker Compose or [`.env.example`](../.env.example) for local development.
 | --- | --- | --- |
 | `litellm_url` | `http://localhost:4000` | LiteLLM proxy and management URL |
 | `litellm_master_key` | required | LiteLLM administrator key |
+| `litellm_enterprise_enabled` | `false` | Manually expose per-model key budgets; requires a licensed LiteLLM Enterprise proxy |
 | `ssl_verify` | `true` | Verify certificates on outgoing LiteLLM and SSO HTTPS connections |
 | `jwt_secret` | required | Portal-session signing secret |
 | `jwt_previous_secrets` | empty | Comma-separated prior session secrets accepted only for verification during rotation |
@@ -215,6 +216,56 @@ of `ORGANIZATION_HIERARCHY` or the contents of `organization_hierarchy_file`;
 it uses the existing hierarchy schema, not the removed standalone mapping schema.
 
 ## Key defaults
+
+### Per-model key budgets (LiteLLM Enterprise)
+
+LiteGate hides per-model budget editing by default. To enable it, first activate
+a valid [LiteLLM Enterprise license](https://docs.litellm.ai/docs/enterprise/activate)
+on your LiteLLM proxy, then set this in the **LiteGate** environment and restart:
+
+```dotenv
+LITELLM_ENTERPRISE_ENABLED=true
+```
+
+For Docker Compose's mounted `config.yaml`, set
+`litellm_enterprise_enabled: true`. For Helm, set
+`config.litellmEnterpriseEnabled=true` (default `false`), for example with
+`helm upgrade --install litegate deploy/helm/litegate --set config.litellmEnterpriseEnabled=true`
+alongside your usual values and credentials. Environment variables take
+precedence over YAML.
+
+This is a manual feature switch: LiteGate does not detect or activate an
+Enterprise license. LiteLLM remains responsible for license validation and budget
+enforcement. Enabling the switch without a valid upstream license does not grant
+Enterprise functionality; failed updates are reported per key. Turning it off
+hides the editor and rejects new per-model budget API writes, including clears;
+it does not remove existing upstream limits.
+
+In **Key policies**, select keys, enable **Replace per-model budgets**, and add a
+row such as model `claude-opus`, amount `25`, period `2h`. Use your exact LiteLLM
+model alias. Each model's spend counts toward the overall key budget as well as
+its own limit. The model's period is independent of the overall key reset; the
+earliest exhausted applicable budget blocks requests. LiteLLM controls when
+windows begin and reset. This configures selected existing keys, not defaults for
+future keys.
+
+Self-service key regeneration returns HTTP 409 while a key has per-model
+budgets, even if this feature switch is later turned off. LiteGate cannot safely
+carry LiteLLM's per-model usage windows to a replacement token. An administrator
+must handle rotation in LiteLLM with the existing usage limits accounted for.
+No key is renamed, created, or revoked by a rejected regeneration.
+
+Replacement overwrites the entire per-model mapping on each selected key. All
+omitted models lose their separate limit; removing every row clears all
+per-model limits. An unchecked replacement option leaves them untouched. Amounts
+must be strictly positive USD; periods are positive integers followed by `s`,
+`m`, `h`, or `d`. The API accepts at most 100 models. See the [bulk API contract](../API.md).
+Zero is rejected by the editor and API because LiteLLM treats a zero model budget
+as unlimited. To deny access, change the key's allowed models. To remove a model
+limit, omit it from the replacement mapping.
+
+The public demo exposes this editor with synthetic data only and never connects
+to a real LiteLLM instance.
 
 ### Optional API key storage
 

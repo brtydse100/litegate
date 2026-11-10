@@ -137,7 +137,9 @@ saved settings or overwrite unrelated values.
 removed when the selection is cleared. It can be collapsed manually; changing
 the selection opens it again. Selection and editing headings are unnumbered.
 Selected rows use one border, with keyboard focus shown around the whole row. Model
-choices appear in a scrollable list with highlighted selections and a count.
+choices have highlighted selections and a count. On **Key policies**, key and
+model lists use the page's scrollbar rather than nested scrollbars. Selection
+lookups are cached so editing fields does not repeatedly scan the full selection.
 Key selection rows keep their reveal button inside the row beside spend, and
 revealed secrets expand within the same card.
 The row's **Show API key** button switches to **Hide API key** while the secret
@@ -154,6 +156,23 @@ names remain array entries through submission, without comma-separated input.
 Select **All allowed models** explicitly to remove model restrictions; an empty
 selection alone cannot grant unrestricted access. Common reset/lifetime durations
 are available alongside custom duration input.
+
+With `LITELLM_ENTERPRISE_ENABLED=true`, **Per-model budgets** lets administrators
+set a model alias, dollar limit, and its own reset period: for example, $25 for
+`claude-opus` every `2h`. Model spending still counts toward the overall key
+budget. Amounts must be greater than zero: LiteLLM treats zero as unlimited, so
+the editor and API reject it. To deny model access, edit **Allowed models**.
+Reaching either the model or overall key budget can block a request. A single
+selected key's saved model budgets are shown. Select **Replace per-model budgets** to edit them;
+this replaces the complete mapping for every selected key, including keys on
+other pages. Removing all rows while replacement is selected clears per-model
+limits. Leaving replacement unchecked preserves them. Changing the key selection
+discards edits. Use the exact model aliases configured in LiteLLM. The flag
+defaults off and requires a valid LiteLLM Enterprise license; see
+[configuration](configuration.md#per-model-key-budgets-litellm-enterprise).
+Keys with per-model budgets require administrator-assisted rotation in LiteLLM;
+LiteGate rejects self-service regeneration to avoid dropping limits or resetting
+their usage windows.
 
 Select **Use key budget as the individual allowance** to remove a duplicate
 personal user cap and the owner's team-member cap for the key's team. This

@@ -210,6 +210,8 @@ async def bulk_update_keys(
     check_key_rate_limit(actor.user.user_id)
 
     changes = payload.settings.model_dump(exclude_unset=True) if payload.settings else {}
+    if "model_max_budget" in changes and not settings.litellm_enterprise_enabled:
+        raise HTTPException(status_code=403, detail="Per-model budgets require LITELLM_ENTERPRISE_ENABLED=true and a LiteLLM Enterprise license")
     semaphore = asyncio.Semaphore(10)
 
     async def update_one(key: str) -> dict:

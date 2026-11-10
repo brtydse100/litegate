@@ -10,6 +10,8 @@ jwt_previous_secrets: ""
 
 # LiteLLM location
 litellm_url: "http://host.docker.internal:4000"
+# Manual opt-in for per-model key budgets; requires a LiteLLM Enterprise license.
+litellm_enterprise_enabled: false
 # Verify outgoing LiteLLM and SSO HTTPS certificates; prefer a trusted CA bundle.
 ssl_verify: true
 

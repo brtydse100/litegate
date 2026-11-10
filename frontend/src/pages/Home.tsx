@@ -41,6 +41,7 @@ interface PortalConfig {
   api_docs_url: string;
   local_users_enabled: boolean;
   save_api_keys_in_db: boolean;
+  litellm_enterprise_enabled: boolean;
 }
 
 async function fetchPortalConfig(): Promise<PortalConfig> {
@@ -558,7 +559,10 @@ export default function Home() {
             ) : section === "/teams" && isAdmin ? (
               <AdminTeams />
             ) : section === "/keys" && isAdmin ? (
-              <AdminKeys saveApiKeysInDb={config?.save_api_keys_in_db} />
+              <AdminKeys
+                saveApiKeysInDb={config?.save_api_keys_in_db}
+                enterpriseEnabled={config?.litellm_enterprise_enabled}
+              />
             ) : section === "/status" && isAdmin ? (
               <AdminStatus />
             ) : (

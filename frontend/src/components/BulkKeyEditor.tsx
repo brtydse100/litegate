@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import RevealKey from "./RevealKey";
+import ModelBudgetEditor, {
+  parseModelBudgets,
+  type ModelBudgetRow,
+} from "./ModelBudgetEditor";
 import {
   CurrentPolicySettings,
   DurationChoices,
@@ -34,6 +38,8 @@ import type {
 const inputClass =
   "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
 const fieldClass = "space-y-1 text-xs text-gray-400";
+const emptyKeys: KeyInfo[] = [];
+const emptyTokens: string[] = [];
 
 interface ResetTarget {
   keys: string[];
@@ -52,9 +58,11 @@ export function maskedToken(token: string): string {
 export default function BulkKeyEditor({
   expanded = false,
   saveApiKeysInDb = false,
+  enterpriseEnabled = false,
 }: {
   expanded?: boolean;
   saveApiKeysInDb?: boolean;
+  enterpriseEnabled?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { operationsBlocked, retryAfter, refreshOperationLimit } =
@@ -66,6 +74,18 @@ export default function BulkKeyEditor({
   const [teamFilter, setTeamFilter] = useState("");
   const [blockedFilter, setBlockedFilter] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectionId = useMemo(() => JSON.stringify(selected), [selected]);
+  const [modelBudgetDraft, setModelBudgetDraft] = useState<{
+    selection: string;
+    rows: ModelBudgetRow[] | undefined;
+  }>();
+  if (modelBudgetDraft && modelBudgetDraft.selection !== selectionId)
+    setModelBudgetDraft(undefined);
+  const modelBudgetRows =
+    modelBudgetDraft?.selection === selectionId
+      ? modelBudgetDraft.rows
+      : undefined;
   const [useKeyBudgetOnly, setUseKeyBudgetOnly] = useState(false);
   const [lastUseKeyBudgetOnly, setLastUseKeyBudgetOnly] = useState(false);
   const [localError, setLocalError] = useState("");
@@ -138,10 +158,11 @@ export default function BulkKeyEditor({
     onSettled: refreshOperationLimit,
   });
 
-  const visibleKeys = adminKeys.data?.keys ?? [];
+  const visibleKeys = adminKeys.data?.keys ?? emptyKeys;
   const visibleTokens = visibleKeys.map(keyToken).filter(Boolean);
-  const selectedVisibleKeys = visibleKeys.filter((key) =>
-    selected.includes(keyToken(key)),
+  const selectedVisibleKeys = useMemo(
+    () => visibleKeys.filter((key) => selectedSet.has(keyToken(key))),
+    [visibleKeys, selectedSet],
   );
   const {
     values,
@@ -157,12 +178,20 @@ export default function BulkKeyEditor({
     values;
   const allVisibleSelected =
     visibleTokens.length > 0 &&
-    visibleTokens.every((token) => selected.includes(token));
-  const allFetchedTokens = selectAll.data?.keys ?? [];
-  const allKeysSelected =
-    allFetchedTokens.length > 0 &&
-    selectAll.data?.total === adminKeys.data?.total &&
-    allFetchedTokens.every((token) => selected.includes(token));
+    visibleTokens.every((token) => selectedSet.has(token));
+  const allFetchedTokens = selectAll.data?.keys ?? emptyTokens;
+  const allKeysSelected = useMemo(
+    () =>
+      allFetchedTokens.length > 0 &&
+      selectAll.data?.total === adminKeys.data?.total &&
+      allFetchedTokens.every((token) => selectedSet.has(token)),
+    [
+      allFetchedTokens,
+      selectAll.data?.total,
+      adminKeys.data?.total,
+      selectedSet,
+    ],
+  );
   const targetKeys = selected;
   const targetCount = targetKeys.length;
   const failedResults =
@@ -172,6 +201,8 @@ export default function BulkKeyEditor({
 
   function settingsFromForm(): KeySettingsUpdate {
     const settings: KeySettingsUpdate = {};
+    if (enterpriseEnabled && modelBudgetRows !== undefined)
+      settings.model_max_budget = parseModelBudgets(modelBudgetRows);
     if (isChanged("alias") && alias.trim()) settings.key_alias = alias.trim();
     if (modelsChanged)
       settings.models = modelSelection.all ? [] : modelSelection.models;
@@ -200,7 +231,13 @@ export default function BulkKeyEditor({
       setLocalError("Select at least one model or allow all models.");
       return;
     }
-    const settings = settingsFromForm();
+    let settings: KeySettingsUpdate;
+    try {
+      settings = settingsFromForm();
+    } catch (error) {
+      setLocalError((error as Error).message);
+      return;
+    }
     if (!Object.keys(settings).length && !useKeyBudgetOnly) {
       setLocalError("Choose at least one setting to change.");
       return;
@@ -468,12 +505,10 @@ export default function BulkKeyEditor({
               </p>
             ) : visibleKeys.length ? (
               <>
-                <div className="max-h-96 space-y-2 overflow-y-auto p-2">
+                <div className="space-y-2 p-2">
                   {visibleKeys.map((key, index) => {
                     const token = keyToken(key);
-                    const isSelected = Boolean(
-                      token && selected.includes(token),
-                    );
+                    const isSelected = Boolean(token && selectedSet.has(token));
                     const label =
                       key.key_alias ||
                       `Key ${(adminKeys.data?.page ?? page) * 25 - 24 + index}`;
@@ -671,15 +706,15 @@ export default function BulkKeyEditor({
                 </div>
               ))}
             {targetCount >
-              visibleTokens.filter((token) => selected.includes(token))
+              visibleTokens.filter((token) => selectedSet.has(token))
                 .length && (
               <p className="text-xs text-amber-600">
                 {targetCount -
-                  visibleTokens.filter((token) => selected.includes(token))
+                  visibleTokens.filter((token) => selectedSet.has(token))
                     .length}{" "}
                 selected{" "}
                 {targetCount -
-                  visibleTokens.filter((token) => selected.includes(token))
+                  visibleTokens.filter((token) => selectedSet.has(token))
                     .length ===
                 1
                   ? "key is"
@@ -692,7 +727,7 @@ export default function BulkKeyEditor({
         )}
         {targetCount > 0 && (
           <details
-            key={JSON.stringify(selected)}
+            key={selectionId}
             open={targetCount > 0}
             className="group rounded-lg border border-slate-200 sm:col-span-2"
           >
@@ -720,6 +755,7 @@ export default function BulkKeyEditor({
                 />
               </label>
               <ModelChoices
+                scrollable={false}
                 value={modelSelection}
                 onChange={setModels}
                 knownModels={selectedVisibleKeys.flatMap(
@@ -727,6 +763,19 @@ export default function BulkKeyEditor({
                 )}
                 status={modelStatus}
               />
+              {enterpriseEnabled && (
+                <ModelBudgetEditor
+                  rows={modelBudgetRows}
+                  onChange={(rows) =>
+                    setModelBudgetDraft({ selection: selectionId, rows })
+                  }
+                  saved={
+                    selected.length === 1
+                      ? selectedVisibleKeys[0]?.model_max_budget
+                      : undefined
+                  }
+                />
+              )}
               <NumericPolicyInput
                 label="Maximum budget"
                 value={budget}

@@ -90,11 +90,13 @@ export function ModelChoices({
   onChange,
   knownModels = [],
   status,
+  scrollable = true,
 }: {
   value: ModelSelection;
   onChange: (value: ModelSelection) => void;
   knownModels?: string[];
   status?: string;
+  scrollable?: boolean;
 }) {
   const catalog = useQuery({
     queryKey: ["admin-models"],
@@ -127,7 +129,9 @@ export function ModelChoices({
         />
         All allowed models
       </label>
-      <div className="grid max-h-48 gap-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 sm:grid-cols-2">
+      <div
+        className={`grid gap-1 rounded-lg border border-slate-200 bg-white p-1 sm:grid-cols-2 ${scrollable ? "max-h-48 overflow-y-auto" : ""}`}
+      >
         {options.map((model) => (
           <label
             key={model}
