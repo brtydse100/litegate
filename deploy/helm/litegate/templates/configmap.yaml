@@ -35,6 +35,7 @@ data:
   ORGANIZATION_HIERARCHY: {{ .Values.organizationHierarchy | default (dict "levels" (list)) | toJson | quote }}
   {{- end }}
   LITELLM_URL: {{ .Values.config.litellmUrl | quote }}
+  LITELLM_ENTERPRISE_ENABLED: {{ .Values.config.litellmEnterpriseEnabled | quote }}
   LITELLM_UI_URL: {{ .Values.config.litellmUiUrl | quote }}
   SSL_VERIFY: {{ .Values.config.sslVerify | quote }}
   ROOT_URL: {{ .Values.config.rootUrl | quote }}

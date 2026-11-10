@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { KeyInfo, ModelSelection } from "../types";
 
 type Field =
@@ -41,7 +41,10 @@ function savedValue(key: KeyInfo, field: Field): string | null | undefined {
 }
 
 export function useKeySettingsForm(selected: string[], knownKeys: KeyInfo[]) {
-  const selection = JSON.stringify([...selected].sort());
+  const selection = useMemo(
+    () => JSON.stringify([...selected].sort()),
+    [selected],
+  );
   const [draft, setDraft] = useState<{
     selection: string;
     values: Partial<Record<Field, string>>;

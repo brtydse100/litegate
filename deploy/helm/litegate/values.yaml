@@ -72,6 +72,8 @@ config:
   # -- LiteLLM connection -----------------------------------------------------
   # Backend URL reachable from inside the LiteGate pod.
   litellmUrl: "http://litellm:4000"
+  # Manual opt-in for per-model key budgets; requires a LiteLLM Enterprise license.
+  litellmEnterpriseEnabled: false
   # Full browser-facing "Open LiteLLM Hub" URL; used as-is, blank hides it.
   # Example: "https://litellm.example.com/ui/model_hub"
   litellmUiUrl: ""

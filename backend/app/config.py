@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
     litellm_url: str = "http://localhost:4000"
     litellm_master_key: str
+    litellm_enterprise_enabled: bool = False
     ssl_verify: bool = True
 
     oidc_issuer_url: str = ""

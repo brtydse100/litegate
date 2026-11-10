@@ -33,18 +33,191 @@ const keys = [
   { token: "key-2", key_alias: "Bob", spend: 2, models: [], user_id: "bob" },
 ];
 
-function renderEditor(saveApiKeysInDb = false) {
+function renderEditor(saveApiKeysInDb = false, enterpriseEnabled = false) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <BulkKeyEditor expanded saveApiKeysInDb={saveApiKeysInDb} />
+      <BulkKeyEditor
+        expanded
+        saveApiKeysInDb={saveApiKeysInDb}
+        enterpriseEnabled={enterpriseEnabled}
+      />
     </QueryClientProvider>,
   );
 }
 
 describe("BulkKeyEditor", () => {
+  it("preserves saved per-model budgets when another field is edited", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [
+        {
+          ...keys[0],
+          model_max_budget: { opus: { budget_limit: 25, time_period: "2h" } },
+        },
+      ],
+      page: 1,
+      size: 25,
+      total: 1,
+      total_pages: 1,
+    });
+    vi.mocked(api.bulkUpdateKeys).mockResolvedValue({
+      updated: 1,
+      failed: 0,
+      results: [{ key: "key-1", updated: true }],
+    });
+    renderEditor(false, true);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.change(screen.getByLabelText("Alias"), {
+      target: { value: "Updated" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    await waitFor(() =>
+      expect(api.bulkUpdateKeys).toHaveBeenCalledWith(["key-1"], {
+        key_alias: "Updated",
+      }),
+    );
+  });
+
+  it("rejects malformed model reset periods without updating any keys", async () => {
+    renderEditor(false, true);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Replace per-model budgets" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add model budget" }));
+    fireEvent.change(screen.getByLabelText("Budget model 1"), {
+      target: { value: "opus" },
+    });
+    fireEvent.change(screen.getByLabelText("Model budget 1 (USD)"), {
+      target: { value: "25" },
+    });
+    fireEvent.change(screen.getByLabelText("Model reset period 1"), {
+      target: { value: "0h" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    expect(
+      screen.getByText(
+        "Enter a positive model reset period, for example 2h or 30d.",
+      ),
+    ).toBeVisible();
+    expect(api.bulkUpdateKeys).not.toHaveBeenCalled();
+  });
+
+  it("hides per-model budget editing by default", async () => {
+    renderEditor();
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    expect(
+      screen.queryByRole("checkbox", { name: "Replace per-model budgets" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("sets a model budget with its own period without changing the overall budget", async () => {
+    vi.mocked(api.bulkUpdateKeys).mockResolvedValue({
+      updated: 1,
+      failed: 0,
+      results: [{ key: "key-1", updated: true }],
+    });
+    renderEditor(false, true);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Replace per-model budgets" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add model budget" }));
+    fireEvent.change(screen.getByLabelText("Budget model 1"), {
+      target: { value: "claude-opus" },
+    });
+    fireEvent.change(screen.getByLabelText("Model budget 1 (USD)"), {
+      target: { value: "25" },
+    });
+    fireEvent.change(screen.getByLabelText("Model reset period 1"), {
+      target: { value: "2h" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    await waitFor(() =>
+      expect(api.bulkUpdateKeys).toHaveBeenCalledWith(["key-1"], {
+        model_max_budget: {
+          "claude-opus": { budget_limit: 25, time_period: "2h" },
+        },
+      }),
+    );
+  });
+
+  it("loads saved model budgets and can explicitly clear them", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [
+        {
+          ...keys[0],
+          model_max_budget: { opus: { budget_limit: 25, time_period: "2h" } },
+        },
+      ],
+      page: 1,
+      size: 25,
+      total: 1,
+      total_pages: 1,
+    });
+    vi.mocked(api.bulkUpdateKeys).mockResolvedValue({
+      updated: 1,
+      failed: 0,
+      results: [{ key: "key-1", updated: true }],
+    });
+    renderEditor(false, true);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Replace per-model budgets" }),
+    );
+    expect(screen.getByLabelText("Budget model 1")).toHaveValue("opus");
+    expect(screen.getByLabelText("Model budget 1 (USD)")).toHaveValue(25);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove model budget 1" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    await waitFor(() =>
+      expect(api.bulkUpdateKeys).toHaveBeenCalledWith(["key-1"], {
+        model_max_budget: {},
+      }),
+    );
+  });
+
+  it("drops model-budget edits when the key selection changes", async () => {
+    renderEditor(false, true);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Replace per-model budgets" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add model budget" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Bob" }));
+    expect(
+      screen.getByRole("checkbox", { name: "Replace per-model budgets" }),
+    ).not.toBeChecked();
+    expect(screen.queryByLabelText("Budget model 1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Deselect Bob" }));
+    expect(
+      screen.getByRole("checkbox", { name: "Replace per-model budgets" }),
+    ).not.toBeChecked();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.listModels).mockResolvedValue({

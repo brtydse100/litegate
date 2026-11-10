@@ -231,7 +231,41 @@ curl -X PATCH https://litegate.example.com/api/v1/keys/bulk \
   }'
 ```
 
-Supported bulk fields are `key_alias`, `models`, `max_budget`, `budget_duration`, `tpm_limit`, `rpm_limit`, `duration`, and `blocked`. A request can contain up to 5,000 unique keys. Updates run with bounded concurrency and return a result for every key, so partial failures are visible.
+Supported bulk fields are `key_alias`, `models`, `max_budget`, `budget_duration`, `tpm_limit`, `rpm_limit`, `duration`, `blocked`, and (when enabled) `model_max_budget`. A request can contain up to 5,000 unique keys. Updates run with bounded concurrency and return a result for every key, so partial failures are visible.
+
+Per-model budgets require `LITELLM_ENTERPRISE_ENABLED=true` in LiteGate and a
+valid LiteLLM Enterprise license on the upstream proxy. The flag defaults to
+`false`: any request containing `model_max_budget`, including `{}`, is rejected
+with HTTP 403 before any key is updated. The flag is manual, not license detection.
+`GET /api/portal-config` includes the boolean `litellm_enterprise_enabled` so the
+frontend can hide the editor when disabled.
+
+For example, add a $25 Opus allowance that resets every two hours:
+
+```json
+{
+  "keys": ["key-1"],
+  "settings": {
+    "model_max_budget": {
+      "claude-opus": { "budget_limit": 25, "time_period": "2h" }
+    }
+  }
+}
+```
+
+Use the exact LiteLLM model alias. `budget_limit` must be finite and nonnegative;
+`time_period` is a positive integer followed by `s`, `m`, `h`, or `d` (up to 32
+characters). At most 100 models are accepted, with names of 1–256 characters and
+no surrounding whitespace. `null` is invalid. The mapping replaces all per-model
+limits on each selected key; `{}` clears them, and omitting the field leaves them
+unchanged. Overall `max_budget` and `budget_duration` are unaffected unless
+explicitly supplied. Model spending also counts toward the overall key budget;
+both limits apply independently. LiteLLM performs accounting, resets, enforcement
+and license validation. Upstream failures remain per-key failures in the response.
+`POST /api/keys/regenerate` returns HTTP 409 before mutation if any existing key
+has per-model budgets. Rotation requires administrator handling in LiteLLM so
+token-scoped model usage windows are not silently reset. This safeguard also
+applies when `LITELLM_ENTERPRISE_ENABLED` is off.
 
 To use the key's budget as its owner's individual allowance, explicitly include
 `"use_key_budget_only": true` alongside `keys` and optional `settings`. For example:

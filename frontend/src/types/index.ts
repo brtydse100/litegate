@@ -21,7 +21,13 @@ export interface ModelSelection {
   all: boolean;
 }
 
+export interface ModelBudget {
+  budget_limit: number;
+  time_period: string;
+}
+
 export interface KeySettingsUpdate {
+  model_max_budget?: Record<string, ModelBudget>;
   key_alias?: string;
   models?: string[];
   max_budget?: number;
@@ -45,6 +51,7 @@ export interface BulkKeySpendResetResponse {
 }
 
 export interface KeyInfo {
+  model_max_budget?: Record<string, ModelBudget> | null;
   user_budget?: number | null;
   organization_managed?: boolean;
   user_budget_available?: boolean;

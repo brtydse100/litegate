@@ -182,6 +182,11 @@ async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias
 
     async with lock_for("user", user_id):
         existing = await key_spend.current_keys(user_id)
+        if any(key.get("model_max_budget") for key in existing):
+            raise HTTPException(
+                status_code=409,
+                detail="Keys with per-model budgets require administrator-assisted rotation in LiteLLM to preserve model usage windows.",
+            )
         renamed_key = None
         try:
             for key_info in existing:

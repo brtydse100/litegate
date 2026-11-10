@@ -157,6 +157,15 @@
     }
   },
   "properties": {
+    "config": {
+      "type": "object",
+      "properties": {
+        "litellmEnterpriseEnabled": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
     "organizationHierarchy": {
       "additionalProperties": false,
       "properties": {

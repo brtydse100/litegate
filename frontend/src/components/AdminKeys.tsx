@@ -3,8 +3,10 @@ import BulkKeyEditor from "./BulkKeyEditor";
 
 export default function AdminKeys({
   saveApiKeysInDb = false,
+  enterpriseEnabled = false,
 }: {
   saveApiKeysInDb?: boolean;
+  enterpriseEnabled?: boolean;
 }) {
   return (
     <section className="w-full space-y-5">
@@ -21,7 +23,11 @@ export default function AdminKeys({
             : "This page never reveals key secrets."}
         </p>
       </div>
-      <BulkKeyEditor expanded saveApiKeysInDb={saveApiKeysInDb} />
+      <BulkKeyEditor
+        expanded
+        saveApiKeysInDb={saveApiKeysInDb}
+        enterpriseEnabled={enterpriseEnabled}
+      />
     </section>
   );
 }
