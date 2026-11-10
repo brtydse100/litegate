@@ -258,8 +258,11 @@ No key is renamed, created, or revoked by a rejected regeneration.
 Replacement overwrites the entire per-model mapping on each selected key. All
 omitted models lose their separate limit; removing every row clears all
 per-model limits. An unchecked replacement option leaves them untouched. Amounts
-are nonnegative USD; periods are positive integers followed by `s`, `m`, `h`, or
-`d`. The API accepts at most 100 models. See the [bulk API contract](../API.md).
+must be strictly positive USD; periods are positive integers followed by `s`,
+`m`, `h`, or `d`. The API accepts at most 100 models. See the [bulk API contract](../API.md).
+Zero is rejected by the editor and API because LiteLLM treats a zero model budget
+as unlimited. To deny access, change the key's allowed models. To remove a model
+limit, omit it from the replacement mapping.
 
 The public demo exposes this editor with synthetic data only and never connects
 to a real LiteLLM instance.

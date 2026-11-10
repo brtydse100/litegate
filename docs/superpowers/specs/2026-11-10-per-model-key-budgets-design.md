@@ -8,7 +8,9 @@ The user selected a manual `LITELLM_ENTERPRISE_ENABLED` environment flag over au
 
 ## Design
 
-Use LiteLLM's `model_max_budget` mapping of model names to `budget_limit` and `time_period`. Provide an explicit replacement editor with model/amount/period rows, saved values where available, and an explicit way to clear limits. Unedited budgets stay untouched. Explain replacement semantics when editing multiple keys. Validate nonnegative finite amounts, nonempty unique model names, and positive duration strings in seconds, minutes, hours or days. Preserve admin authorization, rate limits, audit records and per-key failures.
+Use LiteLLM's `model_max_budget` mapping of model names to `budget_limit` and `time_period`. Provide an explicit replacement editor with model/amount/period rows, saved values where available, and an explicit way to clear limits. Unedited budgets stay untouched. Explain replacement semantics when editing multiple keys. Validate strictly positive finite amounts, nonempty unique model names, and positive duration strings in seconds, minutes, hours or days. Preserve admin authorization, rate limits, audit records and per-key failures.
+
+The local LiteLLM test found that zero is interpreted as unlimited. The user approved rejecting zero-dollar model limits in both UI and API. Use allowed-model restrictions to deny model access and mapping replacement to clear limits.
 
 Remove nested scrolling from the key list and model chooser on Key policies. Memoize selection membership and selection identity to avoid quadratic searches and repeated sorting while typing. Preserve pagination and selection reset behavior.
 

@@ -123,7 +123,7 @@ class LocalUserInfo(BaseModel):
 
 
 class ModelBudget(BaseModel):
-    budget_limit: float = Field(ge=0, allow_inf_nan=False)
+    budget_limit: float = Field(gt=0, allow_inf_nan=False)
     time_period: str = Field(pattern=r"^[1-9][0-9]*(s|m|h|d)$", max_length=32)
 
 

@@ -20,6 +20,7 @@
 
 - Disabled flag rejects attempted API writes, including clearing budgets.
 - Invalid/duplicate model names, nonfinite or negative amounts, and zero or malformed periods cannot reach LiteLLM.
+- Zero-dollar model budgets are rejected by the editor and HTTP API; positive fractional amounts remain valid.
 - Replacing limits does not change the overall key budget or submit untouched values.
 - Changing selection drops drafts intended for earlier keys.
 - Cross-page selection and retries preserve existing behavior with large selections.

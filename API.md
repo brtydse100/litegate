@@ -253,7 +253,7 @@ For example, add a $25 Opus allowance that resets every two hours:
 }
 ```
 
-Use the exact LiteLLM model alias. `budget_limit` must be finite and nonnegative;
+Use the exact LiteLLM model alias. `budget_limit` must be finite and strictly positive;
 `time_period` is a positive integer followed by `s`, `m`, `h`, or `d` (up to 32
 characters). At most 100 models are accepted, with names of 1–256 characters and
 no surrounding whitespace. `null` is invalid. The mapping replaces all per-model
@@ -262,6 +262,9 @@ unchanged. Overall `max_budget` and `budget_duration` are unaffected unless
 explicitly supplied. Model spending also counts toward the overall key budget;
 both limits apply independently. LiteLLM performs accounting, resets, enforcement
 and license validation. Upstream failures remain per-key failures in the response.
+Zero-dollar per-model limits return HTTP 422 because LiteLLM interprets zero as
+unlimited. Use an empty mapping to clear limits or edit allowed models to deny
+access to a model.
 `POST /api/keys/regenerate` returns HTTP 409 before mutation if any existing key
 has per-model budgets. Rotation requires administrator handling in LiteLLM so
 token-scoped model usage windows are not silently reset. This safeguard also

@@ -20,10 +20,10 @@ export function parseModelBudgets(
     if (
       !amount.trim() ||
       !Number.isFinite(Number(amount)) ||
-      Number(amount) < 0
+      Number(amount) <= 0
     )
       throw new Error(
-        "Model budgets must be finite dollar amounts of zero or more.",
+        "Model budgets must be finite dollar amounts greater than zero.",
       );
     if (
       period.trim().length > 32 ||
@@ -136,6 +136,13 @@ export default function ModelBudgetEditor({
                   className={inputClass}
                   type="number"
                   min="0"
+                  ref={(input) =>
+                    input?.setCustomValidity(
+                      row.amount !== "" && Number(row.amount) <= 0
+                        ? "Enter a model budget greater than $0."
+                        : "",
+                    )
+                  }
                   step="any"
                   required
                   value={row.amount}
@@ -179,7 +186,8 @@ export default function ModelBudgetEditor({
           </button>
           <p className="text-slate-500">
             Periods: seconds (s), minutes (m), hours (h), or days (d). Requires
-            a valid LiteLLM Enterprise license.
+            a valid LiteLLM Enterprise license. Amounts must be greater than $0;
+            LiteLLM treats a zero limit as unlimited.
           </p>
         </>
       )}

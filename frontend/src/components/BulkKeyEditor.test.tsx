@@ -49,6 +49,32 @@ function renderEditor(saveApiKeysInDb = false, enterpriseEnabled = false) {
 }
 
 describe("BulkKeyEditor", () => {
+  it("rejects zero-dollar model limits in the editor", async () => {
+    renderEditor(false, true);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Replace per-model budgets" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add model budget" }));
+    fireEvent.change(screen.getByLabelText("Budget model 1"), {
+      target: { value: "opus" },
+    });
+    const amount = screen.getByLabelText("Model budget 1 (USD)");
+    fireEvent.change(amount, { target: { value: "0" } });
+    fireEvent.change(screen.getByLabelText("Model reset period 1"), {
+      target: { value: "2h" },
+    });
+    expect(amount).toBeInvalid();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    expect(api.bulkUpdateKeys).not.toHaveBeenCalled();
+    fireEvent.change(amount, { target: { value: "0.01" } });
+    expect(amount).toBeValid();
+  });
+
   it("preserves saved per-model budgets when another field is edited", async () => {
     vi.mocked(api.listAllKeys).mockResolvedValue({
       keys: [

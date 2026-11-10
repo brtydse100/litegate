@@ -160,8 +160,10 @@ are available alongside custom duration input.
 With `LITELLM_ENTERPRISE_ENABLED=true`, **Per-model budgets** lets administrators
 set a model alias, dollar limit, and its own reset period: for example, $25 for
 `claude-opus` every `2h`. Model spending still counts toward the overall key
-budget, so reaching either limit can block a request. A single selected key's
-saved model budgets are shown. Select **Replace per-model budgets** to edit them;
+budget. Amounts must be greater than zero: LiteLLM treats zero as unlimited, so
+the editor and API reject it. To deny model access, edit **Allowed models**.
+Reaching either the model or overall key budget can block a request. A single
+selected key's saved model budgets are shown. Select **Replace per-model budgets** to edit them;
 this replaces the complete mapping for every selected key, including keys on
 other pages. Removing all rows while replacement is selected clears per-model
 limits. Leaving replacement unchecked preserves them. Changing the key selection

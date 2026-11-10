@@ -6,6 +6,7 @@ describe("model budget validation", () => {
     { model: "", amount: "25", period: "2h" },
     { model: "opus", amount: "", period: "2h" },
     { model: "opus", amount: "-1", period: "2h" },
+    { model: "opus", amount: "0", period: "2h" },
     { model: "opus", amount: "Infinity", period: "2h" },
     { model: "opus", amount: "NaN", period: "2h" },
     { model: "opus", amount: "25", period: "0h" },
@@ -23,15 +24,15 @@ describe("model budget validation", () => {
     ).toThrow("Each model can have only one budget.");
   });
 
-  it("retains zero limits and independent periods for multiple models", () => {
+  it("retains positive fractional limits and independent periods for multiple models", () => {
     expect(
       parseModelBudgets([
         { model: " opus ", amount: "25.5", period: "2h" },
-        { model: "other", amount: "0", period: "30d" },
+        { model: "other", amount: "0.01", period: "30d" },
       ]),
     ).toEqual({
       opus: { budget_limit: 25.5, time_period: "2h" },
-      other: { budget_limit: 0, time_period: "30d" },
+      other: { budget_limit: 0.01, time_period: "30d" },
     });
   });
 });

@@ -66,6 +66,7 @@ def test_model_budgets_survive_validation_without_changing_overall_budget():
         None,
         {"": {"budget_limit": 25, "time_period": "2h"}},
         {" opus ": {"budget_limit": 25, "time_period": "2h"}},
+        {"opus": {"budget_limit": 0, "time_period": "2h"}},
         {"opus": {"budget_limit": -1, "time_period": "2h"}},
         {"opus": {"budget_limit": float("inf"), "time_period": "2h"}},
         {"opus": {"budget_limit": float("nan"), "time_period": "2h"}},
@@ -80,6 +81,22 @@ def test_model_budgets_survive_validation_without_changing_overall_budget():
 def test_invalid_model_budgets_are_rejected(budgets):
     with pytest.raises(ValidationError):
         KeySettingsUpdate(model_max_budget=budgets)
+
+
+async def test_zero_model_budget_is_rejected_at_http_boundary(monkeypatch):
+    monkeypatch.setattr(settings, "litellm_enterprise_enabled", True)
+    monkeypatch.setattr(settings, "management_api_key", "synthetic-test-management")
+    _key_ops.clear()
+    with patch("app.routers.api_v1.key_budgets.update_key", new=AsyncMock()) as update:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as client:
+            response = await client.patch(
+                "/api/v1/keys/bulk",
+                headers={"X-API-Key": "synthetic-test-management"},
+                json={"keys": ["key-1"], "settings": {"model_max_budget": {"opus": {"budget_limit": 0, "time_period": "2h"}}}},
+            )
+    assert response.status_code == 422
+    assert any(error["loc"][-1] == "budget_limit" for error in response.json()["detail"])
+    update.assert_not_awaited()
 
 
 @pytest.mark.parametrize("budgets", [BUDGETS, {}])
