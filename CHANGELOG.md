@@ -7,6 +7,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-11-12
+
+### Added
+
+- Optional per-model key budgets with independent reset periods, governed by
+  the default-off `LITELLM_ENTERPRISE_ENABLED` flag and an upstream Enterprise license.
+- Discovered Advanced key/team settings from the installed LiteLLM OpenAPI,
+  including supported MCP settings and team-member allowance defaults, with
+  generated controls, explicit edits, bounded caching and schema validation.
+- Lightweight organization children/detail endpoints and progressive branch
+  loading with cached revisits and deferred users/usage requests.
+
+### Changed
+
+- Key policies use one page scrollbar and cache selection calculations while editing.
+- Distinguish selected-team spend from subtree usage aggregates. Keep familiar
+  policy controls available when schema discovery fails.
+- Reject self-service regeneration for keys with model budgets to preserve
+  their limits and usage windows; reject misleading zero-dollar model limits.
+
+### Fixed
+
+- Preserve existing member-budget associations and metadata during unrelated
+  Advanced MCP team updates on LiteLLM versions with metadata-backed settings.
+- Preserve supported nested schema constraints and omit unsupported fields
+  instead of advertising weakened validation.
+
 ## [2.17.0] - 2026-11-08
 
 ### Added
@@ -458,7 +485,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.17.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.18.0...HEAD
+[2.18.0]: https://github.com/brtydse100/litegate/compare/v2.17.0...v2.18.0
 [2.17.0]: https://github.com/brtydse100/litegate/compare/v2.16.0...v2.17.0
 [2.13.0]: https://github.com/brtydse100/litegate/compare/v2.12.2...v2.13.0
 [2.12.0]: https://github.com/brtydse100/litegate/compare/v2.11.0...v2.12.0

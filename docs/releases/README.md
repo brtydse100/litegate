@@ -6,6 +6,7 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.18.0](v2.18.0.md) | Per-model key budgets, discovered Advanced policy fields, and progressive organization loading |
 | [2.17.0](v2.17.0.md) | Independent portal messages, shared login logo, single key action, Docker hierarchy guides, and repaired nightly E2E |
 | [2.16.0](v2.16.0.md) | Exact Model Hub URLs and configurable per-key concurrency defaults |
 | [2.15.4](v2.15.4.md) | Stored-key identifier preservation and no-login startup hierarchy migration (prepared) |
