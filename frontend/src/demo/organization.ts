@@ -1,5 +1,7 @@
 import type {
   OrganizationGroup,
+  OrganizationChildren,
+  OrganizationGroupDetail,
   OrganizationOverview,
   OrganizationUsage,
   OrganizationUserPage,
@@ -352,5 +354,40 @@ export function organizationUsage(
     users: selected.length,
     attribution: "current_membership",
     issues: [],
+  };
+}
+
+export function organizationChildren(
+  parent?: string | null,
+): OrganizationChildren {
+  const overview = organizationOverview();
+  return {
+    ...overview,
+    groups: overview.groups
+      .filter((group) => group.parent_id === (parent ?? null))
+      .map((group) => {
+        const metadata = { ...group };
+        Reflect.deleteProperty(metadata, "group_spend");
+        Reflect.deleteProperty(metadata, "sync_error");
+        return {
+          ...metadata,
+          has_children: groups.some((child) => child.parent_id === group.id),
+        };
+      }),
+  };
+}
+
+export function organizationGroup(nodeId: string): OrganizationGroupDetail {
+  const group = organizationOverview().groups.find(
+    (value) => value.id === nodeId,
+  );
+  if (!group) throw new Error("Organization group not found");
+  return {
+    ...group,
+    has_children: groups.some((child) => child.parent_id === group.id),
+    spend_scope: "team",
+    group_spend: members
+      .filter((member) => member.node === nodeId)
+      .reduce((sum, member) => sum + member.budget_spend, 0),
   };
 }

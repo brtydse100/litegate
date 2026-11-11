@@ -272,14 +272,20 @@ async def run_reconciliation() -> None:
         await reconciliation_attempt()
 
 
+def changes_inherited_allowance(changes: dict) -> bool:
+    # Newly discovered budget knobs must not silently bypass the configured
+    # allowance. Separate model caps/routing cannot widen the overall key cap.
+    return any("budget" in field.lower() and field not in {"model_max_budget", "budget_fallbacks"} for field in changes)
+
+
 def guard_team(team_id: str, changes: dict | None = None) -> None:
-    if settings.organization_hierarchy.is_managed_team(team_id) and (changes is None or {"max_budget", "budget_duration"}.intersection(changes)):
+    if settings.organization_hierarchy.is_managed_team(team_id) and (changes is None or changes_inherited_allowance(changes)):
         raise HTTPException(status_code=409, detail="This team's membership and budget are managed by organizationHierarchy")
 
 
 async def guard_key(key: str, changes: dict, *, use_key_budget_only: bool = False) -> None:
     if not settings.organization_hierarchy.levels or (
-        not use_key_budget_only and not {"team_id", "max_budget", "budget_duration"}.intersection(changes)
+        not use_key_budget_only and "team_id" not in changes and not changes_inherited_allowance(changes)
     ):
         return
     info = await litellm.get_key_info(key)

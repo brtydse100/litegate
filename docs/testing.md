@@ -1,5 +1,36 @@
 # Testing strategy
 
+## Dynamic policies and progressive organization navigation
+
+The policy-schema tests cover discovery from the configured upstream only,
+bounded caching/document size/depth, local reference resolution, nullable unions,
+nested validation constraints, unknown/secret field rejection, administrator-only
+access, Enterprise/positive-model-budget checks, and organization-owned allowance
+guards. A synthetic later-version schema verifies that new advertised fields can
+be discovered and saved without adding a field definition to LiteGate.
+
+Frontend tests cover lazy Advanced discovery, opt-in changes, JSON/MCP validation,
+nullable clearing, safe saved-value projection and metadata-backed fields,
+offline fallback, and target changes discarding drafts. Browser tests combine
+Advanced MCP settings with the familiar key model-budget control and exercise
+team member-budget defaults in the generated editor.
+
+Organization tests assert that initial roots and direct-child metadata require
+no LiteLLM team reads, selected details read only the selected team, and reports
+stay disabled before explicit selection. A real-browser regression holds a child
+response unresolved while verifying that roots are already visible, then checks
+progressive expansion and cached reopening. Existing subtree usage and user
+pagination contracts remain covered separately from own-team spend display.
+
+Local compatibility testing against the pinned LiteLLM 1.98.0 image additionally
+used isolated mock license verification, PostgreSQL, and synthetic model calls.
+It verified key per-model cap enforcement, key/team MCP settings persistence,
+member allowance defaults, and preserving a member-budget association while
+updating an unrelated metadata-backed MCP setting. This is simulated Enterprise
+activation, not genuine license validation or an external MCP tool invocation.
+That version advertises no per-model team-member budget; key per-model budgets
+and the advertised member defaults are tested instead.
+
 LiteGate tests are organized around observable behavior first. Internal unit
 tests are useful for calculations and edge cases, but they do not replace the
 public contracts that users and automation depend on.

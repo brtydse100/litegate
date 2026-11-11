@@ -46,7 +46,7 @@ def token(role="user", user_id="u"):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("path", ["", "/users", "/usage"])
+@pytest.mark.parametrize("path", ["", "/users", "/usage", "/children", "/groups/missing"])
 async def test_organization_endpoints_reject_anonymous_users_and_key_identities(monkeypatch, path):
     monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"user_id": "u"}))
     async with client() as browser:
@@ -299,3 +299,25 @@ async def test_an_older_inflight_login_cannot_restore_removed_verified_groups(mo
             release.set()
             await earlier
     upstream_sync.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_admin_reads_lazy_roots_children_and_only_selected_team(monkeypatch):
+    fetch = AsyncMock(return_value={"team_info": {"spend": 12}})
+    monkeypatch.setattr(upstream, "team_info", fetch)
+    async with client() as browser:
+        response = await browser.get("/api/v1/organization/children", headers=token("admin"))
+        assert response.status_code == 200
+        roots = response.json()["groups"]
+        assert roots and all(group["parent_id"] is None for group in roots)
+        fetch.assert_not_awaited()
+        root = roots[0]
+        response = await browser.get("/api/v1/organization/children", params={"parent": root["id"]}, headers=token("admin"))
+        assert response.status_code == 200
+        assert all(group["parent_id"] == root["id"] for group in response.json()["groups"])
+        fetch.assert_not_awaited()
+        response = await browser.get("/api/v1/organization/groups/" + root["id"], headers=token("admin"))
+        assert response.status_code == 200
+        assert response.json()["spend_scope"] == "team"
+        assert response.json()["group_spend"] == 12
+        fetch.assert_awaited_once_with(root["team_id"])

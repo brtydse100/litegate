@@ -32,8 +32,75 @@ Markdown are not interpreted. `logo_url` is shared with `/api/portal-config` and
 used as an image URL. These values are visible before sign-in; do not include
 secrets. See [login-page customization](docs/configuration.md#login-page-customization).
 
+## Discovered policy settings
+
+`GET /api/v1/policy-schemas` requires an administrator portal session or the
+installation management credential. Ordinary users and LiteLLM-key identities
+receive HTTP 403. It reads only the configured LiteLLM `/openapi.json` endpoint
+and returns sanitized request schemas for `key_update`, `team_create`, and
+`team_update`:
+
+```json
+{
+  "available": true,
+  "schemas": {
+    "key_update": { "type": "object", "properties": { "max_parallel_requests": { "type": "integer" } } },
+    "team_create": { "type": "object", "properties": {} },
+    "team_update": { "type": "object", "properties": {} }
+  }
+}
+```
+
+The example is abbreviated; actual properties come from the installed proxy.
+Failures return HTTP 200 with `available: false`, empty `schemas`, and a generic
+`detail`. Successful discovery is cached for five minutes; failures for 30 seconds.
+Only local references are resolved. Request identifiers, owner/member bindings,
+spend counters, credential lifecycle, secret-bearing/opaque configuration,
+read-only and write-only properties, and defaults are excluded. Unknown schema
+constraints are omitted safely rather than weakened.
+
+Key bulk settings and team creation/update payloads accept an optional
+`advanced_settings` mapping. For example:
+
+```json
+{
+  "keys": ["key-1"],
+  "settings": {
+    "advanced_settings": {
+      "max_parallel_requests": 3,
+      "mcp_rpm_limit": { "configured-mcp-alias": 10 }
+    }
+  }
+}
+```
+
+Only fields advertised for that operation are accepted. Unknown, protected,
+duplicate core/Advanced fields, or invalid values return HTTP 422; unavailable
+discovery returns HTTP 503 before mutation. A mapping accepts at most 100 fields
+and 64 KiB of serialized JSON. Nested values are schema-validated and replace the
+complete field; explicit null is accepted only where the schema permits it.
+LiteLLM defines clearing semantics and cross-field behavior. Existing fixed
+controls work without schema discovery when no Advanced settings are supplied.
+
+Advanced values are flattened into the native request before existing hierarchy
+and Enterprise checks. Organization-controlled allowances cannot be replaced by
+new budget-related knobs. Known per-model budget amounts remain positive and
+require `LITELLM_ENTERPRISE_ENABLED=true`. Team Advanced updates preserve existing
+metadata and member allowances; inability to verify an existing member allowance
+returns HTTP 503 without applying the update. Only user-edited field names are
+audited, without submitted values. See [the focused guide](docs/dynamic-policy-editors.md).
+
 ## Organization reporting
 
+- `GET /api/v1/organization/children?parent=<id>`: lightweight direct-child
+  metadata. Omit `parent` for roots. Returns `enabled`, `levels`, `groups`,
+  `total_users` and `issues`; groups include `has_children` and configured
+  allowance/membership metadata, with no live spend or descendant LiteLLM reads.
+- `GET /api/v1/organization/groups/{id}`: the selected group's metadata and
+  current team spend/status. Reads only that team's live details; returns
+  `has_children` and `spend_scope: "team"`. `group_spend` here is that team's own
+  spend, not a descendant aggregate. Upstream failures appear as that group's
+  `sync_error` and unavailable spend so other branches remain navigable.
 - `GET /api/v1/organization`: configured levels/groups, effective allowances,
   aggregate team/descendant cycle spend, tracking targets, member counts, and synchronization issues. When disabled,
   returns `enabled: false`.

@@ -174,6 +174,13 @@ Keys with per-model budgets require administrator-assisted rotation in LiteLLM;
 LiteGate rejects self-service regeneration to avoid dropping limits or resetting
 their usage windows.
 
+**Advanced settings** in the key and team editors discovers additional fields
+from the connected LiteLLM installation. Enable individual edits; untouched
+values stay unchanged. Common types get generated controls, while nested values
+use JSON. Discovery failures leave familiar controls available. See
+[discovered policy fields](dynamic-policy-editors.md) for MCP, member defaults,
+schema caching, validation and protected fields.
+
 Select **Use key budget as the individual allowance** to remove a duplicate
 personal user cap and the owner's team-member cap for the key's team. This
 requires one key per owner and a finite key budget; shared team budgets still

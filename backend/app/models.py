@@ -128,6 +128,7 @@ class ModelBudget(BaseModel):
 
 
 class KeySettingsUpdate(BaseModel):
+    advanced_settings: Optional[dict[str, Any]] = Field(default=None, max_length=100)
     key_alias: Optional[str] = Field(default=None, max_length=128)
     models: Optional[List[str]] = None
     max_budget: Optional[float] = Field(default=None, ge=0)
@@ -226,6 +227,7 @@ class ApiKeyCreateRequest(BaseModel):
 
 
 class TeamCreateRequest(BaseModel):
+    advanced_settings: Optional[dict[str, Any]] = Field(default=None, max_length=100)
     team_alias: str = Field(min_length=1, max_length=128)
     team_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
     models: List[str] = Field(default_factory=list)
@@ -250,6 +252,7 @@ class TeamCreateRequest(BaseModel):
 
 
 class TeamUpdateRequest(BaseModel):
+    advanced_settings: Optional[dict[str, Any]] = Field(default=None, max_length=100)
     team_alias: Optional[str] = Field(default=None, min_length=1, max_length=128)
     models: Optional[List[str]] = None
     max_budget: Optional[float] = Field(default=None, ge=0)

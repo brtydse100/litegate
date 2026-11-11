@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import { ChevronRight, Network, Users } from "lucide-react";
 import { api } from "../api/client";
-import type { OrganizationGroup } from "../types/organization";
+import type { OrganizationNode } from "../types/organization";
 import {
   metricLabels,
   metricValue,
@@ -17,10 +17,10 @@ const money = (value: number | null) =>
   value === null ? "No cap" : metricValue(value, "spend");
 
 function treeOrder(
-  groups: OrganizationGroup[],
+  groups: OrganizationNode[],
   expanded: Set<string>,
   parent: string | null = null,
-): OrganizationGroup[] {
+): OrganizationNode[] {
   return groups
     .filter((group) => group.parent_id === parent)
     .flatMap((group) => [
@@ -31,7 +31,10 @@ function treeOrder(
 
 export default function AdminOrganization() {
   const today = new Date().toISOString().slice(0, 10);
-  const [nodeId, setNodeId] = useState("");
+  const [nodeId, setNodeId] = useState<string | null>(null);
+  const [requestedParents, setRequestedParents] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [page, setPage] = useState(1);
   const [metric, setMetric] = useState<UsageMetric>("spend");
@@ -40,43 +43,65 @@ export default function AdminOrganization() {
   );
   const [endDate, setEndDate] = useState(today);
   const overview = useQuery({
-    queryKey: ["organization"],
-    queryFn: api.organization,
-    refetchInterval: 60000,
+    queryKey: ["organization-children", ""],
+    queryFn: () => api.organizationChildren(),
+    staleTime: 60000,
+  });
+  const childQueries = useQueries({
+    queries: [...requestedParents].map((parent) => ({
+      queryKey: ["organization-children", parent],
+      queryFn: () => api.organizationChildren(parent),
+      staleTime: 60000,
+    })),
   });
   const enabled = overview.data?.enabled === true;
-  const groups = overview.data?.groups ?? [];
+  const groups = [
+    ...(overview.data?.groups ?? []),
+    ...childQueries.flatMap((query) => query.data?.groups ?? []),
+  ];
+  const detail = useQuery({
+    queryKey: ["organization-group", nodeId],
+    queryFn: () => api.organizationGroup(nodeId!),
+    enabled: enabled && !!nodeId && groups.some((group) => group.id === nodeId),
+    staleTime: 60000,
+  });
   const validSelection = !nodeId || groups.some((group) => group.id === nodeId);
-  if (overview.data && !validSelection) {
-    setNodeId("");
+  if (!validSelection) {
+    setNodeId(null);
     setPage(1);
   }
+  const reportEnabled = enabled && nodeId !== null && validSelection;
   const usage = useQuery({
     queryKey: ["organization-usage", nodeId, startDate, endDate],
-    queryFn: () => api.organizationUsage(nodeId, startDate, endDate),
-    enabled: enabled && validSelection,
+    queryFn: () => api.organizationUsage(nodeId ?? "", startDate, endDate),
+    enabled: reportEnabled,
     staleTime: 60000,
   });
   const users = useQuery({
     queryKey: ["organization-users", nodeId, page],
-    queryFn: () => api.organizationUsers(nodeId, page),
-    enabled: enabled && validSelection,
-    refetchInterval: 60000,
+    queryFn: () => api.organizationUsers(nodeId ?? "", page),
+    enabled: reportEnabled,
+    staleTime: 60000,
   });
   const selected = groups.find((group) => group.id === nodeId);
+  const selectedDetail = detail.data;
   const budgetSource = groups.find(
     (group) => group.id === selected?.budget_source,
   );
   const nextLevel = overview.data?.levels[(selected?.level ?? -1) + 1];
-  const showMembers =
-    !!selected && !groups.some((group) => group.parent_id === selected.id);
+  const showMembers = !!selected && !selected.has_children;
   const hasMemberUsage = Array.isArray(usage.data?.by_user);
 
+  function requestChildren(id: string) {
+    if (!groups.find((group) => group.id === id)?.has_children) return;
+    setRequestedParents((current) => new Set(current).add(id));
+  }
   function selectGroup(id: string) {
     setNodeId(id);
     setPage(1);
+    requestChildren(id);
     setExpanded((current) => {
-      const next = new Set(current);
+      const next = new Set(current).add(id);
       let parent = groups.find((group) => group.id === id)?.parent_id;
       while (parent) {
         next.add(parent);
@@ -86,9 +111,10 @@ export default function AdminOrganization() {
     });
   }
   function toggleGroup(id: string) {
+    if (!expanded.has(id)) selectGroup(id);
     setExpanded((current) => {
       const next = new Set(current);
-      if (next.has(id)) next.delete(id);
+      if (expanded.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
@@ -157,9 +183,9 @@ export default function AdminOrganization() {
             <button
               type="button"
               aria-label={`All groups, ${overview.data?.total_users} users`}
-              aria-pressed={!nodeId}
+              aria-pressed={nodeId === ""}
               onClick={() => selectGroup("")}
-              className={`flex w-full justify-between rounded-md px-3 py-2 text-sm ${!nodeId ? "bg-indigo-50 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-50"}`}
+              className={`flex w-full justify-between rounded-md px-3 py-2 text-sm ${nodeId === "" ? "bg-indigo-50 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-50"}`}
             >
               All groups<span>{overview.data?.total_users}</span>
             </button>
@@ -169,7 +195,7 @@ export default function AdminOrganization() {
                 style={{ paddingLeft: 4 + group.level * 14 }}
                 className={`flex items-center rounded-md text-sm ${nodeId === group.id ? "bg-indigo-50 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-50"}`}
               >
-                {groups.some((child) => child.parent_id === group.id) ? (
+                {group.has_children ? (
                   <button
                     type="button"
                     aria-label={`${expanded.has(group.id) ? "Collapse" : "Expand"} ${group.path.join(" → ")}`}
@@ -202,6 +228,28 @@ export default function AdminOrganization() {
                 </button>
               </div>
             ))}
+            {childQueries.map((query, index) =>
+              query.isPending || query.error ? (
+                <div
+                  key={[...requestedParents][index]}
+                  className="p-2 text-xs text-slate-500"
+                >
+                  {query.error ? (
+                    <p role="alert">
+                      {query.error.message}{" "}
+                      <button
+                        type="button"
+                        onClick={() => void query.refetch()}
+                      >
+                        Retry children
+                      </button>
+                    </p>
+                  ) : (
+                    "Loading child groups..."
+                  )}
+                </div>
+              ) : null,
+            )}
           </nav>
         </aside>
         <div className="min-w-0 space-y-5">
@@ -217,6 +265,23 @@ export default function AdminOrganization() {
               <span>All groups</span>
             )}
           </div>
+          {nodeId === null && (
+            <p className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-500">
+              Select a group to load its details, usage, and users, or choose
+              All groups for an organization report.
+            </p>
+          )}
+          {detail.isFetching && (
+            <p className="text-sm text-slate-500">Loading team details...</p>
+          )}
+          {detail.error && (
+            <p role="alert">
+              {detail.error.message}{" "}
+              <button type="button" onClick={() => void detail.refetch()}>
+                Retry details
+              </button>
+            </p>
+          )}
           {selected && (
             <section
               aria-label="Effective budget policy"
@@ -245,20 +310,20 @@ export default function AdminOrganization() {
                     {selected.name} tracking target
                   </p>
                   <p className="mt-1 font-semibold text-slate-950">
-                    {selected.group_spend === null
+                    {!selectedDetail || selectedDetail.group_spend === null
                       ? "Unavailable"
-                      : metricValue(selected.group_spend, "spend")}{" "}
+                      : metricValue(selectedDetail.group_spend!, "spend")}{" "}
                     / {money(selected.group_total)}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Combined team and descendant usage. Tracking only; ancestor
-                    targets do not block keys.
+                    Own-team budget-period spend; excludes descendant teams.
+                    Tracking only; ancestor targets do not block keys.
                   </p>
                 </div>
               </div>
-              {selected.sync_error && (
+              {selectedDetail?.sync_error && (
                 <p role="alert" className="mt-3 text-sm text-amber-800">
-                  {selected.sync_error}
+                  {selectedDetail?.sync_error}
                 </p>
               )}
             </section>
@@ -316,10 +381,13 @@ export default function AdminOrganization() {
               role="alert"
               className="rounded-lg bg-red-50 p-4 text-sm text-red-700"
             >
-              {usage.error.message}
+              {usage.error.message}{" "}
+              <button type="button" onClick={() => void usage.refetch()}>
+                Retry usage
+              </button>
             </p>
           )}
-          {usage.isPending && (
+          {reportEnabled && usage.isPending && (
             <p className="text-sm text-slate-500">Loading usage…</p>
           )}
           {usage.data && (
@@ -371,96 +439,101 @@ export default function AdminOrganization() {
               </div>
             </>
           )}
-          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <h2 className="flex items-center gap-2 border-b border-slate-200 p-4 text-sm font-semibold text-slate-950">
-              <Users size={16} /> Users{" "}
-              <span className="text-slate-500">
-                (
-                {users.data?.total ??
-                  selected?.members ??
-                  overview.data?.total_users}
-                )
-              </span>
-            </h2>
-            {users.error ? (
-              <p role="alert" className="p-4 text-sm text-red-700">
-                {users.error.message}
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500">
-                    <tr>
-                      <th className="px-4 py-3">User</th>
-                      <th className="px-4 py-3">Organization</th>
-                      <th className="px-4 py-3">
-                        Budget-period spend / per-key allowance
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {users.data?.users.map((user) => (
-                      <tr key={user.user_id}>
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-slate-800">
-                            {user.email || user.user_id}
-                          </p>
-                          {user.email && (
-                            <p className="mt-1 text-slate-500">
-                              {user.user_id}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {user.path.join(" → ")}
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-slate-800">
-                            {user.budget_spend === null
-                              ? "Unavailable"
-                              : metricValue(user.budget_spend, "spend")}{" "}
-                            / {money(user.per_user)}
-                          </p>
-                          {user.sync_error && (
-                            <p className="mt-1 text-amber-700">
-                              {user.sync_error}
-                            </p>
-                          )}
-                        </td>
+          {reportEnabled && (
+            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+              <h2 className="flex items-center gap-2 border-b border-slate-200 p-4 text-sm font-semibold text-slate-950">
+                <Users size={16} /> Users{" "}
+                <span className="text-slate-500">
+                  (
+                  {users.data?.total ??
+                    selected?.members ??
+                    overview.data?.total_users}
+                  )
+                </span>
+              </h2>
+              {users.error ? (
+                <p role="alert" className="p-4 text-sm text-red-700">
+                  {users.error.message}{" "}
+                  <button type="button" onClick={() => void users.refetch()}>
+                    Retry users
+                  </button>
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3">User</th>
+                        <th className="px-4 py-3">Organization</th>
+                        <th className="px-4 py-3">
+                          Budget-period spend / per-key allowance
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!users.isPending && !users.data?.users.length && (
-                  <p className="p-6 text-center text-sm text-slate-500">
-                    No mapped users in this group yet. SSO users appear after
-                    signing in.
-                  </p>
-                )}
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {users.data?.users.map((user) => (
+                        <tr key={user.user_id}>
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-slate-800">
+                              {user.email || user.user_id}
+                            </p>
+                            {user.email && (
+                              <p className="mt-1 text-slate-500">
+                                {user.user_id}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {user.path.join(" → ")}
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="text-slate-800">
+                              {user.budget_spend === null
+                                ? "Unavailable"
+                                : metricValue(user.budget_spend, "spend")}{" "}
+                              / {money(user.per_user)}
+                            </p>
+                            {user.sync_error && (
+                              <p className="mt-1 text-amber-700">
+                                {user.sync_error}
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {!users.isPending && !users.data?.users.length && (
+                    <p className="p-6 text-center text-sm text-slate-500">
+                      No mapped users in this group yet. SSO users appear after
+                      signing in.
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage(page - 1)}
+                  className="disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {page} of {users.data?.total_pages ?? 1}
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= (users.data?.total_pages ?? 1)}
+                  onClick={() => setPage(page + 1)}
+                  className="disabled:opacity-40"
+                >
+                  Next
+                </button>
               </div>
-            )}
-            <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-                className="disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <span>
-                Page {page} of {users.data?.total_pages ?? 1}
-              </span>
-              <button
-                type="button"
-                disabled={page >= (users.data?.total_pages ?? 1)}
-                onClick={() => setPage(page + 1)}
-                className="disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </section>
+            </section>
+          )}
         </div>
       </div>
     </div>

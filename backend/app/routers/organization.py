@@ -16,6 +16,21 @@ async def organization_overview(actor: ApiActor = Depends(get_api_actor)):
     return await organization_reports.overview()
 
 
+@router.get("/children")
+async def organization_children(
+    parent: str | None = Query(default=None, max_length=24),
+    actor: ApiActor = Depends(get_api_actor),
+):
+    require_api_admin(actor)
+    return await organization_reports.children(parent)
+
+
+@router.get("/groups/{node_id}")
+async def organization_group(node_id: str, actor: ApiActor = Depends(get_api_actor)):
+    require_api_admin(actor)
+    return await organization_reports.group_detail(node_id)
+
+
 @router.get("/users")
 async def organization_users(
     node: str | None = Query(default=None, max_length=24),

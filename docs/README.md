@@ -7,6 +7,7 @@ Use this page as the entry point for detailed LiteGate documentation.
 | Guide | Use it when you want to... |
 | --- | --- |
 | [Features and access model](features.md) | Understand what users, administrators, and agents can do |
+| [Discovered policy fields](dynamic-policy-editors.md) | Edit additional key/team settings advertised by your LiteLLM installation |
 | [Authentication and security](authentication.md) | Configure OIDC, local users, roles, or API credentials |
 | [Configuration reference](configuration.md) | Set portal behavior, key defaults, and integrations |
 | [Deployment guide](../DEPLOYMENT.md) | Run LiteGate with Docker Compose or Kubernetes/Helm |
