@@ -1,6 +1,9 @@
 import type { AuditEvent, KeyInfo, LocalUser, TeamInfo, User } from "../types";
+import { demoAdvancedSettings, demoPolicySchemas } from "./policySchemas";
 import {
   organizationOverview,
+  organizationChildren,
+  organizationGroup,
   organizationUsers,
   organizationUsage,
   organizationKeyPolicy,
@@ -226,12 +229,30 @@ async function mockResponse(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
+  if (path === "/api/v1/policy-schemas") {
+    if (!signedIn) return json({ detail: "Not signed in" }, 401);
+    if (demoUser.role !== "admin")
+      return json({ detail: "Administrator access required" }, 403);
+    return method === "GET"
+      ? json(demoPolicySchemas)
+      : json({ detail: "Method not allowed" }, 405);
+  }
   if (path.startsWith("/api/v1/organization")) {
     if (!signedIn) return json({ detail: "Not signed in" }, 401);
     if (demoUser.role !== "admin")
       return json({ detail: "Administrator access required" }, 403);
     if (method !== "GET") return json({ detail: "Method not allowed" }, 405);
     if (path === "/api/v1/organization") return json(organizationOverview());
+    if (path === "/api/v1/organization/children")
+      return json(organizationChildren(url.searchParams.get("parent")));
+    if (path.startsWith("/api/v1/organization/groups/")) {
+      const group = organizationGroup(
+        decodeURIComponent(path.split("/").pop() ?? ""),
+      );
+      return group
+        ? json(group)
+        : json({ detail: "Organization group not found" }, 404);
+    }
     if (path.endsWith("/users"))
       return json(
         organizationUsers(
@@ -373,7 +394,9 @@ async function mockResponse(request: Request): Promise<Response> {
   if (path === "/api/v1/keys/bulk" && method === "PATCH") {
     const payload = await body(request);
     const targetKeys = (payload.keys as string[]) ?? [];
-    const settings = (payload.settings as Record<string, unknown>) ?? {};
+    const settings = demoAdvancedSettings(
+      (payload.settings as Record<string, unknown>) ?? {},
+    );
     installationKeys = installationKeys.map((key) =>
       targetKeys.includes(key.token ?? key.key ?? "")
         ? { ...key, ...settings }
@@ -478,6 +501,7 @@ async function mockResponse(request: Request): Promise<Response> {
   if (path === "/api/v1/teams" && method === "POST") {
     const payload = await body(request);
     const created: TeamInfo = {
+      ...demoAdvancedSettings({ advanced_settings: payload.advanced_settings }),
       team_id: String(payload.team_id || payload.team_alias)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-"),
@@ -514,7 +538,7 @@ async function mockResponse(request: Request): Promise<Response> {
   if (path.startsWith("/api/v1/teams/")) {
     const teamId = decodeURIComponent(path.split("/").pop() ?? "");
     if (method === "PATCH") {
-      const payload = await body(request);
+      const payload = demoAdvancedSettings(await body(request));
       let updated = teams.find((team) => team.team_id === teamId);
       teams = teams.map((team) => {
         if (team.team_id !== teamId) return team;

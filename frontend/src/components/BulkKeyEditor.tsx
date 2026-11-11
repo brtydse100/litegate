@@ -1,4 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import AdvancedPolicySettings, {
+  type AdvancedPolicyHandle,
+} from "./AdvancedPolicySettings";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -65,6 +68,7 @@ export default function BulkKeyEditor({
   enterpriseEnabled?: boolean;
 }) {
   const queryClient = useQueryClient();
+  const advanced = useRef<AdvancedPolicyHandle>(null);
   const { operationsBlocked, retryAfter, refreshOperationLimit } =
     useOperationLimit();
   const [editorOpen, setEditorOpen] = useState(expanded);
@@ -201,6 +205,9 @@ export default function BulkKeyEditor({
 
   function settingsFromForm(): KeySettingsUpdate {
     const settings: KeySettingsUpdate = {};
+    const advancedSettings = advanced.current?.read() ?? {};
+    if (Object.keys(advancedSettings).length)
+      settings.advanced_settings = advancedSettings;
     if (enterpriseEnabled && modelBudgetRows !== undefined)
       settings.model_max_budget = parseModelBudgets(modelBudgetRows);
     if (isChanged("alias") && alias.trim()) settings.key_alias = alias.trim();
@@ -851,6 +858,30 @@ export default function BulkKeyEditor({
                   can be retried.
                 </p>
               </div>
+              <AdvancedPolicySettings
+                key={selectionId}
+                ref={advanced}
+                operation="key_update"
+                excludedFields={[
+                  "key_alias",
+                  "models",
+                  "max_budget",
+                  "budget_duration",
+                  "tpm_limit",
+                  "rpm_limit",
+                  "duration",
+                  "blocked",
+                  "model_max_budget",
+                ]}
+                current={
+                  selected.length === 1
+                    ? {
+                        ...selectedVisibleKeys[0],
+                        ...selectedVisibleKeys[0]?.advanced_settings,
+                      }
+                    : undefined
+                }
+              />
               <button
                 disabled={
                   update.isPending || operationsBlocked || targetCount === 0

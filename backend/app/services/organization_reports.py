@@ -40,6 +40,51 @@ def within(node, ancestor) -> bool:
     return ancestor is None or node.path[: len(ancestor.path)] == ancestor.path
 
 
+def node_metadata(node, records) -> dict:
+    return {
+        "id": node.id,
+        "name": node.member.name,
+        "level": node.level,
+        "path": list(node.path),
+        "parent_id": node.parent_id,
+        "team_id": node.team_id,
+        "members": sum(within(member, node) for _, member in records),
+        "per_user": node.per_user,
+        "duration": node.duration,
+        "budget_source": node.budget_source,
+        "group_total": node.member.budget.groupTotal,
+        "has_children": any(child.parent_id == node.id for child in settings.organization_hierarchy.nodes.values()),
+    }
+
+
+async def children(parent_id: str | None) -> dict:
+    selected_nodes(parent_id)
+    tree = settings.organization_hierarchy
+    records, errors = await identities()
+    return {
+        "enabled": bool(tree.levels),
+        "levels": [level.name for level in tree.levels],
+        "groups": [node_metadata(node, records) for node in tree.nodes.values() if node.parent_id == parent_id],
+        "total_users": len(records),
+        "issues": errors,
+    }
+
+
+async def group_detail(node_id: str) -> dict:
+    node = selected_nodes(node_id)
+    records, _ = await identities()
+    result = {**node_metadata(node, records), "group_spend": None, "sync_error": None, "spend_scope": "team"}
+    try:
+        info = await upstream.team_info(node.team_id)
+        team = info.get("team_info", {})
+        result["group_spend"] = upstream.finite_number(team.get("spend"))
+        if team.get("max_budget") is not None or team.get("budget_duration") != node.duration:
+            result["sync_error"] = "LiteLLM's team policy migration is pending"
+    except HTTPException as exc:
+        result["sync_error"] = str(exc.detail)
+    return result
+
+
 async def overview() -> dict:
     tree = settings.organization_hierarchy
     records, errors = await identities()

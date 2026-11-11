@@ -56,3 +56,22 @@ export interface OrganizationUsage {
   attribution: "current_membership";
   issues: Array<{ user_id: string; error: string }>;
 }
+
+export interface OrganizationNode extends Omit<
+  OrganizationGroup,
+  "group_spend" | "sync_error"
+> {
+  has_children: boolean;
+}
+
+export interface OrganizationChildren extends Omit<
+  OrganizationOverview,
+  "groups"
+> {
+  groups: OrganizationNode[];
+}
+
+export interface OrganizationGroupDetail extends OrganizationGroup {
+  has_children: boolean;
+  spend_scope: "team";
+}

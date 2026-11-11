@@ -1,5 +1,25 @@
 # Organization hierarchy and budgets
 
+## Progressive organization navigation
+
+The Organization page initially loads only root-group metadata from LiteGate's
+configured hierarchy and local identity records. It does not wait for live
+LiteLLM data for every internal team, and it does not request installation-wide
+usage or users before a selection.
+
+Select or expand a group to fetch its direct children and that team's current
+details. Deeper groups load the same way as you open them. Child lists, team
+details, users and usage have separate loading/error states and retry controls;
+navigation remains usable while a slow branch or chart request completes.
+Fetched branches and selected data are cached for 60 seconds for quick revisits.
+
+The current team's spend is labelled as **team spend**, not a descendant total.
+Usage charts aggregate the explicitly selected subtree over the selected date
+range. **All groups** is an explicit request for organization-wide reporting,
+which can be more expensive. Existing hierarchy policy and membership protections
+still apply. The legacy full-overview API remains available for existing clients;
+the page uses the lightweight children/detail endpoints described in [API.md](../API.md).
+
 LiteGate organizes users under configurable level labels and provides inherited
 per-key allowances, aggregate budget tracking, and administrative usage graphs.
 LiteLLM remains the source of truth for budgets, spend, and request enforcement.

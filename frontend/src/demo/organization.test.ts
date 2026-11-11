@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { organizationUsage, organizationUsers } from "./organization";
+import {
+  organizationUsage,
+  organizationUsers,
+  organizationChildren,
+  organizationGroup,
+} from "./organization";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -48,4 +53,21 @@ it("uses the same dated data for members, groups, models and daily totals", () =
 it("has no demo usage before the displayed budget period", () => {
   const report = organizationUsage("cloud", "2026-09-01", "2026-09-15");
   expect(report.totals).toEqual({ spend: 0, tokens: 0, requests: 0 });
+});
+
+it("returns only direct demo children and labels selected own-team spend", () => {
+  expect(organizationChildren().groups.map((group) => group.id)).toEqual([
+    "engineering",
+    "marketing",
+  ]);
+  expect(
+    organizationChildren("engineering").groups.map((group) => group.id),
+  ).toEqual(["infrastructure", "applications"]);
+  expect(organizationChildren("cloud").groups).toEqual([]);
+  expect(organizationGroup("engineering")).toMatchObject({
+    spend_scope: "team",
+    group_spend: 0,
+    has_children: true,
+  });
+  expect(organizationGroup("cloud").group_spend).toBe(29.93);
 });

@@ -36,6 +36,19 @@ async function request<T>(
 }
 
 export const api = {
+  policySchemas: () =>
+    request<import("../types").PolicySchemaResponse>("/v1/policy-schemas"),
+  organizationChildren: (parent?: string) => {
+    const params = new URLSearchParams();
+    if (parent) params.set("parent", parent);
+    return request<import("../types/organization").OrganizationChildren>(
+      `/v1/organization/children${params.size ? `?${params}` : ""}`,
+    );
+  },
+  organizationGroup: (nodeId: string) =>
+    request<import("../types/organization").OrganizationGroupDetail>(
+      `/v1/organization/groups/${encodeURIComponent(nodeId)}`,
+    ),
   organization: () =>
     request<import("../types/organization").OrganizationOverview>(
       "/v1/organization",

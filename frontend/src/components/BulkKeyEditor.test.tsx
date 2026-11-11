@@ -12,6 +12,7 @@ import BulkKeyEditor from "./BulkKeyEditor";
 
 vi.mock("../api/client", () => ({
   api: {
+    policySchemas: vi.fn(),
     listAllKeys: vi.fn(),
     listAllKeyIdentifiers: vi.fn(),
     bulkUpdateKeys: vi.fn(),
@@ -49,6 +50,50 @@ function renderEditor(saveApiKeysInDb = false, enterpriseEnabled = false) {
 }
 
 describe("BulkKeyEditor", () => {
+  it("submits only explicitly edited advanced settings and resets them when selection changes", async () => {
+    vi.mocked(api.policySchemas).mockResolvedValue({
+      available: true,
+      schemas: {
+        key_update: {
+          properties: {
+            new_limit: { type: "integer", minimum: 1 },
+            model_max_budget: { type: "object" },
+            key_alias: { type: "string" },
+          },
+        },
+      },
+    });
+    renderEditor(false, true);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select Alice" }),
+    );
+    fireEvent.click(screen.getByText("Advanced settings"));
+    fireEvent.click(await screen.findByLabelText("Edit new_limit"));
+    fireEvent.change(screen.getByLabelText("new_limit"), {
+      target: { value: "4" },
+    });
+    expect(
+      screen.queryByLabelText("Edit model_max_budget"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Edit key_alias")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Bob" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Deselect Bob" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
+    expect(await screen.findByLabelText("Edit new_limit")).not.toBeChecked();
+    fireEvent.click(screen.getByLabelText("Edit new_limit"));
+    fireEvent.change(screen.getByLabelText("new_limit"), {
+      target: { value: "8" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply settings to 1 key" }),
+    );
+    await waitFor(() =>
+      expect(api.bulkUpdateKeys).toHaveBeenCalledWith(["key-1"], {
+        advanced_settings: { new_limit: 8 },
+      }),
+    );
+    expect(api.policySchemas).toHaveBeenCalledTimes(1);
+  });
   it("rejects zero-dollar model limits in the editor", async () => {
     renderEditor(false, true);
     fireEvent.click(

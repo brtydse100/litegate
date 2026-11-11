@@ -12,6 +12,7 @@ import AdminTeams from "./AdminTeams";
 
 vi.mock("../api/client", () => ({
   api: {
+    policySchemas: vi.fn(),
     listTeams: vi.fn(),
     listModels: vi.fn(),
     getOperationLimit: vi.fn(),
@@ -23,6 +24,79 @@ vi.mock("../api/client", () => ({
 }));
 
 describe("team policy editing", () => {
+  it("discovers team model budgets, member defaults and MCP permissions without resending unedited fields", async () => {
+    vi.mocked(api.policySchemas).mockResolvedValue({
+      available: true,
+      schemas: {
+        team_update: {
+          properties: {
+            model_max_budget: { type: "object" },
+            team_member_budget: { type: "number" },
+            object_permission: { type: "object" },
+            new_flag: { type: "boolean" },
+            max_budget: { type: "number" },
+          },
+        },
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <AdminTeams />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
+    expect(await screen.findByLabelText("Edit model_max_budget")).toBeVisible();
+    expect(screen.getByLabelText("Edit team_member_budget")).not.toBeChecked();
+    expect(screen.queryByLabelText("Edit max_budget")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("Edit object_permission"));
+    fireEvent.change(screen.getByLabelText("object_permission"), {
+      target: { value: '{"mcp_servers":["local"]}' },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() =>
+      expect(api.updateTeam).toHaveBeenCalledWith(
+        "devops",
+        expect.objectContaining({
+          advanced_settings: { object_permission: { mcp_servers: ["local"] } },
+        }),
+      ),
+    );
+    const payload = vi.mocked(api.updateTeam).mock.calls[0][1];
+    expect(payload.advanced_settings).not.toHaveProperty("model_max_budget");
+    expect(payload.advanced_settings).not.toHaveProperty("team_member_budget");
+  });
+
+  it("drops advanced drafts after closing and reopening a team editor", async () => {
+    vi.mocked(api.policySchemas).mockResolvedValue({
+      available: true,
+      schemas: {
+        team_update: { properties: { new_flag: { type: "boolean" } } },
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <AdminTeams />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
+    fireEvent.click(await screen.findByLabelText("Edit new_flag"));
+    fireEvent.change(screen.getByLabelText("new_flag"), {
+      target: { value: "true" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Close team editor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
+    expect(await screen.findByLabelText("Edit new_flag")).not.toBeChecked();
+    expect(api.policySchemas).toHaveBeenCalledTimes(1);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.updateTeam).mockResolvedValue({

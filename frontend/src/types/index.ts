@@ -21,12 +21,21 @@ export interface ModelSelection {
   all: boolean;
 }
 
+export type PolicySchemaKind = "key_update" | "team_create" | "team_update";
+
+export interface PolicySchemaResponse {
+  available: boolean;
+  schemas: Partial<Record<PolicySchemaKind, Record<string, unknown>>>;
+  detail?: string;
+}
+
 export interface ModelBudget {
   budget_limit: number;
   time_period: string;
 }
 
 export interface KeySettingsUpdate {
+  advanced_settings?: Record<string, unknown>;
   model_max_budget?: Record<string, ModelBudget>;
   key_alias?: string;
   models?: string[];
@@ -51,6 +60,7 @@ export interface BulkKeySpendResetResponse {
 }
 
 export interface KeyInfo {
+  advanced_settings?: Record<string, unknown>;
   model_max_budget?: Record<string, ModelBudget> | null;
   user_budget?: number | null;
   organization_managed?: boolean;
@@ -135,6 +145,7 @@ export interface OperationLimit {
 }
 
 export interface TeamInfo {
+  advanced_settings?: Record<string, unknown>;
   organization_managed?: boolean;
   team_id: string;
   team_alias?: string | null;
@@ -168,6 +179,7 @@ export interface TeamPage {
 }
 
 export interface TeamCreatePayload {
+  advanced_settings?: Record<string, unknown>;
   team_alias: string;
   team_id?: string;
   models: string[];
@@ -179,6 +191,7 @@ export interface TeamCreatePayload {
 }
 
 export interface TeamUpdatePayload {
+  advanced_settings?: Record<string, unknown>;
   team_alias: string;
   models: string[];
   max_budget?: number | null;

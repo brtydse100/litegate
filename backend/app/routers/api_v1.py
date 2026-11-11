@@ -26,32 +26,15 @@ from app.routers.api_actor import (
 from app.routers.api_v1_system import api_audit_events, api_status, router as system_router
 from app.routers.api_v1_users import api_create_user, api_list_users, api_update_user, router as users_router
 from app.routers.api_v1_models import router as models_router
-from app.services import key_budgets, key_secrets, litellm as llm, organization_sync
+from app.services import key_budgets, key_secrets, litellm as llm, organization_sync, policy_schemas, policy_team_update
+from app.routers.api_v1_policy_schemas import router as policy_schemas_router
+from app.routers.team_policy_context import decorate_team as _decorate_team, team_config_references as _team_config_references
 
 router = APIRouter(prefix="/v1", tags=["api-v1"])
 router.include_router(system_router)
 router.include_router(users_router)
 router.include_router(models_router)
-
-
-def _team_config_references(team_id: str) -> tuple[list[str], bool]:
-    mapped_groups: list[str] = []
-    for group, configured in settings.oidc_group_team_mapping.items():
-        team_ids = [configured] if isinstance(configured, str) else configured
-        if team_id in team_ids:
-            mapped_groups.append(group)
-    return mapped_groups, settings.key_team_id == team_id
-
-
-def _decorate_team(team: dict) -> dict:
-    team_id = str(team.get("team_id") or "")
-    mapped_groups, default_key_team = _team_config_references(team_id)
-    return {
-        **team,
-        "mapped_groups": mapped_groups,
-        "default_key_team": default_key_team,
-        "organization_managed": settings.organization_hierarchy.is_managed_team(team_id),
-    }
+router.include_router(policy_schemas_router)
 
 
 @router.get("/me")
@@ -209,7 +192,7 @@ async def bulk_update_keys(
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
 
-    changes = payload.settings.model_dump(exclude_unset=True) if payload.settings else {}
+    changes = await policy_schemas.merge_settings("key_update", payload.settings)
     if "model_max_budget" in changes and not settings.litellm_enterprise_enabled:
         raise HTTPException(status_code=403, detail="Per-model budgets require LITELLM_ENTERPRISE_ENABLED=true and a LiteLLM Enterprise license")
     semaphore = asyncio.Semaphore(10)
@@ -260,15 +243,16 @@ async def api_list_teams(
 
 @router.post("/teams", status_code=status.HTTP_201_CREATED)
 async def api_create_team(payload: TeamCreateRequest, actor: ApiActor = Depends(get_api_actor)):
-    """Create a LiteLLM team with core budget and access policy."""
+    """Create a LiteLLM team with validated budget and access policy."""
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
-    created = await llm.create_team(payload.model_dump(exclude_none=True))
+    changes = await policy_schemas.merge_settings("team_create", payload)
+    created = await llm.create_team(changes)
     await _record_audit(
         actor,
         "team.create",
         str(created.get("team_id") or payload.team_id or payload.team_alias),
-        details={"setting_fields": sorted(payload.model_fields_set)},
+        details={"setting_fields": sorted(changes)},
     )
     return _decorate_team(created)
 
@@ -279,12 +263,13 @@ async def api_update_team(
     payload: TeamUpdateRequest,
     actor: ApiActor = Depends(get_api_actor),
 ):
-    """Update a LiteLLM team's core budget and access policy."""
+    """Update a LiteLLM team's validated budget and access policy."""
     _require_api_admin(actor)
-    organization_sync.guard_team(team_id, payload.model_dump(exclude_unset=True))
+    changes = await policy_schemas.merge_settings("team_update", payload)
+    organization_sync.guard_team(team_id, changes)
     check_key_rate_limit(actor.user.user_id)
-    updated = await llm.update_team(team_id, payload.model_dump(exclude_unset=True))
-    await _record_audit(actor, "team.update", team_id, details={"setting_fields": sorted(payload.model_fields_set)})
+    updated = await policy_team_update.update(team_id, changes) if payload.advanced_settings else await llm.update_team(team_id, changes)
+    await _record_audit(actor, "team.update", team_id, details={"setting_fields": sorted(changes)})
     return _decorate_team(updated)
 
 

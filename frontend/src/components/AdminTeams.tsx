@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import AdvancedPolicySettings, {
+  type AdvancedPolicyHandle,
+} from "./AdvancedPolicySettings";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
@@ -88,6 +91,7 @@ function TeamEditor({
     existing?.rpm_limit != null ? String(existing.rpm_limit) : "",
   );
   const [blocked, setBlocked] = useState(existing?.blocked ?? false);
+  const advanced = useRef<AdvancedPolicyHandle>(null);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -96,9 +100,20 @@ function TeamEditor({
       return;
     }
     setModelError("");
+    let advancedSettings: Record<string, unknown>;
+    try {
+      advancedSettings = advanced.current?.read() ?? {};
+    } catch (failure) {
+      setModelError((failure as Error).message);
+      return;
+    }
+    const advancedPayload = Object.keys(advancedSettings).length
+      ? { advanced_settings: advancedSettings }
+      : {};
     const modelList = models.all ? [] : models.models;
     if (state.mode === "create") {
       const payload: TeamCreatePayload = {
+        ...advancedPayload,
         team_alias: alias.trim(),
         models: modelList,
         blocked,
@@ -116,6 +131,7 @@ function TeamEditor({
       return;
     }
     onUpdate(state.team.team_id, {
+      ...advancedPayload,
       team_alias: alias.trim(),
       models: modelList,
       ...(!state.team.organization_managed
@@ -267,6 +283,25 @@ function TeamEditor({
             />{" "}
             Block requests from this team
           </label>
+          <AdvancedPolicySettings
+            ref={advanced}
+            operation={state.mode === "create" ? "team_create" : "team_update"}
+            excludedFields={[
+              "team_alias",
+              "team_id",
+              "models",
+              "max_budget",
+              "budget_duration",
+              "tpm_limit",
+              "rpm_limit",
+              "blocked",
+            ]}
+            current={
+              existing
+                ? { ...existing, ...existing.advanced_settings }
+                : undefined
+            }
+          />
         </div>
         {(modelError || error) && (
           <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">

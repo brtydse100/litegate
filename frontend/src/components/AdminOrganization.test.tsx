@@ -11,6 +11,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import {
   organizationOverview,
+  organizationChildren,
+  organizationGroup,
   organizationUsage,
   organizationUsers,
 } from "../demo/organization";
@@ -28,6 +30,8 @@ it("distinguishes sub-cent spend from zero while retaining normal currency preci
 vi.mock("../api/client", () => ({
   api: {
     organization: vi.fn(),
+    organizationChildren: vi.fn(),
+    organizationGroup: vi.fn(),
     organizationUsers: vi.fn(),
     organizationUsage: vi.fn(),
   },
@@ -47,7 +51,13 @@ function renderOrganization() {
 
 describe("organization dashboard contracts", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    vi.mocked(api.organizationChildren).mockImplementation(async (parent) =>
+      organizationChildren(parent),
+    );
+    vi.mocked(api.organizationGroup).mockImplementation(async (id) =>
+      organizationGroup(id),
+    );
     vi.mocked(api.organization).mockResolvedValue(organizationOverview());
     vi.mocked(api.organizationUsers).mockImplementation(async (node, page) =>
       organizationUsers(node, page ?? 1),
@@ -69,15 +79,19 @@ describe("organization dashboard contracts", () => {
       within(navigation).getByRole("button", { name: "Expand Engineering" }),
     );
     fireEvent.click(
-      within(navigation).getByRole("button", {
+      await within(navigation).findByRole("button", {
         name: "Expand Engineering → Infrastructure",
       }),
     );
     fireEvent.click(
-      within(navigation).getByRole("button", { name: "Platform, 1 user" }),
+      await within(navigation).findByRole("button", {
+        name: "Platform, 1 user",
+      }),
     );
     expect(
-      within(navigation).getByRole("button", { name: "Platform, 1 user" }),
+      await within(navigation).findByRole("button", {
+        name: "Platform, 1 user",
+      }),
     ).toHaveTextContent(/^Platform$/);
     expect(
       within(navigation).getByRole("button", { name: "Engineering, 3 users" }),
@@ -124,7 +138,7 @@ describe("organization dashboard contracts", () => {
       name: "Organization groups",
     });
     fireEvent.click(
-      await screen.findByRole("button", { name: "Select Engineering" }),
+      await screen.findByRole("button", { name: "Engineering, 3 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -157,6 +171,10 @@ describe("organization dashboard contracts", () => {
 
   it("changes the queried date range and surfaces upstream failures", async () => {
     renderOrganization();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "All groups, 4 users" }),
+    );
+    await screen.findByRole("img", { name: "Spend (USD) over time" });
     const start = await screen.findByLabelText("Usage start date");
     vi.mocked(api.organizationUsage).mockRejectedValue(
       new Error("Aggregate unavailable"),
@@ -171,10 +189,9 @@ describe("organization dashboard contracts", () => {
   });
 
   it("drills into a group named Direct members using its ID", async () => {
-    const overview = organizationOverview();
-    vi.mocked(api.organization).mockResolvedValue({
-      ...overview,
-      groups: overview.groups.map((group) =>
+    vi.mocked(api.organizationChildren).mockImplementation(async (parent) => ({
+      ...organizationChildren(parent),
+      groups: organizationChildren(parent).groups.map((group) =>
         group.id === "platform"
           ? {
               ...group,
@@ -183,7 +200,7 @@ describe("organization dashboard contracts", () => {
             }
           : group,
       ),
-    });
+    }));
     vi.mocked(api.organizationUsage).mockImplementation(
       async (node, start, end) => {
         const usage = organizationUsage(node, start, end);
@@ -212,7 +229,7 @@ describe("organization dashboard contracts", () => {
     );
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Select Engineering" }),
+      await screen.findByRole("button", { name: "Engineering, 3 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -239,7 +256,7 @@ describe("organization dashboard contracts", () => {
   it("shows each leaf member's selected-period metrics without a Direct members bucket", async () => {
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Select Engineering" }),
+      await screen.findByRole("button", { name: "Engineering, 3 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -279,7 +296,7 @@ describe("organization dashboard contracts", () => {
     );
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Select Engineering" }),
+      await screen.findByRole("button", { name: "Engineering, 3 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -302,7 +319,7 @@ describe("organization dashboard contracts", () => {
   });
 
   it("does not query usage or users when the hierarchy is disabled", async () => {
-    vi.mocked(api.organization).mockResolvedValue({
+    vi.mocked(api.organizationChildren).mockResolvedValue({
       enabled: false,
       groups: [],
       levels: [],
@@ -317,63 +334,129 @@ describe("organization dashboard contracts", () => {
     expect(api.organizationUsers).not.toHaveBeenCalled();
   });
 
-  it("resets a removed selection when the hierarchy refreshes", async () => {
-    const { client } = renderOrganization();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Select Engineering" }),
+  it("loads roots before deferred child and detail responses, and caches expansion", async () => {
+    let releaseChildren!: (
+      value: ReturnType<typeof organizationChildren>,
+    ) => void;
+    let releaseDetail!: (value: ReturnType<typeof organizationGroup>) => void;
+    vi.mocked(api.organizationChildren).mockImplementation((parent) =>
+      parent
+        ? new Promise((resolve) => {
+            releaseChildren = resolve;
+          })
+        : Promise.resolve(organizationChildren()),
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Select Infrastructure" }),
+    vi.mocked(api.organizationGroup).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseDetail = resolve;
+        }),
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Select Platform" }),
-    );
-    await waitFor(() =>
-      expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1),
-    );
-    expect(
-      await within(
-        screen.getByRole("heading", { name: /^Users/ }).closest("section")!,
-      ).findByText("alex@example.com"),
-    ).toBeVisible();
-    const overview = organizationOverview();
-    vi.mocked(api.organization).mockResolvedValue({
-      ...overview,
-      groups: overview.groups.map((group) =>
-        group.id === "platform"
-          ? { ...group, id: "renamed", name: "Renamed" }
-          : group,
-      ),
+    renderOrganization();
+    const engineering = await screen.findByRole("button", {
+      name: "Engineering, 3 users",
     });
-    vi.mocked(api.organizationUsers).mockClear();
-    vi.mocked(api.organizationUsage).mockClear();
-    await act(async () => {
-      await client.invalidateQueries({
-        queryKey: ["organization"],
-        exact: true,
-      });
-    });
-    await waitFor(() =>
-      expect(api.organizationUsers).toHaveBeenLastCalledWith("", 1),
-    );
-    expect(api.organizationUsers).not.toHaveBeenCalledWith(
-      "platform",
-      expect.any(Number),
-    );
-    expect(api.organizationUsage).not.toHaveBeenCalledWith(
-      "platform",
-      expect.any(String),
-      expect.any(String),
-    );
+    expect(api.organizationChildren).toHaveBeenCalledExactlyOnceWith();
+    expect(api.organization).not.toHaveBeenCalled();
+    expect(api.organizationGroup).not.toHaveBeenCalled();
+    expect(api.organizationUsers).not.toHaveBeenCalled();
+    expect(api.organizationUsage).not.toHaveBeenCalled();
+    fireEvent.click(engineering);
     expect(
-      await screen.findByRole("button", { name: "Select Marketing" }),
+      screen.getByRole("button", { name: "Marketing, 1 user" }),
     ).toBeVisible();
+    expect(screen.getByText("Loading team details...")).toBeVisible();
     expect(
-      screen.queryByRole("region", { name: "Effective budget policy" }),
+      screen.queryByRole("button", { name: "Infrastructure, 2 users" }),
     ).not.toBeInTheDocument();
-    expect(await screen.findByText("sam@example.com")).toBeVisible();
+    await act(async () => {
+      releaseChildren(organizationChildren("engineering"));
+      releaseDetail(organizationGroup("engineering"));
+    });
     expect(
-      screen.getByRole("button", { name: "All groups, 4 users" }),
-    ).toHaveAttribute("aria-pressed", "true");
+      await screen.findByRole("button", { name: "Infrastructure, 2 users" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Platform, 1 user" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Collapse Engineering" }),
+    );
+    expect(
+      screen.queryByRole("button", { name: "Infrastructure, 2 users" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Expand Engineering" }));
+    expect(
+      await screen.findByRole("button", { name: "Infrastructure, 2 users" }),
+    ).toBeVisible();
+    expect(api.organizationChildren).toHaveBeenCalledTimes(2);
+    expect(api.organizationGroup).toHaveBeenCalledExactlyOnceWith(
+      "engineering",
+    );
+  });
+  it("keeps roots usable after child failure and retries only that branch", async () => {
+    vi.mocked(api.organizationChildren).mockImplementation(async (parent) => {
+      if (parent === "engineering") throw new Error("Children unavailable");
+      return organizationChildren(parent);
+    });
+    renderOrganization();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+    );
+    expect(await screen.findByText("Children unavailable")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Marketing, 1 user" }),
+    ).toBeVisible();
+    vi.mocked(api.organizationChildren).mockImplementation(async (parent) =>
+      organizationChildren(parent),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry children" }));
+    expect(
+      await screen.findByRole("button", { name: "Infrastructure, 2 users" }),
+    ).toBeVisible();
+  });
+  it("does not flash a previous branch report while the next branch is loading", async () => {
+    renderOrganization();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+    );
+    expect(
+      await screen.findByRole("img", { name: "Spend (USD) over time" }),
+    ).toBeVisible();
+    vi.mocked(api.organizationUsage).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    vi.mocked(api.organizationUsers).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    vi.mocked(api.organizationGroup).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Marketing, 1 user" }));
+    expect(
+      screen.queryByRole("img", { name: "Spend (USD) over time" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("alex@example.com")).not.toBeInTheDocument();
+    expect(screen.getByText("Loading team details...")).toBeVisible();
+  });
+  it("starts whole-organization reports only on explicit selection and preserves user pagination", async () => {
+    vi.mocked(api.organizationUsers).mockImplementation(async (node, page) => ({
+      ...organizationUsers(node, page ?? 1),
+      total: 26,
+      total_pages: 2,
+    }));
+    renderOrganization();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "All groups, 4 users" }),
+    );
+    expect(await screen.findByText("sam@example.com")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() =>
+      expect(api.organizationUsers).toHaveBeenLastCalledWith("", 2),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Marketing, 1 user" }));
+    await waitFor(() =>
+      expect(api.organizationUsers).toHaveBeenLastCalledWith("marketing", 1),
+    );
   });
 });
