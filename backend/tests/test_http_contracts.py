@@ -196,7 +196,7 @@ async def test_oidc_team_sync_failure_fails_login_without_issuing_a_session(monk
 
 @pytest.mark.asyncio
 async def test_key_deletion_contract_keeps_secret_in_json_body():
-    token = auth._make_jwt("user-1", "user@example.com")
+    token = auth._make_jwt("user-1", "user@example.com", "admin")
     headers = {"Authorization": f"Bearer {token}"}
     with (
         patch("app.routers.keys.llm.list_user_keys", new=AsyncMock(return_value=[{"token": "sk-owned"}])),

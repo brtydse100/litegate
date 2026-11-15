@@ -188,10 +188,10 @@ async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias
     async with lock_for("user", user_id):
         existing = await key_spend.current_keys(user_id)
         controls = await key_rotation_policy.snapshot(user_id, existing)
-        if any(key.get("model_max_budget") for key in existing):
+        if key_rotation_policy.requires_assistance(existing):
             raise HTTPException(
                 status_code=409,
-                detail="Keys with per-model budgets require administrator-assisted rotation in LiteLLM to preserve model usage windows.",
+                detail="Keys with per-model budgets or multiple budget windows require administrator-assisted rotation in LiteLLM to preserve usage windows.",
             )
         renamed_key = None
         try:
@@ -205,8 +205,14 @@ async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias
             result = await _generate_key(user_id, email, team_id, initial_spend=litellm.total_key_spend(existing), key_alias=key_alias)
             try:
                 await key_budgets.preserve_rotation_budget(user_id, existing, result["key"])
-                await key_rotation_policy.preserve(user_id, controls, result["key"])
-                await key_spend.verify_replacement(user_id, existing, result["key"])
+                verified = await key_rotation_policy.preserve(user_id, controls, result["key"])
+                source = await key_spend.verify_replacement(user_id, existing, result["key"])
+                if key_rotation_policy.requires_assistance(source) or await key_rotation_policy.snapshot(user_id, source) != controls:
+                    raise HTTPException(
+                        status_code=409, detail="Source key policy changed during rotation; original keys were kept. Retry the operation."
+                    )
+                if verified is not None and "expires" in verified:
+                    result = {**result, "expires": verified["expires"]}
                 for key_info in existing:
                     token = key_info.get("token") or key_info.get("api_key") or key_info.get("key")
                     if token:

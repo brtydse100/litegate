@@ -96,12 +96,17 @@ async def regenerate_key(current_user: CurrentUser = Depends(get_current_user)):
 
 
 async def _delete_owned_key(key: str, current_user: CurrentUser) -> dict:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Permanent key deletion requires an administrator; use regeneration to preserve spend and policy")
     check_key_rate_limit(current_user.user_id)
     async with organization_sync.lock_for("user", current_user.user_id):
         owned = {k.get("token") or k.get("api_key") or k.get("key") for k in await llm.list_user_keys(current_user.user_id)}
         if key not in owned:
             raise HTTPException(status_code=403, detail="Key not owned by user")
         await llm.delete_key(key)
+    await asyncio.to_thread(
+        audit.record, actor_id=current_user.user_id, actor_email=current_user.email, action="key.delete", target="installation-key"
+    )
     return {"deleted": True}
 
 

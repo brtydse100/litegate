@@ -34,6 +34,43 @@
 
 ## Execution notes
 
+### Approved second-pass fixes
+
+The user requested fixing all six subsequently reproduced findings. Add failing
+regressions first, then implement and validate these changes in the same PR:
+
+1. Permanent key deletion becomes administrator-only on both API families,
+   including key-authenticated identities; personal rotation retains allowance.
+   This closes reset/restriction bypasses without adding a local spend ledger.
+2. Validate source teams outside the hierarchy before migration. Restrictive
+   source policies require explicit administrator review rather than being lost.
+3. Preserve MCP/tag rate controls, policies, prompts and related supported
+   controls. Additional budget windows require assisted rotation to retain usage.
+4. Lock administrator updates/deletions with rotation, recheck live ownership,
+   and reject changed source policies before revocation (including external edits).
+5. Return verified replacement expiration rather than stale generation metadata.
+6. Keep process-local, configuration-scoped discovery issue snapshots and expose
+   them through existing organization issue lists. No new database or service.
+
+Run complete checks and a fresh independent review of these fixes before pushing.
+Publish a new immutable preview tag/image; preserve the old preview artifact.
+
+Second-pass execution: the 12 primary regression failures were reproduced before
+implementation. The initial wider run exposed seven stale test contracts/mocks;
+updated administrator authorization expectations and made unrestricted source
+team fixtures explicit. The full suite then passed 724 backend tests and 119
+frontend tests. A fresh independent review found two additional cases within the
+same safeguards: source-team metadata-backed controls and budget-window/model
+budget additions during rotation. Added seven failing parameterized cases, fixed
+both guards and verified 26 focused tests. Full backend validation is being rerun.
+
+Final follow-up validation: 731 backend tests passed, 4 opt-in live skips,
+90.06% coverage; 119 frontend tests; 9 smoke and 2 demo browser tests passed.
+Format, lint, typecheck, frontend build, zero-vulnerability production dependency
+audit, 29 repository script tests, Helm lint, version and Markdown checks passed.
+Both material independent-review findings were fixed with observed failing then
+passing tests, followed by the complete backend coverage run. No deferred findings.
+
 - Baseline: 696 backend tests passed (4 live integration skips); 115 frontend tests passed.
 - Task 1 complete: security/audit regressions observed failing, then 40 related tests passed.
 - Task 2 complete: rotation regressions observed failing, then 43 related tests passed; budget preservation already present on main was retained.

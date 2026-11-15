@@ -272,6 +272,18 @@ block further paid requests. Removing hierarchy configuration is not a rollback
 of the remote policy changes; preserve a configuration/database backup before
 rollout and review any policy reversal deliberately.
 
+Discovery conflicts and unresolved configured selectors appear in the Organization
+page's synchronization issues even before a user record can be adopted. The list
+refreshes each reconciliation pass and clears resolved conflicts automatically.
+Missing users remain pending until their first login or upstream provisioning;
+ambiguous email matches require an exact `userIds` assignment.
+
+Migration checks the key's previous team even when that team is outside the
+new hierarchy. Blocking, model, rate or permission controls on a source team
+are not inherited automatically: LiteGate retains the old key assignment and
+reports the source team for administrator review. Resolve these restrictions in
+LiteLLM before retrying; migration never silently replaces them with broader access.
+
 The closest explicitly configured `perUser` wins, overriding every ancestor's
 per-user default. In the example Engineering defaults to $200, Digital overrides
 that to $50, squad1 overrides it to $100, and squads 2–4 inherit $50.

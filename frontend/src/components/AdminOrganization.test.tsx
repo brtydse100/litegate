@@ -67,6 +67,23 @@ describe("organization dashboard contracts", () => {
     );
   });
 
+  it("shows discovery conflicts even when no user could be adopted", async () => {
+    vi.mocked(api.organizationChildren).mockResolvedValue({
+      ...organizationChildren(),
+      total_users: 0,
+      issues: [
+        {
+          user_id: "unresolved@example.com",
+          error: "Multiple LiteLLM users match; configure an exact user ID",
+        },
+      ],
+    });
+    renderOrganization();
+    const issue = await screen.findByRole("alert");
+    expect(issue).toHaveTextContent("unresolved@example.com");
+    expect(issue).toHaveTextContent("configure an exact user ID");
+  });
+
   it("filters users, charts, and effective budgets together when selecting a squad", async () => {
     renderOrganization();
     const navigation = await screen.findByRole("navigation", {

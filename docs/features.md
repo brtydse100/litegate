@@ -47,6 +47,12 @@ Replacement controls are verified before old credentials are revoked. Keys with
 different policies require administrator-assisted rotation rather than guessing
 which restrictions to keep.
 
+Permanent key deletion is administrator-only, including the compatibility API.
+Ordinary users and key-authenticated clients cannot delete a credential and
+create a fresh allowance. Owners use rotation for replacement; contact an
+administrator for permanent revocation. Rotation retains MCP/tag rate limits,
+policies and prompts as well, and coordinates with administrator policy edits.
+
 New keys inherit the installation defaults for models, budget, reset interval,
 duration, TPM, RPM, and team. For SSO users, an administrator can map identity
 provider groups to existing LiteLLM teams so new or regenerated keys use the

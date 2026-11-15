@@ -87,13 +87,14 @@ async def test_regenerate_rolls_back_new_key_when_old_key_delete_fails():
 
 @pytest.mark.asyncio
 async def test_delete_key_accepts_secret_in_request_body():
-    user = CurrentUser(user_id="user-1", email="user@example.com")
+    user = CurrentUser(user_id="user-1", email="user@example.com", role="admin")
     with (
         patch(
             "app.routers.keys.llm.list_user_keys",
             new=AsyncMock(return_value=[{"token": "sk-owned"}]),
         ),
         patch("app.routers.keys.llm.delete_key", new=AsyncMock()) as delete,
+        patch("app.routers.keys.audit.record"),
     ):
         result = await delete_key(KeyDeleteRequest(key="sk-owned"), user)
 

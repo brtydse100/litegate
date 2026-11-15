@@ -26,7 +26,17 @@ CONTROLS = (
     "enforced_params",
     "metadata",
     "object_permission_id",
+    "object_permission",
+    "mcp_rpm_limit",
+    "tag_rpm_limit",
+    "policies",
+    "prompts",
+    "budget_fallbacks",
 )
+
+
+def requires_assistance(keys: list[dict]) -> bool:
+    return any(key.get("model_max_budget") or key.get("budget_limits") for key in keys)
 
 
 async def snapshot(user_id: str, existing: list[dict]) -> dict:
@@ -54,7 +64,7 @@ def timestamp(value: str) -> datetime:
     return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
 
 
-async def preserve(user_id: str, policy: dict, replacement: str) -> None:
+async def preserve(user_id: str, policy: dict, replacement: str) -> dict | None:
     if not policy:
         return
     info = await litellm.get_key_info(replacement)
@@ -78,3 +88,4 @@ async def preserve(user_id: str, policy: dict, replacement: str) -> None:
         info = await litellm.get_key_info(replacement)
     if not info or info.get("user_id") != user_id or any(not same(field, info.get(field), value) for field, value in policy.items()):
         raise HTTPException(status_code=502, detail="LiteLLM did not preserve replacement key restrictions; original keys were kept")
+    return info

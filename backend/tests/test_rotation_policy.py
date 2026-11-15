@@ -50,6 +50,7 @@ async def test_rotation_uses_supported_duration_without_extending_expiry(native,
     async def generate_with_expiration(*args, **kwargs):
         result = await generate(*args, **kwargs)
         state["keys"][result["key"]]["expires"] = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        result["expires"] = state["keys"][result["key"]]["expires"]
         return result
 
     async def supported_update(key, changes):
@@ -65,6 +66,7 @@ async def test_rotation_uses_supported_duration_without_extending_expiry(native,
     monkeypatch.setattr(sync, "_generate_key", generate_with_expiration)
     result = await sync.rotate_key("alice", "alice@example.com", None, key_alias="replacement")
     actual = state["keys"][result["key"]].get("expires")
+    assert result.get("expires") == actual
     if expires:
         assert actual is not None
         assert 0 <= (datetime.fromisoformat(expires) - datetime.fromisoformat(actual)).total_seconds() < 2

@@ -31,17 +31,31 @@ async def guard_ancestor_restrictions(node: OrganizationNode, user_id: str, keys
         "permissions",
         "object_permission",
         "object_permission_id",
+        "mcp_rpm_limit",
+        "tag_rpm_limit",
+        "mcp_servers",
+        "mcp_access_groups",
+        "policies",
+        "prompts",
+        "allowed_routes",
+        "enforced_params",
+        "aliases",
+        "config",
     )
-    for ancestor in settings.organization_hierarchy.nodes.values():
-        if ancestor.team_id == node.team_id or node.path[: len(ancestor.path)] != ancestor.path:
-            continue
-        info = await upstream.team_info(ancestor.team_id)
+    ancestors = [
+        ancestor.team_id
+        for ancestor in settings.organization_hierarchy.nodes.values()
+        if ancestor.team_id != node.team_id and node.path[: len(ancestor.path)] == ancestor.path
+    ]
+    teams = dict.fromkeys([*ancestors, *sorted(team for team in source_teams if team)])
+    for team_id in teams:
+        info = await upstream.team_info(team_id)
         team = info.get("team_info")
         if not isinstance(team, dict):
             raise HTTPException(status_code=502, detail="Could not verify ancestor team restrictions")
-        member = upstream.membership(info, user_id) if ancestor.team_id in source_teams else None
+        member = upstream.membership(info, user_id) if team_id in source_teams else None
         roster_member = None
-        if ancestor.team_id in source_teams:
+        if team_id in source_teams:
             roster = team.get("members_with_roles")
             if not isinstance(roster, list) or not isinstance(info.get("team_memberships"), list):
                 raise HTTPException(status_code=502, detail="Could not verify the source team member's restrictions")
@@ -56,13 +70,19 @@ async def guard_ancestor_restrictions(node: OrganizationNode, user_id: str, keys
             roster_member or {},
             (member or {}).get("litellm_budget_table") or {},
         ]
+        for record in list(records):
+            metadata = record.get("metadata")
+            if metadata is not None:
+                if not isinstance(metadata, dict):
+                    raise HTTPException(status_code=502, detail="Could not verify source or ancestor team policy metadata")
+                records.append(metadata)
         if any(
             record.get("blocked") or any(record.get(field) is not None for field in limits) or any(record.get(field) for field in policies)
             for record in records
         ):
             raise HTTPException(
                 status_code=409,
-                detail="Review ancestor team restrictions in LiteLLM before using a lowest-level team; model, blocking and rate policies are not inherited",
+                detail=f"Review source or ancestor team {team_id} restrictions in LiteLLM before migration; model, blocking and rate policies are not inherited",
             )
 
 

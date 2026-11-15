@@ -270,13 +270,15 @@ curl -X POST https://litegate.example.com/api/v1/keys \
   -d '{"user_id":"automation:ci","email":"ci@example.com"}'
 ```
 
-Delete a key without placing the credential in the URL (where proxy logs could
-capture it). A virtual key may delete itself; portal users may delete their own
-keys; administrators and the management API may delete any key:
+Permanent deletion requires an administrator portal session or management API
+credential. Ordinary portal users and LiteLLM-key identities receive `403`, even
+for their own key, so deleting/recreating cannot reset spend or remove policy.
+Owners replace credentials through regeneration, which retains spend and controls.
+Administrators delete a key without placing the credential in access-log URLs:
 
 ```bash
 curl -X DELETE https://litegate.example.com/api/v1/keys \
-  -H "Authorization: Bearer $TOKEN_OR_VIRTUAL_KEY" \
+  -H "X-API-Key: $LITEGATE_MANAGEMENT_KEY" \
   -H "Content-Type: application/json" \
   -d '{"key":"sk-key-to-delete"}'
 ```
@@ -343,6 +345,13 @@ can shorten it by less than two seconds). Unmanaged keys retain their team and b
 keys use current hierarchy policy. Multiple source keys with incompatible
 controls return `409` before mutation. If replacement policy verification fails,
 the replacement is revoked and the original credentials are retained.
+
+Preservation includes MCP/tag rate limits, policies and prompts. Administrator
+key updates and deletions share rotation's owner lock and recheck live ownership;
+updates targeting an already replaced key return a conflict for that item.
+Rotation rejects detected changes to the source policy before revoking it and
+returns the verified replacement expiration. Keys with additional budget windows
+also require administrator-assisted rotation to retain their usage counters.
 
 To use the key's budget as its owner's individual allowance, explicitly include
 `"use_key_budget_only": true` alongside `keys` and optional `settings`. For example:
