@@ -1,6 +1,7 @@
 """Compatibility checks against a real LiteLLM proxy and PostgreSQL database."""
 
 import os
+from datetime import datetime
 from uuid import uuid4
 
 import pytest
@@ -135,12 +136,17 @@ async def test_managed_allowance_updates_preserve_windows_and_rotation_carries_s
         assert changed["max_budget"] == 100
         assert changed["spend"] == 12
         assert changed["budget_reset_at"] == first["budget_reset_at"]
+        controls = {"blocked": True, "models": ["litegate-integration-mock"], "rpm_limit": 12, "tpm_limit": 1000, "max_parallel_requests": 2}
+        await litellm.update_key(keys[0], {**controls, "duration": "1h"})
+        expiration = (await litellm.get_key_info(keys[0]))["expires"]
         replacement = await organization_sync.rotate_key(user_id, "", team_id, key_alias=f"rotated-{suffix}")
         keys.append(replacement["key"])
         rotated = await litellm.get_key_info(replacement["key"])
         assert rotated["team_id"] == leaf.team_id
         assert rotated["max_budget"] == 100
         assert rotated["spend"] == 12
+        assert {field: rotated.get(field) for field in controls} == controls
+        assert 0 <= (datetime.fromisoformat(expiration) - datetime.fromisoformat(rotated["expires"])).total_seconds() < 2
         keys.pop(0)
         replacement = await organization_sync.rotate_key(user_id, "", team_id, key_alias=f"rotated-{suffix}")
         keys[:] = [replacement["key"]]

@@ -337,6 +337,13 @@ has per-model budgets. Rotation requires administrator handling in LiteLLM so
 token-scoped model usage windows are not silently reset. This safeguard also
 applies when `LITELLM_ENTERPRISE_ENABLED` is off.
 
+Rotation preserves the source key's blocking, models, rate/concurrency controls
+and expiration deadline without extending it (whole-second duration conversion
+can shorten it by less than two seconds). Unmanaged keys retain their team and budget; managed
+keys use current hierarchy policy. Multiple source keys with incompatible
+controls return `409` before mutation. If replacement policy verification fails,
+the replacement is revoked and the original credentials are retained.
+
 To use the key's budget as its owner's individual allowance, explicitly include
 `"use_key_budget_only": true` alongside `keys` and optional `settings`. For example:
 
@@ -473,6 +480,11 @@ to delete teams referenced by `oidc_group_team_mapping` or `KEY_TEAM_ID`; remove
 the reference first and restart LiteGate with the new configuration.
 
 ## Local users (admin only)
+
+The configured bootstrap administrator username is reserved, case-insensitively;
+creating a database account with it returns `409`. Bootstrap sessions report
+`auth_source: "bootstrap"`. Both `/api/users` compatibility routes and
+`/api/v1/users` record account creation and updates in the administrator audit log.
 
 List local users:
 

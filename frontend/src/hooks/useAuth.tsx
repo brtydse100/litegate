@@ -4,8 +4,10 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { User } from "../types";
 
@@ -19,20 +21,28 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+  const generation = useRef(0);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
+    const current = ++generation.current;
     setLoading(true);
+    await queryClient.cancelQueries();
+    queryClient.clear();
     try {
-      setUser(await api.me());
+      const nextUser = await api.me();
+      if (current === generation.current) setUser(nextUser);
     } catch {
-      localStorage.removeItem("token");
-      setUser(null);
+      if (current === generation.current) {
+        localStorage.removeItem("token");
+        setUser(null);
+      }
     } finally {
-      setLoading(false);
+      if (current === generation.current) setLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     void loadUser();
@@ -44,13 +54,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadUser]);
 
   const logout = useCallback(async () => {
+    const current = ++generation.current;
+    setLoading(true);
+    await queryClient.cancelQueries();
+    queryClient.clear();
     try {
       await api.logout();
     } finally {
-      localStorage.removeItem("token");
-      setUser(null);
+      if (current === generation.current) {
+        localStorage.removeItem("token");
+        setUser(null);
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo(
     () => ({ user, loading, login, logout }),

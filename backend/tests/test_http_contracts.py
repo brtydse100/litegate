@@ -78,7 +78,7 @@ async def test_password_session_contract_is_httponly_usable_and_revocable(monkey
                 "user_id": "local:admin",
                 "email": "admin@local",
                 "role": "admin",
-                "auth_source": "local",
+                "auth_source": "bootstrap",
                 "team_ids": [],
             }
 

@@ -154,6 +154,8 @@ def authenticate(username: str, password: str) -> Optional[dict]:
 
 
 def create_user(username: str, email: str, password: str, role: str = "user") -> dict:
+    if username.casefold() == (settings.local_auth_username or "").casefold():
+        raise ValueError("This username is reserved for the bootstrap administrator")
     init_db()
     now = datetime.now(timezone.utc).isoformat()
     user_id = f"local:{username.lower()}"

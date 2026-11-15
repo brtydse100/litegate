@@ -184,7 +184,7 @@ async def local_login(request: Request, username: str = Form(...), password: str
         user_id = f"local:{username.lower()}"
         email = f"{username}@local"
         role = "admin"
-    elif settings.local_users_enabled:
+    elif settings.local_users_enabled and username.casefold() != (settings.local_auth_username or "").casefold():
         account = await asyncio.to_thread(local_users.authenticate, username, password)
         if not account:
             record_login_failure(client_id)
@@ -201,7 +201,7 @@ async def local_login(request: Request, username: str = Form(...), password: str
         raise HTTPException(status_code=502, detail="Could not provision the LiteLLM user")
     node = await organization_sync.remember(user_id, email, "local", [])
     response = JSONResponse({"authenticated": True}, headers={"Cache-Control": "no-store"})
-    _set_session_cookie(response, _make_jwt(user_id, email, role, "local", [node.team_id] if node else []))
+    _set_session_cookie(response, _make_jwt(user_id, email, role, "bootstrap" if bootstrap_match else "local", [node.team_id] if node else []))
     return response
 
 

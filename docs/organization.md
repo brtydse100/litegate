@@ -245,6 +245,33 @@ does not add SCIM, LDAP, or identity-provider polling.
 
 ## Budgets
 
+### Moving an existing installation into the hierarchy
+
+1. Retain the existing SQLite data volume and LiteLLM database. Add
+   `organizationHierarchy` to the deployment configuration, using existing team
+   IDs where appropriate. List existing users under `userIds` by exact ID or
+   SSO email; local accounts require an exact ID such as `local:alice`.
+2. Restart/redeploy LiteGate. Startup discovers configured existing users,
+   adds missing memberships and updates their existing keys in place. No
+   account import, key regeneration, credential redistribution or spend reset
+   is needed. Assignments based only on `ssoGroups` apply at the next verified
+   SSO login because LiteGate cannot infer provider claims from a remote email.
+3. Check the Organization page's synchronization issues. A reconciliation pass
+   first applies and verifies the key policies for all discovered users, then
+   finalizes individual budgets. This lets users sharing an old native team cap
+   complete together in the same pass. Shared caps remain until every affected
+   credential is protected; unknown or conflicting assignments require review.
+
+Transient failures retry automatically every 60 seconds and after restart,
+continuing from the existing identities and key policies. Successful updates are
+idempotent. Fix reported identity conflicts or unsupported upstream policy rather
+than deleting/recreating users. Secrets, key IDs, aliases, spend, model access and
+rate limits remain intact. Configured hierarchy budgets deliberately replace
+the old key allowance; lowering the allowance below current spend can immediately
+block further paid requests. Removing hierarchy configuration is not a rollback
+of the remote policy changes; preserve a configuration/database backup before
+rollout and review any policy reversal deliberately.
+
 The closest explicitly configured `perUser` wins, overriding every ancestor's
 per-user default. In the example Engineering defaults to $200, Digital overrides
 that to $50, squad1 overrides it to $100, and squads 2–4 inherit $50.

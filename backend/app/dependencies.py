@@ -37,14 +37,22 @@ def decode_portal_token(token: str) -> CurrentUser:
 
 def enforce_account_state(current_user: CurrentUser) -> CurrentUser:
     """Refresh local role/active state so disabling an account revokes sessions immediately."""
-    if current_user.auth_source != "local":
+    if current_user.auth_source not in {"local", "bootstrap"}:
         return current_user
     username = current_user.user_id.removeprefix("local:")
     is_bootstrap = bool(settings.local_auth_enabled and username.lower() == (settings.local_auth_username or "").lower())
-    if is_bootstrap:
+    if current_user.auth_source == "bootstrap":
+        if not is_bootstrap:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bootstrap account configuration changed; sign in again")
         current_user.role = "admin"
         return current_user
     account = local_users.get_user(username)
+    if is_bootstrap:
+        # Older bootstrap sessions used the local source. Only retain them when
+        # there is no database identity with which they could be confused.
+        if account or not current_user.is_admin:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Ambiguous bootstrap identity; sign in again")
+        return current_user
     if not account or not account["active"]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account disabled")
     current_user.email = account["email"]
