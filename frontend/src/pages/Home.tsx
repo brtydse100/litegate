@@ -76,6 +76,32 @@ function Brand({ logoUrl }: { logoUrl?: string }) {
   );
 }
 
+function expirationDate(value: string) {
+  // LiteLLM may omit the timezone; the backend interprets those values as UTC.
+  const timestamp = value.replace(" ", "T");
+  return new Date(
+    timestamp.includes("T") && !/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(timestamp)
+      ? `${timestamp}Z`
+      : timestamp,
+  );
+}
+
+function keyAccessStatus(key: KeyInfo) {
+  if (key.blocked) return "Blocked";
+  if (key.expires && expirationDate(key.expires).getTime() <= Date.now())
+    return "Expired";
+  if (key.policy_error || key.user_budget_available === false)
+    return "Policy unavailable";
+  if (
+    (key.max_budget != null && key.spend >= key.max_budget) ||
+    (key.user_budget != null &&
+      key.user_spend != null &&
+      key.user_spend >= key.user_budget)
+  )
+    return "Budget reached";
+  return "Ready";
+}
+
 function KeyCard({
   keyInfo,
   initialSecret,
@@ -89,6 +115,7 @@ function KeyCard({
 }) {
   const managed = keyInfo.organization_managed || !!keyInfo.organization_path;
   const budgetAvailable = keyInfo.user_budget_available !== false;
+  const accessStatus = keyAccessStatus(keyInfo);
   return (
     <PersonalKeySecret
       identifier={keyToken(keyInfo)}
@@ -113,6 +140,15 @@ function KeyCard({
               </div>
             </div>
             {canReveal && action && <div className="py-4">{action}</div>}
+            {accessStatus !== "Ready" && (
+              <p
+                role="status"
+                className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
+              >
+                Key status: {accessStatus}. Contact an administrator if you need
+                help.
+              </p>
+            )}
             <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
               <div className="px-5 py-4">
                 <dt className="text-xs text-slate-500">
@@ -147,7 +183,7 @@ function KeyCard({
                 <dt className="text-xs text-slate-500">Expires</dt>
                 <dd className="mt-1 font-semibold text-slate-950">
                   {keyInfo.expires
-                    ? new Date(keyInfo.expires).toLocaleDateString()
+                    ? expirationDate(keyInfo.expires).toLocaleDateString()
                     : "Never"}
                 </dd>
               </div>
@@ -177,9 +213,29 @@ function KeyCard({
   );
 }
 
-export function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
+export function AccessSnapshot({
+  keys,
+  unavailable = false,
+  loading = false,
+}: {
+  keys: KeyInfo[];
+  unavailable?: boolean;
+  loading?: boolean;
+}) {
   const [modelsExpanded, setModelsExpanded] = useState(false);
   const first = keys[0];
+  const statuses = keys.map(keyAccessStatus);
+  const status = loading
+    ? "Loading"
+    : unavailable
+      ? "Status unavailable"
+      : statuses.includes("Ready")
+        ? "Ready"
+        : !statuses.length
+          ? "No key"
+          : statuses.every((value) => value === statuses[0])
+            ? statuses[0]
+            : "Access restricted";
   const hasUnrestrictedModelAccess = keys.some(
     (keyInfo) => !keyInfo.models?.length,
   );
@@ -188,10 +244,13 @@ export function AccessSnapshot({ keys }: { keys: KeyInfo[] }) {
   ).sort((left, right) => left.localeCompare(right));
   const items = [
     {
-      label: "Gateway status",
-      value: "Ready",
-      icon: Check,
-      tone: "text-emerald-600 bg-emerald-50",
+      label: "API access",
+      value: status,
+      icon: status === "Ready" ? Check : Shield,
+      tone:
+        status === "Ready"
+          ? "text-emerald-600 bg-emerald-50"
+          : "text-amber-600 bg-amber-50",
     },
     {
       label: "Model access",
@@ -531,6 +590,7 @@ export default function Home() {
               <ThemeToggle />
               <button
                 onClick={() => void logout()}
+                aria-label="Sign out"
                 className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 ${isAdmin ? "md:hidden" : ""}`}
               >
                 <LogOut size={14} />{" "}
@@ -584,12 +644,36 @@ export default function Home() {
                           ? "Saved keys can be shown again when you need them."
                           : "Secrets are only shown once when created or regenerated."}
                   </p>
+                  {portal.isError && (
+                    <button
+                      type="button"
+                      disabled={portal.isFetching}
+                      onClick={() => {
+                        void portal.refetch();
+                      }}
+                      className="mt-2 text-sm font-medium text-indigo-600 disabled:opacity-50"
+                    >
+                      Retry portal configuration
+                    </button>
+                  )}
                 </div>
 
                 {mutationError && (
                   <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                     {(mutationError as Error).message}
                   </p>
+                )}
+                {keys.isError && (
+                  <button
+                    type="button"
+                    disabled={keys.isFetching}
+                    onClick={() => {
+                      void keys.refetch();
+                    }}
+                    className="text-sm font-medium text-indigo-600 disabled:opacity-50"
+                  >
+                    Retry key information
+                  </button>
                 )}
                 {operationsBlocked && (
                   <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -702,7 +786,13 @@ export default function Home() {
                     {config.my_key_text}
                   </p>
                 )}
-                {hasKey && <AccessSnapshot keys={keyList} />}
+                {hasKey && (
+                  <AccessSnapshot
+                    keys={keyList}
+                    unavailable={keys.isError}
+                    loading={keys.isPending}
+                  />
+                )}
                 {(config?.litellm_ui_url || config?.support_ticket_url) && (
                   <div className="grid w-full gap-3 border-t border-slate-200 pt-5">
                     {config.litellm_ui_url && (

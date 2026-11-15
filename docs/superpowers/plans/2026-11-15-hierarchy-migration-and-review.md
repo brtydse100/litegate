@@ -71,6 +71,36 @@ audit, 29 repository script tests, Helm lint, version and Markdown checks passed
 Both material independent-review findings were fixed with observed failing then
 passing tests, followed by the complete backend coverage run. No deferred findings.
 
+### Approved UI follow-up (2026-11-16)
+
+The user requested addressing the subsequent four medium and three low UI
+findings. Add failing tests before changes. Poll organization navigation/status
+every 60 seconds and add manual refresh without eagerly fetching unselected
+reports. Show reset-password errors/cooldowns inside the modal, clear stale
+errors on reopening, and enforce the 256-character backend limit. Extend the
+shared dialog hook with an explicit element ref, initial focus, Tab containment
+and opener restoration; use it on password reset and existing modal callers.
+Show known blocked/expired/budget states without claiming gateway health. Add
+My key retry buttons, an accessible mobile sign-out name, and deployment-neutral
+configuration wording. Retain the intentionally documented saved-key action flow.
+Run frontend tests/checks/browser coverage and a fresh independent review, then
+update PR49 and its immutable preview image. No dependency or backend contract
+changes are needed.
+
+UI execution: reproduced the UI regressions before implementation. The complete
+frontend suite passed 131 tests after the initial fixes. A fresh independent
+review found two material edge cases: manually refreshing All groups bypassed
+the disabled detail query, and timezone-less expiration was interpreted in local
+time instead of UTC. Each received a failing regression followed by its fix;
+the complete suite then passed 133 tests. All 13 browser tests and 2 demo tests
+passed; the password-reset keyboard test is now included in CI smoke coverage.
+Format, lint, typecheck, production build, dependency audit (zero vulnerabilities),
+backend formatting, 29 script tests, Helm lint, version and Markdown checks passed.
+
+- Final: fixed All groups refresh requesting an empty group ID — regression RED→GREEN, suite 132/132.
+- Final: fixed timezone-less expiration outside UTC — regression RED→GREEN, suite 133/133.
+- Final: minor (deferred): removing an outer dialog while an inner dialog remains open can lose final opener restoration; no current UI callers nest dialogs.
+
 - Baseline: 696 backend tests passed (4 live integration skips); 115 frontend tests passed.
 - Task 1 complete: security/audit regressions observed failing, then 40 related tests passed.
 - Task 2 complete: rotation regressions observed failing, then 43 related tests passed; budget preservation already present on main was retained.

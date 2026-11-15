@@ -31,6 +31,15 @@ function keyWithModels(models: string[]): KeyInfo {
 }
 
 describe("model access snapshot", () => {
+  it.each([
+    [{ blocked: true }, "Blocked"],
+    [{ expires: "2000-01-01T00:00:00Z" }, "Expired"],
+    [{ max_budget: 1, spend: 1 }, "Budget reached"],
+  ])("shows known access restrictions (%j)", (state, label) => {
+    render(<AccessSnapshot keys={[{ models: [], spend: 0, ...state }]} />);
+    expect(screen.getByText(label)).toBeVisible();
+    expect(screen.queryByText("Ready")).not.toBeInTheDocument();
+  });
   it("reveals the accessible model names when clicked", () => {
     render(
       <AccessSnapshot
@@ -51,6 +60,24 @@ describe("model access snapshot", () => {
     expect(screen.getByText("claude-sonnet-4")).toBeVisible();
     expect(screen.getByText("gemini-2.5-pro")).toBeVisible();
     expect(screen.getByText("gpt-5")).toBeVisible();
+  });
+
+  it("interprets timezone-less expiration as UTC outside UTC browsers", () => {
+    vi.stubEnv("TZ", "America/New_York");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-16T12:30:00Z"));
+    try {
+      render(
+        <AccessSnapshot
+          keys={[{ models: [], spend: 0, expires: "2026-11-16T12:00:00" }]}
+        />,
+      );
+      expect(screen.getByText("Expired")).toBeVisible();
+      expect(screen.queryByText("Ready")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllEnvs();
+    }
   });
 
   it("explains unrestricted access without inventing model names", () => {
@@ -122,6 +149,49 @@ describe("personal key storage", () => {
     );
     return { list, client };
   }
+
+  it("offers a working retry after a key lookup error", async () => {
+    const { list } = renderHome(
+      false,
+      false,
+      {},
+      new Error("Key service unavailable"),
+    );
+    await screen.findByText("Key service unavailable");
+    list.mockResolvedValue({ keys: [] });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry key information" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Key service unavailable"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("offers a working retry after portal configuration fails", async () => {
+    renderHome(false, false, {}, undefined, false, false, "error");
+    await screen.findByText(/Portal configuration is unavailable/);
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ save_api_keys_in_db: false }),
+    } as Response);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry portal configuration" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/Portal configuration is unavailable/),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("names the mobile sign-out control even when its text is hidden", async () => {
+    renderHome(false, false);
+    await screen.findByText("Virtual key");
+    const mobile = screen.getByRole("button", { name: "Sign out" });
+    expect(mobile).toHaveAttribute("aria-label", "Sign out");
+  });
 
   it("keeps plain multiline guidance beneath the action before and after key creation", async () => {
     const message = 'Keep this key safe.\n<img src=x onerror="alert(1)">';

@@ -2,6 +2,11 @@
 
 ## Progressive organization navigation
 
+The open Organization page refreshes hierarchy and membership status every
+60 seconds, including migration issues. **Refresh organization** updates loaded
+navigation and the selected report immediately. Usage reports remain lazy and
+are refreshed on demand rather than polled in the background.
+
 The Organization page initially loads only root-group metadata from LiteGate's
 configured hierarchy and local identity records. It does not wait for live
 LiteLLM data for every internal team, and it does not request installation-wide

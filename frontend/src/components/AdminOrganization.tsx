@@ -46,12 +46,14 @@ export default function AdminOrganization() {
     queryKey: ["organization-children", ""],
     queryFn: () => api.organizationChildren(),
     staleTime: 60000,
+    refetchInterval: 60000,
   });
   const childQueries = useQueries({
     queries: [...requestedParents].map((parent) => ({
       queryKey: ["organization-children", parent],
       queryFn: () => api.organizationChildren(parent),
       staleTime: 60000,
+      refetchInterval: expanded.has(parent) ? 60000 : false,
     })),
   });
   const enabled = overview.data?.enabled === true;
@@ -64,6 +66,7 @@ export default function AdminOrganization() {
     queryFn: () => api.organizationGroup(nodeId!),
     enabled: enabled && !!nodeId && groups.some((group) => group.id === nodeId),
     staleTime: 60000,
+    refetchInterval: 60000,
   });
   const validSelection = !nodeId || groups.some((group) => group.id === nodeId);
   if (!validSelection) {
@@ -82,6 +85,7 @@ export default function AdminOrganization() {
     queryFn: () => api.organizationUsers(nodeId ?? "", page),
     enabled: reportEnabled,
     staleTime: 60000,
+    refetchInterval: 60000,
   });
   const selected = groups.find((group) => group.id === nodeId);
   const selectedDetail = detail.data;
@@ -91,6 +95,31 @@ export default function AdminOrganization() {
   const nextLevel = overview.data?.levels[(selected?.level ?? -1) + 1];
   const showMembers = !!selected && !selected.has_children;
   const hasMemberUsage = Array.isArray(usage.data?.by_user);
+  const refreshing =
+    overview.isFetching ||
+    childQueries.some((query) => query.isFetching) ||
+    (reportEnabled &&
+      (detail.isFetching || usage.isFetching || users.isFetching));
+  const refreshButton = (
+    <button
+      type="button"
+      disabled={refreshing}
+      onClick={() => {
+        void overview.refetch();
+        childQueries.forEach((query) => {
+          void query.refetch();
+        });
+        if (reportEnabled) {
+          if (nodeId) void detail.refetch();
+          void usage.refetch();
+          void users.refetch();
+        }
+      }}
+      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 disabled:opacity-50"
+    >
+      Refresh organization
+    </button>
+  );
 
   function requestChildren(id: string) {
     if (!groups.find((group) => group.id === id)?.has_children) return;
@@ -130,9 +159,15 @@ export default function AdminOrganization() {
     return <p className="text-sm text-slate-500">Loading organization…</p>;
   if (overview.error)
     return (
-      <p role="alert" className="rounded-lg bg-red-50 p-4 text-sm text-red-700">
-        {overview.error.message}
-      </p>
+      <div className="space-y-3">
+        <p
+          role="alert"
+          className="rounded-lg bg-red-50 p-4 text-sm text-red-700"
+        >
+          {overview.error.message}
+        </p>
+        {refreshButton}
+      </div>
     );
   if (!enabled)
     return (
@@ -140,9 +175,10 @@ export default function AdminOrganization() {
         <Network className="text-indigo-500" />
         <h1 className="mt-4 text-lg font-semibold">Organization</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Configure organizationHierarchy in your Helm values to organize users
-          and manage their budgets.
+          Configure organizationHierarchy in your deployment configuration to
+          organize users and manage their budgets.
         </p>
+        <div className="mt-4">{refreshButton}</div>
       </section>
     );
 
@@ -155,9 +191,12 @@ export default function AdminOrganization() {
             Usage, membership, and budgets across your organization.
           </p>
         </div>
-        <span className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700">
-          Policies managed through Helm
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700">
+            Policies managed by configuration
+          </span>
+          {refreshButton}
+        </div>
       </div>
       {!!overview.data?.issues.length && (
         <div

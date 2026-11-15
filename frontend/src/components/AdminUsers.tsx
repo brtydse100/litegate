@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Info, Shield, UserPlus } from "lucide-react";
 import { api } from "../api/client";
 import { useOperationLimit } from "../hooks/useOperationLimit";
+import { useDialogDismiss } from "../hooks/useDialogDismiss";
 
 const inputClass =
   "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
@@ -54,6 +55,7 @@ export default function AdminUsers() {
     if (
       !resetUsername ||
       replacementPassword.length < 10 ||
+      replacementPassword.length > 256 ||
       operationsBlocked ||
       update.isPending
     )
@@ -69,19 +71,19 @@ export default function AdminUsers() {
     );
   }
 
-  useEffect(() => {
-    if (!resetUsername) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !update.isPending) {
-        setResetUsername(null);
-        setReplacementPassword("");
-      }
-    };
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [resetUsername, update.isPending]);
+  function closeReset() {
+    setResetUsername(null);
+    setReplacementPassword("");
+    update.reset();
+  }
+  const dialogRef = useDialogDismiss<HTMLFormElement>(
+    closeReset,
+    update.isPending,
+    !!resetUsername,
+  );
 
-  const error = create.error ?? update.error ?? users.error;
+  const error =
+    create.error ?? (resetUsername ? null : update.error) ?? users.error;
 
   return (
     <section className="w-full space-y-5">
@@ -181,6 +183,7 @@ export default function AdminUsers() {
             type="password"
             autoComplete="new-password"
             minLength={10}
+            maxLength={256}
             required
           />
         </label>
@@ -250,6 +253,7 @@ export default function AdminUsers() {
                 <div className="flex flex-wrap gap-2 text-xs">
                   <button
                     onClick={() => {
+                      update.reset();
                       setResetUsername(account.username);
                       setReplacementPassword("");
                     }}
@@ -301,15 +305,16 @@ export default function AdminUsers() {
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !update.isPending)
-              setResetUsername(null);
+              closeReset();
           }}
         >
           <form
+            ref={dialogRef}
             onSubmit={submitPasswordReset}
             role="dialog"
             aria-modal="true"
             aria-labelledby="reset-password-title"
-            className="w-full max-w-md space-y-4 rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-5 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-5 shadow-2xl"
           >
             <div>
               <h3
@@ -326,24 +331,32 @@ export default function AdminUsers() {
             <label className="block space-y-1 text-xs text-gray-400">
               <span>New password</span>
               <input
-                autoFocus
                 className={`${inputClass} w-full`}
                 type="password"
                 autoComplete="new-password"
                 minLength={10}
+                maxLength={256}
                 required
                 value={replacementPassword}
                 onChange={(event) => setReplacementPassword(event.target.value)}
               />
             </label>
+            {update.error && (
+              <p role="alert" className="text-sm text-red-700">
+                {update.error.message}
+              </p>
+            )}
+            {operationsBlocked && (
+              <p role="alert" className="text-sm text-amber-800">
+                Account actions are paused. Try again in {retryAfter || 1}{" "}
+                seconds.
+              </p>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 disabled={update.isPending}
-                onClick={() => {
-                  setResetUsername(null);
-                  setReplacementPassword("");
-                }}
+                onClick={closeReset}
                 className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
               >
                 Cancel
@@ -352,7 +365,8 @@ export default function AdminUsers() {
                 disabled={
                   update.isPending ||
                   operationsBlocked ||
-                  replacementPassword.length < 10
+                  replacementPassword.length < 10 ||
+                  replacementPassword.length > 256
                 }
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
               >

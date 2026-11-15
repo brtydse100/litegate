@@ -69,7 +69,7 @@ function TeamEditor({
   onCreate: (payload: TeamCreatePayload) => void;
   onUpdate: (teamId: string, payload: TeamUpdatePayload) => void;
 }) {
-  useDialogDismiss(onClose, pending);
+  const dialogRef = useDialogDismiss(onClose, pending);
   const existing = state.mode === "edit" ? state.team : null;
   const [alias, setAlias] = useState(existing?.team_alias ?? "");
   const [teamId, setTeamId] = useState(existing?.team_id ?? "");
@@ -150,6 +150,7 @@ function TeamEditor({
     <div
       className="!m-0 fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
       role="dialog"
+      ref={dialogRef}
       aria-modal="true"
       aria-labelledby="team-editor-title"
       onMouseDown={(event) => {
@@ -198,7 +199,7 @@ function TeamEditor({
           <label className="space-y-1 text-xs text-gray-400">
             <span>Team name</span>
             <input
-              autoFocus
+              data-dialog-autofocus
               className={inputClass}
               value={alias}
               placeholder={existing?.team_alias || "Team name"}
@@ -350,11 +351,12 @@ function DeleteTeamDialog({
   onDelete: () => void;
 }) {
   const [confirmation, setConfirmation] = useState("");
-  useDialogDismiss(onClose, pending);
+  const dialogRef = useDialogDismiss(onClose, pending);
   return (
     <div
       className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
       role="dialog"
+      ref={dialogRef}
       aria-modal="true"
       aria-labelledby="delete-team-title"
       onMouseDown={(event) => {
@@ -388,7 +390,7 @@ function DeleteTeamDialog({
             Type <code className="text-red-300">{team.team_id}</code> to confirm
           </span>
           <input
-            autoFocus
+            data-dialog-autofocus
             className={inputClass}
             value={confirmation}
             onChange={(event) => setConfirmation(event.target.value)}
