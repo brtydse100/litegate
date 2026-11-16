@@ -125,6 +125,9 @@ plaintext credentials.
 
 ## Budget planning and current enforcement boundary
 
+Usage spend displays use six to ten decimal places; amounts below that precision
+use scientific notation so a nonzero prompt cost is never displayed as zero.
+
 The opt-in budget page currently stores **proposals**. It does not activate a
 new enforcement mode. Child envelopes and manual direct-user overrides reserve
 funds first; the remainder is divided equally among other direct users using

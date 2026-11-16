@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { formatUsd as dollars } from "../formatUsd";
 
 const number = (value: number | null) =>
   value == null ? "Unavailable" : value.toLocaleString();
-const dollars = (value: number) => `$${value.toFixed(6)}`;
 
 export default function PersonalAnalytics() {
   const query = useQuery({

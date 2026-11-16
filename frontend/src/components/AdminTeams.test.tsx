@@ -149,7 +149,7 @@ describe("team policy editing", () => {
       </QueryClientProvider>,
     );
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
-    expect(screen.getByText("$0.0024")).toBeVisible();
+    expect(screen.getByText("$0.002400")).toBeVisible();
     expect(screen.getByText("Config managed")).toBeVisible();
     const dialog = screen.getByRole("dialog", { name: "Edit team" });
     const current = within(dialog).getByRole("region", {

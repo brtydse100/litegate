@@ -21,6 +21,9 @@ it.each([0.000001, 0.000002, 0.0024, 0.02, 0.04, 0.99, 1, 1234, 123456789])(
 );
 it("shows microspend precisely in accessible values", () => {
   expect(metricValue(0.000001, "spend")).toBe("$0.000001");
+  expect(metricValue(0.0000000123, "spend")).toBe("$0.0000000123");
+  expect(metricValue(0, "spend")).toBe("$0.000000");
+  expect(metricValue(1e-12, "spend")).not.toBe("$0.000000");
 });
 it.each(["spend", "tokens", "requests"] as const)(
   "scales %s bars to actual maximum",

@@ -52,6 +52,20 @@ beforeEach(() => {
 });
 
 describe("personal analytics", () => {
+  it("preserves small prompt costs in totals, model rows and chart values", async () => {
+    const data = snapshot();
+    data.totals.cost = 0.0000000123;
+    data.daily[0].cost = data.totals.cost;
+    data.models[0].cost = data.totals.cost;
+    vi.mocked(api.personalAnalytics).mockResolvedValue(data);
+    setup();
+    expect(await screen.findAllByText("$0.0000000123")).toHaveLength(2);
+    expect(
+      screen
+        .getByRole("img", { name: "Daily usage cost" })
+        .querySelector("title"),
+    ).toHaveTextContent("$0.0000000123, 3 requests");
+  });
   it("shows personal metrics, freshness, model breakdown and unavailable tokens", async () => {
     setup();
     expect(await screen.findByText("Input tokens")).toBeInTheDocument();

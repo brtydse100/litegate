@@ -1,5 +1,6 @@
 import type { OrganizationUsage, UsageMetrics } from "../types/organization";
 import EmailAddress from "./EmailAddress";
+import { formatUsd } from "../formatUsd";
 
 export type UsageMetric = keyof UsageMetrics;
 
@@ -11,8 +12,7 @@ export const metricLabels: Record<UsageMetric, string> = {
 
 export function metricValue(value: number, metric: UsageMetric): string {
   if (metric !== "spend") return value.toLocaleString();
-  if (value > 0 && value < 0.000001) return `$${value.toExponential(1)}`;
-  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`;
+  return formatUsd(value);
 }
 
 export function SpendTrend({
