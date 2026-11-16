@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Use concise Highlights-first release notes with compact artifact links and
+  upgrade warnings; reformat historical notes and prepare PR #49 draft notes.
+
 ## [2.18.0] - 2026-11-12
 
 ### Added
