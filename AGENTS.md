@@ -133,18 +133,21 @@ is available.
   Verify its Docker image and shared release aliases are published before
   reporting release completion. Preview images do not update `latest` and do not
   replace the post-merge release requirement.
-- Use the structure of [IceGraph v0.19.4](https://github.com/YanivZalach/IceGraph/releases/tag/v0.19.4)
+- Use the concise structure of [vLLM v0.33.0rc3](https://github.com/vllm-project/vllm/releases/tag/v0.33.0rc3)
   for `docs/releases/vX.Y.Z.md` and the corresponding GitHub release body:
   1. `# LiteGate vX.Y.Z` in the Markdown file (the GitHub release title provides
      this heading; `scripts/release_body.py` removes it from the release body).
-  2. `## Artifacts` with an `Artifact | Get it` table for the versioned GHCR
+  2. `## Highlights` with short, grouped user-visible bullets. Keep narrative,
+     implementation details and validation reports in focused guides or PRs.
+  3. `## Release Artifacts` with an `Artifact | Get it` table for the versioned GHCR
      Docker pull command, current live demo, versioned docs, source, and license.
-  3. `## What's Changed` with user-visible changes and verified author/PR or
-     commit attribution. Keep configuration, migration, security, and upgrade
-     details as `###` subsections here when needed.
-  4. A `**Full Changelog**` link comparing the previous release tag to this tag.
+  4. Optional `## Upgrade Notes` with concise configuration, migration, security
+     and breaking-change bullets. Preserve essential warnings and commands;
+     link detailed guides. Keep non-artifact content within 300 words.
+  5. Compact `**Changes:**` links with verified author/PR or commit attribution,
+     then a `**Full Changelog**` link comparing the previous release tag to this tag.
      For the first release, link to its commit history instead.
-  5. `## Contributors` thanking verified GitHub contributors.
+  6. `## Contributors` thanking verified GitHub contributors.
 - Include only artifacts LiteGate actually ships. Docker image tags are `X.Y.Z`,
   while Git tags are `vX.Y.Z`. Mark the live demo as current; do not imply it
   represents a historical release. Verify versioned artifact links exist; use

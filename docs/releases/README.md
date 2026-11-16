@@ -1,8 +1,12 @@
 # LiteGate release notes
 
-Release notes use a consistent Artifacts, What's Changed, Full Changelog, and
-Contributors format, retaining configuration and upgrade details when needed.
+Release notes lead with short Highlights, then Release Artifacts and optional
+Upgrade Notes, followed by change links and Contributors. Detailed explanations
+live in focused guides; essential migration and security warnings remain here.
 For an exhaustive history, see the [changelog](../../CHANGELOG.md).
+
+Upcoming: [PR #49 draft notes](unreleased-pr-49.md) (unreleased; version assigned
+after merge).
 
 | Version | Main change |
 | --- | --- |
