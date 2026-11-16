@@ -7,9 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-## [2.19.0] - 2026-11-16
-
-Prepared release; the stable tag and image have not been published.
+## [2.19.0] - 2026-11-17
 
 ### Added
 

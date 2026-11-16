@@ -5,12 +5,9 @@ Upgrade Notes, followed by change links and Contributors. Detailed explanations
 live in focused guides; essential migration and security warnings remain here.
 For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
-Upcoming: [2.19.0 prepared notes](v2.19.0.md), including merged PRs #49 and #50
-and the feature suite. Stable artifacts remain pending publication.
-
 | Version | Main change |
 | --- | --- |
-| [2.19.0](v2.19.0.md) | Personal analytics, scoped Organization access, People directory, reliable SQLite startup, and budget proposals (prepared) |
+| [2.19.0](v2.19.0.md) | Personal analytics, scoped Organization access, People directory, reliable SQLite startup, and budget proposals |
 | [2.18.0](v2.18.0.md) | Per-model key budgets, discovered Advanced policy fields, and progressive organization loading |
 | [2.17.0](v2.17.0.md) | Independent portal messages, shared login logo, single key action, Docker hierarchy guides, and repaired nightly E2E |
 | [2.16.0](v2.16.0.md) | Exact Model Hub URLs and configurable per-key concurrency defaults |
