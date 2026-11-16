@@ -343,6 +343,9 @@ def test_sessions_signed_before_a_secret_rotation_remain_valid(monkeypatch):
 @pytest.mark.asyncio
 async def test_admin_local_user_lifecycle_works_through_public_api(monkeypatch, tmp_path):
     monkeypatch.setattr(auth.settings, "local_users_db_path", str(tmp_path / "users.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     token = auth._make_jwt("admin-1", "admin@example.com", role="admin")
     headers = {"Authorization": f"Bearer {token}"}
     async with _client() as client:

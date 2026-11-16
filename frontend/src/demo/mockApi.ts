@@ -229,6 +229,36 @@ async function mockResponse(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
+  if (path === "/api/analytics") {
+    if (!signedIn) return json({ detail: "Not signed in" }, 401);
+    const day = new Date().toISOString().slice(0, 10);
+    const metrics = {
+      requests: 42,
+      tokens: 18000,
+      input_tokens: 12000,
+      output_tokens: 6000,
+      cost: 0.0642,
+    };
+    return json({
+      totals: metrics,
+      daily: [{ date: day, ...metrics }],
+      models: [{ model: "demo-model", ...metrics }],
+      budgets: [],
+      last_refreshed_at: new Date().toISOString(),
+      stale: false,
+      available: true,
+      coverage_start: day,
+      coverage_end: day,
+    });
+  }
+  if (path === "/api/v1/organization/access") {
+    if (!signedIn) return json({ detail: "Not signed in" }, 401);
+    return json({
+      organization: demoUser.role === "admin",
+      global_admin: demoUser.role === "admin",
+      roots: [],
+    });
+  }
   if (path === "/api/v1/policy-schemas") {
     if (!signedIn) return json({ detail: "Not signed in" }, 401);
     if (demoUser.role !== "admin")
@@ -310,6 +340,8 @@ async function mockResponse(request: Request): Promise<Response> {
       litellm_ui_url: "",
       api_docs_url: "https://github.com/brtydse100/litegate/blob/main/API.md",
       local_users_enabled: true,
+      analytics_enabled: true,
+      organization_delegation_enabled: false,
       // Synthetic budgets only; demo mode never connects to a LiteLLM proxy.
       litellm_enterprise_enabled: true,
     });
@@ -451,6 +483,38 @@ async function mockResponse(request: Request): Promise<Response> {
       details: { key_count: targetKeys.length, reset, failed },
     });
     return json({ reset, failed, results });
+  }
+  if (path === "/api/v1/people" && method === "GET") {
+    const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
+    const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+    const size = Math.min(
+      100,
+      Math.max(1, Number(url.searchParams.get("size")) || 25),
+    );
+    const people = [
+      {
+        user_id: demoUser.user_id,
+        email: demoUser.email,
+        upstream_role: "proxy_admin",
+      },
+      {
+        user_id: "demo-sso-no-key",
+        email: "no-key@example.com",
+        upstream_role: "internal_user",
+      },
+      ...users.map((user) => ({
+        user_id: user.user_id,
+        email: user.email,
+        upstream_role: "internal_user",
+      })),
+    ].filter((person) => person.email.toLowerCase().includes(search));
+    return json({
+      users: people.slice((page - 1) * size, page * size),
+      page,
+      size,
+      total: people.length,
+      total_pages: Math.ceil(people.length / size),
+    });
   }
   if (path === "/api/v1/users" && method === "GET") return json(users);
   if (path === "/api/v1/users" && method === "POST") {

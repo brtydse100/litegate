@@ -253,3 +253,13 @@ paginated to avoid loading every key at once.
 
 Continue with the [deployment guide](../DEPLOYMENT.md) or
 [configuration reference](configuration.md).
+
+
+## Scoped access and personal analytics
+
+All portal users can open personal hourly analytics. System administrators can
+search the read-only registered People directory, including SSO/no-key accounts.
+Delegated Organization access requires both designation and group administration;
+LiteGate-managed scoped roles work without an Enterprise license. Full email
+addresses wrap and have explicit copy actions. See [configuration and current
+enforcement limits](governance-and-analytics.md).

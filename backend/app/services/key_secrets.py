@@ -13,7 +13,6 @@ def key_hash(identifier: str) -> str:
 def save(secret: str, user_id: str) -> None:
     if not settings.save_api_keys_in_db:
         return
-    local_users.init_db()
     with local_users.connect() as db:
         db.execute(
             "INSERT OR REPLACE INTO stored_api_keys (key_hash, user_id, key_secret) VALUES (?, ?, ?)",
@@ -32,7 +31,6 @@ def remove(identifier: str) -> None:
 def get(identifier: str, user_id: str) -> str | None:
     if not settings.save_api_keys_in_db:
         return None
-    local_users.init_db()
     with local_users.connect() as db:
         row = db.execute(
             "SELECT key_secret FROM stored_api_keys WHERE key_hash = ? AND user_id = ?",
@@ -44,7 +42,6 @@ def get(identifier: str, user_id: str) -> str | None:
 def annotate(keys: list[dict]) -> list[dict]:
     if not settings.save_api_keys_in_db or not keys:
         return keys
-    local_users.init_db()
     identifiers = [key_hash(key.get("token") or key.get("api_key") or key.get("key") or "") for key in keys]
     available: set[str] = set()
     with local_users.connect() as db:

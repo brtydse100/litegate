@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { ChevronRight, Network, Users } from "lucide-react";
 import { api } from "../api/client";
+import EmailAddress from "./EmailAddress";
 import type { OrganizationNode } from "../types/organization";
 import {
   metricLabels,
@@ -468,6 +469,7 @@ export default function AdminOrganization() {
                       : usage.data.by_group
                   }
                   metric={metric}
+                  emailLabels={showMembers && hasMemberUsage}
                   onSelect={!showMembers && nextLevel ? selectChild : undefined}
                 />
                 <UsageBars
@@ -513,9 +515,16 @@ export default function AdminOrganization() {
                       {users.data?.users.map((user) => (
                         <tr key={user.user_id}>
                           <td className="px-4 py-3">
-                            <p className="font-medium text-slate-800">
-                              {user.email || user.user_id}
-                            </p>
+                            {user.email ? (
+                              <EmailAddress
+                                email={user.email}
+                                className="font-medium text-slate-800"
+                              />
+                            ) : (
+                              <p className="break-all font-medium text-slate-800">
+                                {user.user_id}
+                              </p>
+                            )}
                             {user.email && (
                               <p className="mt-1 text-slate-500">
                                 {user.user_id}

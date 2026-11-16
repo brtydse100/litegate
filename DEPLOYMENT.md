@@ -709,3 +709,11 @@ context supplies `fsGroup: 10001` for supported volume types.
 ## Automation API
 
 Open `/api/docs` for interactive OpenAPI documentation. The stable routes are under `/api/v1`; see [API.md](API.md) for credential options, bulk key updates, and user-management examples.
+
+
+## Persistent SSO data and feature configuration
+
+SSO-only deployments still use SQLite for saved key copies, identity bindings,
+audit history and analytics. Keep its volume/PVC mounted at the configured path
+across upgrades; enabling a new PVC does not move existing pod data. See
+[Helm/Docker configuration and backup guidance](docs/governance-and-analytics.md).

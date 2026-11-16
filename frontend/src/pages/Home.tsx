@@ -25,7 +25,10 @@ import { primaryKeyActionClassName } from "../components/keyActionStyles";
 import { keyToken } from "../components/BulkKeyEditor";
 import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
+import EmailAddress from "../components/EmailAddress";
 import AdminTeams from "../components/AdminTeams";
+import PersonalAnalytics from "../components/PersonalAnalytics";
+import BudgetManager from "../components/BudgetManager";
 import AdminOrganization from "../components/AdminOrganization";
 import ThemeToggle from "../components/ThemeToggle";
 import { api } from "../api/client";
@@ -41,6 +44,9 @@ interface PortalConfig {
   api_docs_url: string;
   local_users_enabled: boolean;
   save_api_keys_in_db: boolean;
+  analytics_enabled?: boolean;
+  organization_delegation_enabled?: boolean;
+  hierarchical_budgets_enabled?: boolean;
   litellm_enterprise_enabled: boolean;
 }
 
@@ -415,18 +421,45 @@ export default function Home() {
 
   const config = portal.data;
   const isAdmin = user?.role === "admin";
+  const organizationAccess = useQuery({
+    queryKey: ["organization-access"],
+    queryFn: () => api.organizationAccess(),
+    enabled: !isAdmin && !!config?.organization_delegation_enabled,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+  const canViewOrganization =
+    isAdmin || organizationAccess.data?.organization === true;
+  const analyticsEnabled = config?.analytics_enabled === true;
+  const showSidebar = isAdmin || canViewOrganization || analyticsEnabled;
   const localUsersEnabled = config?.local_users_enabled ?? true;
   const section = location.pathname === "/" ? "/my-key" : location.pathname;
+  if (
+    (section === "/analytics" || section === "/organization") &&
+    portal.isPending
+  )
+    return <p role="status">Loading access…</p>;
+  if (
+    section === "/organization" &&
+    !isAdmin &&
+    config?.organization_delegation_enabled &&
+    organizationAccess.isPending
+  )
+    return <p role="status">Checking organization access…</p>;
   const adminSections = new Set([
     "/keys",
-    ...(localUsersEnabled ? ["/users"] : []),
+    "/users",
     "/teams",
     "/organization",
     "/status",
+    ...(analyticsEnabled ? ["/analytics"] : []),
   ]);
   if (location.pathname === "/") return <Navigate to="/my-key" replace />;
   if (
-    (!isAdmin && section !== "/my-key") ||
+    (!isAdmin &&
+      section !== "/my-key" &&
+      !(section === "/analytics" && analyticsEnabled) &&
+      !(section === "/organization" && canViewOrganization)) ||
     (isAdmin && section !== "/my-key" && !adminSections.has(section))
   ) {
     return <Navigate to="/my-key" replace />;
@@ -435,10 +468,11 @@ export default function Home() {
   const titles: Record<string, string> = {
     "/my-key": "My API access",
     "/keys": "Key policies",
-    "/users": "Local users",
+    "/users": localUsersEnabled ? "Local users" : "People",
     "/teams": "Teams",
     "/organization": "Organization",
     "/status": "System status",
+    "/analytics": "Personal analytics",
   };
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
@@ -448,12 +482,20 @@ export default function Home() {
     }`;
   const navItems = [
     { to: "/my-key", label: "My key", icon: KeyRound },
+    ...(analyticsEnabled
+      ? [{ to: "/analytics", label: "Analytics", icon: Activity }]
+      : []),
+    ...(!isAdmin && canViewOrganization
+      ? [{ to: "/organization", label: "Organization", icon: Network }]
+      : []),
     ...(isAdmin
       ? [
           { to: "/keys", label: "Key policies", icon: Shield },
-          ...(localUsersEnabled
-            ? [{ to: "/users", label: "Local users", icon: Users }]
-            : []),
+          {
+            to: "/users",
+            label: localUsersEnabled ? "Local users" : "People",
+            icon: Users,
+          },
           { to: "/teams", label: "Teams", icon: Building2 },
           { to: "/organization", label: "Organization", icon: Network },
           { to: "/status", label: "Status", icon: Activity },
@@ -463,7 +505,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 md:flex md:h-screen md:overflow-hidden">
-      {isAdmin && (
+      {showSidebar && (
         <aside className="hidden w-60 flex-none flex-col border-r border-slate-200 bg-white md:flex">
           <div className="flex h-14 items-center border-b border-slate-200 px-4">
             <Brand logoUrl={config?.logo_url} />
@@ -479,6 +521,16 @@ export default function Home() {
               <NavLink to="/my-key" className={navClass}>
                 <KeyRound size={16} /> My key
               </NavLink>
+              {analyticsEnabled && (
+                <NavLink to="/analytics" className={navClass}>
+                  <Activity size={16} /> Analytics
+                </NavLink>
+              )}
+              {!isAdmin && canViewOrganization && (
+                <NavLink to="/organization" className={navClass}>
+                  <Network size={16} /> Organization
+                </NavLink>
+              )}
             </div>
             {isAdmin && (
               <>
@@ -490,11 +542,12 @@ export default function Home() {
                     <NavLink to="/keys" className={navClass}>
                       <Shield size={16} /> Key policies
                     </NavLink>
-                    {localUsersEnabled && (
+                    {
                       <NavLink to="/users" className={navClass}>
-                        <Users size={16} /> Local users
+                        <Users size={16} />{" "}
+                        {localUsersEnabled ? "Local users" : "People"}
                       </NavLink>
-                    )}
+                    }
                     <NavLink to="/teams" className={navClass}>
                       <Building2 size={16} /> Teams
                     </NavLink>
@@ -520,9 +573,12 @@ export default function Home() {
                 {user?.email?.slice(0, 2).toUpperCase() || "LG"}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-slate-800">
-                  {user?.email}
-                </p>
+                {user?.email && (
+                  <EmailAddress
+                    email={user.email}
+                    className="text-xs font-medium text-slate-800"
+                  />
+                )}
                 <p className="text-[10px] capitalize text-slate-500">
                   {user?.role || "user"}
                 </p>
@@ -613,9 +669,14 @@ export default function Home() {
         <main className="min-w-0 flex-1 overflow-y-auto px-4 py-7 sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-6xl">
             {section === "/users" && isAdmin ? (
-              <AdminUsers />
-            ) : section === "/organization" && isAdmin ? (
-              <AdminOrganization />
+              <AdminUsers localUsersEnabled={localUsersEnabled} />
+            ) : section === "/organization" && canViewOrganization ? (
+              <>
+                <AdminOrganization />
+                {config?.hierarchical_budgets_enabled && <BudgetManager />}
+              </>
+            ) : section === "/analytics" && analyticsEnabled ? (
+              <PersonalAnalytics />
             ) : section === "/teams" && isAdmin ? (
               <AdminTeams />
             ) : section === "/keys" && isAdmin ? (

@@ -4,7 +4,7 @@ import json
 import sqlite3
 
 from app.config import settings
-from app.services import local_users
+from app.services import database, local_users
 
 
 class IdentityConflict(ValueError):
@@ -20,15 +20,7 @@ def provider_authority() -> str:
 
 
 def initialize_identity_store() -> None:
-    with local_users.connect() as db:
-        db.execute("""CREATE TABLE IF NOT EXISTS sso_reservations (
-            provider TEXT NOT NULL, email TEXT NOT NULL, user_id TEXT NOT NULL UNIQUE,
-            ownership_token TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'intent'
-                CHECK(status IN ('intent', 'reserved', 'pending', 'superseded')),
-            candidate_id TEXT NOT NULL DEFAULT '', PRIMARY KEY(provider, email))""")
-        db.execute("""CREATE TABLE IF NOT EXISTS sso_bindings (
-            provider TEXT NOT NULL, subject TEXT NOT NULL, email TEXT NOT NULL,
-            user_id TEXT NOT NULL UNIQUE, PRIMARY KEY(provider, subject), UNIQUE(provider, email))""")
+    database.initialize()
 
 
 def _existing_row(query: str, params: tuple) -> dict | None:
@@ -36,7 +28,7 @@ def _existing_row(query: str, params: tuple) -> dict | None:
     path = local_users._db_path()
     if not path.exists():
         return None
-    with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as db:
+    with database.connect(read_only=True) as db:
         db.row_factory = sqlite3.Row
         if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sso_bindings'").fetchone():
             return None
@@ -57,7 +49,6 @@ def reservation(provider: str, email: str) -> dict | None:
 
 
 def bind(provider: str, subject: str, email: str, user_id: str) -> None:
-    initialize_identity_store()
     email = email.strip().casefold()
     try:
         with local_users.connect() as db:

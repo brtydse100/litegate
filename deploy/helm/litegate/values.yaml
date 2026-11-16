@@ -29,7 +29,7 @@ securityContext:
 
 image:
   repository: ghcr.io/brtydse100/litegate
-  tag: "2.18.0"  # Pin a specific tag in production.
+  tag: "2.19.0"  # Pin a specific tag in production.
   pullPolicy: IfNotPresent
 
 service:
@@ -169,6 +169,17 @@ config:
   # -- Generated-key defaults ------------------------------------------------
   # Store full keys in SQLite so owners and administrators can reveal them.
   saveApiKeysInDb: false
+  # Canonical user ID -> team IDs. Also requires a configured or native admin role.
+  organizationAccessDesignations: {}
+  # Native team ID -> canonical user IDs; LiteGate-scoped roles work without Enterprise.
+  organizationGroupAdmins: {}
+  # Assessment/audit only for removed, installation-owned teams; never deletes teams.
+  organizationCleanupEnabled: false
+  analyticsEnabled: true
+  analyticsRetentionDays: 90
+  analyticsBatchConcurrency: 5
+  # Opt-in budget proposals only; activation currently returns 503.
+  hierarchicalBudgetsEnabled: false
   # Uncomment only the limits LiteGate should apply.
   # keyMaxBudget: "10.0"
   # keyBudgetDuration: "30d"

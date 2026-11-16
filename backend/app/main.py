@@ -8,8 +8,11 @@ from fastapi.responses import JSONResponse
 
 from app import observability
 from app.config import settings
+from app.routers import analytics as analytics_router
 from app.routers import api_v1, auth, keys, logs, organization, users
-from app.services import litellm, local_users, organization_sync
+from app.routers import people
+from app.routers import budgets
+from app.services import analytics, litellm, local_users, organization_sync
 from app.version import VERSION
 
 
@@ -18,15 +21,21 @@ async def lifespan(_: FastAPI):
     local_users.init_db()
     await litellm.start_client()
     organization_task = None
+    analytics_task = None
     try:
-        if settings.organization_hierarchy.levels:
+        if settings.organization_hierarchy.levels or settings.organization_cleanup_enabled:
             await organization_sync.reconciliation_attempt()
             organization_task = asyncio.create_task(organization_sync.run_reconciliation())
+        if settings.analytics_enabled:
+            analytics_task = asyncio.create_task(analytics.run())
         yield
     finally:
         if organization_task:
             organization_task.cancel()
             await asyncio.gather(organization_task, return_exceptions=True)
+        if analytics_task:
+            analytics_task.cancel()
+            await asyncio.gather(analytics_task, return_exceptions=True)
         await litellm.close_client()
 
 
@@ -89,6 +98,9 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(keys.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(analytics_router.router, prefix="/api")
+app.include_router(people.router, prefix="/api/v1")
+app.include_router(budgets.router, prefix="/api")
 app.include_router(api_v1.router, prefix="/api")
 app.include_router(organization.router, prefix="/api")
 
@@ -104,6 +116,9 @@ async def portal_config():
         "api_docs_url": "/api/docs",
         "local_users_enabled": settings.local_users_enabled,
         "save_api_keys_in_db": settings.save_api_keys_in_db,
+        "analytics_enabled": settings.analytics_enabled,
+        "organization_delegation_enabled": bool(settings.organization_access_designations),
+        "hierarchical_budgets_enabled": settings.hierarchical_budgets_enabled,
         "litellm_enterprise_enabled": settings.litellm_enterprise_enabled,
     }
 

@@ -94,8 +94,12 @@ it checks budget persistence and reset windows without requiring a license.
 The disposable Compose stack loads `litellm-integration.yaml` with a synthetic
 mock model so LiteLLM initializes its router, which is required for changing an
 existing key's team. The mock uses no real provider credentials or external API.
-Enterprise request enforcement and analytics access still require validation on
-a licensed deployment. Never run this against a production proxy.
+Upstream Enterprise request enforcement and licensed native analytics access
+still require validation on a licensed deployment. LiteGate personal analytics
+uses its own local snapshots and is available without an Enterprise license;
+see the [real SSO harness](testing-sso.md) and
+[governance guide](governance-and-analytics.md). Never run this against a
+production proxy.
 
 ## Spend lifecycle regressions
 
@@ -208,3 +212,11 @@ without a login callback. Run it with the existing integration Compose stack and
 `RUN_LITELLM_INTEGRATION=1`; a working Docker daemon is required. Startup attempts
 can report per-user failures even when the application becomes ready. The Helm
 startup probe allows 30 minutes for the initial pass before liveness enforcement.
+
+
+## Real Keycloak integration
+
+The [local SSO harness](testing-sso.md) uses actual authorization-code callbacks
+with Keycloak and LiteLLM 1.109.1 without patched license checks. It exercises
+positive and negative delegated access through LiteGate-managed group roles,
+no-key discovery, email copy, credential persistence/transfer and owner isolation.

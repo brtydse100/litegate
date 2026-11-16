@@ -4,19 +4,14 @@ import json
 from datetime import datetime, timezone
 
 from app.services.local_users import connect
+from app.services import database
 
 
 def init_db() -> None:
-    with connect() as db:
-        db.execute("""CREATE TABLE IF NOT EXISTS organization_identities (
-            user_id TEXT PRIMARY KEY, email TEXT NOT NULL, auth_source TEXT NOT NULL,
-            groups_json TEXT NOT NULL, team_id TEXT, policy_json TEXT,
-            sync_error TEXT, updated_at TEXT NOT NULL
-        )""")
+    database.initialize()
 
 
 def remember(user_id: str, email: str, auth_source: str, groups: list[str]) -> None:
-    init_db()
     with connect() as db:
         db.execute(
             """INSERT INTO organization_identities
@@ -29,7 +24,6 @@ def remember(user_id: str, email: str, auth_source: str, groups: list[str]) -> N
 
 
 def get(user_id: str) -> dict | None:
-    init_db()
     with connect() as db:
         row = db.execute("SELECT * FROM organization_identities WHERE user_id=?", (user_id,)).fetchone()
     return decode(row) if row else None
@@ -43,7 +37,6 @@ def decode(row) -> dict:
 
 
 def list_identities() -> list[dict]:
-    init_db()
     with connect() as db:
         return [decode(row) for row in db.execute("SELECT * FROM organization_identities ORDER BY user_id")]
 

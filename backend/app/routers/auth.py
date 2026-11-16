@@ -11,7 +11,7 @@ from app.dependencies import get_current_user
 from app.models import CurrentUser
 from app.rate_limit import check_login_rate_limit, clear_login_failures, record_login_failure
 from app.services import litellm as llm
-from app.services import local_users
+from app.services import analytics_store, local_users
 from app.services import generic_sso
 from app.services import key_team_migration
 from app.services import oidc as oidc_svc
@@ -224,4 +224,6 @@ async def auth_config():
 
 @router.get("/me")
 async def me(current_user: CurrentUser = Depends(get_current_user)):
+    if settings.analytics_enabled:
+        await asyncio.to_thread(analytics_store.remember_portal_user, current_user.user_id, current_user.email, current_user.auth_source)
     return current_user

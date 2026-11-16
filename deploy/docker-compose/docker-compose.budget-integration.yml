@@ -1,0 +1,7 @@
+# LiteLLM 1.109.1 override for docker-compose.integration.yml; use a separate project.
+# Requires Docker Compose with !override support; the gateway binds loopback only.
+services:
+  litellm:
+    image: docker.litellm.ai/berriai/litellm@sha256:11175975a3093e05e92faee2fe2fe3412a3ae2fcaa849eb0fe25d5f0d8bcb2e9
+    ports: !override
+      - "127.0.0.1:4001:4000"

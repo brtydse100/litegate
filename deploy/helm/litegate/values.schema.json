@@ -163,6 +163,47 @@
         "litellmEnterpriseEnabled": {
           "type": "boolean",
           "default": false
+        },
+        "organizationAccessDesignations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        },
+        "organizationCleanupEnabled": {
+          "type": "boolean"
+        },
+        "analyticsEnabled": {
+          "type": "boolean"
+        },
+        "analyticsRetentionDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 366
+        },
+        "analyticsBatchConcurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "hierarchicalBudgetsEnabled": {
+          "type": "boolean"
+        },
+        "organizationGroupAdmins": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
         }
       }
     },

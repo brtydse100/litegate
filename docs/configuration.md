@@ -512,3 +512,10 @@ Move the current value to `jwt_previous_secrets`, install a new random
 existing sessions continue to verify with the prior value. After the configured
 `jwt_expire_minutes` has elapsed, remove the prior value and restart again.
 Never reuse a previous secret for signing new sessions.
+
+
+## Scoped access and hourly analytics
+
+See [governance and analytics configuration](governance-and-analytics.md) for the
+matching Helm, Docker/YAML and environment settings, SSO-only database persistence,
+license-independent group roles, hourly snapshots, and opt-in budget proposals.

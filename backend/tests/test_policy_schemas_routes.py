@@ -11,7 +11,7 @@ from app.rate_limit import _key_ops
 from app.routers.api_actor import ApiActor
 from app.routers.api_v1 import api_create_team, api_update_team, bulk_update_keys
 from app.routers.api_v1_policy_schemas import api_policy_schemas
-from app.services import policy_schemas
+from app.services import litellm_client, policy_schemas
 from tests.test_policy_schemas import document, nested_document
 
 
@@ -39,7 +39,7 @@ async def test_unavailable_upstream_is_safe_and_negative_cached(status):
         async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as upstream:
             yield upstream
 
-    with patch.object(policy_schemas, "client", transport):
+    with patch.object(litellm_client, "client", transport):
         first = await policy_schemas.get_policy_schemas()
         assert await policy_schemas.get_policy_schemas() == first
     assert len(requests) == 1
@@ -62,7 +62,7 @@ async def test_discovery_uses_only_configured_origin_no_redirect_or_external_ref
         async with httpx.AsyncClient(transport=httpx.MockTransport(handle), follow_redirects=True) as upstream:
             yield upstream
 
-    with patch.object(policy_schemas, "client", transport):
+    with patch.object(litellm_client, "client", transport):
         assert (await policy_schemas.get_policy_schemas())["available"] is False
     assert [str(request.url) for request in requests] == ["https://configured.invalid/prefix/openapi.json"]
 
@@ -80,7 +80,7 @@ async def test_redirect_is_not_followed():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handle), follow_redirects=True) as upstream:
             yield upstream
 
-    with patch.object(policy_schemas, "client", transport):
+    with patch.object(litellm_client, "client", transport):
         assert (await policy_schemas.get_policy_schemas())["available"] is False
     assert len(requests) == 1
 
@@ -94,7 +94,7 @@ async def test_size_limit_and_timeout_fail_closed(monkeypatch):
         async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=b" " * 11))) as upstream:
             yield upstream
 
-    with patch.object(policy_schemas, "client", transport):
+    with patch.object(litellm_client, "client", transport):
         assert (await policy_schemas.get_policy_schemas())["available"] is False
     monkeypatch.setattr(policy_schemas, "_cache", None)
     with patch.object(policy_schemas, "_fetch_schemas", AsyncMock(side_effect=httpx.ReadTimeout("hidden-upstream-value"))):
@@ -208,5 +208,5 @@ async def test_malformed_upstream_schema_is_unavailable(schema):
         async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=data))) as upstream:
             yield upstream
 
-    with patch.object(policy_schemas, "client", transport):
+    with patch.object(litellm_client, "client", transport):
         assert (await policy_schemas.get_policy_schemas())["available"] is False

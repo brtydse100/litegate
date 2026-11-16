@@ -1,0 +1,15 @@
+LiteGate uses SQLite for saved keys, SSO identity bindings, audit events,
+personal analytics, and budget proposals, including SSO-only installations.
+
+{{- if .Values.persistence.enabled }}
+Persistent data is mounted at /app/backend/data. Keep this claim and the same
+database path across upgrades. Back up SQLite before changing its storage.
+{{- else }}
+WARNING: Built-in persistence is disabled. Verify that an external persistent
+volume is mounted at the configured database path. Otherwise replacing this pod
+loses its local data, including saved API key copies. Existing credentials can
+remain valid in LiteLLM even when their saved copies are lost here.
+{{- end }}
+
+Enabling a new PVC does not transfer data from the current pod. Preserve that
+database before replacing the pod. See docs/governance-and-analytics.md.

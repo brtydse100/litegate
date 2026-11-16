@@ -2,6 +2,7 @@
 
 import asyncio
 import math
+from uuid import uuid4
 
 import httpx
 from fastapi import HTTPException
@@ -36,7 +37,19 @@ async def sync_root(root: OrganizationNode) -> dict:
     existing = await litellm.get_team(root.team_id)
     policy = {"max_budget": None, "budget_duration": root.duration}
     if existing is None:
-        await litellm.create_team({"team_id": root.team_id, "team_alias": root.member.name, **policy})
+        from app.services import organization_retirement
+
+        marker = uuid4().hex
+        created = await litellm.create_team(
+            {"team_id": root.team_id, "team_alias": root.member.name, "metadata": {"litegate_creation": marker}, **policy}
+        )
+        if (
+            isinstance(created, dict)
+            and created.get("team_id") == root.team_id
+            and isinstance(created.get("metadata"), dict)
+            and created["metadata"].get("litegate_creation") == marker
+        ):
+            await asyncio.to_thread(organization_retirement.mark_created, root.team_id)
     # Existing caps are finalized only after individual key policies are verified.
     return await team_info(root.team_id)
 

@@ -6,7 +6,14 @@ import AdminUsers from "./AdminUsers";
 
 afterEach(() => vi.restoreAllMocks());
 
-function setup() {
+function setup(localUsersEnabled = true) {
+  vi.spyOn(api, "listPeople").mockResolvedValue({
+    users: [],
+    page: 1,
+    size: 25,
+    total: 0,
+    total_pages: 0,
+  });
   vi.spyOn(api, "listUsers").mockResolvedValue([
     {
       username: "alice",
@@ -28,11 +35,22 @@ function setup() {
   });
   render(
     <QueryClientProvider client={client}>
-      <AdminUsers />
+      <AdminUsers localUsersEnabled={localUsersEnabled} />
     </QueryClientProvider>,
   );
   return client;
 }
+
+it("keeps the read-only people directory available when local accounts are disabled", async () => {
+  setup(false);
+  expect(
+    await screen.findByRole("region", { name: "People directory" }),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "Add user" }),
+  ).not.toBeInTheDocument();
+  expect(api.listUsers).not.toHaveBeenCalled();
+});
 
 it("shows reset errors in the modal, enforces the length limit and clears errors on reopening", async () => {
   vi.spyOn(api, "updateUser").mockRejectedValue(

@@ -7,10 +7,50 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.19.0] - 2026-11-16
+
+Prepared release; the stable tag and image have not been published.
+
+### Added
+
+- Personal analytics for all portal users, backed by hourly incremental SQLite
+  snapshots with request/token/cost/model/daily totals, coverage, freshness,
+  failure retention and owner-only access.
+- License-independent scoped Organization delegation requiring both an explicit
+  designation and group administration, with subtree-only report data.
+- Read-only People directory for registered SSO and no-key identities, including
+  installations with local password accounts disabled.
+- Opt-in durable hierarchical budget proposals with child reservations, manual
+  direct-user overrides, equal automatic allocations and revision conflict checks.
+  Activation is unavailable; proposals do not apply new inference limits.
+- Ownership-backed, opt-in assessment and audit for removed organization groups;
+  automatic deletion remains unavailable without atomic upstream safeguards.
+- Real Keycloak SSO fixtures and CI coverage for identity, group changes,
+  original-key retention, scoped access and account isolation.
+
 ### Changed
 
+- Initialize shared SQLite state transactionally at startup using versioned
+  migrations and bounded locking; preserve existing users, key copies and SSO
+  bindings without runtime schema creation.
+- Show complete, wrapping, copyable email addresses across user and team views.
+- Return safe field-level Advanced policy errors without weakening validation.
+- Document persistent storage for SSO-only Helm and Docker upgrades.
 - Use concise Highlights-first release notes with compact artifact links and
-  upgrade warnings; reformat historical notes and prepare PR #49 draft notes.
+  upgrade warnings, including reformatted historical notes.
+- Restrict permanent key deletion to administrators; owners retain
+  spend-preserving rotation. Reserve the bootstrap username case-insensitively.
+
+### Fixed
+
+- Adopt existing accounts into configured organization hierarchies while
+  preserving IDs, credentials, spend, key restrictions and retry safety.
+- Preserve rotation expiration and source policies; serialize administrator key
+  changes with rotation and require review of restrictive legacy-team policies.
+- Clear private browser caches between accounts, distinguish bootstrap sessions
+  and audit legacy account routes.
+- Refresh organization migration status automatically and improve password-reset
+  errors, keyboard focus and mobile sign-out accessibility.
 
 ## [2.18.0] - 2026-11-12
 
@@ -490,7 +530,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.18.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.19.0...HEAD
+[2.19.0]: https://github.com/brtydse100/litegate/compare/v2.18.0...v2.19.0
 [2.18.0]: https://github.com/brtydse100/litegate/compare/v2.17.0...v2.18.0
 [2.17.0]: https://github.com/brtydse100/litegate/compare/v2.16.0...v2.17.0
 [2.13.0]: https://github.com/brtydse100/litegate/compare/v2.12.2...v2.13.0

@@ -18,6 +18,9 @@ async def native(monkeypatch, tmp_path):
     tree = OrganizationHierarchy.model_validate(example())
     monkeypatch.setattr(settings, "organization_hierarchy", tree)
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "native.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     sync._locks.clear()
     state = {
         "teams": {"engineering": {"team_id": "engineering", "max_budget": 5000, "budget_duration": "30d", "spend": 5}},

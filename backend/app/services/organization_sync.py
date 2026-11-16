@@ -292,6 +292,10 @@ async def reconcile() -> None:
 async def reconciliation_attempt() -> None:
     try:
         await reconcile()
+        if settings.organization_cleanup_enabled:
+            from app.services import organization_retirement
+
+            await organization_retirement.assess_removed_teams()
     except Exception:
         _logger.exception("Organization synchronization failed")
 

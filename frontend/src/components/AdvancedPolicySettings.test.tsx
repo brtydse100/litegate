@@ -196,3 +196,34 @@ it("discovers fields introduced by a later LiteLLM version on refresh", async ()
   expect(screen.queryByLabelText("Edit password")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("Edit read_only")).not.toBeInTheDocument();
 });
+
+it("associates nested server errors with their control and preserves the draft", async () => {
+  const { ref } = setup();
+  await open();
+  fireEvent.click(screen.getByLabelText("Edit object_permission"));
+  fireEvent.change(screen.getByLabelText("object_permission"), {
+    target: { value: '{"mcp_servers":["draft"]}' },
+  });
+  const error = Object.assign(new Error("Must match the required type."), {
+    fieldErrors: [
+      {
+        loc: [
+          "body",
+          "advanced_settings",
+          "object_permission",
+          "mcp_servers",
+          0,
+        ],
+        msg: "Must match the required type.",
+        type: "schema.type",
+      },
+    ],
+  });
+  act(() => ref.current!.setServerError(error));
+  const control = screen.getByLabelText("object_permission");
+  expect(control).toHaveAttribute("aria-invalid", "true");
+  expect(control).toHaveAccessibleDescription(
+    "object_permission.mcp_servers.0: Must match the required type.",
+  );
+  expect(control).toHaveValue('{"mcp_servers":["draft"]}');
+});

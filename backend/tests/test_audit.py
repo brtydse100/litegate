@@ -6,6 +6,9 @@ from app.services import audit, local_users
 
 def test_audit_history_redacts_secrets_and_summarizes_keys(tmp_path, monkeypatch):
     monkeypatch.setattr(local_users.settings, "local_users_db_path", str(tmp_path / "audit.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
 
     audit.record(
         actor_id="local:admin",
@@ -25,6 +28,9 @@ def test_audit_history_redacts_secrets_and_summarizes_keys(tmp_path, monkeypatch
 
 def test_audit_history_recursively_redacts_secrets(tmp_path, monkeypatch):
     monkeypatch.setattr(local_users.settings, "local_users_db_path", str(tmp_path / "audit.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
 
     audit.record(
         actor_id="local:admin",
@@ -50,11 +56,17 @@ def test_audit_history_recursively_redacts_secrets(tmp_path, monkeypatch):
 
 def test_local_database_healthcheck_is_writable(tmp_path, monkeypatch):
     monkeypatch.setattr(local_users.settings, "local_users_db_path", str(tmp_path / "health.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     assert local_users.healthcheck() == {"ok": True, "detail": "Writable"}
 
 
 def test_record_prunes_expired_audit_events_in_bounded_batches(tmp_path, monkeypatch):
     monkeypatch.setattr(local_users.settings, "local_users_db_path", str(tmp_path / "audit.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     monkeypatch.setattr(local_users.settings, "audit_retention_days", 30)
     monkeypatch.setattr(local_users.settings, "audit_cleanup_batch_size", 2)
     local_users.init_db()

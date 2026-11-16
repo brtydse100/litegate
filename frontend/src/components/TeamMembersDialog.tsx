@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../api/client";
+import EmailAddress from "./EmailAddress";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import type { TeamInfo, TeamMember } from "../types";
 
@@ -114,9 +115,16 @@ export default function TeamMembersDialog({
                     <UserRound size={16} />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-gray-200">
-                      {member.user_email || member.user_id || "Unknown member"}
-                    </p>
+                    {member.user_email ? (
+                      <EmailAddress
+                        email={member.user_email}
+                        className="text-sm text-gray-200"
+                      />
+                    ) : (
+                      <p className="break-all text-sm text-gray-200">
+                        {member.user_id || "Unknown member"}
+                      </p>
+                    )}
                     {member.user_email && member.user_id && (
                       <p className="truncate font-mono text-[10px] text-gray-600">
                         {member.user_id}
@@ -157,7 +165,12 @@ export default function TeamMembersDialog({
         {selected?.user_id && (
           <div className="mt-5 rounded-xl border border-indigo-500/25 bg-indigo-500/5 p-4">
             <h4 className="text-sm font-semibold text-white">
-              Move {selected.user_email || selected.user_id}
+              Move{" "}
+              {selected.user_email ? (
+                <EmailAddress email={selected.user_email} />
+              ) : (
+                selected.user_id
+              )}
             </h4>
             <p className="mt-1 text-xs leading-5 text-gray-400">
               LiteGate adds the destination membership, moves every API key
