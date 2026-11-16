@@ -1,4 +1,5 @@
 import type { OrganizationUsage, UsageMetrics } from "../types/organization";
+import EmailAddress from "./EmailAddress";
 
 export type UsageMetric = keyof UsageMetrics;
 
@@ -141,11 +142,13 @@ export function UsageBars({
   values,
   metric,
   onSelect,
+  emailLabels = false,
 }: {
   title: string;
   values: Array<UsageMetrics & { id?: string | null; name: string }>;
   metric: UsageMetric;
   onSelect?: (id: string) => void;
+  emailLabels?: boolean;
 }) {
   const sorted = [...values].sort((a, b) => b[metric] - a[metric]);
   const max = Math.max(...sorted.map((row) => row[metric]), 0) || 1;
@@ -160,9 +163,16 @@ export function UsageBars({
           const content = (
             <>
               <span className="flex justify-between gap-3 text-xs">
-                <span className="truncate font-medium text-slate-700">
-                  {row.name}
-                </span>
+                {emailLabels && row.name.includes("@") && !onSelect ? (
+                  <EmailAddress
+                    email={row.name}
+                    className="font-medium text-slate-700"
+                  />
+                ) : (
+                  <span className="truncate font-medium text-slate-700">
+                    {row.name}
+                  </span>
+                )}
                 <span className="shrink-0 text-slate-500">
                   {metricValue(row[metric], metric)}
                 </span>

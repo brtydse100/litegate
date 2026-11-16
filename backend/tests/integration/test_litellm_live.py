@@ -114,6 +114,9 @@ async def test_managed_allowance_updates_preserve_windows_and_rotation_carries_s
     root = tree.roots[0]
     monkeypatch.setattr(settings, "organization_hierarchy", tree)
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "integration-organization.db"))
+    from app.services import local_users
+
+    local_users.init_db()
     leaf = tree.resolve(user_id, [])
     keys = []
     try:

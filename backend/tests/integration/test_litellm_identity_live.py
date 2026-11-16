@@ -43,6 +43,9 @@ async def test_email_search_pagination_and_no_login_migration(monkeypatch, tmp_p
         await litellm.update_key(key, {"spend": 42})
         before = await litellm.get_key_info(key)
         monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "startup.db"))
+        from app.services import local_users
+
+        local_users.init_db()
         monkeypatch.setattr(
             settings,
             "organization_hierarchy",

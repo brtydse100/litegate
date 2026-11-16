@@ -1,4 +1,4 @@
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { SpendTrend, UsageBars, metricValue } from "./OrganizationCharts";
 afterEach(cleanup);
@@ -58,4 +58,20 @@ it.each([
   );
   expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
   expect(container.textContent).toContain("$0.00");
+});
+
+it("offers full email copy access in per-user usage labels", () => {
+  render(
+    <UsageBars
+      title="People"
+      metric="spend"
+      emailLabels
+      values={[
+        { name: "long.person@example.com", spend: 2, requests: 1, tokens: 1 },
+      ]}
+    />,
+  );
+  expect(
+    screen.getByRole("button", { name: "Copy email long.person@example.com" }),
+  ).toBeVisible();
 });

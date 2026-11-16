@@ -17,6 +17,8 @@ const keyPage = {
   total_pages: 1,
 };
 
+const peoplePage = { users: [], page: 1, size: 25, total: 0, total_pages: 0 };
+
 async function mockApi(
   page: Page,
   role: "admin" | "user",
@@ -45,6 +47,7 @@ async function mockApi(
       body = { limit: 5, remaining: 5, retry_after: 0 };
     else if (url.pathname === "/api/keys") body = { keys: [] };
     else if (url.pathname === "/api/v1/users") body = [];
+    else if (url.pathname === "/api/v1/people") body = peoplePage;
     else if (url.pathname === "/api/v1/keys/identifiers")
       body = { keys: ["key-1", "key-2"], total: 2 };
     else if (url.pathname === "/api/v1/keys") body = keyPage;
@@ -94,7 +97,7 @@ test("@smoke administrator navigation has stable routes and global selection", a
   await page.getByRole("link", { name: "Local users" }).click();
   await usersRequest;
   await expect(
-    page.getByRole("heading", { name: "Local user access" }),
+    page.getByRole("heading", { name: "People and local access" }),
   ).toBeVisible();
 });
 
@@ -119,7 +122,16 @@ test("local-user navigation follows the deployment setting", async ({
 }) => {
   await mockApi(page, "admin", false);
   await page.goto("/users");
-  await expect(page).toHaveURL(/\/my-key$/);
+  await expect(page).toHaveURL(/\/users$/);
+  await expect(
+    page.getByRole("heading", { name: "People", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "People directory" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Add user", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Local users" })).toHaveCount(0);
 });
 
@@ -336,6 +348,7 @@ test("@smoke administrator can manage a local account without leaving the users 
       body = { limit: 5, remaining: 5, retry_after: 0 };
     else if (url.pathname === "/api/keys") body = { keys: [] };
     else if (url.pathname === "/api/v1/users" && method === "GET") body = users;
+    else if (url.pathname === "/api/v1/people") body = peoplePage;
     else if (url.pathname === "/api/v1/users" && method === "POST") {
       const payload = route.request().postDataJSON();
       const created = {
@@ -366,7 +379,9 @@ test("@smoke administrator can manage a local account without leaving the users 
 
   await page.goto("/users");
   await page.getByLabel("Username").fill("contractor");
-  await page.getByLabel("Email").fill("contractor@example.com");
+  await page
+    .getByLabel("Email", { exact: true })
+    .fill("contractor@example.com");
   await page.getByLabel("Temporary password").fill("temporary-password");
   await page.getByRole("button", { name: "Add user" }).click();
   await expect(page.getByText("contractor@example.com")).toBeVisible();

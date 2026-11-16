@@ -15,6 +15,9 @@ from app.services import audit, litellm, local_users
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "review.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     monkeypatch.setattr(settings, "local_auth_username", "bootstrap")
     monkeypatch.setattr(settings, "local_auth_password", "bootstrap-review-password")
     monkeypatch.setattr(settings, "local_users_enabled", True)

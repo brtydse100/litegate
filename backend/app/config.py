@@ -102,6 +102,13 @@ class Settings(BaseSettings):
     key_duration: Optional[str] = None
     key_team_id: Optional[str] = None
     save_api_keys_in_db: bool = False
+    organization_access_designations: dict[str, list[str]] = Field(default_factory=dict)
+    organization_group_admins: dict[str, list[str]] = Field(default_factory=dict)
+    organization_cleanup_enabled: bool = False
+    analytics_enabled: bool = True
+    analytics_retention_days: int = Field(default=90, ge=1, le=366)
+    analytics_batch_concurrency: int = Field(default=5, ge=1, le=20)
+    hierarchical_budgets_enabled: bool = False
 
     root_url: str = "http://localhost"
     cors_origins: str = "http://localhost,http://localhost:5173,http://localhost:3000"

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AdvancedPolicySettings, {
   type AdvancedPolicyHandle,
 } from "./AdvancedPolicySettings";
@@ -64,7 +64,7 @@ function TeamEditor({
   state: EditorState;
   pending: boolean;
   operationsBlocked: boolean;
-  error?: string;
+  error?: Error | null;
   onClose: () => void;
   onCreate: (payload: TeamCreatePayload) => void;
   onUpdate: (teamId: string, payload: TeamUpdatePayload) => void;
@@ -92,6 +92,9 @@ function TeamEditor({
   );
   const [blocked, setBlocked] = useState(existing?.blocked ?? false);
   const advanced = useRef<AdvancedPolicyHandle>(null);
+  useEffect(() => {
+    advanced.current?.setServerError(error);
+  }, [error]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -306,7 +309,7 @@ function TeamEditor({
         </div>
         {(modelError || error) && (
           <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-            {modelError || error}
+            {modelError || error?.message}
           </p>
         )}
         <div className="mt-5 flex justify-end gap-2">
@@ -751,7 +754,7 @@ export default function AdminTeams() {
           state={editor}
           pending={create.isPending || update.isPending}
           operationsBlocked={operationsBlocked}
-          error={editorError?.message}
+          error={editorError}
           onClose={() => setEditor(null)}
           onCreate={(payload) => create.mutate(payload)}
           onUpdate={(id, payload) => update.mutate({ id, payload })}

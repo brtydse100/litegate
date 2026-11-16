@@ -102,6 +102,13 @@ litellm_ui_url: "http://localhost:4000/ui/model_hub"
 # Key defaults (applied to every generated key)
 # Store full keys in SQLite so owners and administrators can reveal them.
 save_api_keys_in_db: false
+organization_access_designations: {}
+organization_group_admins: {}
+organization_cleanup_enabled: false
+analytics_enabled: true
+analytics_retention_days: 90
+analytics_batch_concurrency: 5
+hierarchical_budgets_enabled: false
 # key_max_budget: 10.0
 # key_budget_duration: "30d"
 # key_models:

@@ -1,4 +1,21 @@
+import type { PeoplePage } from "../types";
+
 const BASE = "/api";
+
+export interface FieldError {
+  loc: (string | number)[];
+  msg: string;
+  type?: string;
+}
+
+export class RequestError extends Error {
+  constructor(
+    public fieldErrors: FieldError[],
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 function getToken(): string | null {
   return localStorage.getItem("token");
@@ -25,17 +42,100 @@ async function request<T>(
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    const detail = Array.isArray(err.detail)
-      ? err.detail
-          .map((item: { msg?: string }) => item.msg ?? "Invalid value")
-          .join("; ")
-      : err.detail;
+    if (Array.isArray(err.detail)) {
+      const fields: FieldError[] = err.detail
+        .slice(0, 20)
+        .map((item: FieldError) => ({
+          loc: Array.isArray(item?.loc)
+            ? item.loc
+                .filter(
+                  (part) =>
+                    typeof part === "string" || typeof part === "number",
+                )
+                .slice(0, 35)
+            : [],
+          msg: typeof item?.msg === "string" ? item.msg : "Invalid value",
+          ...(typeof item?.type === "string" ? { type: item.type } : {}),
+        }));
+      throw new RequestError(
+        fields,
+        fields
+          .map(
+            (field) =>
+              `${field.loc.filter((part) => part !== "body").join(".")}${field.loc.length ? ": " : ""}${field.msg}`,
+          )
+          .join("; "),
+      );
+    }
+    const detail = err.detail;
     throw new Error(typeof detail === "string" ? detail : "Request failed");
   }
   return res.json() as Promise<T>;
 }
 
+function peoplePage(data: unknown, page: number, size: number): PeoplePage {
+  const result = data as PeoplePage | null;
+  if (
+    !result ||
+    result.page !== page ||
+    result.size !== size ||
+    !Number.isInteger(result.total) ||
+    result.total < 0 ||
+    result.total > 1_000_000_000 ||
+    result.total_pages !== Math.ceil(result.total / size) ||
+    !Array.isArray(result.users) ||
+    result.users.length !==
+      Math.min(size, Math.max(0, result.total - (page - 1) * size)) ||
+    result.users.some(
+      (person) =>
+        !person ||
+        typeof person.user_id !== "string" ||
+        !person.user_id.trim() ||
+        person.user_id.length > 512 ||
+        !(
+          person.email === null ||
+          (typeof person.email === "string" && person.email.length <= 512)
+        ) ||
+        !(
+          person.upstream_role === null ||
+          (typeof person.upstream_role === "string" &&
+            person.upstream_role.length <= 100)
+        ),
+    ) ||
+    new Set(result.users.map((person) => person.user_id)).size !==
+      result.users.length
+  ) {
+    throw new Error(
+      "The people directory returned an invalid page. Try again later.",
+    );
+  }
+  return result;
+}
+
 export const api = {
+  organizationBudgets: () =>
+    request<import("../types/budgets").BudgetView>("/v1/organization/budgets"),
+  setGroupBudget: (group: string, revision: number, amount: string) =>
+    request<import("../types/budgets").BudgetView>(
+      `/v1/organization/budgets/groups/${encodeURIComponent(group)}`,
+      { method: "PATCH", body: JSON.stringify({ revision, amount }) },
+    ),
+  setUserBudget: (
+    group: string,
+    user: string,
+    revision: number,
+    amount: string | null,
+  ) =>
+    request<import("../types/budgets").BudgetView>(
+      `/v1/organization/budgets/groups/${encodeURIComponent(group)}/users/${encodeURIComponent(user)}`,
+      { method: "PATCH", body: JSON.stringify({ revision, amount }) },
+    ),
+  organizationAccess: () =>
+    request<{ organization: boolean; global_admin: boolean; roots: string[] }>(
+      "/v1/organization/access",
+    ),
+  personalAnalytics: () =>
+    request<import("../types/analytics").PersonalAnalyticsData>("/analytics"),
   policySchemas: () =>
     request<import("../types").PolicySchemaResponse>("/v1/policy-schemas"),
   organizationChildren: (parent?: string) => {
@@ -159,6 +259,19 @@ export const api = {
   listModels: () => request<{ models: string[] }>("/v1/models"),
 
   listUsers: () => request<import("../types").LocalUser[]>("/v1/users"),
+
+  listPeople: async (page = 1, size = 25, search = "") => {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      search,
+    });
+    return peoplePage(
+      await request<unknown>(`/v1/people?${params}`),
+      page,
+      size,
+    );
+  },
 
   createUser: (payload: {
     username: string;

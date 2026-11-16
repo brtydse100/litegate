@@ -31,6 +31,7 @@ def test_initialization_preserves_local_rows_and_reservations():
 
 
 def test_binding_cannot_switch_subject_email_or_canonical_user():
+    local_users.init_db()
     store.bind("provider", "subject", "alice@example.com", "canonical")
     assert store.lookup_binding("provider", "subject")["user_id"] == "canonical"
     store.bind("provider", "subject", "alice@example.com", "canonical")

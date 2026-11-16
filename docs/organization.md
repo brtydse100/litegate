@@ -386,8 +386,10 @@ replacement before the operation finishes.
 
 Administrators open **Organization** to filter users and graphs by any level,
 inspect effective allowances and current-cycle spend, and compare daily spend,
-tokens, logged requests, groups, and models. Ordinary users and LiteLLM-key
-identities cannot access administrative organization reports.
+tokens, logged requests, groups, and models. Qualifying designated group
+administrators can access their authorized subtree through LiteGate-managed or
+native roles; other ordinary users and all LiteLLM-key identities remain denied.
+See [scoped access and budget planning](governance-and-analytics.md).
 
 Groups without child groups show **Usage by member**, with each person's email
 or user ID and spending for the selected dates. The metric selector also shows

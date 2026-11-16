@@ -1,0 +1,26 @@
+{
+  "levels": [
+    {
+      "name": "Department",
+      "groups": [
+        {
+          "members": [
+            { "name": "Engineering", "litellmTeamId": "sso-test-engineering", "ssoGroups": ["engineering"] },
+            { "name": "Marketing", "litellmTeamId": "sso-test-marketing", "ssoGroups": ["marketing"] }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Team",
+      "groups": [
+        {
+          "parent": "Engineering",
+          "members": [
+            { "name": "Platform", "litellmTeamId": "sso-test-platform", "ssoGroups": ["platform"] }
+          ]
+        }
+      ]
+    }
+  ]
+}

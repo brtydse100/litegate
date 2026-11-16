@@ -9,6 +9,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { api } from "../api/client";
+import EmailAddress from "./EmailAddress";
 
 function StatusCard({
   name,
@@ -169,8 +170,12 @@ export default function AdminStatus() {
                     </span>{" "}
                     · {event.target}
                   </p>
-                  <p className="truncate text-gray-600">
-                    {event.actor_email || event.actor_id}
+                  <p className="break-all text-gray-600">
+                    {event.actor_email ? (
+                      <EmailAddress email={event.actor_email} />
+                    ) : (
+                      event.actor_id
+                    )}
                     {Object.keys(event.details).length
                       ? ` · ${JSON.stringify(event.details)}`
                       : ""}

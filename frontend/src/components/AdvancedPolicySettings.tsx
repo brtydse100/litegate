@@ -1,7 +1,8 @@
-import { forwardRef, useImperativeHandle, useState } from "react";
+import { forwardRef, useId, useImperativeHandle, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { PolicySchemaKind } from "../types";
+import type { FieldError } from "../api/client";
 import {
   allowsNull,
   asSchema,
@@ -12,6 +13,7 @@ import {
 
 export interface AdvancedPolicyHandle {
   read: () => Record<string, unknown>;
+  setServerError: (error: unknown) => void;
 }
 interface Draft {
   text: string;
@@ -34,6 +36,8 @@ const AdvancedPolicySettings = forwardRef<
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Record<string, Draft>>({});
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
+  const id = useId();
   const discovery = useQuery({
     queryKey: ["policy-schemas"],
     queryFn: () => api.policySchemas(),
@@ -52,6 +56,13 @@ const AdvancedPolicySettings = forwardRef<
       !asSchema(value).readOnly,
   );
   useImperativeHandle(ref, () => ({
+    setServerError(failure) {
+      const errors =
+        failure && typeof failure === "object" && "fieldErrors" in failure
+          ? failure.fieldErrors
+          : [];
+      setFieldErrors(Array.isArray(errors) ? errors : []);
+    },
     read() {
       const result: Record<string, unknown> = {};
       try {
@@ -86,6 +97,7 @@ const AdvancedPolicySettings = forwardRef<
           result[name] = value;
         }
         setError("");
+        setFieldErrors([]);
         return result;
       } catch (failure) {
         setError((failure as Error).message);
@@ -95,6 +107,9 @@ const AdvancedPolicySettings = forwardRef<
   }));
   function change(name: string, value: Draft | undefined) {
     setError("");
+    setFieldErrors((previous) =>
+      previous.filter((failure) => failure.loc[2] !== name),
+    );
     setDraft((previous) => {
       const next = { ...previous };
       if (value) next[name] = value;
@@ -141,6 +156,17 @@ const AdvancedPolicySettings = forwardRef<
             const field = asSchema(raw);
             const control = inputSchema(field);
             const edit = draft[name];
+            const failures = fieldErrors.filter(
+              (failure) =>
+                failure.loc[1] === "advanced_settings" &&
+                failure.loc[2] === name,
+            );
+            const accessibility = {
+              "aria-invalid": failures.length ? (true as const) : undefined,
+              "aria-describedby": failures.length
+                ? `${id}-${name}-error`
+                : undefined,
+            };
             const select =
               Array.isArray(control.enum) || control.type === "boolean";
             return (
@@ -205,6 +231,7 @@ const AdvancedPolicySettings = forwardRef<
                     )}
                     {select ? (
                       <select
+                        {...accessibility}
                         aria-label={name}
                         className={inputClass}
                         disabled={edit.clear}
@@ -232,6 +259,7 @@ const AdvancedPolicySettings = forwardRef<
                         String(control.type),
                       ) ? (
                       <input
+                        {...accessibility}
                         aria-label={name}
                         disabled={edit.clear}
                         type={control.type === "string" ? "text" : "number"}
@@ -244,6 +272,7 @@ const AdvancedPolicySettings = forwardRef<
                       />
                     ) : (
                       <textarea
+                        {...accessibility}
                         aria-label={name}
                         disabled={edit.clear}
                         className={`${inputClass} font-mono`}
@@ -256,6 +285,20 @@ const AdvancedPolicySettings = forwardRef<
                       />
                     )}
                   </>
+                )}
+                {failures.length > 0 && (
+                  <p
+                    id={`${id}-${name}-error`}
+                    role="alert"
+                    className="text-xs text-red-600"
+                  >
+                    {failures
+                      .map(
+                        (failure) =>
+                          `${failure.loc.slice(2).join(".")}: ${failure.msg}`,
+                      )
+                      .join("; ")}
+                  </p>
                 )}
               </div>
             );

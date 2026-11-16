@@ -9,29 +9,31 @@ from fastapi import HTTPException
 from app.config import settings
 from app.services import litellm, organization_client as upstream, organization_store as store, organization_discovery as discovery
 from app.services.organization_sync import resolve_identity
+from app.services.organization_access import GLOBAL_SCOPE, OrganizationScope
 
 _usage_cache: dict[tuple[str, str, str], tuple[float, list[dict]]] = {}
 
 
-async def identities() -> tuple[list[tuple[dict, object]], list[dict]]:
-    values, errors = [], discovery.issues()
+async def identities(scope: OrganizationScope = GLOBAL_SCOPE) -> tuple[list[tuple[dict, object]], list[dict]]:
+    values, errors = [], discovery.issues() if scope.global_admin else []
     for identity in await asyncio.to_thread(store.list_identities):
         try:
             node = resolve_identity(identity)
-            if node:
+            if node and scope.allows(node):
                 values.append((identity, node))
-            else:
+            elif scope.global_admin:
                 errors.append({"user_id": identity["user_id"], "error": "No current organization mapping"})
-            if identity.get("sync_error"):
+            if identity.get("sync_error") and scope.global_admin:
                 errors.append({"user_id": identity["user_id"], "error": identity["sync_error"]})
         except HTTPException as exc:
-            errors.append({"user_id": identity["user_id"], "error": str(exc.detail)})
+            if scope.global_admin:
+                errors.append({"user_id": identity["user_id"], "error": str(exc.detail)})
     return values, errors
 
 
-def selected_nodes(node_id: str | None):
+def selected_nodes(node_id: str | None, scope: OrganizationScope = GLOBAL_SCOPE):
     tree = settings.organization_hierarchy
-    if node_id and node_id not in tree.nodes:
+    if node_id and (node_id not in tree.nodes or not scope.allows(tree.nodes[node_id])):
         raise HTTPException(status_code=404, detail="Organization group not found")
     return tree.nodes.get(node_id)
 
@@ -40,7 +42,7 @@ def within(node, ancestor) -> bool:
     return ancestor is None or node.path[: len(ancestor.path)] == ancestor.path
 
 
-def node_metadata(node, records) -> dict:
+def node_metadata(node, records, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     return {
         "id": node.id,
         "name": node.member.name,
@@ -54,26 +56,31 @@ def node_metadata(node, records) -> dict:
         "budget_source": node.budget_source,
         "group_total": node.member.budget.groupTotal,
         "has_children": any(child.parent_id == node.id for child in settings.organization_hierarchy.nodes.values()),
+        **scope.metadata(node),
     }
 
 
-async def children(parent_id: str | None) -> dict:
-    selected_nodes(parent_id)
+async def children(parent_id: str | None, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
+    selected_nodes(parent_id, scope)
     tree = settings.organization_hierarchy
-    records, errors = await identities()
+    records, errors = await identities(scope)
     return {
         "enabled": bool(tree.levels),
-        "levels": [level.name for level in tree.levels],
-        "groups": [node_metadata(node, records) for node in tree.nodes.values() if node.parent_id == parent_id],
+        "levels": scope.levels(),
+        "groups": [
+            node_metadata(node, records, scope)
+            for node in tree.nodes.values()
+            if scope.allows(node) and (node.id in scope.roots if parent_id is None and not scope.global_admin else node.parent_id == parent_id)
+        ],
         "total_users": len(records),
         "issues": errors,
     }
 
 
-async def group_detail(node_id: str) -> dict:
-    node = selected_nodes(node_id)
-    records, _ = await identities()
-    result = {**node_metadata(node, records), "group_spend": None, "sync_error": None, "spend_scope": "team"}
+async def group_detail(node_id: str, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
+    node = selected_nodes(node_id, scope)
+    records, _ = await identities(scope)
+    result = {**node_metadata(node, records, scope), "group_spend": None, "sync_error": None, "spend_scope": "team"}
     try:
         info = await upstream.team_info(node.team_id)
         team = info.get("team_info", {})
@@ -81,13 +88,14 @@ async def group_detail(node_id: str) -> dict:
         if team.get("max_budget") is not None or team.get("budget_duration") != node.duration:
             result["sync_error"] = "LiteLLM's team policy migration is pending"
     except HTTPException as exc:
-        result["sync_error"] = str(exc.detail)
+        result["sync_error"] = str(exc.detail) if scope.global_admin else "Could not read group status"
     return result
 
 
-async def overview() -> dict:
+async def overview(scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     tree = settings.organization_hierarchy
-    records, errors = await identities()
+    records, errors = await identities(scope)
+    visible = [node for node in tree.nodes.values() if scope.allows(node)]
     semaphore = asyncio.Semaphore(5)
 
     async def root_status(root):
@@ -102,12 +110,12 @@ async def overview() -> dict:
                     "error": "LiteLLM's team policy migration is pending" if mismatch else None,
                 }
             except HTTPException as exc:
-                return root.team_id, {"spend": None, "error": str(exc.detail)}
+                return root.team_id, {"spend": None, "error": str(exc.detail) if scope.global_admin else "Could not read group status"}
 
-    roots = dict(await asyncio.gather(*(root_status(node) for node in tree.nodes.values())))
+    roots = dict(await asyncio.gather(*(root_status(node) for node in visible)))
     groups = []
-    for node in tree.nodes.values():
-        statuses = [roots[descendant.team_id] for descendant in tree.nodes.values() if within(descendant, node)]
+    for node in visible:
+        statuses = [roots[descendant.team_id] for descendant in visible if within(descendant, node)]
         status = {
             "spend": sum(item["spend"] for item in statuses) if all(item["spend"] is not None for item in statuses) else None,
             "error": next((item["error"] for item in statuses if item["error"]), None),
@@ -127,20 +135,21 @@ async def overview() -> dict:
                 "group_total": node.member.budget.groupTotal,
                 "group_spend": status["spend"],
                 "sync_error": status["error"],
+                **scope.metadata(node),
             }
         )
     return {
         "enabled": bool(tree.levels),
-        "levels": [level.name for level in tree.levels],
+        "levels": scope.levels(),
         "groups": groups,
         "total_users": len(records),
         "issues": errors,
     }
 
 
-async def users(node_id: str | None, page: int, size: int) -> dict:
-    ancestor = selected_nodes(node_id)
-    records, _ = await identities()
+async def users(node_id: str | None, page: int, size: int, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
+    ancestor = selected_nodes(node_id, scope)
+    records, _ = await identities(scope)
     selected = [(identity, node) for identity, node in records if within(node, ancestor)]
     batch = selected[(page - 1) * size : page * size]
     semaphore = asyncio.Semaphore(5)
@@ -160,11 +169,18 @@ async def users(node_id: str | None, page: int, size: int) -> dict:
             {
                 "user_id": identity["user_id"],
                 "email": identity["email"],
-                "path": list(node.path),
+                "path": scope.path(node),
                 "per_user": node.per_user,
                 "duration": node.duration,
                 "budget_spend": litellm.total_key_spend(keys) if keys is not None else None,
-                "sync_error": identity.get("sync_error") or ("Could not read the user's key metadata" if keys is None else None),
+                "sync_error": (
+                    identity.get("sync_error")
+                    if scope.global_admin
+                    else "Organization synchronization is pending"
+                    if identity.get("sync_error")
+                    else None
+                )
+                or ("Could not read the user's key metadata" if keys is None else None),
             }
         )
     return {"users": result, "page": page, "page_size": size, "total": len(selected), "total_pages": max(1, (len(selected) + size - 1) // size)}
@@ -229,11 +245,11 @@ def add_metrics(target: dict, source: dict) -> None:
         target[key] = upstream.finite_number(target[key] + value, integer=key != "spend")
 
 
-async def usage(node_id: str | None, start: date, end: date) -> dict:
+async def usage(node_id: str | None, start: date, end: date, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     if end < start or (end - start).days > 90 or end > datetime.now(timezone.utc).date():
         raise HTTPException(status_code=422, detail="Select a past or current date range of at most 90 days")
-    ancestor = selected_nodes(node_id)
-    records, issues = await identities()
+    ancestor = selected_nodes(node_id, scope)
+    records, issues = await identities(scope)
     selected = [(identity, node) for identity, node in records if within(node, ancestor)]
     if len(selected) > 500:
         raise HTTPException(status_code=422, detail="Select a smaller group; one report supports at most 500 users")
@@ -256,7 +272,8 @@ async def usage(node_id: str | None, start: date, end: date) -> dict:
     for identity, node, rows in batches:
         member = {"id": identity["user_id"], "name": identity.get("email") or identity["user_id"], **zero_metrics()}
         by_user.append(member)
-        depth = ancestor.level + 1 if ancestor else 0
+        root = scope.root_for(node)
+        depth = ancestor.level + 1 if ancestor else root.level if root is not None and not scope.global_admin else 0
         child = node
         while child.level > depth:
             child = settings.organization_hierarchy.nodes[child.parent_id]

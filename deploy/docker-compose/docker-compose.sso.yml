@@ -1,0 +1,13 @@
+# Standalone Keycloak 26.8.2 test fixture; never deploy publicly.
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+    command: ["start-dev", "--import-realm"]
+    ports:
+      - "127.0.0.1:8082:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: litegate-test-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: litegate-test-admin-password
+      KC_HOSTNAME: http://127.0.0.1:8082
+    volumes:
+      - ./sso/litegate-sso-realm.json:/opt/keycloak/data/import/litegate-sso-realm.json:ro

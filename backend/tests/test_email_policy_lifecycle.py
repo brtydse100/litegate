@@ -17,6 +17,9 @@ from tests.test_hierarchy_email import hierarchy
 def identity(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "organization_hierarchy", hierarchy())
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "lifecycle.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     sync._locks.clear()
     store.remember("subject", "alice@example.com", "sso", [])
     return hierarchy().resolve("subject", [], email="alice@example.com", source="sso")
@@ -55,6 +58,9 @@ async def test_admin_guard_and_personal_policy_use_stored_identity(monkeypatch, 
 @pytest.mark.asyncio
 async def test_first_authenticated_login_creates_actual_subject_without_key(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "first.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     monkeypatch.setattr(settings, "organization_hierarchy", hierarchy())
     monkeypatch.setattr(settings, "generic_authorization_endpoint", "")
     monkeypatch.setattr(settings, "oidc_group_team_mapping", {})
@@ -87,4 +93,4 @@ async def test_first_authenticated_login_creates_actual_subject_without_key(monk
     from app.services import local_users
 
     with local_users.connect() as db:
-        assert db.execute("SELECT name FROM sqlite_master WHERE name='sso_reservations'").fetchone() is None
+        assert db.execute("SELECT * FROM sso_reservations").fetchall() == []

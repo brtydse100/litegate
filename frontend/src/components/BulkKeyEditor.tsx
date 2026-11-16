@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import AdvancedPolicySettings, {
   type AdvancedPolicyHandle,
 } from "./AdvancedPolicySettings";
+import EmailAddress from "./EmailAddress";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -121,6 +122,7 @@ export default function BulkKeyEditor({
   });
 
   const update = useMutation({
+    onError: (error) => advanced.current?.setServerError(error),
     mutationFn: ({
       targetKeys,
       settings,
@@ -555,11 +557,13 @@ export default function BulkKeyEditor({
                             </span>
                             <span className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-gray-500">
                               <UserRound size={10} className="shrink-0" />
-                              <span className="truncate">
-                                {key.user_email ||
-                                  key.user_id ||
-                                  "Unassigned user"}
-                              </span>
+                              {key.user_email ? (
+                                <EmailAddress email={key.user_email} />
+                              ) : (
+                                <span className="break-all">
+                                  {key.user_id || "Unassigned user"}
+                                </span>
+                              )}
                             </span>
                           </span>
                           <span className="hidden shrink-0 flex-col items-end gap-1 sm:flex">

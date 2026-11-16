@@ -4,6 +4,7 @@ import asyncio
 import copy
 import json
 import time
+from itertools import islice
 
 import httpx
 from fastapi import HTTPException
@@ -19,6 +20,70 @@ MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
 _cache: tuple[str, float, dict] | None = None
 _lock = asyncio.Lock()
 UNAVAILABLE = {"available": False, "schemas": {}, "detail": "LiteLLM policy schema is unavailable; advanced settings cannot be saved"}
+
+CONSTRAINT_MESSAGES = {
+    "type": "Must match the required type.",
+    "required": "A required property is missing.",
+    "minimum": "Must meet the minimum value.",
+    "maximum": "Must not exceed the maximum value.",
+    "exclusiveMinimum": "Must exceed the minimum value.",
+    "exclusiveMaximum": "Must be below the maximum value.",
+    "multipleOf": "Must be a multiple of the required increment.",
+    "enum": "Choose one of the allowed values.",
+    "const": "Must match the required constant.",
+    "minLength": "Text is shorter than the allowed minimum.",
+    "maxLength": "Text is longer than the allowed maximum.",
+    "pattern": "Text does not match the required pattern.",
+    "format": "Must match the required format.",
+    "minItems": "Too few items.",
+    "maxItems": "Too many items.",
+    "uniqueItems": "Items must be unique.",
+    "additionalProperties": "Contains an unsupported property.",
+    "minProperties": "Too few properties.",
+    "maxProperties": "Too many properties.",
+}
+
+
+def _safe_path(schema: dict, path) -> list:
+    """Only echo schema-defined names and array indexes, never submitted map keys."""
+    result = []
+    for part in list(path)[:32]:
+        variants = [schema]
+        for item in variants:
+            for union in ("anyOf", "oneOf", "allOf"):
+                variants.extend(value for value in item.get(union, []) if isinstance(value, dict))
+        if type(part) is int:
+            result.append(part)
+            candidates = []
+            for item in variants:
+                prefix = item.get("prefixItems", [])
+                candidates.append(prefix[part] if 0 <= part < len(prefix) else item.get("items", {}))
+        else:
+            properties = {name: value for item in variants for name, value in item.get("properties", {}).items()}
+            result.append(part if part in properties else "<property>")
+            candidates = [properties.get(part, {})]
+        schema = {"anyOf": [value for value in candidates if isinstance(value, dict)]}
+    return result
+
+
+def _nested_errors(error):
+    """Keep precise branch failures for nullable/union schemas, omitting root type noise."""
+    if not error.context:
+        return [error]
+    leaves = [leaf for child in error.context for leaf in _nested_errors(child)][:20]
+    depth = max(len(leaf.absolute_path) for leaf in leaves)
+    return [leaf for leaf in leaves if len(leaf.absolute_path) == depth]
+
+
+def _policy_errors(exc: ValidationError, properties: dict) -> list[dict]:
+    return [
+        {
+            "loc": ["body", "advanced_settings", *_safe_path({"properties": properties}, error["loc"])],
+            "msg": "Must satisfy LiteGate policy limits.",
+            "type": "policy.validation",
+        }
+        for error in exc.errors(include_input=False, include_context=False, include_url=False)[:20]
+    ]
 
 
 async def _fetch_schemas() -> dict:
@@ -82,10 +147,22 @@ async def merge_settings(kind: str, payload) -> dict:
     properties = discovery["schemas"][kind]["properties"]
     if any(name not in properties or forbidden(name) or name in payload.model_fields_set - {"advanced_settings"} for name in advanced):
         raise HTTPException(status_code=422, detail="Advanced settings contain unknown, protected, or duplicate fields")
+    errors = []
     for name, value in advanced.items():
         validator = Draft202012Validator(properties[name], format_checker=FormatChecker())
-        if not validator.is_valid(value):
-            raise HTTPException(status_code=422, detail="An advanced setting does not match the LiteLLM schema")
+        failures = (leaf for error in validator.iter_errors(value) for leaf in _nested_errors(error))
+        for error in islice(failures, 20 - len(errors)):
+            errors.append(
+                {
+                    "loc": ["body", "advanced_settings", name, *_safe_path(properties[name], error.absolute_path)],
+                    "msg": CONSTRAINT_MESSAGES.get(error.validator, "Must satisfy the advertised schema constraint."),
+                    "type": f"schema.{error.validator}",
+                }
+            )
+        if len(errors) == 20:
+            break
+    if errors:
+        raise HTTPException(status_code=422, detail=errors)
     if "model_max_budget" in advanced:
         try:
             advanced = {
@@ -94,8 +171,8 @@ async def merge_settings(kind: str, payload) -> dict:
                     "model_max_budget"
                 ],
             }
-        except ValidationError:
-            raise HTTPException(status_code=422, detail="An advanced setting violates LiteGate policy limits") from None
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=_policy_errors(exc, properties)) from None
         if not settings.litellm_enterprise_enabled:
             raise HTTPException(status_code=403, detail="Per-model budgets require LITELLM_ENTERPRISE_ENABLED=true and a LiteLLM Enterprise license")
     # Known fields retain LiteGate's stricter normalization and validation, including
@@ -105,7 +182,7 @@ async def merge_settings(kind: str, payload) -> dict:
     if known:
         try:
             normalized = model.model_validate({**changes, **known}).model_dump(include=set(known))
-        except ValidationError:
-            raise HTTPException(status_code=422, detail="An advanced setting violates LiteGate policy limits") from None
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=_policy_errors(exc, properties)) from None
         advanced = {**advanced, **normalized}
     return {**changes, **advanced}

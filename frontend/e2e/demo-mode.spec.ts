@@ -125,3 +125,45 @@ test("interactive demo keeps its key views consistent and supports local sign-in
     page.getByRole("heading", { name: "Your API access" }),
   ).toBeVisible();
 });
+
+for (const width of [390, 1280]) {
+  test(`people directory and long email copy work at ${width}px`, async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("./");
+    await page.getByRole("link", { name: "Local users", exact: true }).click();
+    const directory = page.getByRole("region", { name: "People directory" });
+    await directory.getByLabel("Search people by email").fill("no-key");
+    await directory
+      .getByRole("button", { name: "Search people", exact: true })
+      .click();
+    await expect(
+      directory.getByText("no-key@example.com", { exact: true }),
+    ).toBeVisible();
+    const email =
+      "long.address.with.several.selectable.parts@a-long-organization-domain.example.com";
+    await page
+      .getByLabel("Username", { exact: true })
+      .fill(`synthetic-${width}`);
+    await page.getByLabel("Email", { exact: true }).fill(email);
+    await page
+      .getByLabel("Temporary password", { exact: true })
+      .fill("synthetic-only-password");
+    await page.getByRole("button", { name: "Add user", exact: true }).click();
+    const address = page.getByText(email, { exact: true });
+    await expect(address).toBeVisible();
+    await expect(address).toHaveCSS("white-space", "normal");
+    const bounds = await address.boundingBox();
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    await page
+      .getByRole("button", { name: `Copy email ${email}`, exact: true })
+      .click();
+    await expect(page.getByRole("status")).toContainText("Email copied");
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      email,
+    );
+  });
+}

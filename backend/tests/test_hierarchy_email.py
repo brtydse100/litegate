@@ -27,6 +27,9 @@ def test_email_normalization_and_single_path():
 @pytest.mark.asyncio
 async def test_stored_sso_email_controls_policy_and_removal(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "identity.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     monkeypatch.setattr(settings, "organization_hierarchy", hierarchy())
     node = await sync.record_identity("subject", " ALICE@example.com ", "sso", [])
     assert node.path[-1] == "squad1"
@@ -52,6 +55,9 @@ async def test_generic_policy_through_callback(monkeypatch, tmp_path, required, 
     tree = hierarchy()
     monkeypatch.setattr(settings, "organization_hierarchy", tree)
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "claims.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     for key, value in {
         "generic_authorization_endpoint": "https://idp.example/auth",
         "generic_client_id": "client",
@@ -124,6 +130,9 @@ async def test_reconciliation_does_not_create_users_from_email_assignments(monke
 
     monkeypatch.setattr(settings, "organization_hierarchy", hierarchy())
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "empty.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     lookup = AsyncMock(return_value=None)
     monkeypatch.setattr(sync.litellm, "get_user", lookup)
     monkeypatch.setattr(sync.upstream, "sync_root", AsyncMock())
@@ -140,6 +149,9 @@ async def test_discovery_preserves_exact_ids_containing_at_without_email_adoptio
 
     monkeypatch.setattr(settings, "organization_hierarchy", hierarchy())
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "discovery.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
 
     async def lookup(user_id):
         if user_id == "Alice@Example.com":
@@ -178,6 +190,9 @@ async def test_usage_resolves_stored_email_not_groups_only(monkeypatch, tmp_path
     from app.services import organization_reports as reports
 
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "reports.db"))
+    from app.services import database as database_service
+
+    database_service.initialize()
     monkeypatch.setattr(settings, "organization_hierarchy", hierarchy())
     store.remember("subject", "ALICE@example.com", "sso", [])
     values, errors = await reports.identities()

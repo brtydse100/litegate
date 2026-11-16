@@ -4,11 +4,17 @@ import { Bot, Info, Shield, UserPlus } from "lucide-react";
 import { api } from "../api/client";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
+import EmailAddress from "./EmailAddress";
+import PeopleDirectory from "./PeopleDirectory";
 
 const inputClass =
   "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
 
-export default function AdminUsers() {
+export default function AdminUsers({
+  localUsersEnabled = true,
+}: {
+  localUsersEnabled?: boolean;
+}) {
   const queryClient = useQueryClient();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -19,7 +25,11 @@ export default function AdminUsers() {
   const { operationsBlocked, retryAfter, refreshOperationLimit } =
     useOperationLimit();
 
-  const users = useQuery({ queryKey: ["local-users"], queryFn: api.listUsers });
+  const users = useQuery({
+    queryKey: ["local-users"],
+    queryFn: api.listUsers,
+    enabled: localUsersEnabled,
+  });
   const create = useMutation({
     mutationFn: api.createUser,
     onSuccess: () => {
@@ -85,18 +95,28 @@ export default function AdminUsers() {
   const error =
     create.error ?? (resetUsername ? null : update.error) ?? users.error;
 
+  if (!localUsersEnabled)
+    return (
+      <section className="space-y-5">
+        <h1 className="text-2xl font-semibold">People</h1>
+        <PeopleDirectory />
+      </section>
+    );
+
   return (
     <section className="w-full space-y-5">
       <div>
         <p className="text-xs font-medium text-indigo-600">Users</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-          Local user access
+          People and local access
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           Manage password-based accounts for people who cannot sign in with your
           organization&apos;s SSO.
         </p>
       </div>
+
+      <PeopleDirectory />
 
       <div className="grid overflow-hidden rounded-xl border border-[#2A2E42] bg-[#2A2E42] md:grid-cols-3 md:gap-px">
         <div className="bg-[#1A1D27] p-4">
@@ -246,9 +266,10 @@ export default function AdminUsers() {
                       </span>
                     )}
                   </div>
-                  <p className="truncate text-xs text-gray-500">
-                    {account.email}
-                  </p>
+                  <EmailAddress
+                    email={account.email}
+                    className="text-xs text-gray-500"
+                  />
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs">
                   <button

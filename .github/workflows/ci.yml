@@ -134,6 +134,69 @@ jobs:
         if: always()
         run: docker compose -f deploy/docker-compose/docker-compose.integration.yml down --volumes
 
+  sso-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: python -m pip install -r backend/requirements-dev.txt
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start unlicensed LiteLLM 1.109.1 and real Keycloak
+        run: |
+          docker compose -p litegate-budget-compat \
+            -f deploy/docker-compose/docker-compose.integration.yml \
+            -f deploy/docker-compose/docker-compose.budget-integration.yml up -d --wait --wait-timeout 180
+          docker compose -p litegate-sso-test \
+            -f deploy/docker-compose/docker-compose.sso.yml up -d
+      - name: Wait for imported test realm
+        run: |
+          python - <<'PY'
+          import json, time, urllib.request, urllib.error
+          issuer = "http://127.0.0.1:8082/realms/litegate-sso"
+          deadline = time.monotonic() + 120
+          while time.monotonic() < deadline:
+              try:
+                  with urllib.request.urlopen(issuer + "/.well-known/openid-configuration", timeout=2) as response:
+                      if json.load(response).get("issuer") == issuer:
+                          break
+              except (OSError, ValueError, urllib.error.URLError):
+                  pass
+              time.sleep(1)
+          else:
+              raise SystemExit("Keycloak test realm did not become ready")
+          PY
+      - name: Verify real OIDC and license-independent governance
+        run: npx playwright test --config playwright.sso.config.ts
+        working-directory: frontend
+      - name: Verify modern LiteLLM user, key, and organization contracts
+        run: python -m pytest tests/integration -q
+        working-directory: backend
+        env:
+          RUN_LITELLM_INTEGRATION: "1"
+          RUN_LITELLM_ORGANIZATION_INTEGRATION: "1"
+          RUN_LITELLM_BUDGET_INTEGRATION: "1"
+          LITELLM_URL: http://127.0.0.1:4001
+          LITELLM_MASTER_KEY: sk-litegate-integration-master
+          JWT_SECRET: synthetic-integration-jwt-secret-at-least-32-characters
+      - name: Stop disposable SSO stack
+        if: always()
+        run: |
+          docker compose -p litegate-sso-test -f deploy/docker-compose/docker-compose.sso.yml down
+          docker compose -p litegate-budget-compat \
+            -f deploy/docker-compose/docker-compose.integration.yml \
+            -f deploy/docker-compose/docker-compose.budget-integration.yml down
+
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 15

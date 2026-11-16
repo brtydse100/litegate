@@ -92,6 +92,16 @@ audited, without submitted values. See [the focused guide](docs/dynamic-policy-e
 
 ## Organization reporting
 
+System administrators retain full access. Designated users who administer a
+configured root through LiteGate roles or a current native LiteLLM role can read
+that subtree. Every endpoint scopes groups, users, usage, totals, and metadata;
+an omitted selector never widens a delegated user's access. LiteLLM key actors
+cannot use these capabilities. See [configuration](docs/governance-and-analytics.md).
+
+- `GET /api/v1/organization/access`: authenticated capability response with
+  `organization`, `global_admin`, and authorized root IDs. This does not grant
+  access to other administrative APIs.
+
 - `GET /api/v1/organization/children?parent=<id>`: lightweight direct-child
   metadata. Omit `parent` for roots. Returns `enabled`, `levels`, `groups`,
   `total_users` and `issues`; groups include `has_children` and configured
@@ -113,9 +123,10 @@ audited, without submitted values. See [the focused guide](docs/dynamic-policy-e
   `name` (email, or user ID when unavailable), `spend`, `tokens`, and `requests`
   for the same date range. Inactive members remain included with zero metrics.
 
-Omit `node` for all mapped users. These read-only routes require an administrator
-portal session or management credential; ordinary users and LiteLLM-key identities
-receive `403`. Unknown nodes receive `404`, invalid ranges `422`, and upstream
+Omit `node` for all mapped users within the caller's authorized scope. These
+read-only routes accept system administrators and qualifying scoped portal users;
+unqualified users and LiteLLM-key identities receive `403`. Unknown or inaccessible
+nodes receive `404`, invalid ranges `422`, and upstream
 failures return an error without partial totals. Reports use current membership.
 Analytics follows up to 20 upstream pages of 1,000 records per user. Exceeding
 this bound returns `422` and asks for a shorter date range; exceeding a user's
@@ -580,3 +591,58 @@ refreshing metadata and counters. Stored-secret availability still uses the
 persisted SQLite copy; reveal checks current upstream ownership and stored owner.
 Keep the same database volume during upgrades. Null or masked metadata identifiers
 do not require regenerating an otherwise stored key.
+
+
+## Personal analytics
+
+`GET /api/analytics?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` accepts an
+ordinary portal session and always uses its canonical user ID. An owner query
+parameter cannot select another person's data. Management and LiteLLM key
+credentials do not authenticate this endpoint. Dates default to the most recent
+30 days within the configured retention window; invalid ranges return 422,
+and a disabled feature returns 404.
+
+Responses contain `totals`, `daily`, `models`, `budgets`, `available`,
+`last_refreshed_at`, `stale`, `refresh_failed`, `coverage_start`, and
+`coverage_end`. Metrics are `requests`, `tokens`, `input_tokens`, `output_tokens`,
+and `cost`; unavailable token splits are null. A first snapshot is unavailable,
+not a successful zero-usage report. A failed refresh retains the last good data.
+These reads use SQLite snapshots only and do not trigger remote aggregation.
+
+## Registered people directory
+
+`GET /api/v1/people?page=1&size=25&search=<email substring>` is read-only and
+system-admin only. Page size is 1–100. Rows contain only `user_id`, `email`, and
+`upstream_role`; response metadata is `page`, `size`, `total`, and `total_pages`.
+This includes registered SSO/no-key users and preserves the separate local-user
+API contract. Invalid or oversized upstream pages return a sanitized 502 error.
+
+Advanced-settings validation now returns FastAPI-style 422 `detail` entries with
+bounded `loc`, safe `msg`, and `type`. Locations identify the field/nested path;
+messages never include rejected values. Status codes, protected-field checks,
+Enterprise requirements for upstream Enterprise-only settings, and stricter
+LiteGate limits remain enforced.
+
+## Scoped budget proposals
+
+These routes require `hierarchical_budgets_enabled` and Organization scope:
+
+- `GET /api/v1/organization/budgets`: revisioned scoped allocations and native
+  capability limitations. Current mode is `preview`, with `applied: false`.
+- `PATCH /api/v1/organization/budgets/groups/{id}`: `{revision, amount}` assigns
+  a child envelope; only a parent-scope or system administrator can edit a root.
+- `PATCH /api/v1/organization/budgets/groups/{id}/users/{user_id}`:
+  `{revision, amount}` sets a manual direct-user override. Null restores auto.
+- `POST /api/v1/organization/budgets/activate`: `{revision}` is system-admin
+  only and currently returns 503; no inference policy is activated.
+
+Amounts have at most six decimal places. Conflicting revisions/over-allocation
+return 409. A delegate cannot increase their own personal allocation indirectly.
+Inaccessible groups/direct users return 404. Qualified delegated portal users
+can use these scoped routes; other ordinary users and LiteLLM-key identities
+are denied. Activation requires a system administrator.
+Each group includes `allocation_error` (string or null). Invalid legacy groups
+remain readable with null `allocated`, `remainder`, and automatic user `allocation`;
+manual allocations remain numeric. System administrators may repair existing
+deficits incrementally without increasing any group's deficit.
+See [current enforcement and retirement limitations](docs/governance-and-analytics.md).

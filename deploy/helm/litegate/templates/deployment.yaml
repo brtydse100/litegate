@@ -45,6 +45,7 @@ spec:
   template:
     metadata:
       annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | quote }}
         checksum/organization: {{ .Values.organizationHierarchy | default (dict "levels" (list)) | toJson | sha256sum | quote }}
         {{- if $hasHierarchyFile }}
         checksum/organization-file: {{ $hierarchyFile | toJson | sha256sum | quote }}

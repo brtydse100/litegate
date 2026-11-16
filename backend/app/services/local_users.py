@@ -11,79 +11,27 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import settings
+from app.services import database
 
 _HASH_NAME = "sha256"
 _ITERATIONS = 310_000
 
 
 def _db_path() -> Path:
-    path = Path(settings.local_users_db_path)
-    if not path.is_absolute():
-        path = Path(__file__).resolve().parents[2] / path
-    return path
+    return database.path()
 
 
 def connect() -> sqlite3.Connection:
-    path = _db_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path, timeout=5)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA journal_mode=WAL")
-    connection.execute("PRAGMA foreign_keys=ON")
-    return connection
+    return database.connect()
 
 
 def init_db() -> None:
-    with connect() as db:
-        db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS local_users (
-                username TEXT PRIMARY KEY COLLATE NOCASE,
-                user_id TEXT NOT NULL UNIQUE,
-                email TEXT NOT NULL COLLATE NOCASE,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('user', 'admin')),
-                active INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
-        db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS audit_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                occurred_at TEXT NOT NULL,
-                actor_id TEXT NOT NULL,
-                actor_email TEXT NOT NULL,
-                action TEXT NOT NULL,
-                target TEXT NOT NULL,
-                outcome TEXT NOT NULL CHECK(outcome IN ('success', 'failure')),
-                details_json TEXT NOT NULL DEFAULT '{}'
-            )
-            """
-        )
-        db.execute("CREATE INDEX IF NOT EXISTS idx_audit_events_occurred_at ON audit_events(occurred_at DESC)")
-        db.execute(
-            """CREATE TABLE IF NOT EXISTS stored_api_keys (
-                key_hash TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL,
-                key_secret TEXT NOT NULL
-            )"""
-        )
+    """Compatibility entry point for explicit application startup and test setup."""
+    database.initialize()
 
 
 def healthcheck() -> dict:
-    """Verify that the local SQLite store is reachable and writable."""
-    try:
-        init_db()
-        with connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            db.execute("SELECT 1")
-            db.rollback()
-        return {"ok": True, "detail": "Writable"}
-    except sqlite3.Error:
-        return {"ok": False, "detail": "Local account database is not writable"}
+    return database.healthcheck()
 
 
 def _password_hash(password: str) -> str:
@@ -124,27 +72,23 @@ def _public(row: sqlite3.Row) -> dict:
 
 
 def has_users() -> bool:
-    init_db()
     with connect() as db:
         return bool(db.execute("SELECT 1 FROM local_users LIMIT 1").fetchone())
 
 
 def list_users() -> list[dict]:
-    init_db()
     with connect() as db:
         rows = db.execute("SELECT * FROM local_users ORDER BY active DESC, username COLLATE NOCASE").fetchall()
     return [_public(row) for row in rows]
 
 
 def get_user(username: str) -> Optional[dict]:
-    init_db()
     with connect() as db:
         row = db.execute("SELECT * FROM local_users WHERE username = ?", (username,)).fetchone()
     return _public(row) if row else None
 
 
 def authenticate(username: str, password: str) -> Optional[dict]:
-    init_db()
     with connect() as db:
         row = db.execute("SELECT * FROM local_users WHERE username = ?", (username,)).fetchone()
     password_matches = _password_matches(password, row["password_hash"] if row else _DUMMY_PASSWORD_HASH)
@@ -156,7 +100,6 @@ def authenticate(username: str, password: str) -> Optional[dict]:
 def create_user(username: str, email: str, password: str, role: str = "user") -> dict:
     if username.casefold() == (settings.local_auth_username or "").casefold():
         raise ValueError("This username is reserved for the bootstrap administrator")
-    init_db()
     now = datetime.now(timezone.utc).isoformat()
     user_id = f"local:{username.lower()}"
     try:
@@ -180,7 +123,6 @@ def update_user(
     role: Optional[str] = None,
     active: Optional[bool] = None,
 ) -> Optional[dict]:
-    init_db()
     changes: list[str] = []
     values: list[object] = []
     if email is not None:

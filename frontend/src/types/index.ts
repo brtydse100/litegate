@@ -215,3 +215,15 @@ export interface TeamMemberMoveResult {
   keys_moved: number;
   destination_membership_existed: boolean;
 }
+
+export interface PeoplePage {
+  users: {
+    user_id: string;
+    email: string | null;
+    upstream_role: string | null;
+  }[];
+  page: number;
+  size: number;
+  total: number;
+  total_pages: number;
+}

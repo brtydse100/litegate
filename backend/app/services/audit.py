@@ -53,7 +53,6 @@ def record(
     outcome: str = "success",
     details: dict | None = None,
 ) -> None:
-    local_users.init_db()
     payload = json.dumps(_safe_details(details), separators=(",", ":"), default=str)
     now = datetime.now(UTC)
     with local_users.connect() as db:
@@ -75,7 +74,6 @@ def record(
 
 
 def list_events(limit: int = 100) -> list[dict]:
-    local_users.init_db()
     with local_users.connect() as db:
         rows = db.execute(
             """SELECT id, occurred_at, actor_id, actor_email, action, target, outcome, details_json
