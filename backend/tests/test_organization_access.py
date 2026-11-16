@@ -49,14 +49,20 @@ async def test_litegate_group_admin_works_without_enterprise_and_requires_both_g
 
 
 @pytest.mark.asyncio
-async def test_designation_requires_live_admin_and_revocation_applies_immediately(monkeypatch, scoped):
+async def test_designation_requires_live_admin_and_revocation_applies_after_cache_ttl(monkeypatch, scoped):
     _, root, actor = scoped
     assert util.find_spec("app.services.organization_access") is not None, "Organization capability resolver is required"
     access = import_module("app.services.organization_access")
+    clock = [1000.0]
+    monkeypatch.setattr(access, "monotonic", lambda: clock[0])
     scope = await access.resolve_scope(actor)
     assert scope.roots == (root.id,)
     assert not scope.global_admin
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {"members_with_roles": []}}))
+    # Repeated organization requests within the TTL reuse one native lookup.
+    assert (await access.resolve_scope(actor)).roots == (root.id,)
+    upstream.team_info.assert_not_awaited()
+    clock[0] += access.ADMIN_TTL
     with pytest.raises(HTTPException) as denied:
         await access.resolve_scope(actor)
     assert denied.value.status_code == 403
@@ -124,6 +130,23 @@ async def test_unknown_or_insufficient_authority_fails_closed(monkeypatch, scope
         await access.resolve_scope(actor)
     assert denied.value.status_code == 403
     assert await access.capabilities(actor) == {"organization": False, "global_admin": False, "roots": []}
+
+
+@pytest.mark.asyncio
+async def test_transient_upstream_failure_serves_last_good_answer_only_briefly(monkeypatch, scoped):
+    _, root, actor = scoped
+    access = import_module("app.services.organization_access")
+    clock = [1000.0]
+    monkeypatch.setattr(access, "monotonic", lambda: clock[0])
+    assert (await access.resolve_scope(actor)).roots == (root.id,)
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(side_effect=HTTPException(502, "unavailable")))
+    clock[0] += access.ADMIN_TTL
+    assert (await access.resolve_scope(actor)).roots == (root.id,)
+    upstream.team_info.assert_awaited_once()
+    clock[0] += access.STALE_TTL
+    with pytest.raises(HTTPException) as denied:
+        await access.resolve_scope(actor)
+    assert denied.value.status_code == 403
 
 
 @pytest.mark.asyncio

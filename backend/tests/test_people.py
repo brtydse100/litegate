@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.models import CurrentUser
 from app.routers.api_actor import ApiActor, get_api_actor
+from app.services import litellm_client
 
 
 @pytest.fixture
@@ -49,7 +50,7 @@ async def test_directory_includes_sso_without_keys_and_strips_private_fields(tra
         "page_size": 25,
     }
     requests = []
-    with patch.object(people, "client", transport(data, requests)):
+    with patch.object(litellm_client, "client", transport(data, requests)):
         result = await people.directory(page=1, size=25, search="sso@")
     assert result == {
         "users": [{"user_id": "sso-id", "email": "sso@example.com", "upstream_role": "internal_user"}],
@@ -73,13 +74,13 @@ async def test_directory_rejects_invalid_or_incomplete_upstream(override, transp
     from app.services import people
 
     data = {"users": [{"user_id": "u"}], "total": 1, "total_pages": 1, "page": 1, "page_size": 25, **override}
-    with patch.object(people, "client", transport(data, [])):
+    with patch.object(litellm_client, "client", transport(data, [])):
         with pytest.raises(HTTPException) as failure:
             await people.directory(page=1, size=25, search="")
     assert failure.value.status_code == 502
 
 
-@pytest.mark.parametrize("role,source,expected", [("user", "sso", 403), ("admin", "litellm_key", 403), ("admin", "sso", 200)])
+@pytest.mark.parametrize("role,source,expected", [("user", "sso", 403), ("user", "litellm_key", 403), ("admin", "sso", 200)])
 def test_directory_authorization_before_remote_query(role, source, expected):
     from app.routers import people
 

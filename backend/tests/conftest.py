@@ -15,3 +15,11 @@ def isolated_initialized_database(tmp_path, monkeypatch):
 
     monkeypatch.setattr(local_users.settings, "local_users_db_path", str(tmp_path / "default.db"))
     local_users.init_db()
+
+
+@pytest.fixture(autouse=True)
+def isolated_organization_admin_cache(monkeypatch):
+    """Native team-admin lookups are cached process-wide; isolate each test."""
+    from app.services import organization_access
+
+    monkeypatch.setattr(organization_access, "_admin_cache", {})

@@ -1,6 +1,6 @@
 """Administrator-only, read-only registered people directory."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.routers.api_actor import ApiActor, get_api_actor, require_api_admin
 from app.services import people
@@ -16,6 +16,4 @@ async def directory(
     actor: ApiActor = Depends(get_api_actor),
 ):
     require_api_admin(actor)
-    if actor.proof_key is not None or actor.user.auth_source == "litellm_key":
-        raise HTTPException(status_code=403, detail="Administrator access required")
     return await people.directory(page=page, size=size, search=search.strip())

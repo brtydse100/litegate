@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from app.config import settings
 from app.models import KeySettingsUpdate, TeamCreateRequest, TeamUpdateRequest
-from app.services.litellm_client import client, headers
+from app.services.litellm_client import get_bounded_json
 from app.services.policy_schemas_normalize import extract_schemas, forbidden
 
 MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
@@ -87,17 +87,7 @@ def _policy_errors(exc: ValidationError, properties: dict) -> list[dict]:
 
 
 async def _fetch_schemas() -> dict:
-    async with (
-        client() as upstream,
-        upstream.stream("GET", f"{settings.litellm_url.rstrip('/')}/openapi.json", headers=headers(), timeout=10, follow_redirects=False) as response,
-    ):
-        response.raise_for_status()
-        chunks = bytearray()
-        async for chunk in response.aiter_bytes():
-            chunks.extend(chunk)
-            if len(chunks) > MAX_DOCUMENT_BYTES:
-                raise ValueError("Schema document too large")
-    document = json.loads(chunks)
+    document = await get_bounded_json("/openapi.json", max_bytes=MAX_DOCUMENT_BYTES, timeout=10)
     return {"available": True, "schemas": extract_schemas(document)}
 
 

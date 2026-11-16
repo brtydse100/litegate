@@ -22,6 +22,7 @@ def stored(tmp_path, monkeypatch):
 
     monkeypatch.setattr(analytics_router, "datetime", FixedDateTime)
     monkeypatch.setattr(settings, "local_users_db_path", str(tmp_path / "analytics.db"))
+    monkeypatch.setattr(analytics_store, "_remembered", {})
     local_users.init_db()
     with local_users.connect() as db:
         analytics_store.create_tables(db)
@@ -160,3 +161,68 @@ def test_concurrent_publication_cannot_mix_rows_with_old_freshness_or_budgets(st
     assert result["totals"]["requests"] == result["budgets"][0]["used"] == 3
     assert result["last_refreshed_at"] == "2026-11-16T10:00:00+00:00"
     assert analytics_store.read("alice", "2026-11-01", "2026-11-16")["totals"]["requests"] == 9
+
+
+def usage(day, requests):
+    return {"date": day, "metrics": {"spend": 0.01 * requests, "api_requests": requests, "total_tokens": 10 * requests}}
+
+
+@pytest.mark.asyncio
+async def test_refresh_is_incremental_after_first_full_window(stored):
+    fetch = AsyncMock(return_value=[usage("2026-11-10", 1), usage("2026-11-15", 2)])
+    with patch.object(analytics.upstream, "daily_usage", fetch), patch.object(analytics.litellm, "list_user_keys", AsyncMock(return_value=[])):
+        await analytics.refresh_user("alice", date(2026, 11, 15))
+        assert fetch.await_args.args[1] == "2026-08-18"
+        fetch.return_value = [usage("2026-11-15", 5), usage("2026-11-16", 4)]
+        await analytics.refresh_user("alice", date(2026, 11, 16))
+    # Re-reads only the last stored day through today.
+    assert fetch.await_args.args[1:] == ("2026-11-14", "2026-11-16")
+    result = analytics_store.read("alice", "2026-11-01", "2026-11-16")
+    assert [(row["date"], row["requests"]) for row in result["daily"]] == [("2026-11-10", 1), ("2026-11-15", 5), ("2026-11-16", 4)]
+    assert result["coverage_start"] == "2026-08-19"
+
+
+def test_incremental_publish_drops_days_outside_retention(stored):
+    analytics_store.publish("alice", [{**rows()[0], "day": "2026-11-02"}, rows()[0]], "2026-11-01", "2026-11-16", [], "2026-11-16T12:00:00+00:00")
+    analytics_store.publish("alice", [], "2026-11-03", "2026-11-17", [], "2026-11-16T12:00:00+00:00", replace_from="2026-11-16")
+    result = analytics_store.read("alice", "2026-11-01", "2026-11-17")
+    assert [row["date"] for row in result["daily"]] == ["2026-11-15"]
+
+
+def test_roster_discovery_keeps_portal_identity_and_prunes_departed_users(stored):
+    analytics_store.remember_user("carol", "", "sso")
+    analytics_store.discover_users([("alice", "other@example.invalid"), ("carol", "carol@example.invalid"), ("dave", "dave@example.invalid")])
+    analytics_store.publish("bob", rows(), "2026-11-01", "2026-11-16", [], "2026-11-16T12:00:00+00:00")
+    with local_users.connect() as db:
+        identities = {row[0]: (row[1], row[2]) for row in db.execute("SELECT user_id, email, auth_source FROM analytics_users")}
+        db.execute("UPDATE analytics_users SET last_seen='2000-01-01T00:00:00+00:00' WHERE user_id IN ('bob', 'carol')")
+    assert identities["alice"] == ("alice@example.invalid", "sso")
+    assert identities["carol"] == ("carol@example.invalid", "sso")
+    assert identities["dave"] == ("dave@example.invalid", "litellm")
+    # bob left LiteLLM long ago; alice is absent but was seen recently.
+    assert analytics_store.prune_users({"carol", "dave"}) == 1
+    assert analytics_store.users() == ["alice", "carol", "dave"]
+    assert analytics_store.read("bob", "2026-11-01", "2026-11-16")["available"] is False
+
+
+@pytest.mark.asyncio
+async def test_complete_roster_scan_prunes_but_incomplete_scan_does_not(stored, monkeypatch):
+    with local_users.connect() as db:
+        db.execute("UPDATE analytics_users SET last_seen='2000-01-01T00:00:00+00:00'")
+    page = {"users": [{"user_id": "alice", "user_email": None}], "total_pages": 2, "page": 1}
+    monkeypatch.setattr(analytics.upstream, "request", AsyncMock(side_effect=[page, {"users": None}]))
+    with pytest.raises(ValueError):
+        await analytics.discover_users()
+    assert analytics_store.users() == ["alice", "bob"]
+    monkeypatch.setattr(analytics.upstream, "request", AsyncMock(return_value={**page, "total_pages": 1}))
+    await analytics.discover_users()
+    assert analytics_store.users() == ["alice"]
+
+
+def test_portal_identity_write_is_skipped_while_recent_and_unchanged(stored):
+    with patch.object(analytics_store, "remember_user", wraps=analytics_store.remember_user) as write:
+        analytics_store.remember_portal_user("alice", "alice@example.invalid", "sso")
+        analytics_store.remember_portal_user("alice", "alice@example.invalid", "sso")
+        assert write.call_count == 1
+        analytics_store.remember_portal_user("alice", "new@example.invalid", "sso")
+        assert write.call_count == 2

@@ -1,6 +1,8 @@
 """Resolve configured designations against live native team administration."""
 
+import asyncio
 from dataclasses import dataclass
+from time import monotonic
 
 from fastapi import HTTPException
 
@@ -50,6 +52,36 @@ class OrganizationScope:
 GLOBAL_SCOPE = OrganizationScope(global_admin=True)
 
 
+# Organization pages fan out several requests and poll access every minute.
+# Cache each team's native admin IDs briefly. Revocation takes effect within
+# ADMIN_TTL; during an upstream outage the last good answer serves for STALE_TTL.
+ADMIN_TTL = 30.0
+STALE_TTL = 300.0
+_admin_cache: dict[str, tuple[float, frozenset[str]]] = {}
+
+
+async def _team_admins(team_id: str) -> frozenset[str]:
+    cached = _admin_cache.get(team_id)
+    if cached and monotonic() - cached[0] < ADMIN_TTL:
+        return cached[1]
+    try:
+        info = await upstream.team_info(team_id)
+        team = info.get("team_info")
+        if not isinstance(team, dict) or team.get("team_id", team_id) != team_id or not isinstance(team.get("members_with_roles"), list):
+            raise ValueError("Incomplete team information")
+    except (HTTPException, ValueError, AttributeError):
+        if cached and monotonic() - cached[0] < STALE_TTL:
+            return cached[1]
+        return frozenset()
+    admins = frozenset(
+        member["user_id"]
+        for member in team["members_with_roles"]
+        if isinstance(member, dict) and isinstance(member.get("user_id"), str) and member.get("role") == "admin"
+    )
+    _admin_cache[team_id] = (monotonic(), admins)
+    return admins
+
+
 async def resolve_scope(actor: ApiActor) -> OrganizationScope:
     """Designations contain canonical user IDs mapped to configured native TEAM IDs."""
     if actor.proof_key or actor.user.auth_source == "litellm_key":
@@ -57,7 +89,7 @@ async def resolve_scope(actor: ApiActor) -> OrganizationScope:
     if actor.is_admin:
         return GLOBAL_SCOPE
     designated = set(settings.organization_access_designations.get(actor.user.user_id, []))
-    authorized = []
+    authorized, remote = [], []
     for node in settings.organization_hierarchy.nodes.values():
         if node.team_id not in designated:
             continue
@@ -67,18 +99,9 @@ async def resolve_scope(actor: ApiActor) -> OrganizationScope:
         if actor.user.user_id in settings.organization_group_admins.get(node.team_id, []):
             authorized.append(node)
             continue
-        try:
-            info = await upstream.team_info(node.team_id)
-        except HTTPException:
-            continue
-        team = info.get("team_info")
-        if not isinstance(team, dict) or team.get("team_id", node.team_id) != node.team_id:
-            continue
-        members = team.get("members_with_roles")
-        if not isinstance(members, list):
-            continue
-        if any(isinstance(member, dict) and member.get("user_id") == actor.user.user_id and member.get("role") == "admin" for member in members):
-            authorized.append(node)
+        remote.append(node)
+    admins = await asyncio.gather(*(_team_admins(node.team_id) for node in remote))
+    authorized += [node for node, ids in zip(remote, admins) if actor.user.user_id in ids]
     roots = tuple(
         node.id for node in authorized if not any(other.id != node.id and node.path[: len(other.path)] == other.path for other in authorized)
     )

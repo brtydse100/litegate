@@ -16,8 +16,11 @@ Use canonical user IDs from the administrator **People** directory, not email
 addresses or display names. LiteGate-managed administration grants only scoped
 Organization capabilities, not global administration or native LiteLLM roles.
 Authority applies to the designated root and descendants. Multiple roots are
-supported. Backend checks run on every request; native lookup failure grants
-nothing. Configuration changes require the usual application restart/rollout.
+supported. Backend checks run on every request. Native team-admin roles are
+cached for 30 seconds, so a removed native role stops granting access within
+30 seconds. If LiteLLM is briefly unreachable, the last successful answer is used
+for up to 5 minutes; with no recent answer, a lookup failure grants nothing.
+Configuration changes require the usual application restart/rollout.
 
 Docker/direct `config.yaml`:
 
@@ -63,6 +66,15 @@ starting competing collectors. The roster scan is limited to 100 pages of 100
 users and 120 seconds; individual usage scans keep their existing pagination and
 60-second limits. Previously known users are still refreshed after discovery
 failure. Large installations should monitor refresh age and upstream latency.
+
+The first refresh for a user reads the full retention window. Later passes read
+only from the last stored day through today and merge those days into the
+snapshot; days older than the retention window are dropped. Roster discovery
+adds users without overwriting the email or sign-in source recorded at portal
+sign-in. After a complete roster scan, users LiteLLM no longer lists and who have
+not signed in for 24 hours are removed with their cached snapshots. Portal
+sign-ins record the user at most once an hour unless their email or sign-in
+source changes.
 
 Indexed SQLite snapshots contain request/token/cost totals, daily/model data,
 coverage, and last successful refresh time. Each complete user snapshot commits
@@ -139,9 +151,10 @@ root envelope or raise their own personal allowance, including indirectly.
 
 Invalid legacy proposals remain visible with a group-specific allocation error.
 Automatic shares and allocation totals are unavailable until repaired; explicit
-overrides remain visible. System administrators may repair independent deficits
-incrementally, provided no group's deficit increases. Delegated edits require a
-valid allocation throughout.
+overrides remain visible. System administrators and delegates may repair
+deficits incrementally, provided no group's deficit increases. An existing
+deficit in another group, including one outside a delegate's scope, does not
+block unrelated edits.
 
 Existing per-key enforcement remains active. The page reports unknown used and
 remaining amounts as unavailable and marks proposals as not applied. Activation
@@ -168,7 +181,9 @@ The upstream team-delete contract cannot condition deletion on still being empty
 Deleting after an empty snapshot can race another actor adding a member or key.
 Automatic deletion therefore remains unfinished; the assessment records
 `review_required`, including `atomic_delete_unavailable` for an otherwise empty
-candidate, without risking unrelated records.
+candidate, without risking unrelated records. The assessment runs with each
+reconciliation pass, but a candidate is audited only when first found or when its
+reason changes (and once more after an application restart).
 
 ## Startup and upgrade reliability
 

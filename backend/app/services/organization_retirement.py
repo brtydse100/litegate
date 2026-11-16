@@ -9,6 +9,12 @@ from app.config import settings
 from app.services import audit, local_users, organization_client as upstream, organization_store
 
 
+# Last reason audited per team. The 60-second reconciler would otherwise record
+# an identical event every pass. Production is single-replica, so process-local
+# state suffices; a restart re-reports each candidate once.
+_reported: dict[str, str] = {}
+
+
 def mark_created(team_id: str) -> None:
     """Call only after this installation's create operation is confirmed."""
     with local_users.connect() as db:
@@ -63,11 +69,17 @@ async def assess_removed_teams() -> list[dict]:
         return []
     results = []
     configured = configured_team_ids()
+    candidates = set()
     for team_id in await asyncio.to_thread(owned_teams):
         if team_id in configured:
             continue
+        candidates.add(team_id)
         reason = await retirement_reason(team_id)
         result = {"team_id": team_id, "status": "review_required", "reason": reason}
+        results.append(result)
+        if _reported.get(team_id) == reason:
+            continue
+        _reported[team_id] = reason
         await asyncio.to_thread(
             audit.record,
             actor_id="system:organization",
@@ -77,5 +89,7 @@ async def assess_removed_teams() -> list[dict]:
             outcome="success",
             details=result,
         )
-        results.append(result)
+    # Forget teams that were reconfigured or removed so a recurrence is audited.
+    for team_id in set(_reported) - candidates:
+        del _reported[team_id]
     return results

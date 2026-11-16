@@ -1,13 +1,11 @@
 """Bounded read-only directory; LiteLLM remains the source of registered people."""
 
 import asyncio
-import json
 
 import httpx
 from fastapi import HTTPException
 
-from app.config import settings
-from app.services.litellm_client import client, headers
+from app.services.litellm_client import get_bounded_json
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 ERROR = "LiteLLM people directory is unavailable or returned an invalid page"
@@ -56,18 +54,7 @@ async def directory(*, page: int, size: int, search: str) -> dict:
         params["user_email"] = search
     try:
         async with asyncio.timeout(20):
-            async with (
-                client() as pooled,
-                pooled.stream(
-                    "GET", f"{settings.litellm_url.rstrip('/')}/user/list", params=params, headers=headers(), timeout=15, follow_redirects=False
-                ) as response,
-            ):
-                response.raise_for_status()
-                content = bytearray()
-                async for chunk in response.aiter_bytes():
-                    content.extend(chunk)
-                    if len(content) > MAX_RESPONSE_BYTES:
-                        raise ValueError("Directory page too large")
-            return _page(json.loads(content), page, size)
+            data = await get_bounded_json("/user/list", params=params, max_bytes=MAX_RESPONSE_BYTES, timeout=15)
+        return _page(data, page, size)
     except (httpx.HTTPError, ValueError, TypeError, RecursionError, TimeoutError):
         raise HTTPException(status_code=502, detail=ERROR) from None

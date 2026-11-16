@@ -643,6 +643,8 @@ can use these scoped routes; other ordinary users and LiteLLM-key identities
 are denied. Activation requires a system administrator.
 Each group includes `allocation_error` (string or null). Invalid legacy groups
 remain readable with null `allocated`, `remainder`, and automatic user `allocation`;
-manual allocations remain numeric. System administrators may repair existing
-deficits incrementally without increasing any group's deficit.
+manual allocations remain numeric. System administrators and delegates may
+repair existing deficits incrementally without increasing any group's deficit;
+a deficit in another group does not block an unrelated edit. When hierarchical
+budgets are disabled, these routes return 404 before any access lookup.
 See [current enforcement and retirement limitations](docs/governance-and-analytics.md).

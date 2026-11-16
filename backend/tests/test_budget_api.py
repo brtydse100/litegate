@@ -118,6 +118,47 @@ async def test_feature_disabled_is_not_accessible(monkeypatch, context):
     with pytest.raises(HTTPException) as hidden:
         await routes.budget_view(actor)
     assert hidden.value.status_code == 404
+    # The flag is checked before scope resolution, which may call LiteLLM.
+    organization_access.resolve_scope.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_out_of_scope_deficit_does_not_block_delegated_edits(monkeypatch, context):
+    *_, actor = context
+    tree = OrganizationHierarchy.model_validate(
+        {
+            "levels": [
+                {
+                    "name": "Division",
+                    "groups": [
+                        {
+                            "members": [
+                                {"name": "Root", "litellmTeamId": "root", "budget": {"groupTotal": 100}},
+                                {"name": "Other", "litellmTeamId": "other", "budget": {"groupTotal": 20}},
+                            ]
+                        }
+                    ],
+                },
+                {
+                    "name": "Team",
+                    "groups": [
+                        {"parent": "Root", "members": [{"name": "Child", "userIds": ["alice", "delegate"], "budget": {"groupTotal": 50}}]},
+                        {"parent": "Other", "members": [{"name": "OtherChild", "budget": {"groupTotal": 50}}]},
+                    ],
+                },
+            ]
+        }
+    )
+    monkeypatch.setattr(settings, "organization_hierarchy", tree)
+    root = next(node for node in tree.roots if node.member.name == "Root")
+    child = next(node for node in tree.nodes.values() if node.parent_id == root.id)
+    monkeypatch.setattr(organization_access, "resolve_scope", AsyncMock(return_value=organization_access.OrganizationScope(roots=(root.id,))))
+    routes = router(monkeypatch)
+    result = await routes.edit_override(child.id, "alice", routes.UserEdit(revision=0, amount=30), actor)
+    assert result["revision"] == 1
+    # The out-of-scope deficit is neither blocking nor disclosed.
+    assert {row["id"] for row in result["groups"]} == {root.id, child.id}
+    assert all(row["allocation_error"] is None for row in result["groups"])
 
 
 @pytest.mark.asyncio

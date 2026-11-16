@@ -70,15 +70,22 @@ async def refresh_user(user_id: str, end: date | None = None) -> None:
     end = end or datetime.now(timezone.utc).date()
     start = end - timedelta(days=settings.analytics_retention_days - 1)
     try:
-        rows = await upstream.daily_usage(user_id, start.isoformat(), end.isoformat())
-        validate_usage(rows, start.isoformat(), end.isoformat())
+        fetch_from, replace_from = start, None
+        stored = await asyncio.to_thread(store.coverage, user_id)
+        if stored and stored[0] <= start.isoformat() <= stored[1]:
+            # Contiguous history: re-read only the last stored day (it may have
+            # been partial) through today instead of the whole retention window.
+            fetch_from = min(end, max(start, date.fromisoformat(stored[1]) - timedelta(days=1)))
+            replace_from = fetch_from.isoformat()
+        rows = await upstream.daily_usage(user_id, fetch_from.isoformat(), end.isoformat())
+        validate_usage(rows, fetch_from.isoformat(), end.isoformat())
         snapshot = normalize(rows)
         try:
             allowances = await budgets(user_id)
         except Exception:
             allowances = [{"available": False}]
         await asyncio.to_thread(
-            store.publish, user_id, snapshot, start.isoformat(), end.isoformat(), allowances, datetime.now(timezone.utc).isoformat()
+            store.publish, user_id, snapshot, start.isoformat(), end.isoformat(), allowances, datetime.now(timezone.utc).isoformat(), replace_from
         )
     except Exception:
         _logger.warning("Personal analytics refresh failed; keeping the previous snapshot")
@@ -95,13 +102,18 @@ async def discover_users() -> None:
             pages = data.get("total_pages")
             if not isinstance(batch, list) or type(pages) is not int or pages > 100 or pages < 0 or data.get("page") != page:
                 raise ValueError("Incomplete analytics user roster")
+            found = []
             for user in batch:
                 identifier = user.get("user_id")
                 if not isinstance(identifier, str) or not identifier or identifier in seen:
                     raise ValueError("Invalid analytics user roster")
                 seen.add(identifier)
-                await asyncio.to_thread(store.remember_user, identifier, user.get("user_email") or "", "litellm")
+                email = user.get("user_email")
+                found.append((identifier, email if isinstance(email, str) else ""))
+            await asyncio.to_thread(store.discover_users, found)
             if page >= pages:
+                # Prune only after a complete, validated roster.
+                await asyncio.to_thread(store.prune_users, seen)
                 return
     raise ValueError("Analytics roster scan exceeded safety bound")
 

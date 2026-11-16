@@ -225,5 +225,5 @@ async def auth_config():
 @router.get("/me")
 async def me(current_user: CurrentUser = Depends(get_current_user)):
     if settings.analytics_enabled:
-        await asyncio.to_thread(analytics_store.remember_user, current_user.user_id, current_user.email, current_user.auth_source)
+        await asyncio.to_thread(analytics_store.remember_portal_user, current_user.user_id, current_user.email, current_user.auth_source)
     return current_user

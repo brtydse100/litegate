@@ -17,16 +17,31 @@ function BudgetGroupEditor({
   revision: number;
 }) {
   const client = useQueryClient();
-  const [envelope, setEnvelope] = useState(String(group.assigned));
+  // Drafts live per group (editors are keyed by group id, not revision), so a
+  // save elsewhere never discards them. A saved field reverts to server data.
+  const [envelope, setEnvelope] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const mutation = useMutation({
     mutationFn: ({ user, amount }: { user?: string; amount: string | null }) =>
       user
         ? api.setUserBudget(group.id, user, revision, amount)
         : api.setGroupBudget(group.id, revision, amount ?? "0"),
-    onSuccess: (result) =>
-      client.setQueryData(["organization-budgets"], result),
+    onSuccess: (result, { user }) => {
+      client.setQueryData(["organization-budgets"], result);
+      if (user)
+        setOverrides((previous) => {
+          const next = { ...previous };
+          delete next[user];
+          return next;
+        });
+      else setEnvelope(null);
+    },
+    // A conflict means the revision or allocations changed; reload them so
+    // the retained draft can be reviewed and saved against current data.
+    onError: () =>
+      void client.invalidateQueries({ queryKey: ["organization-budgets"] }),
   });
+  const envelopeValue = envelope ?? String(group.assigned);
   return (
     <article className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
       <h3 className="font-semibold text-slate-950">{group.name}</h3>
@@ -57,7 +72,7 @@ function BudgetGroupEditor({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            mutation.mutate({ amount: envelope });
+            mutation.mutate({ amount: envelopeValue });
           }}
           className="flex flex-wrap items-end gap-2"
         >
@@ -66,7 +81,7 @@ function BudgetGroupEditor({
             <input
               aria-label={`${group.name} assigned budget`}
               className={`${inputClass} ml-2`}
-              value={envelope}
+              value={envelopeValue}
               onChange={(event) => setEnvelope(event.target.value)}
               type="number"
               min="0"
@@ -198,7 +213,7 @@ export default function BudgetManager() {
       </p>
       {data.groups.map((group) => (
         <BudgetGroupEditor
-          key={`${data.revision}:${group.id}`}
+          key={group.id}
           group={group}
           revision={data.revision}
         />

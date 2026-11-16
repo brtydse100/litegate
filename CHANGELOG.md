@@ -13,7 +13,7 @@ Prepared release; the stable tag and image have not been published.
 
 ### Added
 
-- Personal analytics for all portal users, backed by hourly atomic SQLite
+- Personal analytics for all portal users, backed by hourly incremental SQLite
   snapshots with request/token/cost/model/daily totals, coverage, freshness,
   failure retention and owner-only access.
 - License-independent scoped Organization delegation requiring both an explicit

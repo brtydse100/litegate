@@ -1,5 +1,6 @@
 """Shared HTTP transport and dependency health for LiteLLM."""
 
+import json
 from contextlib import asynccontextmanager
 
 import httpx
@@ -41,6 +42,23 @@ async def client():
         return
     async with httpx.AsyncClient(verify=settings.ssl_verify) as isolated:
         yield isolated
+
+
+async def get_bounded_json(path: str, *, max_bytes: int, timeout: float, params: dict | None = None):
+    """Stream a GET without redirects and stop once the body exceeds ``max_bytes``."""
+    async with (
+        client() as pooled,
+        pooled.stream(
+            "GET", f"{settings.litellm_url.rstrip('/')}{path}", params=params, headers=headers(), timeout=timeout, follow_redirects=False
+        ) as response,
+    ):
+        response.raise_for_status()
+        content = bytearray()
+        async for chunk in response.aiter_bytes():
+            content.extend(chunk)
+            if len(content) > max_bytes:
+                raise ValueError("LiteLLM response too large")
+    return json.loads(content)
 
 
 def transport_error(_: httpx.TransportError) -> None:

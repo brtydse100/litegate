@@ -18,6 +18,7 @@ def retirement(monkeypatch, tmp_path):
     local_users.init_db()
     monkeypatch.setattr(settings, "organization_hierarchy", OrganizationHierarchy.model_validate(example()))
     monkeypatch.setattr(settings, "organization_cleanup_enabled", True)
+    monkeypatch.setattr(organization_retirement, "_reported", {})
     monkeypatch.setattr(litellm, "delete_team", AsyncMock())
     monkeypatch.setattr(
         upstream,
@@ -74,6 +75,25 @@ async def test_group_admin_team_reference_is_not_a_retirement_candidate(monkeypa
     litellm.delete_team.assert_not_awaited()
     with local_users.connect() as db:
         assert db.execute("SELECT count(*) FROM audit_events WHERE action='organization.retirement'").fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_repeated_passes_audit_a_candidate_only_when_its_reason_changes(monkeypatch, retirement):
+    service = import_module("app.services.organization_retirement")
+    service.mark_created("removed")
+
+    def events():
+        with local_users.connect() as db:
+            return [row[0] for row in db.execute("SELECT details_json FROM audit_events WHERE action='organization.retirement' ORDER BY id")]
+
+    for _ in range(3):
+        assert (await service.assess_removed_teams())[0]["reason"] == "atomic_delete_unavailable"
+    assert len(events()) == 1
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {"members_with_roles": [{"user_id": "late"}]}}))
+    await service.assess_removed_teams()
+    await service.assess_removed_teams()
+    assert len(events()) == 2
+    assert "remote_check_incomplete" in events()[1]
 
 
 @pytest.mark.asyncio

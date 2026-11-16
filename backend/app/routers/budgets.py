@@ -28,10 +28,9 @@ class UserEdit(Activation):
 
 
 async def _scope(actor):
-    scope = await access.resolve_scope(actor)
     if not settings.hierarchical_budgets_enabled:
         raise HTTPException(404, "Hierarchical budget previews are disabled")
-    return scope
+    return await access.resolve_scope(actor)
 
 
 def _members() -> tuple[dict, dict]:
@@ -130,17 +129,19 @@ async def budget_view(actor: ApiActor = Depends(get_api_actor)):
 def _edit(revision, actor, scope, change):
     def validate(state):
         members, _ = _members()
-        # Read invalid proposals without inventing allocations. System admins
-        # may repair independent deficits incrementally, never worsen one.
-        before = _allocations(state, members, strict=not scope.global_admin)
+        # Read invalid proposals without inventing allocations. Any editor may
+        # leave an independent (possibly out-of-scope) deficit in place or repair
+        # it incrementally, but no edit may create or worsen a deficit.
+        before = _allocations(state, members, strict=False)
         change(state, members)
-        after = _allocations(state, members, strict=not scope.global_admin)
-        if scope.global_admin and any(row["shortfall"] > before[node_id]["shortfall"] for node_id, row in after.items()):
+        after = _allocations(state, members, strict=False)
+        if any(row["shortfall"] > before[node_id]["shortfall"] for node_id, row in after.items()):
             raise HTTPException(409, allocation.ALLOCATION_ERROR)
         owner_group = members.get(actor.user.user_id)
         if not scope.global_admin and owner_group:
-            own_before = before[owner_group]["users"].get(actor.user.user_id, 0)
-            own_after = after[owner_group]["users"].get(actor.user.user_id, 0)
+            # A group in deficit reports no automatic share; treat it as zero.
+            own_before = before[owner_group]["users"].get(actor.user.user_id) or 0
+            own_after = after[owner_group]["users"].get(actor.user.user_id) or 0
             if own_after > own_before:
                 raise HTTPException(403, "A parent or system administrator must increase your personal allowance")
 

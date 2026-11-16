@@ -207,3 +207,58 @@ it("retains an unsuccessful draft and reports an allocation conflict", async () 
   ).toHaveValue(11);
   expect(screen.getByText("Automatic: $10.000000")).toBeInTheDocument();
 });
+
+it("reloads current budgets after a conflict so the draft can be saved again", async () => {
+  vi.mocked(api.setUserBudget).mockRejectedValueOnce(
+    new Error("Budget revision conflict; reload and retry"),
+  );
+  setup();
+  fireEvent.change(
+    await screen.findByLabelText("Budget override for alice@example.invalid"),
+    { target: { value: "11" } },
+  );
+  vi.mocked(api.organizationBudgets).mockResolvedValue(view(7));
+  fireEvent.click(screen.getByRole("button", { name: "Save user budget" }));
+  await waitFor(() => expect(api.organizationBudgets).toHaveBeenCalledTimes(2));
+  vi.mocked(api.setUserBudget).mockResolvedValue(view(8));
+  fireEvent.click(screen.getByRole("button", { name: "Save user budget" }));
+  await waitFor(() =>
+    expect(api.setUserBudget).toHaveBeenLastCalledWith(
+      "root",
+      "alice",
+      7,
+      "11",
+    ),
+  );
+});
+
+it("keeps unsaved drafts in other groups when one group is saved", async () => {
+  const initial = view();
+  initial.groups.push({
+    ...initial.groups[0],
+    id: "child",
+    name: "Platform",
+    path: ["Engineering", "Platform"],
+    can_edit_envelope: true,
+    users: [],
+  });
+  const saved = structuredClone(initial);
+  saved.revision = 5;
+  vi.mocked(api.setUserBudget).mockResolvedValue(saved);
+  setup(initial);
+  fireEvent.change(await screen.findByLabelText("Platform assigned budget"), {
+    target: { value: "3" },
+  });
+  fireEvent.change(
+    screen.getByLabelText("Budget override for alice@example.invalid"),
+    { target: { value: "2" } },
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Save user budget" }));
+  // The saved override reverts to server data once the new revision lands.
+  await waitFor(() =>
+    expect(
+      screen.getByLabelText("Budget override for alice@example.invalid"),
+    ).toHaveValue(null),
+  );
+  expect(screen.getByLabelText("Platform assigned budget")).toHaveValue(3);
+});

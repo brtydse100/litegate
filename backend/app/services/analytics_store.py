@@ -2,7 +2,8 @@
 
 import json
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from time import monotonic
 
 from app.services.local_users import connect
 
@@ -33,21 +34,87 @@ def remember_user(user_id: str, email: str, auth_source: str) -> None:
         )
 
 
+# Portal sign-ins call remember_user on every /me. Skip the SQLite write while
+# the stored identity is unchanged and last_seen is under an hour old.
+_remembered: dict[str, tuple[str, str, float]] = {}
+
+
+def remember_portal_user(user_id: str, email: str, auth_source: str) -> None:
+    previous = _remembered.get(user_id)
+    if previous and previous[:2] == (email, auth_source) and monotonic() - previous[2] < 3600:
+        return
+    remember_user(user_id, email, auth_source)
+    _remembered[user_id] = (email, auth_source, monotonic())
+
+
+def discover_users(batch: list[tuple[str, str]]) -> None:
+    """Record roster users without overwriting portal-verified email or source."""
+    seen = datetime.now(timezone.utc).isoformat()
+    with connect() as db:
+        db.executemany(
+            """INSERT INTO analytics_users VALUES (?, ?, 'litellm', ?)
+            ON CONFLICT(user_id) DO UPDATE SET last_seen=excluded.last_seen,
+            email=CASE WHEN analytics_users.email='' THEN excluded.email ELSE analytics_users.email END""",
+            [(user_id, email, seen) for user_id, email in batch],
+        )
+
+
+def prune_users(roster: set[str], *, grace: timedelta = timedelta(hours=24)) -> int:
+    """After a complete roster scan, drop users LiteLLM no longer lists.
+
+    Portal users seen within ``grace`` are kept even when absent from the roster.
+    Only cached copies of LiteLLM data are removed; a returning user is re-added.
+    """
+    cutoff = (datetime.now(timezone.utc) - grace).isoformat()
+    with connect() as db:
+        db.execute("CREATE TEMP TABLE IF NOT EXISTS analytics_roster (user_id TEXT PRIMARY KEY)")
+        db.execute("DELETE FROM analytics_roster")
+        db.executemany("INSERT INTO analytics_roster VALUES (?)", [(user_id,) for user_id in roster])
+        stale = [
+            row[0]
+            for row in db.execute(
+                "SELECT user_id FROM analytics_users WHERE last_seen < ? AND user_id NOT IN (SELECT user_id FROM analytics_roster)", (cutoff,)
+            )
+        ]
+        for table in ("analytics_daily", "analytics_snapshots", "analytics_failures", "analytics_users"):
+            db.executemany(f"DELETE FROM {table} WHERE user_id=?", [(user_id,) for user_id in stale])
+        db.execute("DELETE FROM analytics_roster")
+    for user_id in stale:
+        _remembered.pop(user_id, None)
+    return len(stale)
+
+
+def coverage(user_id: str) -> tuple[str, str] | None:
+    with connect() as db:
+        row = db.execute("SELECT coverage_start, coverage_end FROM analytics_snapshots WHERE user_id=?", (user_id,)).fetchone()
+    return (row[0], row[1]) if row else None
+
+
 def users() -> list[str]:
     with connect() as db:
         return [row[0] for row in db.execute("SELECT user_id FROM analytics_users ORDER BY user_id")]
 
 
-def publish(user_id: str, rows: list[dict], start: str, end: str, budgets: list[dict], refreshed_at: str) -> None:
+def publish(user_id: str, rows: list[dict], start: str, end: str, budgets: list[dict], refreshed_at: str, replace_from: str | None = None) -> None:
+    """Replace the snapshot, or with ``replace_from`` only days from it onward.
+
+    An incremental publish keeps stored days in [start, replace_from) and drops
+    days that fell out of the retention window.
+    """
     values = []
     for row in rows:
         numbers = [row[name] for name in ("requests", "tokens", "input_tokens", "output_tokens", "cost")]
-        if not start <= row["day"] <= end or any(value is not None and (not math.isfinite(value) or value < 0) for value in numbers):
+        if not (replace_from or start) <= row["day"] <= end or any(
+            value is not None and (not math.isfinite(value) or value < 0) for value in numbers
+        ):
             raise ValueError("Invalid analytics snapshot")
         values.append((user_id, row["day"], row["model"], *numbers))
     encoded = json.dumps(budgets, allow_nan=False)
     with connect() as db:
-        db.execute("DELETE FROM analytics_daily WHERE user_id=?", (user_id,))
+        if replace_from is None:
+            db.execute("DELETE FROM analytics_daily WHERE user_id=?", (user_id,))
+        else:
+            db.execute("DELETE FROM analytics_daily WHERE user_id=? AND (day < ? OR day >= ?)", (user_id, start, replace_from))
         db.executemany("INSERT INTO analytics_daily VALUES (?, ?, ?, ?, ?, ?, ?, ?)", values)
         db.execute("DELETE FROM analytics_failures WHERE user_id=?", (user_id,))
         db.execute(
