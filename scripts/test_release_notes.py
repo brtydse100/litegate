@@ -18,7 +18,12 @@ class ReleaseNotesTests(unittest.TestCase):
             with self.subTest(tag=note.stem):
                 text = note.read_text(encoding="utf-8")
                 self.assertTrue(text.startswith(f"# LiteGate {note.stem}\n"))
-                self.assertEqual(re.findall(r"^## (.*)$", text, re.MULTILINE), ["Artifacts", "What's Changed", "Contributors"])
+                headings = re.findall(r"^## (.*)$", text, re.MULTILINE)
+                self.assertEqual(headings[:2], ["Highlights", "Release Artifacts"])
+                self.assertEqual(headings[-1], "Contributors")
+                self.assertTrue(set(headings) <= {"Highlights", "Release Artifacts", "Upgrade Notes", "Contributors"})
+                prose = "\n".join(line for line in text.splitlines() if not line.startswith("|"))
+                self.assertLessEqual(len(prose.split()), 300, "Keep detail in focused guides, not release summaries")
                 self.assertIn("| Artifact | Get it |", text)
                 self.assertIn(f"docker pull ghcr.io/brtydse100/litegate:{note.stem[1:]}", text)
                 self.assertIn(f"/blob/{note.stem}/docs/README.md", text)
@@ -33,8 +38,8 @@ class ReleaseNotesTests(unittest.TestCase):
                     output = Path(directory) / note.name
                     subprocess.run([sys.executable, str(ROOT / "scripts/release_body.py"), str(note), str(output)], check=True)
                     body = output.read_text(encoding="utf-8")
-                    self.assertTrue(body.startswith("## Artifacts\n"))
-                    self.assertIn("## What's Changed\n", body)
+                    self.assertTrue(body.startswith("## Highlights\n"))
+                    self.assertIn("## Release Artifacts\n", body)
                     self.assertIn("## Contributors\n", body)
                     self.assertNotIn(f"# LiteGate {note.stem}", body)
                     for target in re.findall(r"(?<!!)\[[^\]]*\]\(([^)]+)\)", body):
@@ -48,6 +53,14 @@ class ReleaseNotesTests(unittest.TestCase):
                             if fragment:
                                 expected += f"#{fragment}"
                             self.assertIn(f"[{label}]({expected})", body)
+
+    def test_pr_notes_are_explicitly_unreleased_and_link_real_artifacts(self):
+        text = (ROOT / "docs/releases/unreleased-pr-49.md").read_text(encoding="utf-8")
+        self.assertIn("Unreleased", text)
+        self.assertIn("## Highlights", text)
+        self.assertIn("https://github.com/brtydse100/litegate/pull/49", text)
+        self.assertNotRegex(text, r"docker pull ghcr.io/brtydse100/litegate:\d")
+        self.assertNotIn("/blob/v2.19.0/", text)
 
 
 if __name__ == "__main__":
