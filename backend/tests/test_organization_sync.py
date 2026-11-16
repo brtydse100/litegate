@@ -26,7 +26,7 @@ def hierarchy(monkeypatch, tmp_path):
         "team_info",
         AsyncMock(
             return_value={
-                "team_info": {"max_budget": None, "budget_duration": "30d"},
+                "team_info": {"max_budget": None, "budget_duration": "30d", "members_with_roles": []},
                 "team_memberships": [{"user_id": owner, "litellm_budget_table": {"max_budget": None}} for owner in ("u", "alice", "bob")],
             }
         ),

@@ -21,7 +21,9 @@ def setup(monkeypatch, tmp_path):
     configure(monkeypatch, ["alice@example.com"])
     local_users.init_db()
     monkeypatch.setattr(upstream, "sync_root", AsyncMock(return_value={}))
-    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {"max_budget": None}, "team_memberships": []}))
+    monkeypatch.setattr(
+        upstream, "team_info", AsyncMock(return_value={"team_info": {"max_budget": None, "members_with_roles": []}, "team_memberships": []})
+    )
     monkeypatch.setattr(key_policy, "finish_team", AsyncMock())
     monkeypatch.setattr(key_policy, "normalize_individual_caps", AsyncMock())
     monkeypatch.setattr(litellm, "add_team_member", AsyncMock())

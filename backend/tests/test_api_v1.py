@@ -177,7 +177,10 @@ def test_bulk_spend_reset_rejects_missing_key_shape():
 async def test_admin_can_update_multiple_keys():
     actor = ApiActor(CurrentUser(user_id="admin", email="a@example.com", role="admin"))
     payload = BulkKeyUpdateRequest(keys=["key-1", "key-2"], settings={"models": ["gpt-4o"]})
-    with patch("app.routers.api_v1.llm.update_key", new=AsyncMock(return_value={})) as update:
+    with (
+        patch("app.routers.api_v1.llm.update_key", new=AsyncMock(return_value={})) as update,
+        patch("app.routers.api_v1.llm.get_key_info", new=AsyncMock(return_value={"user_id": "owner"})),
+    ):
         result = await bulk_update_keys(payload, actor)
     assert result["updated"] == 2
     assert update.await_count == 2
@@ -256,16 +259,14 @@ async def test_admin_api_does_not_apply_own_team_to_another_user():
 
 
 @pytest.mark.asyncio
-async def test_litellm_key_can_delete_itself_but_not_another_key():
+async def test_litellm_key_cannot_permanently_delete_itself_or_another_key():
     actor = ApiActor(
         CurrentUser(user_id="user-1", email="", auth_source="litellm_key"),
         proof_key="sk-self",
     )
     with patch("app.routers.api_v1.llm.delete_key", new=AsyncMock()) as delete:
-        result = await api_delete_key(KeyDeleteRequest(key="sk-self"), actor)
-        with pytest.raises(HTTPException) as exc:
-            await api_delete_key(KeyDeleteRequest(key="sk-other"), actor)
-
-    assert result == {"deleted": True}
-    assert exc.value.status_code == 403
-    delete.assert_awaited_once_with("sk-self")
+        for key in ("sk-self", "sk-other"):
+            with pytest.raises(HTTPException) as exc:
+                await api_delete_key(KeyDeleteRequest(key=key), actor)
+            assert exc.value.status_code == 403
+    delete.assert_not_awaited()

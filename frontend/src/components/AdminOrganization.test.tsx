@@ -67,6 +67,86 @@ describe("organization dashboard contracts", () => {
     );
   });
 
+  it("refreshes migration issues while open without loading an unselected report", async () => {
+    vi.useFakeTimers();
+    const issue = {
+      user_id: "pending@example.com",
+      error: "Migration pending",
+    };
+    vi.mocked(api.organizationChildren).mockResolvedValue({
+      ...organizationChildren(),
+      issues: [issue],
+    });
+    const { unmount, client } = renderOrganization();
+    try {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect(screen.getByRole("alert")).toHaveTextContent("Migration pending");
+      vi.mocked(api.organizationChildren).mockResolvedValue(
+        organizationChildren(),
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60000);
+      });
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(api.organizationUsage).not.toHaveBeenCalled();
+      expect(api.organizationUsers).not.toHaveBeenCalled();
+    } finally {
+      unmount();
+      client.clear();
+      vi.useRealTimers();
+    }
+  });
+
+  it("offers manual status refresh and uses deployment-neutral wording", async () => {
+    renderOrganization();
+    await screen.findByRole("navigation", { name: "Organization groups" });
+    expect(screen.queryByText(/managed through Helm/)).not.toBeInTheDocument();
+    const calls = vi.mocked(api.organizationChildren).mock.calls.length;
+    fireEvent.click(
+      screen.getByRole("button", { name: "Refresh organization" }),
+    );
+    await waitFor(() =>
+      expect(
+        vi.mocked(api.organizationChildren).mock.calls.length,
+      ).toBeGreaterThan(calls),
+    );
+  });
+
+  it("shows discovery conflicts even when no user could be adopted", async () => {
+    vi.mocked(api.organizationChildren).mockResolvedValue({
+      ...organizationChildren(),
+      total_users: 0,
+      issues: [
+        {
+          user_id: "unresolved@example.com",
+          error: "Multiple LiteLLM users match; configure an exact user ID",
+        },
+      ],
+    });
+    renderOrganization();
+    const issue = await screen.findByRole("alert");
+    expect(issue).toHaveTextContent("unresolved@example.com");
+    expect(issue).toHaveTextContent("configure an exact user ID");
+  });
+
+  it("refreshes All groups reports without requesting a group with an empty ID", async () => {
+    renderOrganization();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "All groups, 4 users" }),
+    );
+    await screen.findByRole("img", { name: "Spend (USD) over time" });
+    const refresh = screen.getByRole("button", {
+      name: "Refresh organization",
+    });
+    await waitFor(() => expect(refresh).toBeEnabled());
+    fireEvent.click(refresh);
+    await waitFor(() => expect(api.organizationUsage).toHaveBeenCalledTimes(2));
+    expect(api.organizationGroup).not.toHaveBeenCalled();
+    expect(api.organizationUsers).toHaveBeenLastCalledWith("", 1);
+  });
+
   it("filters users, charts, and effective budgets together when selecting a squad", async () => {
     renderOrganization();
     const navigation = await screen.findByRole("navigation", {

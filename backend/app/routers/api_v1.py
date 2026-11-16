@@ -26,7 +26,7 @@ from app.routers.api_actor import (
 from app.routers.api_v1_system import api_audit_events, api_status, router as system_router
 from app.routers.api_v1_users import api_create_user, api_list_users, api_update_user, router as users_router
 from app.routers.api_v1_models import router as models_router
-from app.services import key_budgets, key_secrets, litellm as llm, organization_sync, policy_schemas, policy_team_update
+from app.services import key_budgets, key_mutations, key_secrets, litellm as llm, organization_sync, policy_schemas, policy_team_update
 from app.routers.api_v1_policy_schemas import router as policy_schemas_router
 from app.routers.team_policy_context import decorate_team as _decorate_team, team_config_references as _team_config_references
 
@@ -124,15 +124,10 @@ async def api_create_key(
 @router.delete("/keys")
 async def api_delete_key(payload: KeyDeleteRequest, actor: ApiActor = Depends(get_api_actor)):
     """Delete a key while keeping the credential out of URLs and access logs."""
-    if actor.proof_key:
-        if payload.key != actor.proof_key:
-            raise HTTPException(status_code=403, detail="A LiteLLM key can only delete itself")
-    elif not actor.is_admin:
-        owned = {key.get("token") or key.get("api_key") or key.get("key") for key in await llm.list_user_keys(actor.user.user_id)}
-        if payload.key not in owned:
-            raise HTTPException(status_code=403, detail="Key not owned by user")
+    _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
-    await llm.delete_key(payload.key)
+    async with key_mutations.locked_key(payload.key):
+        await llm.delete_key(payload.key)
     if actor.is_admin:
         await _record_audit(actor, "key.delete", "installation-key")
     return {"deleted": True}

@@ -39,6 +39,20 @@ Personal spend is displayed to six decimal places. Regeneration uses the normal
 `name's key` name without a rotation suffix while retaining spend and verified
 key allowances.
 
+Rotation also preserves key model restrictions, blocking, rate/concurrency
+limits and the existing expiration deadline (it may shorten by less than two
+seconds because LiteLLM accepts relative durations). Unmanaged keys retain their team and
+budget; hierarchy-managed keys use the current hierarchy assignment and allowance.
+Replacement controls are verified before old credentials are revoked. Keys with
+different policies require administrator-assisted rotation rather than guessing
+which restrictions to keep.
+
+Permanent key deletion is administrator-only, including the compatibility API.
+Ordinary users and key-authenticated clients cannot delete a credential and
+create a fresh allowance. Owners use rotation for replacement; contact an
+administrator for permanent revocation. Rotation retains MCP/tag rate limits,
+policies and prompts as well, and coordinates with administrator policy edits.
+
 New keys inherit the installation defaults for models, budget, reset interval,
 duration, TPM, RPM, and team. For SSO users, an administrator can map identity
 provider groups to existing LiteLLM teams so new or regenerated keys use the
@@ -46,14 +60,12 @@ matched team's model and budget policy. See
 [SSO team mapping](authentication.md#mapping-sso-groups-to-litellm-teams) and
 the [configuration guide](configuration.md#key-defaults).
 
-An optional [email organization hierarchy](configuration.md#email-organization-mapping)
-assigns users to existing LiteLLM teams and their ancestors even when SSO groups
-are outdated. Startup can pre-create users and memberships without keys or
-local passwords; first SSO login binds the authenticated identity to its
-canonical account. Existing SSO primary teams take precedence. Memberships are
-additive and never infer administrator access. Pending existing accounts need
-authenticated legacy-subject proof; superseded reservations remain visible in
-LiteLLM and may count toward user limits. See the
+An optional [organization hierarchy](organization.md) assigns users by exact
+ID, configured email or verified SSO groups. Startup discovers existing users
+and migrates their keys in place; it creates no users or keys. New SSO users are
+provisioned keylessly at authenticated login. The deepest compatible hierarchy
+assignment controls managed keys. Memberships are additive and never infer
+administrator access. Existing legacy identity bindings remain supported; see the
 [identity lifecycle](authentication.md#email-organization-mapping-and-identity).
 
 The portal disables key, local-account, team, and bulk-edit controls when the

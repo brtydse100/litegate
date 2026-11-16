@@ -48,7 +48,7 @@ def _period_advanced(before: dict, after: dict) -> bool:
     return later > earlier
 
 
-async def verify_replacement(user_id: str, existing: list[dict], replacement: str) -> None:
+async def verify_replacement(user_id: str, existing: list[dict], replacement: str) -> list[dict]:
     # Read again after policy writes. A real period reset must not be undone by
     # copying an earlier snapshot or historical user usage into a current counter.
     source = await current_keys(user_id, existing)
@@ -59,3 +59,4 @@ async def verify_replacement(user_id: str, existing: list[dict], replacement: st
     expected = sum(counter(key) for key in source)
     if not info or info.get("user_id") != user_id or not math.isclose(counter(info), expected, rel_tol=1e-12, abs_tol=1e-12):
         raise HTTPException(status_code=502, detail="LiteLLM did not preserve replacement key spend; original keys were kept")
+    return source

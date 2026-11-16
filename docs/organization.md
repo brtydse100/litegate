@@ -2,6 +2,11 @@
 
 ## Progressive organization navigation
 
+The open Organization page refreshes hierarchy and membership status every
+60 seconds, including migration issues. **Refresh organization** updates loaded
+navigation and the selected report immediately. Usage reports remain lazy and
+are refreshed on demand rather than polled in the background.
+
 The Organization page initially loads only root-group metadata from LiteGate's
 configured hierarchy and local identity records. It does not wait for live
 LiteLLM data for every internal team, and it does not request installation-wide
@@ -244,6 +249,45 @@ login; users sign in again after provider-side membership changes. This feature
 does not add SCIM, LDAP, or identity-provider polling.
 
 ## Budgets
+
+### Moving an existing installation into the hierarchy
+
+1. Retain the existing SQLite data volume and LiteLLM database. Add
+   `organizationHierarchy` to the deployment configuration, using existing team
+   IDs where appropriate. List existing users under `userIds` by exact ID or
+   SSO email; local accounts require an exact ID such as `local:alice`.
+2. Restart/redeploy LiteGate. Startup discovers configured existing users,
+   adds missing memberships and updates their existing keys in place. No
+   account import, key regeneration, credential redistribution or spend reset
+   is needed. Assignments based only on `ssoGroups` apply at the next verified
+   SSO login because LiteGate cannot infer provider claims from a remote email.
+3. Check the Organization page's synchronization issues. A reconciliation pass
+   first applies and verifies the key policies for all discovered users, then
+   finalizes individual budgets. This lets users sharing an old native team cap
+   complete together in the same pass. Shared caps remain until every affected
+   credential is protected; unknown or conflicting assignments require review.
+
+Transient failures retry automatically every 60 seconds and after restart,
+continuing from the existing identities and key policies. Successful updates are
+idempotent. Fix reported identity conflicts or unsupported upstream policy rather
+than deleting/recreating users. Secrets, key IDs, aliases, spend, model access and
+rate limits remain intact. Configured hierarchy budgets deliberately replace
+the old key allowance; lowering the allowance below current spend can immediately
+block further paid requests. Removing hierarchy configuration is not a rollback
+of the remote policy changes; preserve a configuration/database backup before
+rollout and review any policy reversal deliberately.
+
+Discovery conflicts and unresolved configured selectors appear in the Organization
+page's synchronization issues even before a user record can be adopted. The list
+refreshes each reconciliation pass and clears resolved conflicts automatically.
+Missing users remain pending until their first login or upstream provisioning;
+ambiguous email matches require an exact `userIds` assignment.
+
+Migration checks the key's previous team even when that team is outside the
+new hierarchy. Blocking, model, rate or permission controls on a source team
+are not inherited automatically: LiteGate retains the old key assignment and
+reports the source team for administrator review. Resolve these restrictions in
+LiteLLM before retrying; migration never silently replaces them with broader access.
 
 The closest explicitly configured `perUser` wins, overriding every ancestor's
 per-user default. In the example Engineering defaults to $200, Digital overrides

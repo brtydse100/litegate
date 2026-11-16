@@ -7,7 +7,7 @@ import httpx
 from fastapi import HTTPException
 
 from app.config import settings
-from app.services import litellm, organization_client, organization_store, organization_sync
+from app.services import key_mutations, litellm, organization_client, organization_store, organization_sync
 from app.services.litellm_client import client, headers, transport_error
 
 
@@ -43,16 +43,12 @@ async def _remove_individual_caps(user_id: str, team_id: str | None) -> None:
 
 
 async def update_key(key: str, changes: dict, *, use_key_budget_only: bool = False) -> dict:
-    if not use_key_budget_only:
-        return await litellm.update_key(key, changes)
-    info = await litellm.get_key_info(key)
-    if not info or not info.get("user_id"):
-        raise HTTPException(status_code=422, detail="The key must have an owner before removing user budgets")
-    async with organization_sync.lock_for("user", info["user_id"]):
-        current = await litellm.get_key_info(key)
-        if not current or current.get("user_id") != info["user_id"]:
-            raise HTTPException(status_code=409, detail="Key ownership changed; retry the migration")
-        await organization_sync.guard_key(key, changes, use_key_budget_only=True)
+    async with key_mutations.locked_key(key) as current:
+        await organization_sync.guard_key(key, changes, use_key_budget_only=use_key_budget_only)
+        if not use_key_budget_only:
+            return await litellm.update_key(key, changes)
+        if not current.get("user_id"):
+            raise HTTPException(status_code=422, detail="The key must have an owner before removing user budgets")
         return await _migrate_key(key, changes, current)
 
 

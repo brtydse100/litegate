@@ -984,11 +984,12 @@ function ResetSpendDialog({
   onClose: () => void;
   onReset: () => void;
 }) {
-  useDialogDismiss(onClose, pending);
+  const dialogRef = useDialogDismiss(onClose, pending);
   return (
     <div
       className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
       role="dialog"
+      ref={dialogRef}
       aria-modal="true"
       aria-labelledby="reset-spend-title"
       onMouseDown={(event) => {

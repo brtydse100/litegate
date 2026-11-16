@@ -298,7 +298,7 @@ test("administrator can create, edit, move a member, and delete a team", async (
   await expect(page.getByRole("heading", { name: "Research" })).toHaveCount(0);
 });
 
-test("administrator can manage a local account without leaving the users page", async ({
+test("@smoke administrator can manage a local account without leaving the users page", async ({
   page,
 }) => {
   let users: Array<{
@@ -379,7 +379,23 @@ test("administrator can manage a local account without leaving the users page", 
   const reset = page.getByRole("dialog", {
     name: "Reset contractor's password",
   });
+  const password = reset.getByLabel("New password");
+  await expect(password).toBeFocused();
+  await expect(password).toHaveAttribute("maxlength", "256");
+  await page.keyboard.press("Shift+Tab");
+  await expect(reset.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Reset password" }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "Reset password" }).click();
   await reset.getByLabel("New password").fill("replacement-password");
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    reset.getByRole("button", { name: "Reset password" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(password).toBeFocused();
   await reset.getByRole("button", { name: "Reset password" }).click();
   await expect(reset).toBeHidden();
 

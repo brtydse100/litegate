@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.dependencies import require_admin
 from app.models import CurrentUser, LocalUserCreate, LocalUserInfo, LocalUserUpdate
 from app.rate_limit import check_key_rate_limit
+from app.routers.api_actor import ApiActor, record_audit
 from app.services import litellm as llm
 from app.services import local_users
 
@@ -24,6 +25,7 @@ async def create_local_user(payload: LocalUserCreate, current_user: CurrentUser 
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     await llm.ensure_user_exists(user["user_id"], user["email"])
+    await record_audit(ApiActor(current_user), "local_user.create", user["user_id"], details={"role": user["role"]})
     return user
 
 
@@ -41,4 +43,6 @@ async def update_local_user(
         raise HTTPException(status_code=400, detail="You cannot disable your own account")
     if existing["user_id"] == current_user.user_id and payload.role == "user":
         raise HTTPException(status_code=400, detail="You cannot remove your own admin role")
-    return await asyncio.to_thread(local_users.update_user, username, **payload.model_dump(exclude_unset=True))
+    updated = await asyncio.to_thread(local_users.update_user, username, **payload.model_dump(exclude_unset=True))
+    await record_audit(ApiActor(current_user), "local_user.update", existing["user_id"], details={"setting_fields": sorted(payload.model_fields_set)})
+    return updated

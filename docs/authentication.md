@@ -10,6 +10,20 @@ administrator. After signing in, an administrator can use the **Users** tab to
 create persistent local accounts, assign `user` or `admin`, reset passwords, and
 enable or disable accounts.
 
+Password-reset dialogs keep errors and action cooldowns visible until corrected
+or dismissed. Local passwords accept at most 256 characters. Dialogs support
+keyboard focus containment, Escape dismissal when idle, and focus restoration.
+
+The configured bootstrap username is reserved, ignoring case. Bootstrap logins
+use a distinct `bootstrap` session source; changing or disabling that configured
+identity invalidates those sessions. If an older database account already has
+that username, its password cannot sign in as the bootstrap administrator.
+Ambiguous older sessions must sign in again with the configured bootstrap
+credentials. Use a different username for database accounts.
+
+Signing out or starting another login clears browser query and mutation caches,
+including pending query results, before another account's data is shown.
+
 Local users are appropriate for:
 
 - setup and recovery before SSO is ready;

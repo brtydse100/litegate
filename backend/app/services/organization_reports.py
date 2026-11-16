@@ -7,14 +7,14 @@ from time import monotonic
 from fastapi import HTTPException
 
 from app.config import settings
-from app.services import litellm, organization_client as upstream, organization_store as store
+from app.services import litellm, organization_client as upstream, organization_store as store, organization_discovery as discovery
 from app.services.organization_sync import resolve_identity
 
 _usage_cache: dict[tuple[str, str, str], tuple[float, list[dict]]] = {}
 
 
 async def identities() -> tuple[list[tuple[dict, object]], list[dict]]:
-    values, errors = [], []
+    values, errors = [], discovery.issues()
     for identity in await asyncio.to_thread(store.list_identities):
         try:
             node = resolve_identity(identity)

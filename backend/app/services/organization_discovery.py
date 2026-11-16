@@ -9,6 +9,17 @@ from app.config import settings
 from app.services import litellm, local_users, organization_client as upstream, organization_store as store
 
 _logger = logging.getLogger(__name__)
+_issue_snapshot: tuple[tuple[str, str], dict[str, str]] | None = None
+
+
+def issue_scope() -> tuple[str, str]:
+    return settings.local_users_db_path, settings.organization_hierarchy.model_dump_json()
+
+
+def issues() -> list[dict]:
+    if _issue_snapshot is None or _issue_snapshot[0] != issue_scope():
+        return []
+    return [{"user_id": selector, "error": error} for selector, error in sorted(_issue_snapshot[1].items())]
 
 
 def email_of(user: dict) -> str:
@@ -88,6 +99,9 @@ async def email_match(email: str) -> dict | None:
 
 async def refresh(identities: list[dict], lock_for, resolve) -> set[str]:
     """Revalidate remote-derived assignments BEFORE any known-user synchronization."""
+    global _issue_snapshot
+    errors: dict[str, str] = {}
+    _issue_snapshot = issue_scope(), errors
     selectors = {value for node in settings.organization_hierarchy.nodes.values() for value in node.member.userIds}
     known = {item["user_id"]: item for item in identities}
     blocked = {item["user_id"] for item in identities if item["auth_source"] == "configured_email"}
@@ -120,9 +134,12 @@ async def refresh(identities: list[dict], lock_for, resolve) -> set[str]:
                             await asyncio.to_thread(store.validated, selector)
                         blocked.discard(selector)
                         exact.add(selector)
+                elif "@" not in selector:
+                    errors[selector] = "No existing LiteLLM user for this configured ID; awaiting login or provisioning, retrying automatically"
             except HTTPException as exc:
                 # A failed exact-ID lookup must not fall back to an email scan.
                 exact.add(selector)
+                errors[selector] = str(exc.detail)
                 _logger.warning("Organization selector %s discovery failed: %s", selector, exc.detail)
 
     await asyncio.gather(*(discover_id(value) for value in sorted(selectors)))
@@ -152,6 +169,7 @@ async def refresh(identities: list[dict], lock_for, resolve) -> set[str]:
                     await asyncio.to_thread(store.validated, user_id)
                     blocked.discard(user_id)
             except HTTPException as exc:
+                errors[email] = str(exc.detail)
                 _logger.warning("Organization email %s discovery failed: %s", email, exc.detail)
                 for identity in identities:
                     if identity["auth_source"] == "configured_email" and identity["email"] == email:
