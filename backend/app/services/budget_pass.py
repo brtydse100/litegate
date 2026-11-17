@@ -3,6 +3,7 @@
 import asyncio
 import contextvars
 from functools import wraps
+from inspect import signature
 from weakref import WeakKeyDictionary
 
 from fastapi import HTTPException
@@ -36,7 +37,8 @@ async def _collect(identities):
     semaphore = asyncio.Semaphore(5)
 
     async def one(identity):
-        if _node(identity) is None:
+        node = _node(identity)
+        if node is None:
             if identity.get("team_id"):
                 raise HTTPException(409, "Resolve removed organization mappings before reallocating budgets")
             return
@@ -46,6 +48,8 @@ async def _collect(identities):
             budget_key_guards.guard_single_key(current)
             for key in current:
                 key_spend.counter(key)  # Unknown spend must never become zero.
+                if settings.organization_hierarchy.is_managed_team(key.get("team_id")) and key["team_id"] != node.team_id:
+                    raise HTTPException(409, "Review managed group transfer before releasing the source allowance")
             await enforcement.observe(user_id, current)
             observations[user_id] = current
 
@@ -80,7 +84,10 @@ async def _decrease(identities, observations):
             key["max_budget"] = target
 
 
-def serialized(function):
+def serialized(function=None, *, provision=False):
+    if function is None:
+        return lambda operation: serialized(operation, provision=provision)
+
     @wraps(function)
     async def wrapped(*args, **kwargs):
         if not enforcement.enforced() or _observed.get() is not None:
@@ -88,6 +95,16 @@ def serialized(function):
         loop = asyncio.get_running_loop()
         lock = _locks.setdefault(loop, asyncio.Lock())
         async with lock:
+            if provision:
+                arguments = signature(function).bind(*args, **kwargs).arguments
+                user_id, email = arguments["user_id"], arguments["email"]
+                identity = await asyncio.to_thread(store.get, user_id)
+                if identity is None:
+                    identity = {"user_id": user_id, "email": email, "auth_source": "explicit", "groups": []}
+                    if _node(identity) is not None:
+                        await asyncio.to_thread(store.remember, user_id, email, "explicit", [])
+                if _node(identity) is not None:
+                    await asyncio.to_thread(enforcement.mark_participant, user_id)
             identities = await asyncio.to_thread(store.list_identities)
             observations = await _collect(identities)
             token = await enforcement.pin()

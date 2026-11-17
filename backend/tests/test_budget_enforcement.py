@@ -238,8 +238,8 @@ def test_spend_changes_alone_do_not_rewrite_caps(org):
     join("ann", "ben")
     snapshot = enforcement.refresh()
     enforcement.observe_spend("ann", 44)
-    # Same members and budgets: the snapshot (and every key cap) is unchanged.
-    assert enforcement.refresh() is snapshot
+    # Refresh accounting floors while keeping all effective allocations unchanged.
+    assert enforcement.refresh()["rows"] == snapshot["rows"]
     assert (cap("ann"), cap("ben")) == (45, 45)
 
 

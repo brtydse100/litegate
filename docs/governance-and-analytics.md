@@ -201,6 +201,12 @@ values on top.
 - Each pass uses one fixed set of shares. A sign-in or budget edit during a pass
   applies on the next pass, about a minute later; it never caps a key at zero.
   A temporary synchronization error does not remove a member from the split.
+- A key still attached to a different managed group stops budget writes before
+  the source group's capacity can be released. An operator must review and
+  complete that transfer before reconciliation resumes. First-time provisioning
+  records the identity and participant under the same serialization lock before
+  collecting spend. Deficit snapshots refresh their fallback spend floors even
+  when allocation totals remain unchanged.
 - Manual overrides saved for someone who has not signed in stay saved but
   inactive, and apply when that person first signs in. That can push the group
   into a deficit, which the Budget planning page shows. If manual values exceed the group amount, automatic

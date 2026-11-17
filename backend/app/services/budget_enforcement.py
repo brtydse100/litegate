@@ -146,11 +146,11 @@ def allocations(state: dict, memberships: dict, *, strict: bool = True, floors: 
 
 
 def refresh() -> dict:
-    """Return a current snapshot, replacing it only when the shares changed.
+    """Return a current snapshot, replacing it when shares or spend floors change.
 
     Shares are recomputed from current members, budgets and spend every time,
     so a restart, a spend change or a period reset is reflected. The snapshot
-    object (and therefore every key cap) only changes when the result does.
+    object changes with accounting; keys are only written when their caps differ.
     Safe to call from worker threads: each call takes a ticket, and an older
     build finishing late never replaces a newer one.
     """
@@ -166,11 +166,12 @@ def refresh() -> dict:
         current = _snapshot
         if current is not None and current["ticket"] > ticket:
             return current
-        if current is not None and (current["rows"], current["budgeted"], current["memberships"], current["participants"]) == (
+        if current is not None and (current["rows"], current["budgeted"], current["memberships"], current["participants"], current["floors"]) == (
             rows,
             budgeted,
             memberships,
             active,
+            floors,
         ):
             current["ticket"] = ticket
             return current

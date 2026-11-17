@@ -167,7 +167,7 @@ async def prepare_user(user_id: str, email: str) -> OrganizationNode | None:
     return await synchronize(identity)
 
 
-@budget_pass.serialized
+@budget_pass.serialized(provision=True)
 async def generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
     async with lock_for("user", user_id):
         return await _generate_key(user_id, email, team_id, **options)
