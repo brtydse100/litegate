@@ -1,32 +1,48 @@
 """Enforced hierarchical allowances: equal groupTotal shares for signed-in members.
 
-A group is *budgeted* when it has a configured ``groupTotal`` or an envelope set
-on the Budget planning page. Its envelope, minus budgeted child envelopes and
-manual overrides, is shared equally by its participating direct members.
-``perUser`` remains a ceiling. Members of unbudgeted groups keep ``perUser``.
+A group is *budgeted* when it has a configured ``groupTotal``, an envelope set on
+the Budget planning page, or a manual override for one of its members. Its
+amount, minus budgeted child envelopes and manual overrides, is shared equally
+by its participating direct members. ``perUser`` remains a ceiling. Members of
+unbudgeted groups keep ``perUser``.
 
 Participants are users who signed in or already hold a key, so nothing is
 reserved for people who never use LiteGate. A new participant changes every
 share in the group; the 60-second reconciliation applies the new caps.
+
+Shares come from an immutable snapshot. Each reconciliation pass pins one
+snapshot for all of its members, so a sign-in or budget edit during a pass
+cannot make the pass disagree with itself. A snapshot is rebuilt only when
+participants, memberships or saved budgets change, which also freezes spend
+floors between those changes and avoids rewriting keys on every pass.
 """
 
 import asyncio
+import contextvars
+import itertools
 import math
+import threading
 from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 
-from app.config import settings
-from app.organization import MembershipConflict, OrganizationNode
 from fastapi import HTTPException
 
+from app.config import settings
+from app.organization import MembershipConflict, OrganizationNode
 from app.services import budget_allocations as allocation, budget_store, database, litellm, organization_store
 
-# Latest verified current-period spend per user, in micro-dollars. Shares never
-# fall below consumed spend, so a join cannot hand out money already spent.
+# Latest verified current-period spend per user, in micro-dollars. A snapshot
+# copies it when built; shares never fall below that consumed spend.
 _spent: dict[str, int] = {}
 _snapshot: dict | None = None
 _primed = False
+_tickets = itertools.count(1)
+_lock = threading.Lock()
+# Users marked by this process, so a key holder recorded after a snapshot was
+# built is never mistaken for a non-participant and capped at zero.
+_marked: set[str] = set()
+_pinned: contextvars.ContextVar[dict | None] = contextvars.ContextVar("budget_snapshot", default=None)
 
 
 def create_table(db) -> None:
@@ -37,18 +53,10 @@ def enforced() -> bool:
     return settings.hierarchical_budgets_enforced and bool(settings.organization_hierarchy.levels)
 
 
-def invalidate() -> None:
-    global _snapshot
-    _snapshot = None
-
-
 def mark_participant(user_id: str) -> None:
     with database.connect() as db:
-        inserted = db.execute(
-            "INSERT OR IGNORE INTO organization_participants VALUES (?, ?)", (user_id, datetime.now(timezone.utc).isoformat())
-        ).rowcount
-    if inserted:
-        invalidate()
+        db.execute("INSERT OR IGNORE INTO organization_participants VALUES (?, ?)", (user_id, datetime.now(timezone.utc).isoformat()))
+    _marked.add(user_id)
 
 
 def participants() -> set[str]:
@@ -61,31 +69,27 @@ def _units(value, rounding) -> int:
 
 
 def observe_spend(user_id: str, spend: float) -> None:
-    # Callers invalidate once per pass; per-user invalidation would recompute
-    # the whole allocation for every member.
     _spent[user_id] = _units(spend, ROUND_CEILING) if math.isfinite(spend) and spend > 0 else 0
 
 
 async def observe(user_id: str, keys: list[dict]) -> None:
     """Record a member's current-period key spend; key holders participate."""
+    if not enforced():
+        return
     observe_spend(user_id, litellm.total_key_spend(keys))
     if keys:
         await asyncio.to_thread(mark_participant, user_id)
 
 
 async def observe_all(user_ids: list[str], semaphore: asyncio.Semaphore) -> None:
-    """Give each reconciliation pass one consistent allocation snapshot.
+    """Record existing key holders once, before any share is applied.
 
-    Only the first pass after startup lists every member's keys, so existing
-    key holders count before any share is applied. Later passes reuse the spend
-    and key holders recorded by the previous pass's own key listing, adding no
-    LiteLLM requests; spend floors are therefore at most one pass old.
+    Only the first pass after startup lists every member's keys. Later passes
+    rely on the spend and key holders the regular sync already reads, adding no
+    LiteLLM requests.
     """
     global _primed
-    if not enforced():
-        return
-    if _primed:
-        invalidate()
+    if not enforced() or _primed:
         return
 
     async def one(user_id: str):
@@ -97,7 +101,6 @@ async def observe_all(user_ids: list[str], semaphore: asyncio.Semaphore) -> None
 
     await asyncio.gather(*(one(user_id) for user_id in user_ids))
     _primed = True
-    invalidate()
 
 
 def spent() -> dict[str, int]:
@@ -105,12 +108,16 @@ def spent() -> dict[str, int]:
 
 
 def members() -> tuple[dict, dict]:
-    """Map participating, validly synchronized users to their direct group."""
+    """Map participating users to their direct group.
+
+    Transient synchronization errors do not remove anyone: dropping a member
+    would cap their key at zero and enlarge everyone else's share.
+    """
     tree = settings.organization_hierarchy
     active = participants()
     memberships, emails = {}, {}
     for identity in organization_store.list_identities():
-        if identity["user_id"] not in active or identity.get("sync_error"):
+        if identity["user_id"] not in active:
             continue
         try:
             node = tree.resolve(identity["user_id"], identity["groups"], email=identity["email"], source=identity["auth_source"])
@@ -121,45 +128,92 @@ def members() -> tuple[dict, dict]:
     return memberships, emails
 
 
-def budgeted(node: OrganizationNode, state: dict, memberships: dict) -> bool:
-    """A configured total, a planning-page envelope, or a member override."""
-    return (
-        node.member.budget.groupTotal is not None
-        or node.id in state["envelopes"]
-        or any(group == node.id and state["overrides"].get(user) is not None for user, group in memberships.items())
-    )
+def budgeted_nodes(state: dict, memberships: dict) -> set[str]:
+    """Groups with a configured total, a planning-page envelope, or a member override."""
+    tree = settings.organization_hierarchy
+    result = {node.id for node in tree.nodes.values() if node.member.budget.groupTotal is not None}
+    result.update(node_id for node_id in state["envelopes"] if node_id in tree.nodes)
+    result.update(group for user, group in memberships.items() if state["overrides"].get(user) is not None)
+    return result
 
 
-def allocations(state: dict, memberships: dict, *, strict: bool = True) -> dict:
+def allocations(state: dict, memberships: dict, *, strict: bool = True, floors: dict | None = None) -> dict:
     tree = settings.organization_hierarchy
     envelopes = {node.id: allocation.units(node.member.budget.groupTotal or 0) for node in tree.nodes.values()}
     envelopes.update({key: value for key, value in state["envelopes"].items() if key in tree.nodes})
-    return allocation.allocate(tree, envelopes, state["overrides"], memberships, spent=spent(), strict=strict)
+    return allocation.allocate(tree, envelopes, state["overrides"], memberships, spent=spent() if floors is None else floors, strict=strict)
 
 
-def _compute() -> dict:
+def refresh() -> dict:
+    """Return a current snapshot, rebuilding it only when its inputs changed.
+
+    Safe to call from worker threads. Each build takes a ticket; an older build
+    finishing late never replaces a newer one, so no sign-in is lost.
+    """
+    global _snapshot
+    ticket = next(_tickets)
     state = budget_store.read()
     memberships, _ = members()
-    rows = allocations(state, memberships, strict=False)
-    return {"state": state, "memberships": memberships, "rows": rows}
+    current = _snapshot
+    if current and current["revision"] == state["revision"] and current["memberships"] == memberships:
+        return current
+    floors = spent()
+    built = {
+        "ticket": ticket,
+        "revision": state["revision"],
+        "state": state,
+        "memberships": memberships,
+        "participants": participants(),
+        "floors": floors,
+        "budgeted": budgeted_nodes(state, memberships),
+        "rows": allocations(state, memberships, strict=False, floors=floors),
+    }
+    with _lock:
+        if _snapshot is None or _snapshot["ticket"] < ticket:
+            _snapshot = built
+        return _snapshot
+
+
+async def refresh_async() -> None:
+    if enforced():
+        await asyncio.to_thread(refresh)
+
+
+async def pin() -> contextvars.Token | None:
+    """Freeze one snapshot for the rest of the current reconciliation pass."""
+    if not enforced():
+        return None
+    return _pinned.set(await asyncio.to_thread(refresh))
+
+
+def unpin(token: contextvars.Token | None) -> None:
+    if token is not None:
+        _pinned.reset(token)
 
 
 def allowance(node: OrganizationNode, user_id: str) -> OrganizationNode:
     """Return ``node`` with ``per_user`` replaced by the user's enforced share."""
-    global _snapshot
     if not enforced():
         return node
-    if _snapshot is None:
-        _snapshot = _compute()
-    if not budgeted(node, _snapshot["state"], _snapshot["memberships"]):
+    snapshot = _pinned.get()
+    pinned = snapshot is not None
+    if snapshot is None:
+        snapshot = _snapshot or refresh()
+    if node.id not in snapshot["budgeted"]:
         return node
-    if _snapshot["memberships"].get(user_id) != node.id:
-        # Not yet a participant (no sign-in or key): nothing is reserved.
-        value = 0
+    if snapshot["memberships"].get(user_id) != node.id:
+        if user_id not in snapshot["participants"] and user_id not in _marked:
+            value = 0  # No sign-in or key yet: nothing is reserved.
+        elif not pinned and refresh() is not snapshot:
+            return allowance(node, user_id)
+        else:
+            # Membership changed after the snapshot was built. Never cap a
+            # participant at zero: keep the key's current cap and retry.
+            raise HTTPException(409, "Organization membership changed during synchronization; retrying next pass")
     else:
-        share = _snapshot["rows"][node.id]["users"].get(user_id)
+        share = snapshot["rows"][node.id]["users"].get(user_id)
         # A deficit leaves automatic shares unknown; allow no new spend.
-        value = share if share is not None else _spent.get(user_id, 0)
+        value = share if share is not None else snapshot["floors"].get(user_id, 0)
     if node.per_user is not None:
         value = min(value, _units(node.per_user, ROUND_FLOOR))
     return replace(node, per_user=allocation.dollars(value))

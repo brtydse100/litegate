@@ -46,6 +46,7 @@ def _can_edit_envelope(node, scope):
 def _view(state, scope, actor):
     members, emails = enforcement.members()
     allocated = enforcement.allocations(state, members, strict=False)
+    budgeted = enforcement.budgeted_nodes(state, members)
     groups = []
     for node in settings.organization_hierarchy.nodes.values():
         if not scope.allows(node):
@@ -55,11 +56,9 @@ def _view(state, scope, actor):
             {
                 "user_id": user,
                 "email": emails.get(user, ""),
-                "allocation": _displayed(node, state, members, value),
+                "allocation": _displayed(node, node.id in budgeted, value),
                 "override": allocation.dollars(state["overrides"][user]) if state["overrides"].get(user) is not None else None,
-                "mode": (
-                    "manual" if state["overrides"].get(user) is not None else "automatic" if enforcement.budgeted(node, state, members) else "fixed"
-                ),
+                "mode": ("manual" if state["overrides"].get(user) is not None else "automatic" if node.id in budgeted else "fixed"),
                 "used": None,
                 "remaining": None,
                 "can_edit": scope.global_admin or user != actor.user.user_id,
@@ -85,9 +84,9 @@ def _view(state, scope, actor):
     return {"revision": state["revision"], "mode": "enforced" if applied else "preview", "applied": applied, "pending": False, "groups": groups}
 
 
-def _displayed(node, state, members, value):
+def _displayed(node, budgeted, value):
     """The allowance enforcement applies: the share capped by perUser, or perUser."""
-    if not enforcement.budgeted(node, state, members):
+    if not budgeted:
         return node.per_user
     if value is not None and node.per_user is not None:
         return min(allocation.dollars(value), node.per_user)
@@ -126,7 +125,8 @@ def _edit(revision, actor, scope, change):
                 raise HTTPException(403, "A parent or system administrator must increase your personal allowance")
 
     state = store.edit(revision, validate)
-    enforcement.invalidate()
+    if enforcement.enforced():
+        enforcement.refresh()
     return state
 
 

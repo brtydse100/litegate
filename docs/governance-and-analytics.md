@@ -185,14 +185,21 @@ values on top.
   keep their fixed `perUser` allowance, and those groups are not deducted from
   their parent.
 - Shares never fall below a member's current-period spend, so a newcomer only
-  shares what is left. To avoid extra LiteLLM requests, only the first pass
-  after startup lists every member's keys; later passes reuse the spend the
-  regular sync already reads, so spend floors are at most one pass old. If manual values exceed the group amount, automatic
+  shares what is left. Shares are recalculated only when members, groups or
+  saved budgets change, taking spend at that moment; spending alone never
+  rewrites everyone's keys. Only the first pass after startup lists every
+  member's keys; later passes reuse what the regular sync already reads, so
+  enforcement adds no LiteLLM requests in normal operation.
+- Each pass uses one fixed set of shares. A sign-in or budget edit during a pass
+  applies on the next pass, about a minute later; it never caps a key at zero.
+  A temporary synchronization error does not remove a member from the split.
+- Manual overrides saved for someone who has not signed in stay saved but
+  inactive, and apply when that person first signs in. That can push the group
+  into a deficit, which the Budget planning page shows. If manual values exceed the group amount, automatic
   members are held at their current spend until an administrator fixes it.
 - Each key keeps its own `duration` reset, so a group's total holds within each
   member's budget period rather than one aligned period. Until the next pass,
-  existing members briefly keep their previous, larger share after a newcomer
-  joins.
+  existing members keep their previous, larger share after a newcomer joins.
 
 Strict hierarchical enforcement remains unfinished: aligned reset/transfer
 accounting and all supported request-path reservation guarantees must be verified

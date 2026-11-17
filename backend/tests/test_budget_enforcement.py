@@ -42,9 +42,9 @@ def org(monkeypatch):
 
     monkeypatch.setattr(enforcement, "_spent", {})
     monkeypatch.setattr(enforcement, "_primed", False)
-    enforcement.invalidate()
+    monkeypatch.setattr(enforcement, "_snapshot", None)
+    monkeypatch.setattr(enforcement, "_marked", set())
     yield configure
-    enforcement.invalidate()
 
 
 def cap(user: str) -> float | None:
@@ -52,8 +52,10 @@ def cap(user: str) -> float | None:
 
 
 def join(*users: str) -> None:
+    """Sign-in marks the participant, then refreshes the shares."""
     for user in users:
         enforcement.mark_participant(user)
+    enforcement.refresh()
 
 
 def test_total_is_split_equally_among_signed_in_members_and_updates_on_join(org):
@@ -83,7 +85,8 @@ def test_consumed_spend_is_never_reclaimed_by_a_new_member(org):
     org()
     join("ann", "ben")
     enforcement.observe_spend("ann", 80.0000001)
-    enforcement.invalidate()
+    # Spend floors are taken when the snapshot is rebuilt (e.g. on a join).
+    enforcement._snapshot = None
     # ann already spent more than an equal share; ben gets only what remains.
     assert (cap("ann"), cap("ben")) == (80.000001, 9.999999)
 
@@ -93,7 +96,7 @@ def test_planning_page_override_and_envelope_are_enforced(org):
     join("ann", "ben", "cat")
     engineering = next(node for node in hierarchy.nodes.values() if node.team_id == "eng")
     budget_store.edit(0, lambda state: state.update(envelopes={engineering.id: 120_000_000}, overrides={"ann": 60_000_000}))
-    enforcement.invalidate()
+    enforcement.refresh()
     assert (cap("ann"), cap("ben"), cap("cat")) == (60, 30, 30)
 
 
@@ -154,12 +157,108 @@ async def test_admin_budget_changes_survive_a_restart(org, monkeypatch):
     join("ann", "ben", "cat")
     engineering = next(node for node in hierarchy.nodes.values() if node.team_id == "eng")
     budget_store.edit(0, lambda state: state.update(envelopes={engineering.id: 120_000_000}, overrides={"ann": 60_000_000}))
-    enforcement.invalidate()
+    enforcement.refresh()
     before = (cap("ann"), cap("ben"), cap("cat"))
     # A restart clears all process memory; only the database remains.
     monkeypatch.setattr(enforcement, "_spent", {})
     monkeypatch.setattr(enforcement, "_primed", False)
-    enforcement.invalidate()
+    monkeypatch.setattr(enforcement, "_snapshot", None)
+    monkeypatch.setattr(enforcement, "_marked", set())
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
     await enforcement.observe_all(["ann", "ben", "cat"], asyncio.Semaphore(5))
     assert (cap("ann"), cap("ben"), cap("cat")) == before == (60, 30, 30)
+
+
+@pytest.mark.asyncio
+async def test_a_sign_in_during_a_pass_never_changes_that_pass_or_caps_at_zero(org):
+    import asyncio
+    import contextvars
+
+    from fastapi import HTTPException
+
+    org()
+    join("ann", "ben")
+    token = await enforcement.pin()
+    try:
+        before = sync.resolve_identity(store.get("ann"))
+        # cat signs in on another request while the pass is running.
+        await asyncio.create_task(asyncio.to_thread(join, "cat"), context=contextvars.Context())
+        # The pass keeps one consistent share, so its own check never fails.
+        assert sync.resolve_identity(store.get("ann")) == before and before.per_user == 45
+        # cat is not in the pinned shares: retry next pass, never a zero cap.
+        with pytest.raises(HTTPException) as retry:
+            sync.resolve_identity(store.get("cat"))
+        assert retry.value.status_code == 409
+    finally:
+        enforcement.unpin(token)
+    assert (cap("ann"), cap("ben"), cap("cat")) == (30, 30, 30)
+
+
+def test_a_sync_error_does_not_remove_a_member_from_the_split(org):
+    org()
+    join("ann", "ben", "cat")
+    store.failed("cat", "LiteLLM returned 502")
+    enforcement._snapshot = None
+    assert (cap("ann"), cap("ben"), cap("cat")) == (30, 30, 30)
+
+
+@pytest.mark.asyncio
+async def test_a_group_change_at_sign_in_gets_the_new_groups_share_not_zero(monkeypatch):
+    hierarchy = OrganizationHierarchy.model_validate(
+        {
+            "levels": [
+                {
+                    "name": "Department",
+                    "groups": [
+                        {
+                            "members": [
+                                {"name": "Eng", "litellmTeamId": "eng", "ssoGroups": ["eng"], "budget": {"groupTotal": 90}},
+                                {"name": "Sales", "litellmTeamId": "sales", "ssoGroups": ["sales"], "budget": {"groupTotal": 40}},
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+    monkeypatch.setattr(settings, "organization_hierarchy", hierarchy)
+    monkeypatch.setattr(settings, "hierarchical_budgets_enforced", True)
+    monkeypatch.setattr(enforcement, "_snapshot", None)
+    monkeypatch.setattr(enforcement, "_marked", set())
+    monkeypatch.setattr(enforcement, "_spent", {})
+    await sync.record_identity("ann", "ann@example.invalid", "sso", ["eng"])
+    await sync.record_identity("bob", "bob@example.invalid", "sso", ["eng"])
+    assert cap("ann") == 45
+    await sync.record_identity("ann", "ann@example.invalid", "sso", ["sales"])
+    assert (cap("ann"), cap("bob")) == (40, 90)
+
+
+def test_spend_changes_alone_do_not_rewrite_caps(org):
+    org()
+    join("ann", "ben")
+    snapshot = enforcement.refresh()
+    enforcement.observe_spend("ann", 44)
+    # Same members and budgets: the snapshot (and every key cap) is unchanged.
+    assert enforcement.refresh() is snapshot
+    assert (cap("ann"), cap("ben")) == (45, 45)
+
+
+def test_an_older_rebuild_never_replaces_a_newer_one(org, monkeypatch):
+    org()
+    join("ann")
+    original = enforcement.members
+    calls = []
+
+    def members():
+        result = original()
+        if not calls:
+            calls.append(1)
+            # A newer rebuild (cat signing in) completes while this one runs.
+            join("cat")
+        return result
+
+    monkeypatch.setattr(enforcement, "members", members)
+    enforcement._snapshot = None
+    enforcement.refresh()
+    monkeypatch.setattr(enforcement, "members", original)
+    assert enforcement._snapshot["memberships"].keys() == {"ann", "cat"}
