@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { api } from "../api/client";
 import EmailAddress from "./EmailAddress";
+import DismissibleMessage from "./DismissibleMessage";
 
 function StatusCard({
   name,
@@ -86,9 +87,13 @@ export default function AdminStatus() {
       </div>
 
       {status.error && (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <DismissibleMessage
+          role="alert"
+          messageKey={(status.error as Error).message}
+          className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+        >
           {(status.error as Error).message}
-        </p>
+        </DismissibleMessage>
       )}
       <div className="grid gap-3 md:grid-cols-2">
         <StatusCard

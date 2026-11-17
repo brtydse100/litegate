@@ -179,6 +179,9 @@ jobs:
       - name: Verify real OIDC and license-independent governance
         run: npx playwright test --config playwright.sso.config.ts
         working-directory: frontend
+      - name: Verify enforced budgets, team-admin authority, and restarts with and without persistence
+        run: npx playwright test --config playwright.sso-restart.config.ts
+        working-directory: frontend
       - name: Verify modern LiteLLM user, key, and organization contracts
         run: python -m pytest tests/integration -q
         working-directory: backend

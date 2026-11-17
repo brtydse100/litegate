@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- After a restart without persistent storage, the key page no longer reports a
+  removed organization mapping: it shows a dismissible info notice to sign in
+  again. Users moved to another group see where they were moved instead of a
+  warning, and a key needing attention shows one message instead of two.
+- The key page no longer offers **Regenerate key** when enforced organization
+  budgets forbid replacing a managed key; it explains that the key keeps working.
+
+### Changed
+
+- Notifications and error banners can be closed with an **×** button. Form field
+  validation is unchanged.
+- Dark mode keeps light hover highlights readable, and a key without a saved
+  copy now says the key still works instead of "Original key unavailable".
+
+### Tests
+
+- Real Keycloak/LiteLLM browser tests cover enforced budgets across restarts
+  with and without persistence, and team administrators redistributing within
+  their team's total without being able to change it.
+
 ## [2.20.1] - 2026-11-17
 
 ### Changed

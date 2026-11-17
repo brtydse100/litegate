@@ -3,6 +3,7 @@ import { useQuery, useQueries } from "@tanstack/react-query";
 import { ChevronRight, Network, Users } from "lucide-react";
 import { api } from "../api/client";
 import EmailAddress from "./EmailAddress";
+import DismissibleMessage from "./DismissibleMessage";
 import type { OrganizationNode } from "../types/organization";
 import {
   metricLabels,
@@ -200,8 +201,11 @@ export default function AdminOrganization() {
         </div>
       </div>
       {!!overview.data?.issues.length && (
-        <div
+        <DismissibleMessage
           role="alert"
+          messageKey={overview.data.issues
+            .map((issue) => `${issue.user_id}:${issue.error}`)
+            .join("|")}
           className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
         >
           <p className="font-medium">Some memberships need attention</p>
@@ -212,7 +216,7 @@ export default function AdminOrganization() {
               </li>
             ))}
           </ul>
-        </div>
+        </DismissibleMessage>
       )}
       <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="self-start rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
@@ -417,15 +421,16 @@ export default function AdminOrganization() {
             the table shows budget-period spending.
           </p>
           {usage.error && (
-            <p
+            <DismissibleMessage
               role="alert"
+              messageKey={usage.error.message}
               className="rounded-lg bg-red-50 p-4 text-sm text-red-700"
             >
               {usage.error.message}{" "}
               <button type="button" onClick={() => void usage.refetch()}>
                 Retry usage
               </button>
-            </p>
+            </DismissibleMessage>
           )}
           {reportEnabled && usage.isPending && (
             <p className="text-sm text-slate-500">Loading usage…</p>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { api } from "../api/client";
+import DismissibleMessage from "./DismissibleMessage";
 
 export default function RevealKey({
   identifier,
@@ -69,12 +70,13 @@ export default function RevealKey({
         {pending ? "Loading..." : secret ? "Hide API key" : "Show API key"}
       </button>
       {error && (
-        <p
+        <DismissibleMessage
           role="alert"
+          messageKey={error}
           className={`${compact ? "col-span-2 pb-2 " : ""}text-sm text-red-600`}
         >
           {error}
-        </p>
+        </DismissibleMessage>
       )}
       {secret && (
         <div

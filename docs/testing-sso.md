@@ -53,7 +53,24 @@ secret after login/restart/group transfer, and successful inference with that
 original credential. Analytics isolation uses deliberately distinct synthetic
 stored snapshots; aggregation correctness is tested separately in backend tests.
 
+A second suite runs the same harness with enforced organization budgets:
+
+```bash
+npx playwright test --config playwright.sso-restart.config.ts
+```
+
+It saves budgets for two teams across backend restarts. One test deletes the
+test database on each restart, like a deployment without persistent storage, and
+checks that the key page shows one dismissible info notice (sign in again), no
+warnings, and no **Regenerate key** action the backend would reject. The other
+keeps the database and checks that budgets and the saved key survive. A third
+signs in real team administrators and checks, in the page and through the API,
+that they can redistribute within their team's total (child teams and member
+overrides) but never change that total, over-allocate it, or raise their own
+share.
+
 The helper can restart its own test backend through an ignored marker file.
+Writing `wipe` to it deletes only the test database before restarting.
 It does not control production processes. Browser traces are disabled because
 they could capture temporary authorization codes or synthetic key secrets.
 The fixture's static passwords/client secret are test-only and explicitly public.

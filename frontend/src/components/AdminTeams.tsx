@@ -23,6 +23,7 @@ import type {
   ModelSelection,
 } from "../types";
 import TeamMembersDialog from "./TeamMembersDialog";
+import DismissibleMessage from "./DismissibleMessage";
 import { metricValue } from "./OrganizationCharts";
 import {
   CurrentPolicySettings,
@@ -554,9 +555,12 @@ export default function AdminTeams() {
         until that configuration is changed.
       </div>
       {operationsBlocked && (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <DismissibleMessage
+          messageKey="team-actions-paused"
+          className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        >
           Team actions are paused. Try again in {retryAfter || 1} seconds.
-        </p>
+        </DismissibleMessage>
       )}
 
       <form onSubmit={applySearch} className="flex gap-2">
@@ -580,9 +584,13 @@ export default function AdminTeams() {
       </form>
 
       {pageError && (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <DismissibleMessage
+          role="alert"
+          messageKey={pageError.message}
+          className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+        >
           {pageError.message}
-        </p>
+        </DismissibleMessage>
       )}
       <div className="overflow-hidden rounded-xl border border-[#2A2E42] bg-[#1A1D27]">
         <div className="flex items-center justify-between border-b border-[#2A2E42] px-4 py-3">

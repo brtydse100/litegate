@@ -4,7 +4,7 @@ import httpx
 import pytest
 from fastapi import HTTPException
 from app.config import settings
-from app.services import litellm, litellm_client, organization_sync as sync
+from app.services import litellm, litellm_client, organization_personal, organization_sync as sync
 
 
 @pytest.mark.asyncio
@@ -135,7 +135,7 @@ async def test_homepage_api_uses_live_spend_over_stale_zero(monkeypatch):
 
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[{"token": "old", "spend": 0}]))
     monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value={"user_id": "owner", "spend": 0.04}))
-    monkeypatch.setattr(sync, "personal_policy", AsyncMock(return_value=None))
+    monkeypatch.setattr(organization_personal, "personal_policy", AsyncMock(return_value=None))
     result = await list_keys(CurrentUser(user_id="owner", email="owner@example.invalid"))
     assert result["keys"][0]["spend"] == 0.04
 

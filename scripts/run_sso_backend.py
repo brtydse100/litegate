@@ -155,8 +155,15 @@ def serve() -> None:
     try:
         while child.poll() is None:
             if RESTART.exists():
+                wipe = RESTART.read_text().strip() == "wipe"
                 child.terminate()
                 child.wait(timeout=15)
+                if wipe:
+                    # Reproduce a deployment without persistent storage: the
+                    # restarted backend starts from an empty database.
+                    database = ROOT / "backend/data/litegate-sso-test.db"
+                    for suffix in ("", "-wal", "-shm"):
+                        Path(f"{database}{suffix}").unlink(missing_ok=True)
                 child = subprocess.Popen(command)
                 for _ in range(300):
                     try:

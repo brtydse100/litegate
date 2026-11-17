@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from app.config import settings
 from app.models import CurrentUser
 from app.routers import auth
-from app.services import litellm, organization_store as store, organization_sync as sync
+from app.services import litellm, organization_personal, organization_store as store, organization_sync as sync
 from tests.test_hierarchy_email import hierarchy
 
 
@@ -49,7 +49,7 @@ async def test_admin_guard_and_personal_policy_use_stored_identity(monkeypatch, 
     with pytest.raises(HTTPException) as error:
         await sync.guard_key("test-key", {}, use_key_budget_only=True)
     assert error.value.status_code == 409
-    policy = await sync.personal_policy(CurrentUser(user_id="subject", email="stale@example.com", auth_source="sso"), [key])
+    policy = await organization_personal.personal_policy(CurrentUser(user_id="subject", email="stale@example.com", auth_source="sso"), [key])
     assert policy["path"][-1] == "squad1"
     assert policy["spend"] == 17
     assert policy["sync_error"] is None
