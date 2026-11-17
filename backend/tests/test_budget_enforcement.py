@@ -144,3 +144,22 @@ async def test_disabled_enforcement_makes_no_extra_requests(org, monkeypatch):
     monkeypatch.setattr(litellm, "list_user_keys", listing)
     await enforcement.observe_all(["ann"], asyncio.Semaphore(5))
     listing.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_admin_budget_changes_survive_a_restart(org, monkeypatch):
+    import asyncio
+
+    hierarchy = org()
+    join("ann", "ben", "cat")
+    engineering = next(node for node in hierarchy.nodes.values() if node.team_id == "eng")
+    budget_store.edit(0, lambda state: state.update(envelopes={engineering.id: 120_000_000}, overrides={"ann": 60_000_000}))
+    enforcement.invalidate()
+    before = (cap("ann"), cap("ben"), cap("cat"))
+    # A restart clears all process memory; only the database remains.
+    monkeypatch.setattr(enforcement, "_spent", {})
+    monkeypatch.setattr(enforcement, "_primed", False)
+    enforcement.invalidate()
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
+    await enforcement.observe_all(["ann", "ben", "cat"], asyncio.Semaphore(5))
+    assert (cap("ann"), cap("ben"), cap("cat")) == before == (60, 30, 30)
