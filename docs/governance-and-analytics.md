@@ -187,9 +187,17 @@ values on top.
 - Shares never fall below a member's current-period spend, so a newcomer only
   shares what is left. Shares are recalculated every pass from current spend,
   so a restart or a period reset is reflected, but a key is only rewritten when
-  its share actually changes. Only the first pass after startup lists every
-  member's keys; later passes reuse what the regular sync already reads, so
-  enforcement adds no listing requests in normal operation.
+  its share actually changes. Every enforced write collects current managed-key
+  spend before pinning shares. Reconciliation reuses that roster while applying
+  policy. Required decreases are verified before any increases; a failed read or
+  decrease aborts the operation without raising caps.
+- Enforced accounts support **one key**. Multiple-key owners stop the operation
+  before existing controls are removed. Additional key creation and overlapping
+  rotation are rejected; administrators must review aggregate accounting first.
+- Managed-key deletion, spend resets and Advanced spend edits are blocked while
+  enforcement is on. An empty key roster retains observed consumed spend rather
+  than treating deletion as a period reset. Direct upstream changes and loss of
+  process history still require operator review; this is not a durable spend ledger.
 - Each pass uses one fixed set of shares. A sign-in or budget edit during a pass
   applies on the next pass, about a minute later; it never caps a key at zero.
   A temporary synchronization error does not remove a member from the split.

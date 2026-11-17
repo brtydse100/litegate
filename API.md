@@ -652,3 +652,12 @@ repair existing deficits incrementally without increasing any group's deficit;
 a deficit in another group does not block an unrelated edit. When hierarchical
 budgets are disabled, these routes return 404 before any access lookup.
 See [current enforcement and retirement limitations](docs/governance-and-analytics.md).
+
+### Enforced budget mutation guards
+
+When `hierarchical_budgets_enforced` is enabled, managed key deletion, manual
+spend reset, additional key creation and overlapping rotation return 409.
+Multiple-key owners block enforcement migration until aggregate accounting is
+reviewed. Existing controls remain in place. Budget writes collect current spend
+and verify decreases before permitting increases; failed verification prevents
+increases. Disabled deployments retain their existing behavior.

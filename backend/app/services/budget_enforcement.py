@@ -76,8 +76,9 @@ async def observe(user_id: str, keys: list[dict]) -> None:
     """Record a member's current-period key spend; key holders participate."""
     if not enforced():
         return
-    observe_spend(user_id, litellm.total_key_spend(keys))
+    # An absent key is not evidence that its budget period reset.
     if keys:
+        observe_spend(user_id, litellm.total_key_spend(keys))
         await asyncio.to_thread(mark_participant, user_id)
 
 
@@ -193,6 +194,8 @@ async def refresh_async() -> None:
 async def pin() -> contextvars.Token | None:
     """Freeze one snapshot for the rest of the current reconciliation pass."""
     if not enforced():
+        return None
+    if _pinned.get() is not None:
         return None
     return _pinned.set(await asyncio.to_thread(refresh))
 

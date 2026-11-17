@@ -11,6 +11,7 @@ from app.config import settings
 from app.models import CurrentUser
 from app.organization import MembershipConflict, OrganizationNode
 from app.services import audit, budget_enforcement, key_cleanup, key_spend, litellm, organization_key_policy as key_policy
+from app.services import budget_key_guards, budget_pass
 from app.services import organization_client as upstream, organization_store as store, organization_discovery as discovery
 
 _logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ async def remember(user_id: str, email: str, source: str, groups: list[str]) -> 
     return await synchronize_user(user_id)
 
 
+@budget_pass.serialized
 async def synchronize_user(user_id: str) -> OrganizationNode | None:
     """Finish provisioning from current stored claims without rewriting them."""
     if not settings.organization_hierarchy.levels:
@@ -106,9 +108,8 @@ async def synchronize(identity: dict) -> OrganizationNode:
 
 
 async def sync_identity(identity: dict, info: dict, *, defer_finalization: bool = False) -> OrganizationNode:
-    existing = await litellm.list_user_keys(identity["user_id"])
-    # Key holders count toward equal splits; record them before resolving the
-    # enforced allowance so an existing key is never capped as a non-member.
+    existing = await budget_pass.keys(identity["user_id"])
+    budget_key_guards.guard_single_key(existing)
     await budget_enforcement.observe(identity["user_id"], existing)
     node = resolve_identity(identity)
     if node is None:
@@ -159,7 +160,6 @@ async def prepare_user(user_id: str, email: str) -> OrganizationNode | None:
             return None
         await asyncio.to_thread(store.remember, user_id, email, "explicit", [])
         identity = await asyncio.to_thread(store.get, user_id)
-    # The caller marked this user; include them now that their identity exists.
     await budget_enforcement.refresh_async()
     node = resolve_identity(identity)
     if node is None:
@@ -167,17 +167,18 @@ async def prepare_user(user_id: str, email: str) -> OrganizationNode | None:
     return await synchronize(identity)
 
 
+@budget_pass.serialized
 async def generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
     async with lock_for("user", user_id):
         return await _generate_key(user_id, email, team_id, **options)
 
 
 async def _generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
-    """Generate while the caller holds the owner's operation lock."""
     await asyncio.to_thread(budget_enforcement.mark_participant, user_id)
     node = await prepare_user(user_id, email)
     if node is None:
         return await litellm.generate_key(user_id, email, team_id, **options)
+    budget_key_guards.guard_new_key(await litellm.list_user_keys(user_id))
     identity = await asyncio.to_thread(store.get, user_id)
     if identity and identity["auth_source"] == "sso":
         email = identity["email"].strip().casefold()
@@ -193,12 +194,15 @@ async def _generate_key(user_id: str, email: str, team_id: str | None, **options
     return result
 
 
+@budget_pass.serialized
 async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias: str) -> dict:
     """Serialize the spend snapshot, replacement, and old-key revocation together."""
     from app.services import key_budgets, key_rotation_policy
 
     async with lock_for("user", user_id):
         existing = await key_spend.current_keys(user_id)
+        if any(settings.organization_hierarchy.is_managed_team(key.get("team_id")) for key in existing):
+            budget_key_guards.guard_new_key(existing)
         controls = await key_rotation_policy.snapshot(user_id, existing)
         if key_rotation_policy.requires_assistance(existing):
             raise HTTPException(
@@ -240,6 +244,7 @@ async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias
         return result
 
 
+@budget_pass.serialized
 async def reconcile() -> None:
     if not settings.organization_hierarchy.levels:
         return
@@ -260,8 +265,6 @@ async def reconcile() -> None:
                 _logger.warning("Organization root %s synchronization failed: %s", root.team_id, exc.detail)
 
     await asyncio.gather(*(prepare_root(root) for root in settings.organization_hierarchy.nodes.values()))
-    await budget_enforcement.observe_all([identity["user_id"] for identity in identities if identity["user_id"] not in blocked], semaphore)
-    # Every member in this pass uses the same shares.
     token = await budget_enforcement.pin()
     try:
 
@@ -337,6 +340,8 @@ def guard_team(team_id: str, changes: dict | None = None) -> None:
 
 
 async def guard_key(key: str, changes: dict, *, use_key_budget_only: bool = False) -> None:
+    if any("spend" in field.lower() for field in changes):
+        await budget_key_guards.guard_erase_key(key)
     if not settings.organization_hierarchy.levels or (
         not use_key_budget_only and "team_id" not in changes and not changes_inherited_allowance(changes)
     ):
