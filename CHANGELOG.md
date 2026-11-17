@@ -14,6 +14,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   key, recalculated when someone joins, with `perUser` as a ceiling and
   Budget planning overrides and envelopes applied to key caps.
 
+### Fixed
+
+- Collect current managed-key spend before pinning allocations; verify required
+  cap decreases before permitting increases. Failed reads, decreases or group
+  transfers retain existing controls instead of releasing unverified capacity.
+- Refresh spend floors after restarts and period resets, including deficits with
+  unchanged allocation totals. Register first-time provisioning before pinning;
+  keep a disappearing membership from aborting other users' synchronization.
+- Verify incomplete key source metadata through key-info before budget writes;
+  distinguish missing team information from an explicitly unassigned key.
+
+### Upgrade Notes
+
+- Enforcement defaults off. Enabled managed accounts currently support one key:
+  additional keys, overlapping rotation, deletion and manual spend resets are
+  blocked until aggregate accounting can preserve their allowance safely.
+- Enforced allocations remain eventual per-key caps with separate reset periods,
+  not strict atomic group limits. Managed transfers require operator review;
+  automatic removed-group deletion remains unavailable. See the
+  [governance guide](docs/governance-and-analytics.md#enforced-equal-splits).
+
 ## [2.19.0] - 2026-11-17
 
 ### Added
