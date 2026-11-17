@@ -11,12 +11,12 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 | [2.18.0](v2.18.0.md) | Per-model key budgets, discovered Advanced policy fields, and progressive organization loading |
 | [2.17.0](v2.17.0.md) | Independent portal messages, shared login logo, single key action, Docker hierarchy guides, and repaired nightly E2E |
 | [2.16.0](v2.16.0.md) | Exact Model Hub URLs and configurable per-key concurrency defaults |
-| [2.15.4](v2.15.4.md) | Stored-key identifier preservation and no-login startup hierarchy migration (prepared) |
-| [2.15.3](v2.15.3.md) | Dynamic small-spend charts and verified spend counters during regeneration (prepared) |
-| [2.15.2](v2.15.2.md) | JSON file input for the existing organization hierarchy and ConfigMap file mounts (prepared) |
-| [2.15.1](v2.15.1.md) | Unified hierarchy SSO email assignments, deferred provisioning, and consistent email verification (prepared) |
+| [2.15.4](v2.15.4.md) | Stored-key identifier preservation and no-login startup hierarchy migration |
+| [2.15.3](v2.15.3.md) | Dynamic small-spend charts and verified spend counters during regeneration |
+| [2.15.2](v2.15.2.md) | JSON file input for the existing organization hierarchy and ConfigMap file mounts |
+| [2.15.1](v2.15.1.md) | Unified hierarchy SSO email assignments, deferred provisioning, and consistent email verification |
 | [2.15.0](v2.15.0.md) | Email organization mapping with named levels, inherited memberships, and keyless SSO provisioning |
-| [2.14.0](v2.14.0.md) | Automatic configured-team key migration, stable rotation names, and detailed personal spend (prepared) |
+| [2.14.0](v2.14.0.md) | Automatic configured-team key migration, stable rotation names, and detailed personal spend |
 | [2.13.0](v2.13.0.md) | Organization hierarchy, per-key allowances, current policy editors, safe regeneration, and local budget testing |
 | [2.12.2](v2.12.2.md) | Optional outgoing TLS and generic SSO email verification; custom CA source validation |
 | [2.12.1](v2.12.1.md) | Minimal Helm values documentation and complete defaults reference |
