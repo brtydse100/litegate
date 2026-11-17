@@ -6,7 +6,7 @@ from app.dependencies import get_current_user
 from app.models import CurrentUser, KeyCreateResponse, KeyDeleteRequest
 from app.rate_limit import check_key_rate_limit, key_rate_limit_status
 from app.services import litellm as llm
-from app.services import audit, key_secrets, key_spend, organization_sync
+from app.services import audit, budget_key_guards, key_secrets, key_spend, organization_sync
 
 router = APIRouter(prefix="/keys", tags=["keys"])
 
@@ -103,6 +103,7 @@ async def _delete_owned_key(key: str, current_user: CurrentUser) -> dict:
         owned = {k.get("token") or k.get("api_key") or k.get("key") for k in await llm.list_user_keys(current_user.user_id)}
         if key not in owned:
             raise HTTPException(status_code=403, detail="Key not owned by user")
+        await budget_key_guards.guard_erase_key(key)
         await llm.delete_key(key)
     await asyncio.to_thread(
         audit.record, actor_id=current_user.user_id, actor_email=current_user.email, action="key.delete", target="installation-key"

@@ -10,7 +10,8 @@ from fastapi import HTTPException
 from app.config import settings
 from app.models import CurrentUser
 from app.organization import MembershipConflict, OrganizationNode
-from app.services import audit, key_cleanup, key_spend, litellm, organization_key_policy as key_policy
+from app.services import audit, budget_enforcement, key_cleanup, key_spend, litellm, organization_key_policy as key_policy
+from app.services import budget_key_guards, budget_pass
 from app.services import organization_client as upstream, organization_store as store, organization_discovery as discovery
 
 _logger = logging.getLogger(__name__)
@@ -36,7 +37,8 @@ def resolve(user_id: str, groups: list[str], *, email: str = "", source: str = "
 def resolve_identity(identity: dict) -> OrganizationNode | None:
     if identity["auth_source"] == "configured_email" and identity.get("sync_error"):
         raise HTTPException(status_code=409, detail=identity["sync_error"])
-    return resolve(identity["user_id"], identity["groups"], email=identity["email"], source=identity["auth_source"])
+    node = resolve(identity["user_id"], identity["groups"], email=identity["email"], source=identity["auth_source"])
+    return budget_enforcement.allowance(node, identity["user_id"]) if node else node
 
 
 def policy(node: OrganizationNode) -> dict:
@@ -54,6 +56,11 @@ async def record_identity(user_id: str, email: str, source: str, groups: list[st
             node = resolve(user_id, groups, email=email, source=source)
             if node is not None or previous:
                 await asyncio.to_thread(store.remember, user_id, email, source, groups)
+            if node is not None:
+                await asyncio.to_thread(budget_enforcement.mark_participant, user_id)
+            # A changed group or a new participant must reach the shares used
+            # by the immediate synchronization below.
+            await budget_enforcement.refresh_async()
             if node is None and previous:
                 raise HTTPException(status_code=403, detail="Your managed organization mapping was removed; contact an administrator")
         except HTTPException as exc:
@@ -70,6 +77,7 @@ async def remember(user_id: str, email: str, source: str, groups: list[str]) -> 
     return await synchronize_user(user_id)
 
 
+@budget_pass.serialized
 async def synchronize_user(user_id: str) -> OrganizationNode | None:
     """Finish provisioning from current stored claims without rewriting them."""
     if not settings.organization_hierarchy.levels:
@@ -100,10 +108,12 @@ async def synchronize(identity: dict) -> OrganizationNode:
 
 
 async def sync_identity(identity: dict, info: dict, *, defer_finalization: bool = False) -> OrganizationNode:
+    existing = await budget_pass.keys(identity["user_id"])
+    budget_key_guards.guard_single_key(existing)
+    await budget_enforcement.observe(identity["user_id"], existing)
     node = resolve_identity(identity)
     if node is None:
         raise HTTPException(status_code=409, detail="Organization mapping was removed; review the user's keys before changing membership")
-    existing = await litellm.list_user_keys(identity["user_id"])
     ancestor_teams = {
         ancestor.team_id for ancestor in settings.organization_hierarchy.nodes.values() if node.path[: len(ancestor.path)] == ancestor.path
     }
@@ -150,22 +160,25 @@ async def prepare_user(user_id: str, email: str) -> OrganizationNode | None:
             return None
         await asyncio.to_thread(store.remember, user_id, email, "explicit", [])
         identity = await asyncio.to_thread(store.get, user_id)
+    await budget_enforcement.refresh_async()
     node = resolve_identity(identity)
     if node is None:
         raise HTTPException(status_code=403, detail="Your organization mapping is no longer valid")
     return await synchronize(identity)
 
 
+@budget_pass.serialized(provision=True)
 async def generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
     async with lock_for("user", user_id):
         return await _generate_key(user_id, email, team_id, **options)
 
 
 async def _generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
-    """Generate while the caller holds the owner's operation lock."""
+    await asyncio.to_thread(budget_enforcement.mark_participant, user_id)
     node = await prepare_user(user_id, email)
     if node is None:
         return await litellm.generate_key(user_id, email, team_id, **options)
+    budget_key_guards.guard_new_key(await litellm.list_user_keys(user_id))
     identity = await asyncio.to_thread(store.get, user_id)
     if identity and identity["auth_source"] == "sso":
         email = identity["email"].strip().casefold()
@@ -181,12 +194,15 @@ async def _generate_key(user_id: str, email: str, team_id: str | None, **options
     return result
 
 
+@budget_pass.serialized
 async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias: str) -> dict:
     """Serialize the spend snapshot, replacement, and old-key revocation together."""
     from app.services import key_budgets, key_rotation_policy
 
     async with lock_for("user", user_id):
         existing = await key_spend.current_keys(user_id)
+        if any(settings.organization_hierarchy.is_managed_team(key.get("team_id")) for key in existing):
+            budget_key_guards.guard_new_key(existing)
         controls = await key_rotation_policy.snapshot(user_id, existing)
         if key_rotation_policy.requires_assistance(existing):
             raise HTTPException(
@@ -228,6 +244,7 @@ async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias
         return result
 
 
+@budget_pass.serialized
 async def reconcile() -> None:
     if not settings.organization_hierarchy.levels:
         return
@@ -248,45 +265,50 @@ async def reconcile() -> None:
                 _logger.warning("Organization root %s synchronization failed: %s", root.team_id, exc.detail)
 
     await asyncio.gather(*(prepare_root(root) for root in settings.organization_hierarchy.nodes.values()))
+    token = await budget_enforcement.pin()
+    try:
 
-    async def sync_one(user_id: str):
-        async with semaphore, lock_for("user", user_id):
-            try:
-                identity = await asyncio.to_thread(store.get, user_id)
-                node = resolve_identity(identity)
-                if node is None or node.team_id not in ready:
-                    raise HTTPException(status_code=409, detail="Organization mapping or its LiteLLM team is unavailable")
-                await sync_identity(identity, await upstream.team_info(node.team_id), defer_finalization=True)
-                prepared[user_id] = node
-            except HTTPException as exc:
-                await asyncio.to_thread(store.failed, user_id, str(exc.detail))
-
-    await asyncio.gather(*(sync_one(identity["user_id"]) for identity in identities if identity["user_id"] not in blocked))
-
-    # Establish every user's key policy before attempting to remove shared caps.
-    # Otherwise the first users in a team stay failed until the next minute.
-    async def finalize_one(user_id: str):
-        async with semaphore, lock_for("user", user_id):
-            try:
-                identity = await asyncio.to_thread(store.get, user_id)
-                node = resolve_identity(identity)
-                if node != prepared[user_id]:
-                    raise HTTPException(status_code=409, detail="Organization assignment changed during migration; retrying next pass")
-                await finalize_identity(identity, node, bool(await litellm.list_user_keys(user_id)))
-            except HTTPException as exc:
-                await asyncio.to_thread(store.failed, user_id, str(exc.detail))
-
-    await asyncio.gather(*(finalize_one(user_id) for user_id in prepared))
-
-    async def finish_team(node):
-        async with semaphore, lock_for("team", node.team_id):
-            if node.team_id in ready:
+        async def sync_one(user_id: str):
+            async with semaphore, lock_for("user", user_id):
                 try:
-                    await key_policy.finish_team(node)
+                    identity = await asyncio.to_thread(store.get, user_id)
+                    node = resolve_identity(identity)
+                    if node is None or node.team_id not in ready:
+                        raise HTTPException(status_code=409, detail="Organization mapping or its LiteLLM team is unavailable")
+                    await sync_identity(identity, await upstream.team_info(node.team_id), defer_finalization=True)
+                    prepared[user_id] = node
                 except HTTPException as exc:
-                    _logger.warning("Organization team %s migration pending: %s", node.team_id, exc.detail)
+                    await asyncio.to_thread(store.failed, user_id, str(exc.detail))
 
-    await asyncio.gather(*(finish_team(node) for node in settings.organization_hierarchy.nodes.values()))
+        await asyncio.gather(*(sync_one(identity["user_id"]) for identity in identities if identity["user_id"] not in blocked))
+
+        # Establish every user's key policy before attempting to remove shared caps.
+        # Otherwise the first users in a team stay failed until the next minute.
+        async def finalize_one(user_id: str):
+            async with semaphore, lock_for("user", user_id):
+                try:
+                    identity = await asyncio.to_thread(store.get, user_id)
+                    node = resolve_identity(identity)
+                    if node is None or (node.id, node.team_id) != (prepared[user_id].id, prepared[user_id].team_id):
+                        raise HTTPException(status_code=409, detail="Organization assignment changed during migration; retrying next pass")
+                    await finalize_identity(identity, node, bool(await litellm.list_user_keys(user_id)))
+                except HTTPException as exc:
+                    await asyncio.to_thread(store.failed, user_id, str(exc.detail))
+
+        await asyncio.gather(*(finalize_one(user_id) for user_id in prepared))
+
+        async def finish_team(node):
+            async with semaphore, lock_for("team", node.team_id):
+                if node.team_id in ready:
+                    try:
+                        await key_policy.finish_team(node)
+                    except HTTPException as exc:
+                        _logger.warning("Organization team %s migration pending: %s", node.team_id, exc.detail)
+
+        await asyncio.gather(*(finish_team(node) for node in settings.organization_hierarchy.nodes.values()))
+
+    finally:
+        budget_enforcement.unpin(token)
 
 
 async def reconciliation_attempt() -> None:
@@ -318,6 +340,8 @@ def guard_team(team_id: str, changes: dict | None = None) -> None:
 
 
 async def guard_key(key: str, changes: dict, *, use_key_budget_only: bool = False) -> None:
+    if any("spend" in field.lower() for field in changes):
+        await budget_key_guards.guard_erase_key(key)
     if not settings.organization_hierarchy.levels or (
         not use_key_budget_only and "team_id" not in changes and not changes_inherited_allowance(changes)
     ):

@@ -26,7 +26,16 @@ from app.routers.api_actor import (
 from app.routers.api_v1_system import api_audit_events, api_status, router as system_router
 from app.routers.api_v1_users import api_create_user, api_list_users, api_update_user, router as users_router
 from app.routers.api_v1_models import router as models_router
-from app.services import key_budgets, key_mutations, key_secrets, litellm as llm, organization_sync, policy_schemas, policy_team_update
+from app.services import (
+    budget_key_guards,
+    key_budgets,
+    key_mutations,
+    key_secrets,
+    litellm as llm,
+    organization_sync,
+    policy_schemas,
+    policy_team_update,
+)
 from app.routers.api_v1_policy_schemas import router as policy_schemas_router
 from app.routers.team_policy_context import decorate_team as _decorate_team, team_config_references as _team_config_references
 
@@ -126,7 +135,8 @@ async def api_delete_key(payload: KeyDeleteRequest, actor: ApiActor = Depends(ge
     """Delete a key while keeping the credential out of URLs and access logs."""
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
-    async with key_mutations.locked_key(payload.key):
+    async with key_mutations.locked_key(payload.key) as info:
+        await budget_key_guards.guard_erase_key(payload.key, info)
         await llm.delete_key(payload.key)
     if actor.is_admin:
         await _record_audit(actor, "key.delete", "installation-key")
@@ -143,6 +153,7 @@ async def api_reset_key_spend(
     check_key_rate_limit(actor.user.user_id)
 
     if payload.uses_legacy_single_key:
+        await budget_key_guards.guard_erase_key(payload.keys[0])
         result = await llm.reset_key_spend(payload.keys[0])
         previous_spend = result.get("previous_spend") if isinstance(result, dict) else None
         await _record_audit(
@@ -158,6 +169,7 @@ async def api_reset_key_spend(
     async def reset_one(key: str) -> dict:
         async with semaphore:
             try:
+                await budget_key_guards.guard_erase_key(key)
                 await llm.reset_key_spend(key)
                 return {"key": key, "reset": True}
             except HTTPException as exc:

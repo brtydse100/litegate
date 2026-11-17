@@ -35,6 +35,12 @@ def context(monkeypatch):
     )
     monkeypatch.setattr(settings, "organization_hierarchy", tree)
     monkeypatch.setattr(settings, "hierarchical_budgets_enabled", True)
+    from app.services import budget_enforcement
+
+    # Only signed-in members (or key holders) take part in budget splits.
+    for user in ("alice", "delegate"):
+        organization_store.remember(user, "", "explicit", [])
+        budget_enforcement.mark_participant(user)
     root = tree.roots[0]
     child = next(node for node in tree.nodes.values() if node.parent_id == root.id)
     scope = organization_access.OrganizationScope(roots=(root.id,))

@@ -6,10 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictStr
 
 from app.config import settings
-from app.organization import MembershipConflict
 from app.routers.api_actor import ApiActor, get_api_actor, record_audit
 from app.services import budget_allocations as allocation, budget_native as native, budget_store as store
-from app.services import organization_access as access, organization_store
+from app.services import budget_enforcement as enforcement, organization_access as access
 
 router = APIRouter(prefix="/v1/organization/budgets", tags=["organization budgets"])
 
@@ -33,37 +32,6 @@ async def _scope(actor):
     return await access.resolve_scope(actor)
 
 
-def _members() -> tuple[dict, dict]:
-    tree = settings.organization_hierarchy
-    identities = {row["user_id"]: row for row in organization_store.list_identities()}
-    for node in tree.nodes.values():
-        for user in node.member.userIds:
-            # Email selectors are resolved by verified identity discovery, never
-            # treated as canonical user IDs merely because they are configured.
-            if "@" not in user:
-                identities.setdefault(user, {"user_id": user, "groups": [], "email": "", "auth_source": "explicit"})
-    memberships, emails = {}, {}
-    for user, identity in identities.items():
-        if identity.get("sync_error"):
-            continue
-        try:
-            node = tree.resolve(user, identity["groups"], email=identity["email"], source=identity["auth_source"])
-        except MembershipConflict:
-            continue
-        if node:
-            memberships[user], emails[user] = node.id, identity["email"]
-    return memberships, emails
-
-
-def _allocations(state, members, *, strict=True):
-    tree = settings.organization_hierarchy
-    envelopes = {node.id: allocation.units(node.member.budget.groupTotal or 0) for node in tree.nodes.values()}
-    envelopes.update({key: value for key, value in state["envelopes"].items() if key in tree.nodes})
-    # Preview spend is intentionally unknown: legacy key windows cannot be
-    # represented truthfully as one aligned aggregate membership period.
-    return allocation.allocate(tree, envelopes, state["overrides"], members, strict=strict)
-
-
 def _node(node_id, scope):
     node = settings.organization_hierarchy.nodes.get(node_id)
     if node is None or not scope.allows(node):
@@ -76,8 +44,9 @@ def _can_edit_envelope(node, scope):
 
 
 def _view(state, scope, actor):
-    members, emails = _members()
-    allocated = _allocations(state, members, strict=False)
+    members, emails = enforcement.members()
+    allocated = enforcement.allocations(state, members, strict=False)
+    budgeted = enforcement.budgeted_nodes(state, members)
     groups = []
     for node in settings.organization_hierarchy.nodes.values():
         if not scope.allows(node):
@@ -87,9 +56,9 @@ def _view(state, scope, actor):
             {
                 "user_id": user,
                 "email": emails.get(user, ""),
-                "allocation": allocation.dollars(value) if value is not None else None,
+                "allocation": _displayed(node, node.id in budgeted, value),
                 "override": allocation.dollars(state["overrides"][user]) if state["overrides"].get(user) is not None else None,
-                "mode": "manual" if state["overrides"].get(user) is not None else "automatic",
+                "mode": ("manual" if state["overrides"].get(user) is not None else "automatic" if node.id in budgeted else "fixed"),
                 "used": None,
                 "remaining": None,
                 "can_edit": scope.global_admin or user != actor.user.user_id,
@@ -111,7 +80,17 @@ def _view(state, scope, actor):
                 "users": users,
             }
         )
-    return {"revision": state["revision"], "mode": "preview", "applied": False, "pending": False, "groups": groups}
+    applied = enforcement.enforced()
+    return {"revision": state["revision"], "mode": "enforced" if applied else "preview", "applied": applied, "pending": False, "groups": groups}
+
+
+def _displayed(node, budgeted, value):
+    """The allowance enforcement applies: the share capped by perUser, or perUser."""
+    if not budgeted:
+        return node.per_user
+    if value is not None and node.per_user is not None:
+        return min(allocation.dollars(value), node.per_user)
+    return allocation.dollars(value) if value is not None else None
 
 
 async def _response(state, scope, actor):
@@ -128,13 +107,13 @@ async def budget_view(actor: ApiActor = Depends(get_api_actor)):
 
 def _edit(revision, actor, scope, change):
     def validate(state):
-        members, _ = _members()
+        members, _ = enforcement.members()
         # Read invalid proposals without inventing allocations. Any editor may
         # leave an independent (possibly out-of-scope) deficit in place or repair
         # it incrementally, but no edit may create or worsen a deficit.
-        before = _allocations(state, members, strict=False)
+        before = enforcement.allocations(state, members, strict=False)
         change(state, members)
-        after = _allocations(state, members, strict=False)
+        after = enforcement.allocations(state, members, strict=False)
         if any(row["shortfall"] > before[node_id]["shortfall"] for node_id, row in after.items()):
             raise HTTPException(409, allocation.ALLOCATION_ERROR)
         owner_group = members.get(actor.user.user_id)
@@ -145,7 +124,10 @@ def _edit(revision, actor, scope, change):
             if own_after > own_before:
                 raise HTTPException(403, "A parent or system administrator must increase your personal allowance")
 
-    return store.edit(revision, validate)
+    state = store.edit(revision, validate)
+    if enforcement.enforced():
+        enforcement.refresh()
+    return state
 
 
 @router.patch("/groups/{node_id}")

@@ -194,6 +194,9 @@
         "hierarchicalBudgetsEnabled": {
           "type": "boolean"
         },
+        "hierarchicalBudgetsEnforced": {
+          "type": "boolean"
+        },
         "organizationGroupAdmins": {
           "type": "object",
           "additionalProperties": {

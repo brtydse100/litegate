@@ -119,6 +119,7 @@ async def portal_config():
         "analytics_enabled": settings.analytics_enabled,
         "organization_delegation_enabled": bool(settings.organization_access_designations),
         "hierarchical_budgets_enabled": settings.hierarchical_budgets_enabled,
+        "hierarchical_budgets_enforced": settings.hierarchical_budgets_enforced,
         "litellm_enterprise_enabled": settings.litellm_enterprise_enabled,
     }
 

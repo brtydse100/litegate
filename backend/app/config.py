@@ -109,6 +109,7 @@ class Settings(BaseSettings):
     analytics_retention_days: int = Field(default=90, ge=1, le=366)
     analytics_batch_concurrency: int = Field(default=5, ge=1, le=20)
     hierarchical_budgets_enabled: bool = False
+    hierarchical_budgets_enforced: bool = False
 
     root_url: str = "http://localhost"
     cors_origins: str = "http://localhost,http://localhost:5173,http://localhost:3000"

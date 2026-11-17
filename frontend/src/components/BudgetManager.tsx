@@ -114,8 +114,12 @@ function BudgetGroupEditor({
                 <span className="break-all">{user.user_id}</span>
               )}
               <p className="text-xs text-slate-500">
-                {user.mode === "automatic" ? "Automatic" : "Manual override"}:{" "}
-                {money(user.allocation)}
+                {user.mode === "automatic"
+                  ? "Automatic"
+                  : user.mode === "fixed"
+                    ? "Fixed per-user"
+                    : "Manual override"}
+                : {money(user.allocation)}
               </p>
             </div>
             {user.can_edit && (
@@ -189,27 +193,39 @@ export default function BudgetManager() {
   return (
     <section className="mt-8 space-y-5" aria-label="Budget management">
       <h2 className="text-xl font-semibold text-slate-950">Budget planning</h2>
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-        <p>
-          These allocations are proposals, not applied to inference. Existing
-          enforced policies remain active.
-        </p>
-        <ul className="mt-2 list-inside list-disc">
-          {data.capability.reasons.map((reason) => (
-            <li key={reason}>{reason}</li>
-          ))}
-        </ul>
-        <button
-          disabled
-          className="mt-3 rounded border border-amber-300 px-3 py-2 disabled:opacity-60"
+      {data.applied ? (
+        <div
+          role="status"
+          className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900"
         >
-          Activate budget enforcement
-        </button>
-      </div>
+          Enforced: these allowances cap members' keys. Changes and new members
+          apply within about a minute.
+        </div>
+      ) : (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p>
+            These allocations are proposals, not applied to inference. Existing
+            enforced policies remain active.
+          </p>
+          <ul className="mt-2 list-inside list-disc">
+            {data.capability.reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+          <button
+            disabled
+            className="mt-3 rounded border border-amber-300 px-3 py-2 disabled:opacity-60"
+          >
+            Activate budget enforcement
+          </button>
+        </div>
+      )}
       <p className="text-sm text-slate-600">
         Child allocations and manual overrides are reserved first. The remainder
-        is shared equally by other direct members. Clear a user override to
-        restore automatic allocation.
+        is shared equally by other signed-in direct members, never above the
+        group's per-user limit. Members of groups without a budget keep their
+        fixed per-user allowance. Clear a user override to restore automatic
+        allocation.
       </p>
       {data.groups.map((group) => (
         <BudgetGroupEditor

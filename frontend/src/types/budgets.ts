@@ -3,7 +3,7 @@ export interface BudgetUser {
   email: string;
   allocation: number | null;
   override: number | null;
-  mode: "automatic" | "manual";
+  mode: "automatic" | "manual" | "fixed";
   used: number | null;
   remaining: number | null;
   can_edit: boolean;

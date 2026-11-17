@@ -300,7 +300,9 @@ personal-user and team-member caps are removed only after the key policy is
 applied and verified. Normal creation remains limited to one key per user,
 including concurrent creation requests.
 
-`groupTotal` is an informational tracking target, allowed at any level.
+`groupTotal` is an informational tracking target, allowed at any level, unless
+[enforced equal splits](governance-and-analytics.md#enforced-equal-splits) are
+enabled; then it is shared equally by the group's signed-in members.
 Engineering's $5,000 target compares against direct-team and descendant-team
 usage, counting each distinct team once. Exceeding it does **not** block keys.
 Managed teams have no native shared spend cap; individual keys enforce the
@@ -337,7 +339,7 @@ requests immediately. Failures are shown in the admin dashboard.
 
 **Rate limits:** Hierarchy budgets are USD spending allowances, not request or token rate limits.
 `perUser` sets each managed key's spend allowance; `groupTotal` only tracks
-aggregate spend. Neither field sets requests per minute (RPM), tokens per minute
+aggregate spend unless enforced equal splits are enabled. Neither field sets requests per minute (RPM), tokens per minute
 (TPM), or concurrent request limits, and the hierarchy has no inherited rate-limit
 fields. For newly generated keys, use root-level `key_rpm_limit`, `key_tpm_limit`,
 and `key_max_parallel_requests` in `config.yaml` (or their uppercase environment

@@ -99,6 +99,7 @@ Raw logs, key secrets/hashes, and upstream API-key breakdowns are not returned.
 | `analytics_retention_days` | `ANALYTICS_RETENTION_DAYS` | `analyticsRetentionDays` | `90` |
 | `analytics_batch_concurrency` | `ANALYTICS_BATCH_CONCURRENCY` | `analyticsBatchConcurrency` | `5` |
 | `hierarchical_budgets_enabled` | `HIERARCHICAL_BUDGETS_ENABLED` | `hierarchicalBudgetsEnabled` | `false` |
+| `hierarchical_budgets_enforced` | `HIERARCHICAL_BUDGETS_ENFORCED` | `hierarchicalBudgetsEnforced` | `false` |
 
 Environment mappings use JSON objects. Retention accepts 1–366 days; concurrency
 accepts 1–20. Helm validates these types and rolls the pod when ConfigMap-backed
@@ -140,8 +141,9 @@ plaintext credentials.
 Usage spend displays use six to ten decimal places; amounts below that precision
 use scientific notation so a nonzero prompt cost is never displayed as zero.
 
-The opt-in budget page currently stores **proposals**. It does not activate a
-new enforcement mode. Child envelopes and manual direct-user overrides reserve
+The opt-in budget page stores allocations. Without enforcement they are
+**proposals**; with `hierarchical_budgets_enforced` they cap members' keys (see
+[Enforced equal splits](#enforced-equal-splits)). Child envelopes and manual direct-user overrides reserve
 funds first; the remainder is divided equally among other direct users using
 integer micro-dollars. Children allocate recursively; descendant users are not
 counted twice. Zero is a manual zero allocation; a blank override means automatic.
@@ -157,10 +159,64 @@ deficit in another group, including one outside a delegate's scope, does not
 block unrelated edits.
 
 Existing per-key enforcement remains active. The page reports unknown used and
-remaining amounts as unavailable and marks proposals as not applied. Activation
-returns 503. A native adapter and durable apply journal are covered by contract
+remaining amounts as unavailable. Without enforcement it marks proposals as not
+applied, and its Activate action returns 503. A native adapter and durable apply journal are covered by contract
 tests, including aggregate member caps and verified decreases before increases.
 They are not called from proposal editing.
+
+## Enforced equal splits
+
+Set `hierarchical_budgets_enforced: true` (environment
+`HIERARCHICAL_BUDGETS_ENFORCED`, Helm `config.hierarchicalBudgetsEnforced`) to
+turn group budgets into key caps. It is off by default because it can lower
+existing caps. It works without the Budget planning page, which only adds manual
+values on top.
+
+- A group is **budgeted** when it has `groupTotal`, a planning-page envelope, or
+  a manual override for one of its members. Its amount, minus budgeted child
+  groups and manual overrides, is shared **equally** by its participating direct
+  members. No administrator action is needed.
+- **Participants** are members who signed in or already hold a key. Nobody is
+  reserved a share before they use LiteGate. When someone signs in for the first
+  time, every share in their group is recalculated; the 60-second
+  reconciliation applies the new caps. Upgrading counts users who already signed
+  in.
+- `perUser` remains a **ceiling** on each share. Members of unbudgeted groups
+  keep their fixed `perUser` allowance, and those groups are not deducted from
+  their parent.
+- Shares never fall below a member's current-period spend, so a newcomer only
+  shares what is left. Shares are recalculated every pass from current spend,
+  so a restart or a period reset is reflected, but a key is only rewritten when
+  its share actually changes. Every enforced write collects current managed-key
+  spend before pinning shares. Reconciliation reuses that roster while applying
+  policy. Required decreases are verified before any increases; a failed read or
+  decrease aborts the operation without raising caps.
+- Enforced accounts support **one key**. Multiple-key owners stop the operation
+  before existing controls are removed. Additional key creation and overlapping
+  rotation are rejected; administrators must review aggregate accounting first.
+- Managed-key deletion, spend resets and Advanced spend edits are blocked while
+  enforcement is on. An empty key roster retains observed consumed spend rather
+  than treating deletion as a period reset. Direct upstream changes and loss of
+  process history still require operator review; this is not a durable spend ledger.
+- Each pass uses one fixed set of shares. A sign-in or budget edit during a pass
+  applies on the next pass, about a minute later; it never caps a key at zero.
+  A temporary synchronization error does not remove a member from the split.
+- A key still attached to a different managed group stops budget writes before
+  the source group's capacity can be released. An operator must review and
+  complete that transfer before reconciliation resumes. First-time provisioning
+  records the identity and participant under the same serialization lock before
+  collecting spend. Deficit snapshots refresh their fallback spend floors even
+  when allocation totals remain unchanged.
+  Incomplete key records are hydrated through key-info and ownership is verified.
+  An omitted source team stops writes if hydration cannot establish it; only an
+  explicit `null` means the key is unassigned.
+- Manual overrides saved for someone who has not signed in stay saved but
+  inactive, and apply when that person first signs in. That can push the group
+  into a deficit, which the Budget planning page shows. If manual values exceed the group amount, automatic
+  members are held at their current spend until an administrator fixes it.
+- Each key keeps its own `duration` reset, so a group's total holds within each
+  member's budget period rather than one aligned period. Until the next pass,
+  existing members keep their previous, larger share after a newcomer joins.
 
 Strict hierarchical enforcement remains unfinished: aligned reset/transfer
 accounting and all supported request-path reservation guarantees must be verified
