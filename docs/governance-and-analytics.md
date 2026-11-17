@@ -185,11 +185,11 @@ values on top.
   keep their fixed `perUser` allowance, and those groups are not deducted from
   their parent.
 - Shares never fall below a member's current-period spend, so a newcomer only
-  shares what is left. Shares are recalculated only when members, groups or
-  saved budgets change, taking spend at that moment; spending alone never
-  rewrites everyone's keys. Only the first pass after startup lists every
+  shares what is left. Shares are recalculated every pass from current spend,
+  so a restart or a period reset is reflected, but a key is only rewritten when
+  its share actually changes. Only the first pass after startup lists every
   member's keys; later passes reuse what the regular sync already reads, so
-  enforcement adds no LiteLLM requests in normal operation.
+  enforcement adds no listing requests in normal operation.
 - Each pass uses one fixed set of shares. A sign-in or budget edit during a pass
   applies on the next pass, about a minute later; it never caps a key at zero.
   A temporary synchronization error does not remove a member from the split.

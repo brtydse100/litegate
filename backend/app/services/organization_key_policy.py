@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 from app.config import settings
 from app.organization import OrganizationNode, MembershipConflict
-from app.services import litellm, organization_client as upstream, organization_store as store
+from app.services import budget_enforcement, litellm, organization_client as upstream, organization_store as store
 
 
 def key_policy(node: OrganizationNode) -> dict:
@@ -126,6 +126,8 @@ async def finish_team(node: OrganizationNode) -> dict:
                     )
                 except MembershipConflict as exc:
                     raise HTTPException(status_code=409, detail="Resolve conflicting team memberships before removing a shared cap") from exc
+                # Compare against the enforced share, not the raw perUser.
+                assigned = budget_enforcement.allowance(assigned, owner) if assigned else assigned
                 if not assigned or assigned.team_id != node.team_id or not matches(key, assigned):
                     raise HTTPException(status_code=409, detail="Protect or migrate every key in this team before removing its old shared budget")
             if result.get("total_pages", 1) <= page:

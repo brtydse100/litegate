@@ -262,3 +262,71 @@ def test_an_older_rebuild_never_replaces_a_newer_one(org, monkeypatch):
     enforcement.refresh()
     monkeypatch.setattr(enforcement, "members", original)
     assert enforcement._snapshot["memberships"].keys() == {"ann", "cat"}
+
+
+@pytest.mark.asyncio
+async def test_restart_before_spend_is_known_does_not_freeze_wrong_shares(org, monkeypatch):
+    import asyncio
+
+    org()
+    join("ann", "ben")
+    # A request right after a restart builds shares before spend is known.
+    assert cap("ben") == 45
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(side_effect=lambda user: [{"token": user, "spend": 80 if user == "ann" else 0}]))
+    await enforcement.observe_all(["ann", "ben"], asyncio.Semaphore(5))
+    token = await enforcement.pin()
+    try:
+        # ann already spent 80 of 90: ben may only spend what is left.
+        assert (cap("ann"), cap("ben")) == (80, 10)
+    finally:
+        enforcement.unpin(token)
+
+
+def test_a_budget_period_reset_restores_equal_shares(org):
+    org()
+    join("ann", "ben")
+    enforcement.observe_spend("ann", 80)
+    enforcement.refresh()
+    assert (cap("ann"), cap("ben")) == (80, 10)
+    enforcement.observe_spend("ann", 0)  # LiteLLM reset the key's period spend.
+    enforcement.refresh()
+    assert (cap("ann"), cap("ben")) == (45, 45)
+
+
+@pytest.mark.asyncio
+async def test_a_mapping_removed_mid_pass_fails_that_user_not_the_whole_pass(org, monkeypatch):
+    org()
+    join("ann")
+    node = sync.resolve_identity(store.get("ann"))
+    finished = AsyncMock()
+    monkeypatch.setattr(sync.discovery, "refresh", AsyncMock(return_value=set()))
+    monkeypatch.setattr(sync.upstream, "sync_root", AsyncMock())
+    monkeypatch.setattr(sync.upstream, "team_info", AsyncMock(return_value={}))
+    monkeypatch.setattr(sync, "sync_identity", AsyncMock())
+    monkeypatch.setattr(key_policy, "finish_team", finished)
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
+    results = iter([node, None])
+    monkeypatch.setattr(sync, "resolve_identity", lambda identity: next(results) if identity["user_id"] == "ann" else None)
+    await sync.reconcile()
+    finished.assert_awaited()
+    assert "changed" in store.get("ann")["sync_error"]
+
+
+@pytest.mark.asyncio
+async def test_removing_an_old_shared_cap_accepts_keys_capped_at_the_share(org, monkeypatch):
+    hierarchy = org({"groupTotal": 90, "perUser": 50})
+    join("ann", "ben", "cat")
+    engineering = next(node for node in hierarchy.nodes.values() if node.team_id == "eng")
+    infos = iter(
+        [
+            {"team_info": {"max_budget": 500, "budget_duration": None}},
+            {"team_info": {"max_budget": None, "budget_duration": None}},
+        ]
+    )
+    monkeypatch.setattr(key_policy.upstream, "team_info", AsyncMock(side_effect=lambda team: next(infos)))
+    keys = [{"user_id": user, "team_id": "eng", "max_budget": 30, "budget_duration": None} for user in ("ann", "ben", "cat")]
+    monkeypatch.setattr(litellm, "list_keys_filtered", AsyncMock(return_value={"keys": keys, "total_pages": 1}))
+    update = AsyncMock()
+    monkeypatch.setattr(litellm, "update_team", update)
+    await key_policy.finish_team(engineering)
+    update.assert_awaited_once()

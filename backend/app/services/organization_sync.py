@@ -286,7 +286,7 @@ async def reconcile() -> None:
                 try:
                     identity = await asyncio.to_thread(store.get, user_id)
                     node = resolve_identity(identity)
-                    if (node.id, node.team_id) != (prepared[user_id].id, prepared[user_id].team_id):
+                    if node is None or (node.id, node.team_id) != (prepared[user_id].id, prepared[user_id].team_id):
                         raise HTTPException(status_code=409, detail="Organization assignment changed during migration; retrying next pass")
                     await finalize_identity(identity, node, bool(await litellm.list_user_keys(user_id)))
                 except HTTPException as exc:

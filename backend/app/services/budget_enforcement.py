@@ -10,11 +10,11 @@ Participants are users who signed in or already hold a key, so nothing is
 reserved for people who never use LiteGate. A new participant changes every
 share in the group; the 60-second reconciliation applies the new caps.
 
-Shares come from an immutable snapshot. Each reconciliation pass pins one
-snapshot for all of its members, so a sign-in or budget edit during a pass
-cannot make the pass disagree with itself. A snapshot is rebuilt only when
-participants, memberships or saved budgets change, which also freezes spend
-floors between those changes and avoids rewriting keys on every pass.
+Shares come from a snapshot. Each reconciliation pass pins one snapshot for
+all of its members, so a sign-in or budget edit during a pass cannot make the
+pass disagree with itself. Shares are recomputed every pass from current spend
+(so restarts and period resets are reflected), but keys are only rewritten when
+a share actually changes.
 """
 
 import asyncio
@@ -145,32 +145,43 @@ def allocations(state: dict, memberships: dict, *, strict: bool = True, floors: 
 
 
 def refresh() -> dict:
-    """Return a current snapshot, rebuilding it only when its inputs changed.
+    """Return a current snapshot, replacing it only when the shares changed.
 
-    Safe to call from worker threads. Each build takes a ticket; an older build
-    finishing late never replaces a newer one, so no sign-in is lost.
+    Shares are recomputed from current members, budgets and spend every time,
+    so a restart, a spend change or a period reset is reflected. The snapshot
+    object (and therefore every key cap) only changes when the result does.
+    Safe to call from worker threads: each call takes a ticket, and an older
+    build finishing late never replaces a newer one.
     """
     global _snapshot
     ticket = next(_tickets)
     state = budget_store.read()
     memberships, _ = members()
-    current = _snapshot
-    if current and current["revision"] == state["revision"] and current["memberships"] == memberships:
-        return current
     floors = spent()
-    built = {
-        "ticket": ticket,
-        "revision": state["revision"],
-        "state": state,
-        "memberships": memberships,
-        "participants": participants(),
-        "floors": floors,
-        "budgeted": budgeted_nodes(state, memberships),
-        "rows": allocations(state, memberships, strict=False, floors=floors),
-    }
+    budgeted = budgeted_nodes(state, memberships)
+    rows = allocations(state, memberships, strict=False, floors=floors)
+    active = participants()
     with _lock:
-        if _snapshot is None or _snapshot["ticket"] < ticket:
-            _snapshot = built
+        current = _snapshot
+        if current is not None and current["ticket"] > ticket:
+            return current
+        if current is not None and (current["rows"], current["budgeted"], current["memberships"], current["participants"]) == (
+            rows,
+            budgeted,
+            memberships,
+            active,
+        ):
+            current["ticket"] = ticket
+            return current
+        _snapshot = {
+            "ticket": ticket,
+            "state": state,
+            "memberships": memberships,
+            "participants": active,
+            "floors": floors,
+            "budgeted": budgeted,
+            "rows": rows,
+        }
         return _snapshot
 
 
