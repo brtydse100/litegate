@@ -207,6 +207,9 @@ values on top.
   records the identity and participant under the same serialization lock before
   collecting spend. Deficit snapshots refresh their fallback spend floors even
   when allocation totals remain unchanged.
+  Incomplete key records are hydrated through key-info and ownership is verified.
+  An omitted source team stops writes if hydration cannot establish it; only an
+  explicit `null` means the key is unassigned.
 - Manual overrides saved for someone who has not signed in stay saved but
   inactive, and apply when that person first signs in. That can push the group
   into a deficit, which the Budget planning page shows. If manual values exceed the group amount, automatic

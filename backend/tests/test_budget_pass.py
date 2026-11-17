@@ -30,7 +30,7 @@ async def test_current_spend_is_collected_before_pinning(org, monkeypatch):
         "list_user_keys",
         AsyncMock(
             side_effect=lambda user: (
-                [{"token": user, "user_id": user, "spend": 80 if user == "ann" else 0, "max_budget": 90 if user == "ann" else 10}]
+                [{"token": user, "user_id": user, "team_id": "eng", "spend": 80 if user == "ann" else 0, "max_budget": 90 if user == "ann" else 10}]
                 if user in {"ann", "ben"}
                 else []
             )
@@ -63,7 +63,9 @@ async def test_failed_decrease_prevents_any_increase(org, monkeypatch):
         "list_user_keys",
         AsyncMock(
             side_effect=lambda user: (
-                [{"token": user, "user_id": user, "spend": 0, "max_budget": 80 if user == "ann" else 10}] if user in {"ann", "ben"} else []
+                [{"token": user, "user_id": user, "team_id": "eng", "spend": 0, "max_budget": 80 if user == "ann" else 10}]
+                if user in {"ann", "ben"}
+                else []
             )
         ),
     )
@@ -104,7 +106,7 @@ async def test_reconcile_uses_current_spend_and_one_pinned_snapshot(org, monkeyp
         "list_user_keys",
         AsyncMock(
             side_effect=lambda user: (
-                [{"token": user, "user_id": user, "spend": 80 if user == "ann" else 0, "max_budget": 80 if user == "ann" else 10}]
+                [{"token": user, "user_id": user, "team_id": "eng", "spend": 80 if user == "ann" else 0, "max_budget": 80 if user == "ann" else 10}]
                 if user in {"ann", "ben"}
                 else []
             )
@@ -133,7 +135,11 @@ async def test_unavailable_spend_does_not_allow_policy_writes(org, monkeypatch):
 
     org()
     join("ann")
-    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(side_effect=lambda user: [{"token": "a", "max_budget": 90}] if user == "ann" else []))
+    monkeypatch.setattr(
+        litellm,
+        "list_user_keys",
+        AsyncMock(side_effect=lambda user: [{"token": "a", "user_id": "ann", "team_id": "eng", "max_budget": 90}] if user == "ann" else []),
+    )
     operation = AsyncMock()
     with pytest.raises(HTTPException, match="502"):
         await budget_pass.serialized(operation)()

@@ -46,12 +46,20 @@ async def _collect(identities):
             user_id = identity["user_id"]
             current = await litellm.list_user_keys(user_id)
             budget_key_guards.guard_single_key(current)
+            verified_keys = []
             for key in current:
+                if "team_id" not in key or "user_id" not in key:
+                    key = (await key_spend.current_keys(user_id, [key]))[0]
+                if key.get("user_id") != user_id or "team_id" not in key:
+                    raise HTTPException(502, "Cannot verify key ownership and source team; no budget changes applied")
+                if key["team_id"] is not None and (not isinstance(key["team_id"], str) or not key["team_id"].strip()):
+                    raise HTTPException(502, "Cannot verify key source team; no budget changes applied")
                 key_spend.counter(key)  # Unknown spend must never become zero.
                 if settings.organization_hierarchy.is_managed_team(key.get("team_id")) and key["team_id"] != node.team_id:
                     raise HTTPException(409, "Review managed group transfer before releasing the source allowance")
-            await enforcement.observe(user_id, current)
-            observations[user_id] = current
+                verified_keys.append(key)
+            await enforcement.observe(user_id, verified_keys)
+            observations[user_id] = verified_keys
 
     # A failed read aborts before any cap is raised. Do not swallow failures.
     results = await asyncio.gather(*(one(identity) for identity in identities), return_exceptions=True)
