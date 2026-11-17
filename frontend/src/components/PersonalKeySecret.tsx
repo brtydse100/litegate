@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { api } from "../api/client";
 import { primaryKeyActionClassName } from "./keyActionStyles";
+import DismissibleMessage from "./DismissibleMessage";
 
 interface Props {
   identifier: string;
@@ -124,13 +125,20 @@ function SecretContent({
           </button>
         </div>
       ) : !canReveal ? (
-        <span className="text-xs text-slate-500">Original key unavailable</span>
+        <span className="text-xs text-slate-500">
+          LiteGate has no saved copy of this key to show. The key itself still
+          works.
+        </span>
       ) : null}
       {children ? children(action) : action}
       {error && (
-        <p role="alert" className="mt-1 text-xs text-red-600">
+        <DismissibleMessage
+          role="alert"
+          messageKey={error}
+          className="mt-1 text-xs text-red-600"
+        >
           {error}
-        </p>
+        </DismissibleMessage>
       )}
     </div>
   );

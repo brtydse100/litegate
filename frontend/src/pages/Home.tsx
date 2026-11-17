@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import AdminKeys from "../components/AdminKeys";
 import PersonalKeySecret from "../components/PersonalKeySecret";
+import DismissibleMessage from "../components/DismissibleMessage";
 import { primaryKeyActionClassName } from "../components/keyActionStyles";
 import { keyToken } from "../components/BulkKeyEditor";
 import AdminStatus from "../components/AdminStatus";
@@ -97,8 +98,9 @@ function keyAccessStatus(key: KeyInfo) {
   if (key.blocked) return "Blocked";
   if (key.expires && expirationDate(key.expires).getTime() <= Date.now())
     return "Expired";
-  if (key.policy_error || key.user_budget_available === false)
-    return "Policy unavailable";
+  if (key.policy_error) return "Needs attention";
+  if (key.user_budget_available === false)
+    return key.policy_notice ? "Updating" : "Budget details unavailable";
   if (
     (key.max_budget != null && key.spend >= key.max_budget) ||
     (key.user_budget != null &&
@@ -147,14 +149,18 @@ function KeyCard({
               </div>
             </div>
             {canReveal && action && <div className="py-4">{action}</div>}
-            {accessStatus !== "Ready" && (
-              <p
-                role="status"
+            {/* "Needs attention" and "Updating" are explained by their own
+                messages below, so they never show a second box. */}
+            {!["Ready", "Needs attention", "Updating"].includes(
+              accessStatus,
+            ) && (
+              <DismissibleMessage
+                messageKey={accessStatus}
                 className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
               >
                 Key status: {accessStatus}. Contact an administrator if you need
                 help.
-              </p>
+              </DismissibleMessage>
             )}
             <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
               <div className="px-5 py-4">
@@ -196,12 +202,21 @@ function KeyCard({
               </div>
             </dl>
             {keyInfo.policy_error && (
-              <p
+              <DismissibleMessage
                 role="alert"
+                messageKey={keyInfo.policy_error}
                 className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
               >
                 {keyInfo.policy_error}
-              </p>
+              </DismissibleMessage>
+            )}
+            {keyInfo.policy_notice && (
+              <DismissibleMessage
+                messageKey={keyInfo.policy_notice}
+                className="border-t border-sky-200 bg-sky-50 px-5 py-3 text-sm text-sky-900"
+              >
+                {keyInfo.policy_notice}
+              </DismissibleMessage>
             )}
             {keyInfo.team_id && (
               <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
@@ -721,9 +736,13 @@ export default function Home() {
                 </div>
 
                 {mutationError && (
-                  <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <DismissibleMessage
+                    role="alert"
+                    messageKey={(mutationError as Error).message}
+                    className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                  >
                     {(mutationError as Error).message}
-                  </p>
+                  </DismissibleMessage>
                 )}
                 {keys.isError && (
                   <button
@@ -738,10 +757,13 @@ export default function Home() {
                   </button>
                 )}
                 {operationsBlocked && (
-                  <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <DismissibleMessage
+                    messageKey="key-actions-paused"
+                    className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                  >
                     Key actions are paused. Try again in {retryAfter || 1}{" "}
                     seconds.
-                  </p>
+                  </DismissibleMessage>
                 )}
                 {newKey && !newKeyIdentifier && (
                   <div>
@@ -826,7 +848,17 @@ export default function Home() {
                             : "Create API key"}
                       </button>
                     ) : config?.save_api_keys_in_db &&
-                      keyList.some((key) => key.secret_available) ? null : (
+                      keyList.some(
+                        (key) => key.secret_available,
+                      ) ? null : keyList.some(
+                        (key) => key.rotation_available === false,
+                      ) ? (
+                      <p className="rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                        Your key keeps working. Organization budgets are
+                        enforced, so it can't be replaced here; ask an
+                        administrator if you need a new one.
+                      </p>
+                    ) : (
                       <button
                         onClick={() => setConfirmRegenerate(true)}
                         disabled={operationsBlocked}

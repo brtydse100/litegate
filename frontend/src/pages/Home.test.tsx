@@ -519,6 +519,57 @@ describe("personal key storage", () => {
     );
   });
 
+  it("tells a moved user where they went in one dismissible info box", async () => {
+    renderHome(false, false, {
+      organization_managed: true,
+      user_budget_available: true,
+      user_budget: 50,
+      user_spend: 5,
+      policy_notice:
+        "You were moved to Engineering / Platform. Your key moves there within about a minute.",
+    });
+    const notice = await screen.findByText(/You were moved to Engineering/);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Key status:/)).not.toBeInTheDocument();
+    fireEvent.click(
+      within(notice.closest("[role=status]") as HTMLElement).getByRole(
+        "button",
+        { name: "Dismiss message" },
+      ),
+    );
+    expect(
+      screen.queryByText(/You were moved to Engineering/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows one warning, not two, when a key needs attention", async () => {
+    renderHome(false, false, {
+      organization_managed: true,
+      user_budget_available: false,
+      policy_error:
+        "Your organization mapping was removed; contact an administrator",
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "mapping was removed",
+    );
+    expect(screen.queryByText(/Key status:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Policy unavailable/)).not.toBeInTheDocument();
+  });
+
+  it("explains instead of offering replacement when enforced budgets forbid it", async () => {
+    renderHome(false, false, {
+      organization_managed: true,
+      user_budget_available: true,
+      rotation_available: false,
+    });
+    expect(await screen.findByText(/it can't be replaced here/)).toBeVisible();
+    expect(
+      screen.queryByRole("button", {
+        name: /Regenerate key|Regeneration paused/,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
   it.each([false, true])(
     "does not offer key creation when listing keys fails (cached empty: %s)",
     async (cachedEmpty) => {

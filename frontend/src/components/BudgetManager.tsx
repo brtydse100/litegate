@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { BudgetGroup, BudgetView } from "../types/budgets";
 import EmailAddress from "./EmailAddress";
+import DismissibleMessage from "./DismissibleMessage";
 import { formatUsd } from "../formatUsd";
 
 const money = (value: number | null) =>
@@ -168,9 +169,13 @@ function BudgetGroupEditor({
         ))}
       </ul>
       {mutation.error && (
-        <p role="alert" className="text-sm text-red-600">
+        <DismissibleMessage
+          role="alert"
+          messageKey={mutation.error.message}
+          className="text-sm text-red-600"
+        >
           {mutation.error.message}
-        </p>
+        </DismissibleMessage>
       )}
     </article>
   );

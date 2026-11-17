@@ -6,6 +6,7 @@ import { useOperationLimit } from "../hooks/useOperationLimit";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import EmailAddress from "./EmailAddress";
 import PeopleDirectory from "./PeopleDirectory";
+import DismissibleMessage from "./DismissibleMessage";
 
 const inputClass =
   "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
@@ -150,14 +151,21 @@ export default function AdminUsers({
       </div>
 
       {error && (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <DismissibleMessage
+          role="alert"
+          messageKey={(error as Error).message}
+          className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+        >
           {(error as Error).message}
-        </p>
+        </DismissibleMessage>
       )}
       {operationsBlocked && (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <DismissibleMessage
+          messageKey="account-actions-paused"
+          className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+        >
           Account actions are paused. Try again in {retryAfter || 1} seconds.
-        </p>
+        </DismissibleMessage>
       )}
 
       <form

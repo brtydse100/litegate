@@ -32,7 +32,9 @@ it("does not offer to copy a hash when no stored secret exists", () => {
   render(
     <PersonalKeySecret identifier="hashed-identifier" canReveal={false} />,
   );
-  expect(screen.getByText("Original key unavailable")).toBeVisible();
+  expect(
+    screen.getByText(/LiteGate has no saved copy of this key to show/),
+  ).toBeVisible();
   expect(
     screen.queryByRole("button", { name: "Copy API key" }),
   ).not.toBeInTheDocument();

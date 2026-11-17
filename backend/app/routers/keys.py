@@ -6,7 +6,7 @@ from app.dependencies import get_current_user
 from app.models import CurrentUser, KeyCreateResponse, KeyDeleteRequest
 from app.rate_limit import check_key_rate_limit, key_rate_limit_status
 from app.services import litellm as llm
-from app.services import audit, budget_key_guards, key_secrets, key_spend, organization_sync
+from app.services import audit, budget_key_guards, key_secrets, key_spend, organization_personal, organization_sync
 
 router = APIRouter(prefix="/keys", tags=["keys"])
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/keys", tags=["keys"])
 @router.get("")
 async def list_keys(current_user: CurrentUser = Depends(get_current_user)):
     keys = await key_spend.current_keys(current_user.user_id)
-    policy = await organization_sync.personal_policy(current_user, keys)
+    policy = await organization_personal.personal_policy(current_user, keys)
     if policy:
         keys = [
             {
@@ -25,9 +25,14 @@ async def list_keys(current_user: CurrentUser = Depends(get_current_user)):
                 "user_budget_available": policy["budget_available"] and "max_budget" in key and "budget_duration" in key,
                 "organization_path": policy["path"],
                 "policy_error": policy["sync_error"],
+                "policy_notice": policy["notice"],
             }
             for key in keys
         ]
+    # Enforced organization budgets forbid replacing a managed key; say so up front
+    # instead of offering an action the backend rejects.
+    enforced = settings.hierarchical_budgets_enforced
+    keys = [{**key, "rotation_available": not (enforced and settings.organization_hierarchy.is_managed_team(key.get("team_id")))} for key in keys]
     return {"keys": await asyncio.to_thread(key_secrets.annotate, keys)}
 
 

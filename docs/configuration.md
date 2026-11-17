@@ -279,7 +279,10 @@ When enabled, **Show API key** replaces **Regenerate key** for keys with a store
 copy. Owners can reveal their own keys, and administrators can reveal keys from
 the installation key list. Keys created before enabling storage, or outside
 LiteGate, have no recoverable copy; owners must regenerate them once to save a
-replacement. Revealing a key does not rotate it or reset its spend.
+replacement. Revealing a key does not rotate it or reset its spend. While
+enforced organization budgets apply (`hierarchical_budgets_enforced`), a managed
+key cannot be replaced, so the page explains this instead of offering
+**Regenerate key**; the existing key keeps working.
 
 Stored secrets are plaintext, so the database, its volume, and its backups contain
 usable credentials. Keep the existing persistent volume and restrict access to
