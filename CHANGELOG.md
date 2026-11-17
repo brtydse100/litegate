@@ -7,12 +7,35 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.20.0] - 2026-11-17
+
 ### Added
 
 - Opt-in enforced equal budget splits (`HIERARCHICAL_BUDGETS_ENFORCED`): each
   group's `groupTotal` is divided equally among members who signed in or hold a
   key, recalculated when someone joins, with `perUser` as a ceiling and
   Budget planning overrides and envelopes applied to key caps.
+
+### Fixed
+
+- Collect current managed-key spend before pinning allocations; verify required
+  cap decreases before permitting increases. Failed reads, decreases or group
+  transfers retain existing controls instead of releasing unverified capacity.
+- Refresh spend floors after restarts and period resets, including deficits with
+  unchanged allocation totals. Register first-time provisioning before pinning;
+  keep a disappearing membership from aborting other users' synchronization.
+- Verify incomplete key source metadata through key-info before budget writes;
+  distinguish missing team information from an explicitly unassigned key.
+
+### Upgrade Notes
+
+- Enforcement defaults off. Enabled managed accounts currently support one key:
+  additional keys, overlapping rotation, deletion and manual spend resets are
+  blocked until aggregate accounting can preserve their allowance safely.
+- Enforced allocations remain eventual per-key caps with separate reset periods,
+  not strict atomic group limits. Managed transfers require operator review;
+  automatic removed-group deletion remains unavailable. See the
+  [governance guide](docs/governance-and-analytics.md#enforced-equal-splits).
 
 ## [2.19.0] - 2026-11-17
 
@@ -535,7 +558,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.19.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.20.0...HEAD
+[2.20.0]: https://github.com/brtydse100/litegate/compare/v2.19.0...v2.20.0
 [2.19.0]: https://github.com/brtydse100/litegate/compare/v2.18.0...v2.19.0
 [2.18.0]: https://github.com/brtydse100/litegate/compare/v2.17.0...v2.18.0
 [2.17.0]: https://github.com/brtydse100/litegate/compare/v2.16.0...v2.17.0

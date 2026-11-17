@@ -7,6 +7,7 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.20.0](v2.20.0.md) | Opt-in equal budget splits, verified cap decreases, and accounting safeguards |
 | [2.19.0](v2.19.0.md) | Personal analytics, scoped Organization access, People directory, reliable SQLite startup, and budget proposals |
 | [2.18.0](v2.18.0.md) | Per-model key budgets, discovered Advanced policy fields, and progressive organization loading |
 | [2.17.0](v2.17.0.md) | Independent portal messages, shared login logo, single key action, Docker hierarchy guides, and repaired nightly E2E |
