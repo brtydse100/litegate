@@ -31,5 +31,6 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Claude Code
-.claude/
+# Claude Code (project skills are shared)
+.claude/*
+!.claude/skills/

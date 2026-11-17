@@ -120,6 +120,8 @@ is available.
 
 ## Release notes and publication
 
+- To cut a release, follow the `release` skill in
+  [.claude/skills/release/SKILL.md](.claude/skills/release/SKILL.md).
 - Every PR must have an immutable preview Git tag and published Docker image
   named `test-pr-<PR number>-<short commit SHA>` before merge. Commit and push
   all PR changes first, then tag the final validated PR head, push the tag, and
