@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from app.config import settings
 from app.models import CurrentUser
 from app.organization import MembershipConflict, OrganizationNode
-from app.services import audit, key_cleanup, key_spend, litellm, organization_key_policy as key_policy
+from app.services import audit, budget_enforcement, key_cleanup, key_spend, litellm, organization_key_policy as key_policy
 from app.services import organization_client as upstream, organization_store as store, organization_discovery as discovery
 
 _logger = logging.getLogger(__name__)
@@ -36,7 +36,8 @@ def resolve(user_id: str, groups: list[str], *, email: str = "", source: str = "
 def resolve_identity(identity: dict) -> OrganizationNode | None:
     if identity["auth_source"] == "configured_email" and identity.get("sync_error"):
         raise HTTPException(status_code=409, detail=identity["sync_error"])
-    return resolve(identity["user_id"], identity["groups"], email=identity["email"], source=identity["auth_source"])
+    node = resolve(identity["user_id"], identity["groups"], email=identity["email"], source=identity["auth_source"])
+    return budget_enforcement.allowance(node, identity["user_id"]) if node else node
 
 
 def policy(node: OrganizationNode) -> dict:
@@ -54,6 +55,8 @@ async def record_identity(user_id: str, email: str, source: str, groups: list[st
             node = resolve(user_id, groups, email=email, source=source)
             if node is not None or previous:
                 await asyncio.to_thread(store.remember, user_id, email, source, groups)
+            if node is not None:
+                await asyncio.to_thread(budget_enforcement.mark_participant, user_id)
             if node is None and previous:
                 raise HTTPException(status_code=403, detail="Your managed organization mapping was removed; contact an administrator")
         except HTTPException as exc:
@@ -100,10 +103,13 @@ async def synchronize(identity: dict) -> OrganizationNode:
 
 
 async def sync_identity(identity: dict, info: dict, *, defer_finalization: bool = False) -> OrganizationNode:
+    existing = await litellm.list_user_keys(identity["user_id"])
+    # Key holders count toward equal splits; record them before resolving the
+    # enforced allowance so an existing key is never capped as a non-member.
+    await budget_enforcement.observe(identity["user_id"], existing)
     node = resolve_identity(identity)
     if node is None:
         raise HTTPException(status_code=409, detail="Organization mapping was removed; review the user's keys before changing membership")
-    existing = await litellm.list_user_keys(identity["user_id"])
     ancestor_teams = {
         ancestor.team_id for ancestor in settings.organization_hierarchy.nodes.values() if node.path[: len(ancestor.path)] == ancestor.path
     }
@@ -163,6 +169,7 @@ async def generate_key(user_id: str, email: str, team_id: str | None, **options)
 
 async def _generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
     """Generate while the caller holds the owner's operation lock."""
+    await asyncio.to_thread(budget_enforcement.mark_participant, user_id)
     node = await prepare_user(user_id, email)
     if node is None:
         return await litellm.generate_key(user_id, email, team_id, **options)
@@ -248,6 +255,7 @@ async def reconcile() -> None:
                 _logger.warning("Organization root %s synchronization failed: %s", root.team_id, exc.detail)
 
     await asyncio.gather(*(prepare_root(root) for root in settings.organization_hierarchy.nodes.values()))
+    await budget_enforcement.observe_all([identity["user_id"] for identity in identities if identity["user_id"] not in blocked], semaphore)
 
     async def sync_one(user_id: str):
         async with semaphore, lock_for("user", user_id):

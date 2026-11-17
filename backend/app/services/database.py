@@ -99,8 +99,19 @@ def _analytics_failures(db: sqlite3.Connection) -> None:
     analytics_store.create_failure_table(db)
 
 
+def _organization_participants(db: sqlite3.Connection) -> None:
+    from app.services import budget_enforcement
+
+    budget_enforcement.create_table(db)
+    # Users who already signed in count toward equal budget splits.
+    db.execute(
+        """INSERT OR IGNORE INTO organization_participants
+        SELECT user_id, updated_at FROM organization_identities WHERE auth_source IN ('sso', 'local')"""
+    )
+
+
 # Append migrations in order; each callable receives the same reserved transaction.
-MIGRATIONS = (_existing_stores, _analytics_store, _budget_store, _analytics_failures)
+MIGRATIONS = (_existing_stores, _analytics_store, _budget_store, _analytics_failures, _organization_participants)
 
 
 def _enable_wal(db: sqlite3.Connection, deadline: float) -> None:

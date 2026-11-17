@@ -1,0 +1,146 @@
+"""Enforced equal groupTotal splits among signed-in members, applied to key caps."""
+
+from unittest.mock import AsyncMock
+
+import pytest
+
+from app.config import settings
+from app.organization import OrganizationHierarchy
+from app.services import budget_enforcement as enforcement, budget_store, litellm, organization_key_policy as key_policy
+from app.services import organization_store as store, organization_sync as sync
+
+
+def tree(team_budget: dict) -> OrganizationHierarchy:
+    return OrganizationHierarchy.model_validate(
+        {
+            "levels": [
+                {
+                    "name": "Department",
+                    "groups": [
+                        {
+                            "members": [
+                                {"name": "Engineering", "litellmTeamId": "eng", "userIds": ["ann", "ben", "cat"], "budget": team_budget},
+                                {"name": "Sales", "litellmTeamId": "sales", "userIds": ["dan"], "budget": {"perUser": 7}},
+                            ]
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+
+@pytest.fixture
+def org(monkeypatch):
+    def configure(team_budget=None, *, enforced=True):
+        hierarchy = tree(team_budget or {"groupTotal": 90})
+        monkeypatch.setattr(settings, "organization_hierarchy", hierarchy)
+        monkeypatch.setattr(settings, "hierarchical_budgets_enforced", enforced)
+        for user in ("ann", "ben", "cat", "dan"):
+            store.remember(user, f"{user}@example.invalid", "explicit", [])
+        return hierarchy
+
+    monkeypatch.setattr(enforcement, "_spent", {})
+    monkeypatch.setattr(enforcement, "_primed", False)
+    enforcement.invalidate()
+    yield configure
+    enforcement.invalidate()
+
+
+def cap(user: str) -> float | None:
+    return sync.resolve_identity(store.get(user)).per_user
+
+
+def join(*users: str) -> None:
+    for user in users:
+        enforcement.mark_participant(user)
+
+
+def test_total_is_split_equally_among_signed_in_members_and_updates_on_join(org):
+    org()
+    join("ann", "ben")
+    # cat never signed in: nothing is reserved for her.
+    assert (cap("ann"), cap("ben"), cap("cat")) == (45, 45, 0)
+    join("cat")
+    assert (cap("ann"), cap("ben"), cap("cat")) == (30, 30, 30)
+    assert key_policy.key_policy(sync.resolve_identity(store.get("ann")))["max_budget"] == 30
+
+
+def test_per_user_is_a_ceiling_and_unbudgeted_groups_keep_it(org):
+    org({"groupTotal": 90, "perUser": 20})
+    join("ann", "ben", "dan")
+    assert (cap("ann"), cap("ben")) == (20, 20)
+    assert cap("dan") == 7
+
+
+def test_disabled_enforcement_keeps_fixed_per_user(org):
+    org({"groupTotal": 90, "perUser": 20}, enforced=False)
+    join("ann", "ben")
+    assert cap("ann") == 20
+
+
+def test_consumed_spend_is_never_reclaimed_by_a_new_member(org):
+    org()
+    join("ann", "ben")
+    enforcement.observe_spend("ann", 80.0000001)
+    enforcement.invalidate()
+    # ann already spent more than an equal share; ben gets only what remains.
+    assert (cap("ann"), cap("ben")) == (80.000001, 9.999999)
+
+
+def test_planning_page_override_and_envelope_are_enforced(org):
+    hierarchy = org()
+    join("ann", "ben", "cat")
+    engineering = next(node for node in hierarchy.nodes.values() if node.team_id == "eng")
+    budget_store.edit(0, lambda state: state.update(envelopes={engineering.id: 120_000_000}, overrides={"ann": 60_000_000}))
+    enforcement.invalidate()
+    assert (cap("ann"), cap("ben"), cap("cat")) == (60, 30, 30)
+
+
+@pytest.mark.asyncio
+async def test_existing_key_holder_joins_the_split_before_their_key_is_capped(org, monkeypatch):
+    org()
+    join("ann")
+    applied = {}
+
+    async def apply(node, key):
+        applied[key["token"]] = node.per_user
+
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[{"token": "ben-key", "spend": 5}]))
+    monkeypatch.setattr(key_policy, "guard_ancestor_restrictions", AsyncMock())
+    monkeypatch.setattr(key_policy, "apply_key", apply)
+    monkeypatch.setattr(litellm, "add_team_member", AsyncMock())
+    monkeypatch.setattr(sync.upstream, "team_info", AsyncMock(return_value={}))
+    monkeypatch.setattr(sync.upstream, "membership", lambda info, user: {"user_id": user})
+    await sync.sync_identity(store.get("ben"), {}, defer_finalization=True)
+    # ben was never marked, but holding a key makes him a participant first.
+    assert applied == {"ben-key": 45}
+    assert "ben" in enforcement.participants()
+
+
+@pytest.mark.asyncio
+async def test_only_the_first_pass_lists_every_members_keys(org, monkeypatch):
+    import asyncio
+
+    org()
+    listing = AsyncMock(return_value=[{"token": "k", "spend": 3}])
+    monkeypatch.setattr(litellm, "list_user_keys", listing)
+    users = ["ann", "ben", "cat"]
+    await enforcement.observe_all(users, asyncio.Semaphore(5))
+    assert listing.await_count == 3
+    assert enforcement.participants() >= set(users)
+    await enforcement.observe_all(users, asyncio.Semaphore(5))
+    await enforcement.observe_all(users, asyncio.Semaphore(5))
+    # Later passes rely on the regular sync's own listing: no extra requests.
+    assert listing.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_disabled_enforcement_makes_no_extra_requests(org, monkeypatch):
+    import asyncio
+
+    org(enforced=False)
+    listing = AsyncMock(return_value=[])
+    monkeypatch.setattr(litellm, "list_user_keys", listing)
+    await enforcement.observe_all(["ann"], asyncio.Semaphore(5))
+    listing.assert_not_awaited()

@@ -7,6 +7,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Opt-in enforced equal budget splits (`HIERARCHICAL_BUDGETS_ENFORCED`): each
+  group's `groupTotal` is divided equally among members who signed in or hold a
+  key, recalculated when someone joins, with `perUser` as a ceiling and
+  Budget planning overrides and envelopes applied to key caps.
+
 ## [2.19.0] - 2026-11-17
 
 ### Added

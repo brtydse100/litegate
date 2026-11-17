@@ -181,3 +181,17 @@ def test_preversioning_upgrade_preserves_reservations_and_saved_keys(database_pa
         "candidate_id": "candidate",
     }
     assert local_users.healthcheck()["ok"]
+
+
+def test_participant_migration_counts_previously_signed_in_users_only(database_path, monkeypatch):
+    from app.services import budget_enforcement, database
+
+    # Simulate an install upgraded from the release before participants existed.
+    with monkeypatch.context() as patch:
+        patch.setattr(database, "MIGRATIONS", database.MIGRATIONS[:-1])
+        database.initialize()
+    organization_store.remember("signed-in", "a@example.invalid", "sso", [])
+    organization_store.remember("local-user", "b@example.invalid", "local", [])
+    organization_store.remember("discovered", "c@example.invalid", "configured_email", [])
+    database.initialize()
+    assert budget_enforcement.participants() == {"signed-in", "local-user"}

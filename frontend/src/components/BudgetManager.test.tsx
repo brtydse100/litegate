@@ -262,3 +262,22 @@ it("keeps unsaved drafts in other groups when one group is saved", async () => {
   );
   expect(screen.getByLabelText("Platform assigned budget")).toHaveValue(3);
 });
+
+it("shows the enforced banner and fixed per-user allowances when enforcement is on", async () => {
+  const enforced = view();
+  enforced.applied = true;
+  enforced.mode = "enforced";
+  enforced.groups[0].users[0] = {
+    ...enforced.groups[0].users[0],
+    mode: "fixed",
+    allocation: 7,
+  };
+  setup(enforced);
+  expect(
+    await screen.findByText(/Enforced: these allowances/),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Fixed per-user: $7.000000")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Activate budget enforcement" }),
+  ).not.toBeInTheDocument();
+});

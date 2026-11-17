@@ -628,13 +628,17 @@ LiteGate limits remain enforced.
 These routes require `hierarchical_budgets_enabled` and Organization scope:
 
 - `GET /api/v1/organization/budgets`: revisioned scoped allocations and native
-  capability limitations. Current mode is `preview`, with `applied: false`.
+  capability limitations. `mode` is `preview` with `applied: false`, or
+  `enforced` with `applied: true` when `hierarchical_budgets_enforced` is set.
+  Each user's `mode` is `automatic`, `manual`, or `fixed` (an unbudgeted group's
+  `perUser`); `allocation` is the cap enforcement applies. Only members who
+  signed in or hold a key are listed.
 - `PATCH /api/v1/organization/budgets/groups/{id}`: `{revision, amount}` assigns
   a child envelope; only a parent-scope or system administrator can edit a root.
 - `PATCH /api/v1/organization/budgets/groups/{id}/users/{user_id}`:
   `{revision, amount}` sets a manual direct-user override. Null restores auto.
 - `POST /api/v1/organization/budgets/activate`: `{revision}` is system-admin
-  only and currently returns 503; no inference policy is activated.
+  only and currently returns 503. Enforcement is enabled by configuration.
 
 Amounts have at most six decimal places. Conflicting revisions/over-allocation
 return 409. A delegate cannot increase their own personal allocation indirectly.

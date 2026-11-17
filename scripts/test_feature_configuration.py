@@ -41,6 +41,11 @@ FIELDS = {
         "HIERARCHICAL_BUDGETS_ENABLED",
         False,
     ),
+    "hierarchicalBudgetsEnforced": (
+        "hierarchical_budgets_enforced",
+        "HIERARCHICAL_BUDGETS_ENFORCED",
+        False,
+    ),
 }
 
 
@@ -76,6 +81,7 @@ class FeatureConfiguration(unittest.TestCase):
             "analyticsRetentionDays": 366,
             "analyticsBatchConcurrency": 20,
             "hierarchicalBudgetsEnabled": True,
+            "hierarchicalBudgetsEnforced": True,
         }
         with tempfile.TemporaryDirectory() as directory:
             values = Path(directory) / "values.json"
@@ -106,6 +112,7 @@ class FeatureConfiguration(unittest.TestCase):
             ("analyticsEnabled", "true"),
             ("organizationCleanupEnabled", "false"),
             ("hierarchicalBudgetsEnabled", "true"),
+            ("hierarchicalBudgetsEnforced", "true"),
             ("organizationAccessDesignations", {"alice": "engineering"}),
             ("organizationGroupAdmins", {"engineering": [1]}),
         ]

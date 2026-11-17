@@ -178,8 +178,11 @@ config:
   analyticsEnabled: true
   analyticsRetentionDays: 90
   analyticsBatchConcurrency: 5
-  # Opt-in budget proposals only; activation currently returns 503.
+  # Opt-in Budget planning page (proposals).
   hierarchicalBudgetsEnabled: false
+  # Opt-in enforcement: split each group's groupTotal equally among signed-in
+  # members (perUser stays a ceiling) and apply planning-page values to keys.
+  hierarchicalBudgetsEnforced: false
   # Uncomment only the limits LiteGate should apply.
   # keyMaxBudget: "10.0"
   # keyBudgetDuration: "30d"
