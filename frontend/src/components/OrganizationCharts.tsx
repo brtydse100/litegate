@@ -61,7 +61,7 @@ export function SpendTrend({
               className="text-slate-500"
             >
               {max * ratio >= 1000
-                ? `${metric === "spend" ? "$" : ""}${(max * ratio).toLocaleString(undefined, { notation: "compact", maximumFractionDigits: 6 })}`
+                ? `${metric === "spend" ? "$" : ""}${(max * ratio).toLocaleString(undefined, { notation: "compact", minimumFractionDigits: metric === "spend" ? 2 : 0, maximumFractionDigits: metric === "spend" ? 2 : 6 })}`
                 : metricValue(max * ratio, metric)}
             </text>
           </g>

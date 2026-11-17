@@ -1,9 +1,7 @@
-/** Keep small usage charges visible without rounding nonzero values to zero. */
+/** Round currency for display only; retain full precision in data and edits. */
 export function formatUsd(value: number): string {
-  if (value !== 0 && Math.abs(value) < 0.0000000001)
-    return `$${value.toExponential(3)}`;
-  return `$${value.toLocaleString(undefined, {
-    minimumFractionDigits: 6,
-    maximumFractionDigits: 10,
+  return `${value < 0 ? "-" : ""}$${Math.abs(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })}`;
 }

@@ -32,6 +32,7 @@ import BudgetManager from "../components/BudgetManager";
 import AdminOrganization from "../components/AdminOrganization";
 import ThemeToggle from "../components/ThemeToggle";
 import { api } from "../api/client";
+import { formatUsd } from "../formatUsd";
 import { useAuth } from "../hooks/useAuth";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import type { KeyInfo } from "../types";
@@ -163,7 +164,7 @@ function KeyCard({
                 <dd className="mt-1 font-semibold text-slate-950">
                   {managed && !budgetAvailable
                     ? "Unavailable"
-                    : `$${(keyInfo.user_spend ?? keyInfo.spend).toFixed(6)}`}
+                    : formatUsd(keyInfo.user_spend ?? keyInfo.spend)}
                 </dd>
               </div>
               <div className="px-5 py-4">

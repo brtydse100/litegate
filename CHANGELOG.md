@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Display currency with two decimal places across spend, analytics, charts and
+  allocation summaries, preserving stored amounts and precise numeric edits.
+- Clarify assigned team totals as read-only for delegated team administrators;
+  distinguish child allocations and retain backend authority checks, with direct
+  API regressions for redistribution within the parent's existing allowance.
+
 ## [2.20.0] - 2026-11-17
 
 ### Added

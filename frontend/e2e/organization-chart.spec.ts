@@ -42,7 +42,7 @@ test("@smoke microspend axis labels fit inside the chart", async ({ page }) => {
     }),
   );
   expect(bounds).toHaveLength(3);
-  expect(bounds.map((label) => label.text)).toContain("$0.000001");
+  expect(bounds.map((label) => label.text)).toContain("$0.00");
   for (const label of bounds) expect(label.left).toBeGreaterThanOrEqual(0);
 });
 

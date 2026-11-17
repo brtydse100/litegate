@@ -22,7 +22,7 @@ test("organization demo filters usage and protects the admin view", async ({
     .click();
   await navigation.getByRole("button", { name: /^Platform,/ }).click();
   const policy = page.getByRole("region", { name: "Effective budget policy" });
-  await expect(policy.getByText("$100.000000", { exact: false })).toBeVisible();
+  await expect(policy.getByText("$100.00", { exact: false })).toBeVisible();
   await expect(policy.getByText("Platform tracking target")).toBeVisible();
   await expect(page.getByText("sam@example.com", { exact: true })).toHaveCount(
     0,
@@ -37,21 +37,19 @@ test("organization demo filters usage and protects the admin view", async ({
   await expect(
     navigation.getByRole("button", { name: /^Platform,/ }),
   ).toHaveCount(0);
-  await expect(policy.getByText("$100.000000", { exact: false })).toBeVisible();
+  await expect(policy.getByText("$100.00", { exact: false })).toBeVisible();
   await navigation
     .getByRole("button", { name: "Expand Engineering", exact: true })
     .click();
   await navigation.getByRole("button", { name: /^Cloud,/ }).click();
   await expect(page.getByText("Inherited from Engineering")).toBeVisible();
-  await expect(policy.getByText("$50.000000", { exact: false })).toBeVisible();
+  await expect(policy.getByText("$50.00", { exact: false })).toBeVisible();
   await page.getByLabel("Chart metric").selectOption("spend");
   const memberChart = page
     .getByRole("heading", { name: "Usage by member" })
     .locator("..");
   await expect(memberChart.getByText("priya@example.com")).toBeVisible();
-  await expect(
-    memberChart.getByText("$29.930000", { exact: true }),
-  ).toBeVisible();
+  await expect(memberChart.getByText("$29.93", { exact: true })).toBeVisible();
   await expect(memberChart.getByText("Direct members")).toHaveCount(0);
   await page.getByRole("button", { name: "View demo as user" }).click();
   await expect(page).toHaveURL(/\/my-key$/);
@@ -91,7 +89,7 @@ test("interactive demo keeps its key views consistent and supports local sign-in
   ).toBeVisible();
   await expect(page.getByText("sk-litega....4d8e")).toBeVisible();
   await expect(page.getByText("sk-litega....7f3a")).toHaveCount(0);
-  await expect(page.getByText("$18.420000 spent")).toBeVisible();
+  await expect(page.getByText("$18.42 spent")).toBeVisible();
   await page.getByLabel("Select alex-primary").check({ force: true });
   await page.getByLabel("Select product-research").check({ force: true });
   await page.getByRole("button", { name: "Reset spend for 2 keys" }).click();
@@ -100,7 +98,7 @@ test("interactive demo keeps its key views consistent and supports local sign-in
   ).toBeVisible();
   await page.getByRole("button", { name: "Reset spend to zero" }).click();
   await expect(page.getByText("2 reset, 0 failed.")).toBeVisible();
-  await expect(page.getByText("$0.000000 spent")).toHaveCount(2);
+  await expect(page.getByText("$0.00 spent")).toHaveCount(2);
 
   await page.getByRole("button", { name: "View demo as user" }).click();
   await expect(page).toHaveURL(/\/litegate\/my-key$/);

@@ -3,9 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { BudgetGroup, BudgetView } from "../types/budgets";
 import EmailAddress from "./EmailAddress";
+import { formatUsd } from "../formatUsd";
 
 const money = (value: number | null) =>
-  value === null ? "Unavailable" : `$${value.toFixed(6)}`;
+  value === null ? "Unavailable" : formatUsd(value);
 const inputClass =
   "w-32 rounded border border-slate-300 bg-white p-2 text-sm text-slate-900";
 
@@ -77,9 +78,9 @@ function BudgetGroupEditor({
           className="flex flex-wrap items-end gap-2"
         >
           <label className="text-xs text-slate-600">
-            Assigned budget
+            {group.parent_id ? "Child allocation" : "Assigned budget"}
             <input
-              aria-label={`${group.name} assigned budget`}
+              aria-label={`${group.name} ${group.parent_id ? "child allocation" : "assigned budget"}`}
               className={`${inputClass} ml-2`}
               value={envelopeValue}
               onChange={(event) => setEnvelope(event.target.value)}
@@ -98,7 +99,8 @@ function BudgetGroupEditor({
         </form>
       ) : (
         <p className="text-xs text-slate-500">
-          A parent or system administrator assigns this group's budget.
+          This assigned total is read-only. Redistribute it among members and
+          child teams below. A parent or system administrator assigns the total.
         </p>
       )}
       <ul className="space-y-3">
