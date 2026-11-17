@@ -2,7 +2,7 @@ import { render, cleanup, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { SpendTrend, UsageBars, metricValue } from "./OrganizationCharts";
 afterEach(cleanup);
-it.each([0.000001, 0.000002, 0.0024, 0.02, 0.04, 0.99, 1, 1234, 123456789])(
+it.each([0.02, 0.04, 0.99, 1, 1234, 123456789])(
   "distinguishes ticks at scale %s",
   (spend) => {
     const { container } = render(
@@ -19,11 +19,29 @@ it.each([0.000001, 0.000002, 0.0024, 0.02, 0.04, 0.99, 1, 1234, 123456789])(
     expect(labels[2]).not.toMatch(/^\$0(?:\.0+)?$/);
   },
 );
-it("shows microspend precisely in accessible values", () => {
-  expect(metricValue(0.000001, "spend")).toBe("$0.000001");
-  expect(metricValue(0.0000000123, "spend")).toBe("$0.0000000123");
-  expect(metricValue(0, "spend")).toBe("$0.000000");
-  expect(metricValue(1e-12, "spend")).not.toBe("$0.000000");
+it("rounds sub-cent spend to two decimals for display", () => {
+  expect(metricValue(0.000001, "spend")).toBe("$0.00");
+  expect(metricValue(0.0000000123, "spend")).toBe("$0.00");
+  expect(metricValue(0, "spend")).toBe("$0.00");
+  expect(metricValue(1e-12, "spend")).toBe("$0.00");
+});
+it("keeps sub-cent chart proportions while rounding only their labels", () => {
+  const { container } = render(
+    <UsageBars
+      title="Small charges"
+      metric="spend"
+      values={[
+        { name: "A", spend: 0.00000002, tokens: 2, requests: 2 },
+        { name: "B", spend: 0.00000001, tokens: 1, requests: 1 },
+      ]}
+    />,
+  );
+  expect(screen.getAllByText("$0.00")).toHaveLength(2);
+  expect(
+    [...container.querySelectorAll("[style]")].map((el) =>
+      el.getAttribute("style"),
+    ),
+  ).toEqual(["width: 100%;", "width: 50%;"]);
 });
 it.each(["spend", "tokens", "requests"] as const)(
   "scales %s bars to actual maximum",

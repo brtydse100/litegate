@@ -108,6 +108,12 @@ it("shows automatic allocations and prevents edits to the administered root enve
     screen.queryByRole("button", { name: "Save Engineering budget" }),
   ).not.toBeInTheDocument();
   expect(
+    screen.queryByLabelText("Engineering assigned budget"),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/This assigned total is read-only/),
+  ).toBeInTheDocument();
+  expect(
     screen.getByRole("button", { name: "Activate budget enforcement" }),
   ).toBeDisabled();
 });
@@ -163,9 +169,7 @@ it("keeps zero as a manual override and sends null when restoring automatic allo
     { target: { value: "0" } },
   );
   fireEvent.click(screen.getByRole("button", { name: "Save user budget" }));
-  expect(
-    await screen.findByText("Manual override: $0.000000"),
-  ).toBeInTheDocument();
+  expect(await screen.findByText("Manual override: $0.00")).toBeInTheDocument();
   expect(
     screen.getByLabelText("Budget override for alice@example.invalid"),
   ).toHaveValue(0);
@@ -183,7 +187,7 @@ it("keeps zero as a manual override and sends null when restoring automatic allo
       null,
     ),
   );
-  expect(await screen.findByText("Automatic: $10.000000")).toBeInTheDocument();
+  expect(await screen.findByText("Automatic: $10.00")).toBeInTheDocument();
   expect(
     screen.getByLabelText("Budget override for alice@example.invalid"),
   ).toHaveValue(null);
@@ -205,7 +209,7 @@ it("retains an unsuccessful draft and reports an allocation conflict", async () 
   expect(
     screen.getByLabelText("Budget override for alice@example.invalid"),
   ).toHaveValue(11);
-  expect(screen.getByText("Automatic: $10.000000")).toBeInTheDocument();
+  expect(screen.getByText("Automatic: $10.00")).toBeInTheDocument();
 });
 
 it("reloads current budgets after a conflict so the draft can be saved again", async () => {
@@ -237,6 +241,7 @@ it("keeps unsaved drafts in other groups when one group is saved", async () => {
   initial.groups.push({
     ...initial.groups[0],
     id: "child",
+    parent_id: "root",
     name: "Platform",
     path: ["Engineering", "Platform"],
     can_edit_envelope: true,
@@ -246,7 +251,7 @@ it("keeps unsaved drafts in other groups when one group is saved", async () => {
   saved.revision = 5;
   vi.mocked(api.setUserBudget).mockResolvedValue(saved);
   setup(initial);
-  fireEvent.change(await screen.findByLabelText("Platform assigned budget"), {
+  fireEvent.change(await screen.findByLabelText("Platform child allocation"), {
     target: { value: "3" },
   });
   fireEvent.change(
@@ -260,7 +265,7 @@ it("keeps unsaved drafts in other groups when one group is saved", async () => {
       screen.getByLabelText("Budget override for alice@example.invalid"),
     ).toHaveValue(null),
   );
-  expect(screen.getByLabelText("Platform assigned budget")).toHaveValue(3);
+  expect(screen.getByLabelText("Platform child allocation")).toHaveValue(3);
 });
 
 it("shows the enforced banner and fixed per-user allowances when enforcement is on", async () => {
@@ -276,7 +281,7 @@ it("shows the enforced banner and fixed per-user allowances when enforcement is 
   expect(
     await screen.findByText(/Enforced: these allowances/),
   ).toBeInTheDocument();
-  expect(screen.getByText("Fixed per-user: $7.000000")).toBeInTheDocument();
+  expect(screen.getByText("Fixed per-user: $7.00")).toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "Activate budget enforcement" }),
   ).not.toBeInTheDocument();

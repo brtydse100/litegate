@@ -135,7 +135,9 @@ async def edit_envelope(node_id: str, body: EnvelopeEdit, actor: ApiActor = Depe
     scope = await _scope(actor)
     node = _node(node_id, scope)
     if not _can_edit_envelope(node, scope):
-        raise HTTPException(403, "A parent or system administrator must assign this root envelope")
+        raise HTTPException(
+            403, "Only a parent or system administrator can change this team's assigned budget; redistribute it among members or child teams"
+        )
     amount = allocation.units(body.amount)
     state = await asyncio.to_thread(_edit, body.revision, actor, scope, lambda state, members: state["envelopes"].update({node_id: amount}))
     await record_audit(actor, "organization.budget_preview", node_id, details={"revision": state["revision"], "kind": "envelope"})

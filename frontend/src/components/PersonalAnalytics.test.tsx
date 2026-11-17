@@ -52,19 +52,19 @@ beforeEach(() => {
 });
 
 describe("personal analytics", () => {
-  it("preserves small prompt costs in totals, model rows and chart values", async () => {
+  it("displays small prompt costs with two decimals in totals, model rows and chart values", async () => {
     const data = snapshot();
     data.totals.cost = 0.0000000123;
     data.daily[0].cost = data.totals.cost;
     data.models[0].cost = data.totals.cost;
     vi.mocked(api.personalAnalytics).mockResolvedValue(data);
     setup();
-    expect(await screen.findAllByText("$0.0000000123")).toHaveLength(2);
+    expect(await screen.findAllByText("$0.00")).toHaveLength(2);
     expect(
       screen
         .getByRole("img", { name: "Daily usage cost" })
         .querySelector("title"),
-    ).toHaveTextContent("$0.0000000123, 3 requests");
+    ).toHaveTextContent("$0.00, 3 requests");
   });
   it("shows personal metrics, freshness, model breakdown and unavailable tokens", async () => {
     setup();
@@ -99,9 +99,7 @@ describe("personal analytics", () => {
       await screen.findByText(/previous successful refresh/i),
     ).toBeInTheDocument();
     expect(screen.getByText("model-a")).toBeInTheDocument();
-    expect(
-      screen.getByText("$0.030000", { selector: "dd" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("$0.03", { selector: "dd" })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -156,10 +154,10 @@ describe("personal analytics", () => {
     });
     setup();
     expect(
-      await screen.findByText("Key 1: $8.000000 remaining of $10.000000 (1d)"),
+      await screen.findByText("Key 1: $8.00 remaining of $10.00 (1d)"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Key 2: $12.000000 remaining of $20.000000 (30d)"),
+      screen.getByText("Key 2: $12.00 remaining of $20.00 (30d)"),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Current allowance unavailable"),

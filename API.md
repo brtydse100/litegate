@@ -634,7 +634,9 @@ These routes require `hierarchical_budgets_enabled` and Organization scope:
   `perUser`); `allocation` is the cap enforcement applies. Only members who
   signed in or hold a key are listed.
 - `PATCH /api/v1/organization/budgets/groups/{id}`: `{revision, amount}` assigns
-  a child envelope; only a parent-scope or system administrator can edit a root.
+  a child allocation within its parent's existing budget. A team administrator
+  cannot change their own team's assigned total; only a parent-scope or system
+  administrator may assign that total. Direct requests to change it return 403.
 - `PATCH /api/v1/organization/budgets/groups/{id}/users/{user_id}`:
   `{revision, amount}` sets a manual direct-user override. Null restores auto.
 - `POST /api/v1/organization/budgets/activate`: `{revision}` is system-admin

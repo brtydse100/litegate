@@ -19,12 +19,12 @@ import {
 import AdminOrganization from "./AdminOrganization";
 import { metricValue } from "./OrganizationCharts";
 
-it("distinguishes sub-cent spend from zero while retaining normal currency precision", () => {
-  expect(metricValue(0.0024, "spend")).toBe("$0.002400");
-  expect(metricValue(0.000001, "spend")).toBe("$0.000001");
-  expect(metricValue(0, "spend")).toBe("$0.000000");
-  expect(metricValue(0.01, "spend")).toBe("$0.010000");
-  expect(metricValue(1.1, "spend")).toBe("$1.100000");
+it("uses two decimal places for ordinary and sub-cent spend", () => {
+  expect(metricValue(0.0024, "spend")).toBe("$0.00");
+  expect(metricValue(0.000001, "spend")).toBe("$0.00");
+  expect(metricValue(0, "spend")).toBe("$0.00");
+  expect(metricValue(0.01, "spend")).toBe("$0.01");
+  expect(metricValue(1.1, "spend")).toBe("$1.10");
 });
 
 vi.mock("../api/client", () => ({
@@ -179,7 +179,7 @@ describe("organization dashboard contracts", () => {
     const policy = await screen.findByRole("region", {
       name: "Effective budget policy",
     });
-    expect(within(policy).getByText("$100.000000")).toBeVisible();
+    expect(within(policy).getByText("$100.00")).toBeVisible();
     expect(within(policy).getByText("Platform tracking target")).toBeVisible();
     await waitFor(() =>
       expect(api.organizationUsage).toHaveBeenLastCalledWith(
@@ -208,7 +208,7 @@ describe("organization dashboard contracts", () => {
     expect(
       within(navigation).queryByRole("button", { name: "Platform, 1 user" }),
     ).not.toBeInTheDocument();
-    expect(within(policy).getByText("$100.000000")).toBeVisible();
+    expect(within(policy).getByText("$100.00")).toBeVisible();
     expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1);
   });
 
@@ -317,8 +317,8 @@ describe("organization dashboard contracts", () => {
     const chart = (
       await screen.findByRole("heading", { name: "Usage by Team" })
     ).closest("section")!;
-    expect(within(chart).getByText("$10.000000")).toBeVisible();
-    expect(within(chart).getByText("$5.000000")).toBeVisible();
+    expect(within(chart).getByText("$10.00")).toBeVisible();
+    expect(within(chart).getByText("$5.00")).toBeVisible();
     expect(within(chart).getAllByText("Direct members")).toHaveLength(2);
     fireEvent.click(
       within(chart).getByRole("button", { name: "Select Direct members" }),
@@ -348,7 +348,7 @@ describe("organization dashboard contracts", () => {
       await screen.findByRole("heading", { name: "Usage by member" })
     ).closest("section")!;
     expect(await within(chart).findByText("priya@example.com")).toBeVisible();
-    expect(within(chart).getByText("$29.930000")).toBeVisible();
+    expect(within(chart).getByText("$29.93")).toBeVisible();
     expect(within(chart).queryByText("Direct members")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Chart metric"), {
       target: { value: "requests" },
@@ -392,7 +392,7 @@ describe("organization dashboard contracts", () => {
     const chart = screen
       .getByRole("heading", { name: "Usage in this group" })
       .closest("section")!;
-    expect(within(chart).getByText("$29.930000")).toBeVisible();
+    expect(within(chart).getByText("$29.93")).toBeVisible();
     expect(
       screen.queryByRole("heading", { name: "Usage by member" }),
     ).not.toBeInTheDocument();

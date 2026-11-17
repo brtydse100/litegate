@@ -138,8 +138,9 @@ plaintext credentials.
 
 ## Budget planning and current enforcement boundary
 
-Usage spend displays use six to ten decimal places; amounts below that precision
-use scientific notation so a nonzero prompt cost is never displayed as zero.
+Currency displays use exactly two decimal places for readability. Sub-cent
+charges round to `$0.00` on screen; stored usage, allocation calculations and
+numeric editing retain their full precision.
 
 The opt-in budget page stores allocations. Without enforcement they are
 **proposals**; with `hierarchical_budgets_enforced` they cap members' keys (see
@@ -150,6 +151,10 @@ counted twice. Zero is a manual zero allocation; a blank override means automati
 Manual overrides persist across recalculation. Conflicting revision edits and
 over-allocation are rejected transactionally. Delegates cannot edit their scoped
 root envelope or raise their own personal allowance, including indirectly.
+Team administrators redistribute the team's existing allowance among members
+and child teams; redistribution cannot expand that team's assigned total.
+Only an authorized parent or system administrator changes the assigned total.
+The backend enforces this restriction even for direct API requests.
 
 Invalid legacy proposals remain visible with a group-specific allocation error.
 Automatic shares and allocation totals are unavailable until repaired; explicit
