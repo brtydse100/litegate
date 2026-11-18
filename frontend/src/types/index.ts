@@ -67,7 +67,6 @@ export interface KeyInfo {
   user_budget_available?: boolean;
   policy_error?: string | null;
   policy_notice?: string | null;
-  rotation_available?: boolean;
   user_spend?: number | null;
   organization_path?: string[];
   blocked?: boolean;

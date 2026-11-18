@@ -21,6 +21,23 @@ def guard_new_key(existing: list[dict]) -> None:
         raise HTTPException(409, "An enforced budget supports one key; additional keys and overlapping rotation require aggregate accounting")
 
 
+async def guard_rotation(user_id: str, existing: list[dict]) -> None:
+    """A managed member replaces their one key, into a team LiteGate can resolve."""
+    tree = settings.organization_hierarchy
+    if not any(tree.is_managed_team(key.get("team_id")) for key in existing):
+        return
+    guard_single_key(existing)
+    if await asyncio.to_thread(organization_store.get, user_id) is not None:
+        return
+    try:
+        configured = tree.resolve(user_id, [])
+    except MembershipConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    if configured is None:
+        # Group memberships arrive with sign-in (lost with a non-persistent database).
+        raise HTTPException(409, "Sign out and sign in again before replacing your key")
+
+
 async def guard_erase_key(key: str, info: dict | None = None) -> None:
     """Reject deletion/reset while consumed spend lives on a managed key."""
     if not settings.hierarchical_budgets_enforced:

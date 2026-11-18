@@ -55,8 +55,9 @@ async def _collect(identities):
                 if key["team_id"] is not None and (not isinstance(key["team_id"], str) or not key["team_id"].strip()):
                     raise HTTPException(502, "Cannot verify key source team; no budget changes applied")
                 key_spend.counter(key)  # Unknown spend must never become zero.
-                if settings.organization_hierarchy.is_managed_team(key.get("team_id")) and key["team_id"] != node.team_id:
-                    raise HTTPException(409, "Review managed group transfer before releasing the source allowance")
+                # A key still in a member's previous managed group is a transfer:
+                # spend floors follow the member, so the new group counts what was
+                # already used and sign-in or the next sync moves the key there.
                 verified_keys.append(key)
             await enforcement.observe(user_id, verified_keys)
             observations[user_id] = verified_keys

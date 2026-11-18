@@ -197,8 +197,14 @@ values on top.
   policy. Required decreases are verified before any increases; a failed read or
   decrease aborts the operation without raising caps.
 - Enforced accounts support **one key**. Multiple-key owners stop the operation
-  before existing controls are removed. Additional key creation and overlapping
-  rotation are rejected; administrators must review aggregate accounting first.
+  before existing controls are removed. Additional key creation is rejected.
+- Members replace their own key with **Regenerate key**. LiteGate first blocks the
+  old key, waits about 12 seconds for LiteLLM's batched spend writes, then creates
+  the replacement starting from that spend and deletes the old key. If any step
+  fails, the old key is unblocked and kept. A key left blocked by an interrupted
+  replacement (for example a restart) is unblocked at the member's next sign-in
+  or synchronization. After a restart that lost the database, the member must
+  sign in again before replacing the key.
 - Managed-key deletion, spend resets and Advanced spend edits are blocked while
   enforcement is on. An empty key roster retains observed consumed spend rather
   than treating deletion as a period reset. Direct upstream changes and loss of
@@ -206,9 +212,10 @@ values on top.
 - Each pass uses one fixed set of shares. A sign-in or budget edit during a pass
   applies on the next pass, about a minute later; it never caps a key at zero.
   A temporary synchronization error does not remove a member from the split.
-- A key still attached to a different managed group stops budget writes before
-  the source group's capacity can be released. An operator must review and
-  complete that transfer before reconciliation resumes. First-time provisioning
+- A member moved to another managed group keeps their key: sign-in or the next
+  synchronization moves it to the new group. Consumed spend follows the member,
+  so the new group counts it and the previous group's share is released to its
+  remaining members. First-time provisioning
   records the identity and participant under the same serialization lock before
   collecting spend. Deficit snapshots refresh their fallback spend floors even
   when allocation totals remain unchanged.

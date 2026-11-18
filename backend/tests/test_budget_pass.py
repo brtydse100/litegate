@@ -144,3 +144,28 @@ async def test_unavailable_spend_does_not_allow_policy_writes(org, monkeypatch):
     with pytest.raises(HTTPException, match="502"):
         await budget_pass.serialized(operation)()
     operation.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_moved_members_key_counts_its_spend_in_the_new_group(org, monkeypatch):
+    from app.services import budget_pass
+
+    org()
+    join("ann", "ben")
+    # ann's key is still in Sales, her previous group, with $50 already spent.
+    monkeypatch.setattr(
+        litellm,
+        "list_user_keys",
+        AsyncMock(
+            side_effect=lambda user: [{"token": "k", "user_id": "ann", "team_id": "sales", "spend": 50, "max_budget": 7}] if user == "ann" else []
+        ),
+    )
+    monkeypatch.setattr(litellm, "update_key", AsyncMock())
+
+    @budget_pass.serialized
+    async def operation():
+        return sync.resolve_identity(store.get("ann")).per_user, sync.resolve_identity(store.get("ben")).per_user
+
+    # The transfer no longer stops every budget write; Engineering's $90 keeps
+    # ann's consumed $50 and shares the rest.
+    assert await operation() == (50, 40)

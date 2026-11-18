@@ -52,13 +52,3 @@ async def test_a_removed_mapping_is_still_a_warning(monkeypatch):
     key = await key_status(monkeypatch, "engineering")
     assert key["policy_error"] == "Your organization mapping was removed; contact an administrator"
     assert key["policy_notice"] is None
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("enforced", [False, True])
-async def test_key_replacement_availability_matches_the_backend_guard(monkeypatch, enforced):
-    monkeypatch.setattr(settings, "hierarchical_budgets_enforced", enforced)
-    store.remember("u", "u@example.com", "sso", ["squad1"])
-    key = await key_status(monkeypatch, squad_team())
-    # Enforced budgets reject replacing a managed key, so the page must not offer it.
-    assert key["rotation_available"] is (not enforced)

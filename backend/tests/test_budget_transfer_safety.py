@@ -3,11 +3,10 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from fastapi import HTTPException
 
 from app.config import settings
 from app.organization import OrganizationHierarchy
-from app.services import budget_enforcement as enforcement, budget_store, litellm, organization_store as store, organization_sync as sync
+from app.services import budget_enforcement as enforcement, budget_pass, budget_store, litellm, organization_store as store, organization_sync as sync
 from tests.test_budget_enforcement import org, join
 
 
@@ -32,7 +31,7 @@ async def test_first_generation_registers_participant_before_pinning(org, monkey
 
 
 @pytest.mark.asyncio
-async def test_failed_transfer_preserves_source_caps_before_any_write(org, monkeypatch):
+async def test_a_transfer_moves_the_share_without_raising_any_cap_first(org, monkeypatch):
     org()
     hierarchy = OrganizationHierarchy.model_validate(
         {
@@ -62,12 +61,17 @@ async def test_failed_transfer_preserves_source_caps_before_any_write(org, monke
     monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(side_effect=lambda user: [dict(current[user])] if user in current else []))
     update = AsyncMock()
     monkeypatch.setattr(litellm, "update_key", update)
-    await sync.record_identity("ann", "ann@example.invalid", "sso", ["sales"])
-    with pytest.raises(HTTPException) as exc:
-        await sync.reconcile()
-    assert exc.value.status_code == 409
+    store.remember("ann", "ann@example.invalid", "sso", ["sales"])
+    join("ann")
+
+    @budget_pass.serialized
+    async def operation():
+        return [sync.resolve_identity(store.get(user)).per_user for user in ("ann", "ben")]
+
+    # ann's key is still in Eng. Her share moves to Sales and ben keeps Eng's
+    # total; the pass itself lowers nothing and raises nothing before the sync.
+    assert await operation() == [90, 90]
     update.assert_not_awaited()
-    assert current["ann"]["max_budget"] + current["ben"]["max_budget"] == 90
 
 
 def test_deficit_snapshot_replaces_floors_without_mutating_pinned_snapshot(org):

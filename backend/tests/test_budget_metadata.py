@@ -13,7 +13,6 @@ from tests.test_budget_enforcement import org, join
 @pytest.mark.parametrize(
     "info, status",
     [
-        ({"user_id": "ann", "spend": 0, "team_id": "sales"}, 409),
         ({"user_id": "ann", "spend": 0}, 502),
         ({"user_id": "other", "spend": 0, "team_id": "eng"}, 502),
     ],
