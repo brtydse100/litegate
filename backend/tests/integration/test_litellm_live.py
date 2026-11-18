@@ -155,7 +155,8 @@ async def test_managed_allowance_updates_preserve_windows_and_rotation_carries_s
         keys[:] = [replacement["key"]]
         assert (await litellm.get_key_info(keys[0]))["spend"] == 12
         await litellm.update_team(leaf.team_id, {"team_member_budget": 50, "team_member_rpm_limit": 120})
-        await organization_sync.synchronize_user(user_id)
+        # A settled member skips the sign-in pass; the full pass repairs upstream drift.
+        await organization_sync._synchronize_user(user_id)
         default = (await organization.team_info(leaf.team_id))["team_info"]["team_member_budget_table"]
         assert default["max_budget"] is None
         assert default["rpm_limit"] == 120
