@@ -19,6 +19,9 @@ _DISCOVERY_TTL = 3600.0  # re-fetch OIDC config at most once per hour
 _signer = None
 _signer_secret: str | None = None
 
+# Tolerated difference between the identity provider's clock and ours.
+CLOCK_SKEW_SECONDS = 10
+
 
 def _get_signer() -> URLSafeTimedSerializer:
     global _signer, _signer_secret
@@ -188,6 +191,8 @@ async def verify_id_token(id_token: str, expected_nonce: str = "") -> dict:
         audience=settings.oidc_client_id,
         issuer=metadata.get("issuer", settings.oidc_issuer_url),
         options={"verify_exp": True},
+        # The identity provider's clock may run slightly ahead of or behind ours.
+        leeway=CLOCK_SKEW_SECONDS,
     )
     if expected_nonce and not secrets.compare_digest(str(claims.get("nonce", "")), expected_nonce):
         raise jwt.InvalidTokenError("OIDC nonce mismatch")

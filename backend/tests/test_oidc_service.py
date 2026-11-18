@@ -21,7 +21,7 @@ def test_oidc_flow_started_before_secret_rotation_can_finish(monkeypatch):
     assert oidc.state_nonce(state) == "rotation-nonce"
 
 
-def _signed_id_token(*, kid: str, nonce: str) -> tuple[str, dict]:
+def _signed_id_token(*, kid: str, nonce: str, **claims) -> tuple[str, dict]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_jwk = json.loads(RSAAlgorithm.to_jwk(private_key.public_key()))
     public_jwk["kid"] = kid
@@ -32,6 +32,7 @@ def _signed_id_token(*, kid: str, nonce: str) -> tuple[str, dict]:
             "aud": "litegate-client",
             "exp": int(time.time()) + 300,
             "nonce": nonce,
+            **claims,
         },
         private_key,
         algorithm="RS256",
@@ -142,3 +143,33 @@ async def test_discovery_remains_the_default(monkeypatch):
 
     assert metadata["jwks_uri"] == "https://discovery.example/keys"
     assert [str(request.url) for request in requests] == ["https://discovery.example/.well-known/openid-configuration"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "claim, offset, accepted",
+    [
+        ("iat", 5, True),  # provider clock slightly ahead
+        ("iat", 60, False),
+        ("exp", -5, True),  # provider clock slightly behind
+        ("exp", -60, False),
+    ],
+)
+async def test_id_token_verification_tolerates_ten_seconds_of_clock_skew(monkeypatch, claim, offset, accepted):
+    token, signing_key = _signed_id_token(kid="current-key", nonce="browser-nonce", **{claim: int(time.time()) + offset})
+
+    async def jwks(force_refresh: bool = False):
+        return {"keys": [signing_key]}
+
+    async def discovery():
+        return {"issuer": "https://idp.example"}
+
+    monkeypatch.setattr(oidc.settings, "oidc_client_id", "litegate-client")
+    monkeypatch.setattr(oidc, "get_jwks", jwks)
+    monkeypatch.setattr(oidc, "get_discovery", discovery)
+
+    if accepted:
+        assert (await oidc.verify_id_token(token, expected_nonce="browser-nonce"))["sub"] == "oidc-user"
+    else:
+        with pytest.raises(jwt.InvalidTokenError):
+            await oidc.verify_id_token(token, expected_nonce="browser-nonce")
