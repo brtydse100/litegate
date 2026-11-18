@@ -148,6 +148,10 @@ export interface OperationLimit {
 export interface TeamInfo {
   advanced_settings?: Record<string, unknown>;
   organization_managed?: boolean;
+  /** Organization group of a config-managed team and its per-user limit. */
+  organization_node_id?: string | null;
+  organization_per_user?: number | null;
+  organization_per_user_override?: number | null;
   team_id: string;
   team_alias?: string | null;
   organization_id?: string | null;

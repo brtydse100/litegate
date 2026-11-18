@@ -82,6 +82,16 @@ function TeamEditor({
   const [budget, setBudget] = useState(
     existing?.max_budget != null ? String(existing.max_budget) : "",
   );
+  // A config-managed team's budget is its organization group's per-user limit.
+  const perUserNode = existing?.organization_managed
+    ? (existing.organization_node_id ?? null)
+    : null;
+  const configuredPerUser =
+    existing?.organization_per_user != null
+      ? String(existing.organization_per_user)
+      : "";
+  const [perUserLimit, setPerUserLimit] = useState(configuredPerUser);
+  const [savingPerUser, setSavingPerUser] = useState(false);
   const [budgetDuration, setBudgetDuration] = useState(
     existing?.budget_duration ?? "",
   );
@@ -97,7 +107,7 @@ function TeamEditor({
     advanced.current?.setServerError(error);
   }, [error]);
 
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!models.all && !models.models.length) {
       setModelError("Select at least one model or allow all models.");
@@ -134,6 +144,17 @@ function TeamEditor({
       onCreate(payload);
       return;
     }
+    if (perUserNode && perUserLimit.trim() !== configuredPerUser) {
+      setSavingPerUser(true);
+      try {
+        await api.setGroupPerUser(perUserNode, perUserLimit.trim() || null);
+      } catch (failure) {
+        setModelError((failure as Error).message);
+        return;
+      } finally {
+        setSavingPerUser(false);
+      }
+    }
     onUpdate(state.team.team_id, {
       ...advancedPayload,
       team_alias: alias.trim(),
@@ -162,7 +183,7 @@ function TeamEditor({
       }}
     >
       <form
-        onSubmit={submit}
+        onSubmit={(event) => void submit(event)}
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#2A2E42] bg-[#1A1D27] p-5 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-4">
@@ -225,18 +246,28 @@ function TeamEditor({
               }
             />
           </label>
-          <NumericPolicyInput
-            label="Maximum budget (USD)"
-            disabled={existing?.organization_managed}
-            value={budget}
-            onValueChange={setBudget}
-            step="any"
-            placeholder={
-              existing
-                ? currentLimitPlaceholder(existing.max_budget)
-                : "Unlimited"
-            }
-          />
+          {perUserNode ? (
+            <NumericPolicyInput
+              label="Per-user limit (USD)"
+              value={perUserLimit}
+              onValueChange={setPerUserLimit}
+              step="any"
+              placeholder="Configured value"
+            />
+          ) : (
+            <NumericPolicyInput
+              label="Maximum budget (USD)"
+              disabled={existing?.organization_managed}
+              value={budget}
+              onValueChange={setBudget}
+              step="any"
+              placeholder={
+                existing
+                  ? currentLimitPlaceholder(existing.max_budget)
+                  : "Unlimited"
+              }
+            />
+          )}
           <label className="space-y-1 text-xs text-gray-400">
             <span>Budget reset</span>
             <input
@@ -255,6 +286,12 @@ function TeamEditor({
               maxLength={32}
             />
           </label>
+          {perUserNode && (
+            <p className="text-xs text-gray-500 sm:col-span-2">
+              The per-user limit caps each member's key in this organization
+              group. Clear it to use the organization configuration again.
+            </p>
+          )}
           <NumericPolicyInput
             label="TPM limit"
             value={tpm}
@@ -322,7 +359,9 @@ function TeamEditor({
             Cancel
           </button>
           <button
-            disabled={pending || operationsBlocked || !alias.trim()}
+            disabled={
+              pending || savingPerUser || operationsBlocked || !alias.trim()
+            }
             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {pending

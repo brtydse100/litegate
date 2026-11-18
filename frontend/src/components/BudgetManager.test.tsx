@@ -10,6 +10,7 @@ vi.mock("../api/client", () => ({
     organizationBudgets: vi.fn(),
     setGroupBudget: vi.fn(),
     setUserBudget: vi.fn(),
+    setGroupPerUser: vi.fn(),
   },
 }));
 
@@ -38,6 +39,10 @@ function view(revision = 4): BudgetView {
         used: null,
         remaining: null,
         can_edit_envelope: false,
+        per_user: 100,
+        per_user_config: 100,
+        per_user_override: null,
+        can_edit_per_user: false,
         users: [
           {
             user_id: "alice",
@@ -284,5 +289,45 @@ it("shows the enforced banner and fixed per-user allowances when enforcement is 
   expect(screen.getByText("Fixed per-user: $7.00")).toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "Activate budget enforcement" }),
+  ).not.toBeInTheDocument();
+});
+
+it("lets a global administrator override and restore a group's per-user limit", async () => {
+  const initial = view();
+  Object.assign(initial.groups[0], {
+    can_edit_per_user: true,
+    per_user: 40,
+    per_user_override: 40,
+  });
+  vi.mocked(api.setGroupPerUser).mockResolvedValue({
+    node_id: "root",
+    per_user: 25,
+    per_user_config: 100,
+    per_user_override: 25,
+  });
+  setup(initial);
+  const input = await screen.findByLabelText("Engineering per-user limit");
+  expect(input).toHaveValue(40);
+  expect(screen.getByText("set here; configured $100.00")).toBeVisible();
+  fireEvent.change(input, { target: { value: "25" } });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Save Engineering per-user limit" }),
+  );
+  await waitFor(() =>
+    expect(api.setGroupPerUser).toHaveBeenCalledWith("root", "25"),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Use configured value" }));
+  await waitFor(() =>
+    expect(api.setGroupPerUser).toHaveBeenLastCalledWith("root", null),
+  );
+});
+
+it("shows the per-user limit read-only to group administrators", async () => {
+  setup();
+  expect(
+    await screen.findByText("Per-user limit: $100.00 (from configuration)"),
+  ).toBeVisible();
+  expect(
+    screen.queryByLabelText("Engineering per-user limit"),
   ).not.toBeInTheDocument();
 });

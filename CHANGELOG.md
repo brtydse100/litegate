@@ -7,8 +7,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Large organizations with enforced budgets: a budget update now locks and
+  re-reads only the groups it affects, so sign-ins and key replacements in
+  different groups no longer wait for each other or for the background
+  synchronization. Returning members sign in without any budget work, and the
+  synchronization makes about a third of the LiteLLM requests.
+- Organization usage reads LiteLLM's per-team activity (one request per 50
+  teams) instead of one request per member, and the overview reuses team status
+  for a minute. Reports support up to 5000 members.
+- `KEY_ROTATION_SETTLE_SECONDS` (default 12) sets how long an enforced key is
+  paused during regeneration.
+
+### Added
+
+- System administrators can set a group's per-user limit on Budget planning or
+  in a configuration-managed team's Teams dialog, overriding the configured
+  `perUser`; clearing it restores the configured value.
+
 ### Fixed
 
+- The nightly browser run no longer runs the real-SSO tests without their
+  Keycloak and LiteLLM services.
 - OIDC sign-in no longer fails with a server error when the identity
   provider's clock runs slightly ahead of LiteGate's; ID-token times tolerate
   10 seconds of clock difference.

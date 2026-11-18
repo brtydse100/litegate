@@ -20,6 +20,7 @@ vi.mock("../api/client", () => ({
     updateTeam: vi.fn(),
     deleteTeam: vi.fn(),
     moveTeamMember: vi.fn(),
+    setGroupPerUser: vi.fn(),
   },
 }));
 
@@ -240,6 +241,78 @@ describe("team policy editing", () => {
         "devops",
         expect.objectContaining({ models: [] }),
       ),
+    );
+  });
+});
+
+describe("organization per-user limits", () => {
+  it("edits a config-managed team's per-user limit instead of its shared budget", async () => {
+    vi.mocked(api.policySchemas).mockResolvedValue({
+      available: false,
+      schemas: {},
+    });
+    vi.mocked(api.getOperationLimit).mockResolvedValue({
+      limit: 5,
+      remaining: 5,
+      retry_after: 0,
+    });
+    vi.mocked(api.listModels).mockResolvedValue({ models: [] });
+    vi.mocked(api.setGroupPerUser).mockResolvedValue({
+      node_id: "node-eng",
+      per_user: 150,
+      per_user_config: 200,
+      per_user_override: 150,
+    });
+    vi.mocked(api.listTeams).mockResolvedValue({
+      teams: [
+        {
+          team_id: "eng",
+          team_alias: "Engineering",
+          organization_managed: true,
+          organization_node_id: "node-eng",
+          organization_per_user: 200,
+          organization_per_user_override: null,
+          max_budget: null,
+          budget_duration: "30d",
+          models: [],
+          blocked: false,
+          members_with_roles: [],
+          mapped_groups: [],
+          default_key_team: false,
+        },
+      ],
+      page: 1,
+      page_size: 25,
+      total: 1,
+      total_pages: 1,
+    });
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <AdminTeams />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit team" });
+    expect(
+      within(dialog).queryByLabelText("Maximum budget (USD)"),
+    ).not.toBeInTheDocument();
+    const limit = within(dialog).getByLabelText("Per-user limit (USD)");
+    expect(limit).toHaveValue(200);
+    expect(limit).toBeEnabled();
+    fireEvent.change(limit, { target: { value: "150" } });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    );
+    await waitFor(() =>
+      expect(api.setGroupPerUser).toHaveBeenCalledWith("node-eng", "150"),
+    );
+    await waitFor(() => expect(api.updateTeam).toHaveBeenCalled());
+    expect(vi.mocked(api.updateTeam).mock.calls[0][1]).not.toHaveProperty(
+      "max_budget",
     );
   });
 });

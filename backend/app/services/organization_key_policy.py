@@ -96,6 +96,8 @@ async def apply_key(node: OrganizationNode, key: dict) -> None:
         verified = await litellm.get_key_info(identifier)
         if not verified or not matches(verified, node):
             raise HTTPException(status_code=502, detail="Could not verify the managed key's budget policy")
+        # Keep the pass's cached copy current for later checks in this pass.
+        key.update(changes)
 
 
 async def finish_team(node: OrganizationNode) -> dict:
@@ -147,9 +149,9 @@ async def finish_team(node: OrganizationNode) -> dict:
     return verified
 
 
-async def normalize_individual_caps(node: OrganizationNode, user_id: str) -> None:
+async def normalize_individual_caps(node: OrganizationNode, user_id: str, keys: list[dict] | None = None) -> None:
     """Do not remove a user's ceiling while another credential is unprotected."""
-    keys = await litellm.list_user_keys(user_id)
+    keys = await litellm.list_user_keys(user_id) if keys is None else keys
     if not keys or any(not matches(key, node) for key in keys):
         raise HTTPException(status_code=409, detail="Verify all of this user's key allowances before removing individual user budgets")
     info = await finish_team(node)

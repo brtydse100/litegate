@@ -188,7 +188,7 @@ async def test_omitted_usage_scope_groups_by_authorized_roots(monkeypatch, scope
     _, root, actor = scoped
     access = import_module("app.services.organization_access")
     scope = await access.resolve_scope(actor)
-    monkeypatch.setattr(upstream, "daily_usage", AsyncMock(return_value=[]))
+    monkeypatch.setattr(upstream, "team_daily_usage", AsyncMock(return_value=[]))
     reports._usage_cache.clear()
     today = datetime.now(timezone.utc).date()
     result = await reports.usage(None, today, today, scope)

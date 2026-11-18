@@ -1,7 +1,8 @@
 """Shared HTTP transport and dependency health for LiteLLM."""
 
+import contextvars
 import json
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 
 import httpx
 from fastapi import HTTPException
@@ -9,6 +10,29 @@ from fastapi import HTTPException
 from app.config import settings
 
 _shared_client: httpx.AsyncClient | None = None
+# Team records read during one reconciliation step; any write empties it.
+_team_cache: contextvars.ContextVar[dict | None] = contextvars.ContextVar("team_info_cache", default=None)
+
+
+async def _forget_on_write(request: httpx.Request) -> None:
+    cache = _team_cache.get()
+    if cache and request.method != "GET":
+        cache.clear()
+
+
+@contextmanager
+def team_cache():
+    """Reuse team reads within a block; an unhooked test client disables it."""
+    hooked = _shared_client is None or _forget_on_write in _shared_client.event_hooks.get("request", [])
+    token = _team_cache.set({} if hooked else None)
+    try:
+        yield
+    finally:
+        _team_cache.reset(token)
+
+
+def cached_teams() -> dict | None:
+    return _team_cache.get()
 
 
 def headers() -> dict[str, str]:
@@ -24,6 +48,7 @@ async def start_client() -> None:
             headers=headers(),
             timeout=httpx.Timeout(15.0, connect=5.0),
             limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+            event_hooks={"request": [_forget_on_write]},
         )
 
 
@@ -40,7 +65,7 @@ async def client():
     if _shared_client is not None:
         yield _shared_client
         return
-    async with httpx.AsyncClient(verify=settings.ssl_verify) as isolated:
+    async with httpx.AsyncClient(verify=settings.ssl_verify, event_hooks={"request": [_forget_on_write]}) as isolated:
         yield isolated
 
 

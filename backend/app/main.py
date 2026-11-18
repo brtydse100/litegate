@@ -12,13 +12,15 @@ from app.routers import analytics as analytics_router
 from app.routers import api_v1, auth, keys, logs, organization, users
 from app.routers import people
 from app.routers import budgets
-from app.services import analytics, litellm, local_users, organization_sync
+from app.services import analytics, litellm, local_users, organization_limits, organization_sync
 from app.version import VERSION
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     local_users.init_db()
+    if settings.organization_hierarchy.levels:
+        organization_limits.apply()
     await litellm.start_client()
     organization_task = None
     analytics_task = None

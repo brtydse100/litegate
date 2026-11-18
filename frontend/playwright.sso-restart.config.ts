@@ -10,7 +10,11 @@ const extra = {
 
 export default defineConfig({
   ...base,
-  testMatch: ["sso-restart.spec.ts", "sso-budget-authority.spec.ts"],
+  testMatch: [
+    "sso-restart.spec.ts",
+    "sso-budget-authority.spec.ts",
+    "sso-large-org.spec.ts",
+  ],
   webServer: (Array.isArray(base.webServer) ? base.webServer : []).map(
     (server) => ({ ...server, env: { ...server.env, ...extra } }),
   ),

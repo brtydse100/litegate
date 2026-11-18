@@ -46,6 +46,11 @@ FIELDS = {
         "HIERARCHICAL_BUDGETS_ENFORCED",
         False,
     ),
+    "keyRotationSettleSeconds": (
+        "key_rotation_settle_seconds",
+        "KEY_ROTATION_SETTLE_SECONDS",
+        12,
+    ),
 }
 
 
@@ -82,6 +87,7 @@ class FeatureConfiguration(unittest.TestCase):
             "analyticsBatchConcurrency": 20,
             "hierarchicalBudgetsEnabled": True,
             "hierarchicalBudgetsEnforced": True,
+            "keyRotationSettleSeconds": 30,
         }
         with tempfile.TemporaryDirectory() as directory:
             values = Path(directory) / "values.json"
@@ -113,6 +119,8 @@ class FeatureConfiguration(unittest.TestCase):
             ("organizationCleanupEnabled", "false"),
             ("hierarchicalBudgetsEnabled", "true"),
             ("hierarchicalBudgetsEnforced", "true"),
+            ("keyRotationSettleSeconds", -1),
+            ("keyRotationSettleSeconds", 121),
             ("organizationAccessDesignations", {"alice": "engineering"}),
             ("organizationGroupAdmins", {"engineering": [1]}),
         ]

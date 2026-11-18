@@ -22,7 +22,18 @@ export interface BudgetGroup {
   used: number | null;
   remaining: number | null;
   can_edit_envelope: boolean;
+  /** Effective per-user limit: the override when set, else the configured value. */
+  per_user: number | null;
+  per_user_config: number | null;
+  per_user_override: number | null;
+  can_edit_per_user: boolean;
   users: BudgetUser[];
+}
+export interface PerUserLimit {
+  node_id: string;
+  per_user: number | null;
+  per_user_config: number | null;
+  per_user_override: number | null;
 }
 export interface BudgetView {
   revision: number;

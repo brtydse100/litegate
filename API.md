@@ -118,7 +118,11 @@ cannot use these capabilities. See [configuration](docs/governance-and-analytics
   current paths, per-key allowances, and key spend. Page size is at most 100.
 - `GET /api/v1/organization/usage?node=<id>&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`:
   daily/group/model spend, tokens, and logged requests. Defaults to 30 days through
-  today. Supports up to 90 days between UTC dates and 500 users per report.
+  today. Supports up to 90 days between UTC dates and 5000 users per report.
+  LiteGate reads LiteLLM's per-team daily activity for every managed team (one
+  request per 50 teams, cached for a minute) and counts each key's usage for its
+  owner, wherever that key was. Usage of keys outside managed teams is not part
+  of the organization report.
   The additive `by_user` array contains each selected member's `id` (user ID),
   `name` (email, or user ID when unavailable), `spend`, `tokens`, and `requests`
   for the same date range. Inactive members remain included with zero metrics.
@@ -641,6 +645,19 @@ These routes require `hierarchical_budgets_enabled` and Organization scope:
   `{revision, amount}` sets a manual direct-user override. Null restores auto.
 - `POST /api/v1/organization/budgets/activate`: `{revision}` is system-admin
   only and currently returns 503. Enforcement is enabled by configuration.
+- Each group also reports `per_user` (the effective per-user limit),
+  `per_user_config` (the configured `perUser`), `per_user_override` (set in the
+  portal, or null) and `can_edit_per_user` (system administrators only).
+
+`PATCH /api/v1/organization/groups/{id}/per-user` with `{"amount": "25"}` sets a
+group's per-user limit, overriding its configured `perUser`; `{"amount": null}`
+restores the configured value. Child groups inherit it like a configured value.
+It requires a system administrator (403 otherwise), works whether or not budget
+planning is enabled, is audited as `organization.per_user_limit`, and returns
+`{node_id, per_user, per_user_config, per_user_override}`. Keys follow within
+about a minute. Team listings add `organization_node_id`,
+`organization_per_user` and `organization_per_user_override` for
+configuration-managed teams.
 
 Amounts have at most six decimal places. Conflicting revisions/over-allocation
 return 409. A delegate cannot increase their own personal allocation indirectly.
@@ -659,7 +676,8 @@ See [current enforcement and retirement limitations](docs/governance-and-analyti
 
 When `hierarchical_budgets_enforced` is enabled, managed key deletion, manual
 spend reset and additional key creation return 409. `POST /api/keys/regenerate`
-blocks the managed key, waits about 12 seconds for spend to settle, then replaces
+blocks the managed key, waits `KEY_ROTATION_SETTLE_SECONDS` (12 by default) for
+spend to settle, then replaces
 it with the spend carried over; on failure the original key is unblocked and kept.
 It returns 409 while another replacement for the same user is running, for
 several managed keys, or when the user must sign in again after a restart that
