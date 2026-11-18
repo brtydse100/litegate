@@ -80,6 +80,10 @@ export interface KeyInfo {
   tpm_limit?: number | null;
   rpm_limit?: number | null;
   budget_duration?: string | null;
+  /** LiteLLM's next budget reset, passed through from key info. */
+  budget_reset_at?: string | null;
+  /** LiteLLM's masked secret preview, e.g. `sk-...7f3a`. */
+  key_name?: string | null;
   created_at?: string | null;
   user_id?: string;
   user_email?: string;

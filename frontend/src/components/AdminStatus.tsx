@@ -142,7 +142,10 @@ export default function AdminStatus() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-[#2A2E42] bg-[#1A1D27]">
+      <div
+        id="audit"
+        className="scroll-mt-6 overflow-hidden rounded-xl border border-[#2A2E42] bg-[#1A1D27]"
+      >
         <div className="border-b border-[#2A2E42] px-4 py-3">
           <h2 className="text-sm font-medium text-gray-200">
             Administrator audit history

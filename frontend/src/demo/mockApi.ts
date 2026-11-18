@@ -19,12 +19,20 @@ let demoUser: User = {
 };
 
 let signedIn = true;
+
+/** Synthetic budget reset 12 days from now, so the demo always looks current. */
+function demoResetAt() {
+  return new Date(Date.now() + 12 * 86_400_000).toISOString();
+}
 let personalKeys: KeyInfo[] = [
   {
     token: "sk-litegate-demo-key-7f3a",
     key_alias: "alex-primary",
+    key_name: "sk-...7f3a",
     spend: 18.42,
     max_budget: 100,
+    budget_duration: "30d",
+    budget_reset_at: demoResetAt(),
     expires: "2026-12-31T23:59:59Z",
     models: ["gpt-5", "claude-sonnet-4", "gemini-2.5-pro"],
     rpm_limit: 120,
@@ -354,7 +362,10 @@ async function mockResponse(request: Request): Promise<Response> {
     const created: KeyInfo = {
       token: key,
       key_alias: "alex-primary",
+      key_name: "sk-...9b2c",
       max_budget: 100,
+      budget_duration: "30d",
+      budget_reset_at: demoResetAt(),
       models: ["gpt-5", "claude-sonnet-4", "gemini-2.5-pro"],
       rpm_limit: 120,
       team_id: "platform-engineering",

@@ -1,42 +1,46 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { NavLink, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import {
   Activity,
-  BookOpen,
-  Building2,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  Gauge,
+  Clock3,
   KeyRound,
-  LogOut,
-  Network,
-  RefreshCw,
-  Shield,
-  Ticket,
+  LayoutGrid,
+  List,
+  User as UserIcon,
   Users,
-  Zap,
 } from "lucide-react";
 import AdminKeys from "../components/AdminKeys";
-import PersonalKeySecret from "../components/PersonalKeySecret";
 import DismissibleMessage from "../components/DismissibleMessage";
-import { primaryKeyActionClassName } from "../components/keyActionStyles";
+import PersonalKeySecret from "../components/PersonalKeySecret";
 import { keyToken } from "../components/BulkKeyEditor";
 import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
-import EmailAddress from "../components/EmailAddress";
 import AdminTeams from "../components/AdminTeams";
 import PersonalAnalytics from "../components/PersonalAnalytics";
 import BudgetManager from "../components/BudgetManager";
 import AdminOrganization from "../components/AdminOrganization";
-import ThemeToggle from "../components/ThemeToggle";
+import {
+  AdminSidebar,
+  BrandMark,
+  DemoRoleSwitch,
+  UserMenu,
+  type NavGroup,
+} from "../components/AppChrome";
 import { api } from "../api/client";
-import { formatUsd } from "../formatUsd";
 import { useAuth } from "../hooks/useAuth";
 import { useOperationLimit } from "../hooks/useOperationLimit";
-import type { KeyInfo } from "../types";
+import {
+  BudgetCard,
+  CreateKeyCard,
+  DetailsCard,
+  KeyCard,
+  LinkCard,
+  RegenerateButton,
+  RegenerateConfirm,
+  StatusCard,
+  keyAccessStatus,
+} from "./MyKey";
 
 interface PortalConfig {
   support_ticket_url: string;
@@ -56,316 +60,6 @@ async function fetchPortalConfig(): Promise<PortalConfig> {
   const response = await fetch("/api/portal-config");
   if (!response.ok) throw new Error("Could not load portal configuration");
   return response.json();
-}
-
-function Brand({ logoUrl }: { logoUrl?: string }) {
-  return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt="LiteGate"
-          className="h-7 w-auto object-contain"
-        />
-      ) : (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm">
-          <Zap size={14} fill="currentColor" />
-        </div>
-      )}
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold tracking-tight text-slate-950">
-          LiteGate
-        </p>
-        <p className="truncate text-[10px] text-slate-500">
-          LiteLLM access portal
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function expirationDate(value: string) {
-  // LiteLLM may omit the timezone; the backend interprets those values as UTC.
-  const timestamp = value.replace(" ", "T");
-  return new Date(
-    timestamp.includes("T") && !/(?:Z|[+-]\d{2}(?::?\d{2})?)$/i.test(timestamp)
-      ? `${timestamp}Z`
-      : timestamp,
-  );
-}
-
-function keyAccessStatus(key: KeyInfo) {
-  if (key.blocked) return "Blocked";
-  if (key.expires && expirationDate(key.expires).getTime() <= Date.now())
-    return "Expired";
-  if (key.policy_error) return "Needs attention";
-  if (key.user_budget_available === false)
-    return key.policy_notice ? "Updating" : "Budget details unavailable";
-  if (
-    (key.max_budget != null && key.spend >= key.max_budget) ||
-    (key.user_budget != null &&
-      key.user_spend != null &&
-      key.user_spend >= key.user_budget)
-  )
-    return "Budget reached";
-  return "Ready";
-}
-
-function KeyCard({
-  keyInfo,
-  initialSecret,
-  canReveal,
-  onHide,
-}: {
-  keyInfo: KeyInfo;
-  initialSecret?: string | null;
-  canReveal: boolean;
-  onHide: () => void;
-}) {
-  const managed = keyInfo.organization_managed || !!keyInfo.organization_path;
-  const budgetAvailable = keyInfo.user_budget_available !== false;
-  const accessStatus = keyAccessStatus(keyInfo);
-  return (
-    <PersonalKeySecret
-      identifier={keyToken(keyInfo)}
-      canReveal={canReveal}
-      initialSecret={initialSecret}
-      onHide={onHide}
-    >
-      {(action) => (
-        <>
-          <article className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 px-5 py-5">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="shrink-0 rounded-md border border-indigo-100 bg-indigo-50 p-2 text-indigo-600">
-                  <KeyRound size={17} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-950">
-                    {keyInfo.key_alias || "API key"}
-                  </p>
-                  <p className="text-xs text-slate-500">Virtual key</p>
-                </div>
-              </div>
-            </div>
-            {canReveal && action && <div className="py-4">{action}</div>}
-            {/* "Needs attention" and "Updating" are explained by their own
-                messages below, so they never show a second box. */}
-            {!["Ready", "Needs attention", "Updating"].includes(
-              accessStatus,
-            ) && (
-              <DismissibleMessage
-                messageKey={accessStatus}
-                className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
-              >
-                Key status: {accessStatus}. Contact an administrator if you need
-                help.
-              </DismissibleMessage>
-            )}
-            <dl className="grid divide-y divide-slate-200 text-sm sm:grid-cols-4 sm:divide-x sm:divide-y-0">
-              <div className="px-5 py-4">
-                <dt className="text-xs text-slate-500">
-                  {managed ? "Key spend" : "Spend"}
-                </dt>
-                <dd className="mt-1 font-semibold text-slate-950">
-                  {managed && !budgetAvailable
-                    ? "Unavailable"
-                    : formatUsd(keyInfo.user_spend ?? keyInfo.spend)}
-                </dd>
-              </div>
-              <div className="px-5 py-4">
-                <dt className="text-xs text-slate-500">
-                  {managed ? "Key budget" : "Budget"}
-                </dt>
-                <dd className="mt-1 font-semibold text-slate-950">
-                  {managed && !budgetAvailable
-                    ? "Unavailable"
-                    : (managed ? keyInfo.user_budget : keyInfo.max_budget) !=
-                        null
-                      ? `$${managed ? keyInfo.user_budget : keyInfo.max_budget}`
-                      : "Unlimited"}
-                </dd>
-              </div>
-              <div className="px-5 py-4">
-                <dt className="text-xs text-slate-500">Models</dt>
-                <dd className="mt-1 font-semibold text-slate-950">
-                  {keyInfo.models?.length ? keyInfo.models.length : "All"}
-                </dd>
-              </div>
-              <div className="px-5 py-4">
-                <dt className="text-xs text-slate-500">Expires</dt>
-                <dd className="mt-1 font-semibold text-slate-950">
-                  {keyInfo.expires
-                    ? expirationDate(keyInfo.expires).toLocaleDateString()
-                    : "Never"}
-                </dd>
-              </div>
-            </dl>
-            {keyInfo.policy_error && (
-              <DismissibleMessage
-                role="alert"
-                messageKey={keyInfo.policy_error}
-                className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900"
-              >
-                {keyInfo.policy_error}
-              </DismissibleMessage>
-            )}
-            {keyInfo.policy_notice && (
-              <DismissibleMessage
-                messageKey={keyInfo.policy_notice}
-                className="border-t border-sky-200 bg-sky-50 px-5 py-3 text-sm text-sky-900"
-              >
-                {keyInfo.policy_notice}
-              </DismissibleMessage>
-            )}
-            {keyInfo.team_id && (
-              <div className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
-                <Building2 size={13} />
-                Assigned through{" "}
-                <span className="font-medium text-slate-800">
-                  {keyInfo.organization_path?.join(" → ") ?? keyInfo.team_id}
-                </span>
-              </div>
-            )}
-          </article>
-          {!canReveal && action}
-        </>
-      )}
-    </PersonalKeySecret>
-  );
-}
-
-export function AccessSnapshot({
-  keys,
-  unavailable = false,
-  loading = false,
-}: {
-  keys: KeyInfo[];
-  unavailable?: boolean;
-  loading?: boolean;
-}) {
-  const [modelsExpanded, setModelsExpanded] = useState(false);
-  const first = keys[0];
-  const statuses = keys.map(keyAccessStatus);
-  const status = loading
-    ? "Loading"
-    : unavailable
-      ? "Status unavailable"
-      : statuses.includes("Ready")
-        ? "Ready"
-        : !statuses.length
-          ? "No key"
-          : statuses.every((value) => value === statuses[0])
-            ? statuses[0]
-            : "Access restricted";
-  const hasUnrestrictedModelAccess = keys.some(
-    (keyInfo) => !keyInfo.models?.length,
-  );
-  const accessibleModels = Array.from(
-    new Set(keys.flatMap((keyInfo) => keyInfo.models ?? [])),
-  ).sort((left, right) => left.localeCompare(right));
-  const items = [
-    {
-      label: "API access",
-      value: status,
-      icon: status === "Ready" ? Check : Shield,
-      tone:
-        status === "Ready"
-          ? "text-emerald-600 bg-emerald-50"
-          : "text-amber-600 bg-amber-50",
-    },
-    {
-      label: "Model access",
-      value: hasUnrestrictedModelAccess
-        ? "All models"
-        : accessibleModels.length
-          ? `${accessibleModels.length} models`
-          : "All models",
-      icon: Zap,
-      tone: "text-indigo-600 bg-indigo-50",
-    },
-    {
-      label: "Rate limit",
-      value:
-        first?.rpm_limit != null
-          ? `${first.rpm_limit.toLocaleString()} RPM`
-          : "Default limits",
-      icon: Gauge,
-      tone: "text-amber-600 bg-amber-50",
-    },
-  ];
-  return (
-    <section className="space-y-3" aria-label="Access snapshot">
-      <div className="grid gap-3 sm:grid-cols-3">
-        {items.map((item) => {
-          const content = (
-            <>
-              <span className={`rounded-md p-2 ${item.tone}`}>
-                <item.icon size={16} />
-              </span>
-              <div className="min-w-0 flex-1 text-left">
-                <p className="text-xs text-slate-500">{item.label}</p>
-                <p className="mt-0.5 text-sm font-semibold text-slate-950">
-                  {item.value}
-                </p>
-              </div>
-            </>
-          );
-
-          return item.label === "Model access" ? (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => setModelsExpanded((expanded) => !expanded)}
-              aria-expanded={modelsExpanded}
-              aria-controls="accessible-models"
-              className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-indigo-200 hover:bg-indigo-50/30"
-            >
-              {content}
-              <ChevronDown
-                size={16}
-                className={`text-slate-400 transition-transform ${modelsExpanded ? "rotate-180" : ""}`}
-              />
-            </button>
-          ) : (
-            <div
-              key={item.label}
-              className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-            >
-              {content}
-            </div>
-          );
-        })}
-      </div>
-      {modelsExpanded && (
-        <div
-          id="accessible-models"
-          className="rounded-lg border border-indigo-100 bg-white p-5 shadow-sm"
-        >
-          <h2 className="text-sm font-semibold text-slate-950">
-            Accessible models
-          </h2>
-          {hasUnrestrictedModelAccess ? (
-            <p className="mt-2 text-sm text-slate-600">
-              Your key can access all models available through this LiteLLM
-              gateway.
-            </p>
-          ) : (
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {accessibleModels.map((model) => (
-                <li
-                  key={model}
-                  className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 font-mono text-xs text-slate-700"
-                >
-                  {model}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </section>
-  );
 }
 
 export default function Home() {
@@ -444,10 +138,15 @@ export default function Home() {
     refetchInterval: 60_000,
     retry: false,
   });
+  const systemStatus = useQuery({
+    queryKey: ["system-status"],
+    queryFn: api.getSystemStatus,
+    enabled: isAdmin,
+    refetchInterval: 30_000,
+  });
   const canViewOrganization =
     isAdmin || organizationAccess.data?.organization === true;
   const analyticsEnabled = config?.analytics_enabled === true;
-  const showSidebar = isAdmin || canViewOrganization || analyticsEnabled;
   const localUsersEnabled = config?.local_users_enabled ?? true;
   const section = location.pathname === "/" ? "/my-key" : location.pathname;
   if (
@@ -481,430 +180,343 @@ export default function Home() {
     return <Navigate to="/my-key" replace />;
   }
 
-  const titles: Record<string, string> = {
-    "/my-key": "My API access",
-    "/keys": "Key policies",
-    "/users": localUsersEnabled ? "Local users" : "People",
-    "/teams": "Teams",
-    "/organization": "Organization",
-    "/status": "System status",
-    "/analytics": "Personal analytics",
-  };
-  const navClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
-      isActive
-        ? "bg-slate-100 font-medium text-slate-950"
-        : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
-    }`;
-  const navItems = [
-    { to: "/my-key", label: "My key", icon: KeyRound },
-    ...(analyticsEnabled
-      ? [{ to: "/analytics", label: "Analytics", icon: Activity }]
+  const signOut = () => void logout();
+  const demoSwitch = (
+    <DemoRoleSwitch
+      role={user?.role}
+      pending={demoRolePending}
+      onSwitch={(role) => void switchDemoRole(role)}
+    />
+  );
+  const adminLayout = section !== "/my-key" && section !== "/analytics";
+  const adminHome = isAdmin || canViewOrganization ? "/organization" : null;
+
+  const notices = (
+    <>
+      {portal.isPending && (
+        <p role="status" className="text-sm text-ink-4">
+          Loading portal configuration…
+        </p>
+      )}
+      {portal.isError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-ink-2"
+        >
+          Portal configuration is unavailable. Retry before creating or
+          replacing a key.
+          <button
+            type="button"
+            disabled={portal.isFetching}
+            onClick={() => {
+              void portal.refetch();
+            }}
+            className="font-semibold text-blue-ink disabled:opacity-50"
+          >
+            Retry portal configuration
+          </button>
+        </div>
+      )}
+      {mutationError && (
+        <DismissibleMessage
+          role="alert"
+          messageKey={(mutationError as Error).message}
+          className="rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger"
+        >
+          {(mutationError as Error).message}
+        </DismissibleMessage>
+      )}
+      {keys.isError && (
+        <button
+          type="button"
+          disabled={keys.isFetching}
+          onClick={() => {
+            void keys.refetch();
+          }}
+          className="self-start text-sm font-semibold text-blue-ink disabled:opacity-50"
+        >
+          Retry key information
+        </button>
+      )}
+      {operationsBlocked && (
+        <DismissibleMessage
+          messageKey="key-actions-paused"
+          className="rounded-xl border border-sand/40 bg-sand-tint px-4 py-3 text-sm text-sand-ink"
+        >
+          Key actions are paused. Try again in {retryAfter || 1} seconds.
+        </DismissibleMessage>
+      )}
+      {newKey && !newKeyIdentifier && (
+        <section
+          aria-label="New key"
+          className="flex flex-col gap-3 rounded-2xl border border-line bg-card p-6"
+        >
+          <p className="text-sm font-semibold text-mint-ink">
+            Your API key is ready. Copy it before leaving this page.
+          </p>
+          <PersonalKeySecret
+            identifier=""
+            canReveal={false}
+            initialSecret={newKey}
+            onHide={() => setNewKey(null)}
+          />
+        </section>
+      )}
+    </>
+  );
+
+  // In stored-key mode, Show replaces regeneration (docs/features.md).
+  const storedKeyMode =
+    !!config?.save_api_keys_in_db &&
+    keyList.some((key) => key.secret_available);
+  const keyActionsReady =
+    !portal.isPending && !portal.isError && !keys.isPending && !keys.isError;
+  const regenerateAction =
+    !keyActionsReady || newKey || storedKeyMode ? null : confirmRegenerate ? (
+      <RegenerateConfirm
+        pending={regenerate.isPending}
+        paused={operationsBlocked}
+        onConfirm={() => regenerate.mutate()}
+        onCancel={() => setConfirmRegenerate(false)}
+      />
+    ) : (
+      <RegenerateButton
+        paused={operationsBlocked}
+        onClick={() => setConfirmRegenerate(true)}
+      />
+    );
+  const statusLabel = keys.isPending
+    ? "Loading"
+    : keys.isError && !hasKey
+      ? "Status unavailable"
+      : !hasKey
+        ? "No key"
+        : keyList.map(keyAccessStatus).includes("Ready")
+          ? "Ready"
+          : keyAccessStatus(keyList[0]);
+  const helpfulLinks = [
+    ...(config?.litellm_ui_url
+      ? [{ href: config.litellm_ui_url, label: "Open LiteLLM model hub" }]
       : []),
-    ...(!isAdmin && canViewOrganization
-      ? [{ to: "/organization", label: "Organization", icon: Network }]
-      : []),
-    ...(isAdmin
-      ? [
-          { to: "/keys", label: "Key policies", icon: Shield },
-          {
-            to: "/users",
-            label: localUsersEnabled ? "Local users" : "People",
-            icon: Users,
-          },
-          { to: "/teams", label: "Teams", icon: Building2 },
-          { to: "/organization", label: "Organization", icon: Network },
-          { to: "/status", label: "Status", icon: Activity },
-        ]
+    ...(config?.support_ticket_url
+      ? [{ href: config.support_ticket_url, label: "Support" }]
       : []),
   ];
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 md:flex md:h-screen md:overflow-hidden">
-      {showSidebar && (
-        <aside className="hidden w-60 flex-none flex-col border-r border-slate-200 bg-white md:flex">
-          <div className="flex h-14 items-center border-b border-slate-200 px-4">
-            <Brand logoUrl={config?.logo_url} />
-          </div>
-          <nav
-            className="flex-1 space-y-5 overflow-y-auto px-3 py-4"
-            aria-label="Primary navigation"
+  const myKey = (
+    <div className="flex flex-wrap items-start gap-6">
+      <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-5">
+        <h1 className="sr-only">My key</h1>
+        {notices}
+        {keys.isLoading ? (
+          <div
+            role="status"
+            className="h-80 animate-pulse rounded-2xl border border-line bg-card"
           >
-            <div>
-              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                Workspace
-              </p>
-              <NavLink to="/my-key" className={navClass}>
-                <KeyRound size={16} /> My key
-              </NavLink>
-              {analyticsEnabled && (
-                <NavLink to="/analytics" className={navClass}>
-                  <Activity size={16} /> Analytics
-                </NavLink>
-              )}
-              {!isAdmin && canViewOrganization && (
-                <NavLink to="/organization" className={navClass}>
-                  <Network size={16} /> Organization
-                </NavLink>
-              )}
-            </div>
-            {isAdmin && (
-              <>
-                <div>
-                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Access control
-                  </p>
-                  <div className="space-y-0.5">
-                    <NavLink to="/keys" className={navClass}>
-                      <Shield size={16} /> Key policies
-                    </NavLink>
-                    {
-                      <NavLink to="/users" className={navClass}>
-                        <Users size={16} />{" "}
-                        {localUsersEnabled ? "Local users" : "People"}
-                      </NavLink>
-                    }
-                    <NavLink to="/teams" className={navClass}>
-                      <Building2 size={16} /> Teams
-                    </NavLink>
-                    <NavLink to="/organization" className={navClass}>
-                      <Network size={16} /> Organization
-                    </NavLink>
-                  </div>
-                </div>
-                <div>
-                  <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Operations
-                  </p>
-                  <NavLink to="/status" className={navClass}>
-                    <Activity size={16} /> Status
-                  </NavLink>
-                </div>
-              </>
-            )}
-          </nav>
-          <div className="border-t border-slate-200 p-3">
-            <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700">
-                {user?.email?.slice(0, 2).toUpperCase() || "LG"}
-              </div>
-              <div className="min-w-0 flex-1">
-                {user?.email && (
-                  <EmailAddress
-                    email={user.email}
-                    className="text-xs font-medium text-slate-800"
-                  />
-                )}
-                <p className="text-[10px] capitalize text-slate-500">
-                  {user?.role || "user"}
-                </p>
-              </div>
-              <button
-                onClick={() => void logout()}
-                aria-label="Sign out"
-                title="Sign out"
-                className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-800"
-              >
-                <LogOut size={15} />
-              </button>
-            </div>
+            <span className="sr-only">Loading key information…</span>
           </div>
-        </aside>
-      )}
+        ) : !hasKey ? (
+          keyActionsReady && !newKey ? (
+            <CreateKeyCard
+              pending={create.isPending}
+              paused={operationsBlocked}
+              onCreate={() => create.mutate()}
+            />
+          ) : (
+            (keys.isPending || keys.isError) && (
+              <p className="text-sm text-ink-4">
+                {keys.isError
+                  ? "Key information is unavailable. Retry before creating or replacing a key."
+                  : "Loading key information…"}
+              </p>
+            )
+          )
+        ) : (
+          keyList.map((keyInfo, index) => (
+            <div key={keyInfo.token ?? index} className="flex flex-col gap-5">
+              <BudgetCard keyInfo={keyInfo} />
+              <KeyCard
+                keyInfo={keyInfo}
+                initialSecret={
+                  keyToken(keyInfo) === newKeyIdentifier ? newKey : null
+                }
+                canReveal={
+                  !!config?.save_api_keys_in_db && !!keyInfo.secret_available
+                }
+                onHide={() => setNewKey(null)}
+                action={index === 0 ? regenerateAction : null}
+              />
+            </div>
+          ))
+        )}
+        {hasKey && keys.isError && (
+          <p className="text-sm text-ink-4">
+            Key information is unavailable. Retry before creating or replacing a
+            key.
+          </p>
+        )}
+        {config?.my_key_text?.trim() && (
+          <p
+            aria-label="My key guidance"
+            className="whitespace-pre-wrap break-words text-sm text-ink-3"
+          >
+            {config.my_key_text}
+          </p>
+        )}
+      </div>
+      <aside
+        aria-label="Key status"
+        className="flex flex-[1_1_280px] flex-col gap-3.5"
+      >
+        <StatusCard keyInfo={keyList[0]} status={statusLabel} />
+        {hasKey && <DetailsCard keys={keyList} />}
+        <LinkCard links={helpfulLinks} />
+      </aside>
+    </div>
+  );
 
-      <div className="min-w-0 flex-1 md:flex md:flex-col md:overflow-hidden">
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white md:static md:flex-none">
-          <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
-            <div className="md:hidden">
-              <Brand logoUrl={config?.logo_url} />
-            </div>
-            <div className="hidden min-w-0 items-center gap-2 text-sm md:flex">
-              <span className="text-slate-400">LiteGate</span>
-              <ChevronRight size={14} className="text-slate-300" />
-              <span className="truncate font-medium text-slate-700">
-                {titles[section]}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              {import.meta.env.VITE_DEMO_MODE === "true" && (
-                <div
-                  className="mr-1 flex items-center rounded-md border border-slate-200 bg-slate-50 p-0.5"
-                  aria-label="Demo role"
-                >
-                  {(["user", "admin"] as const).map((role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      onClick={() => void switchDemoRole(role)}
-                      disabled={demoRolePending}
-                      aria-label={`View demo as ${role}`}
-                      className={`rounded px-2.5 py-1 text-[11px] font-medium capitalize transition-colors disabled:opacity-50 ${
-                        user?.role === role
-                          ? "bg-white text-slate-900 shadow-sm"
-                          : "text-slate-500 hover:text-slate-900"
-                      }`}
-                    >
-                      {role}
-                    </button>
-                  ))}
-                </div>
-              )}
+  if (!adminLayout) {
+    const topLink =
+      "rounded-md px-1 py-2 text-navy-text no-underline hover:text-paper";
+    return (
+      <div className="min-h-screen bg-canvas text-ink">
+        <header className="bg-navy text-[#E6ECF3]">
+          <div className="mx-auto flex max-w-[1040px] flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-8">
+            <Link to="/my-key" className="no-underline">
+              <BrandMark logoUrl={config?.logo_url} />
+            </Link>
+            <nav
+              aria-label="Primary navigation"
+              className="flex flex-wrap items-center gap-x-[18px] gap-y-1 text-sm"
+            >
+              {demoSwitch}
+              {analyticsEnabled &&
+                (section === "/analytics" ? (
+                  <Link to="/my-key" className={topLink}>
+                    My key
+                  </Link>
+                ) : (
+                  <Link to="/analytics" className={topLink}>
+                    Analytics
+                  </Link>
+                ))}
               {config?.api_docs_url && (
                 <a
                   href={config.api_docs_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="hidden items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 sm:flex"
+                  className={topLink}
                 >
-                  <BookOpen size={14} /> Docs
+                  Setup guide
                 </a>
               )}
-              <ThemeToggle />
-              <button
-                onClick={() => void logout()}
-                aria-label="Sign out"
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900 ${isAdmin ? "md:hidden" : ""}`}
-              >
-                <LogOut size={14} />{" "}
-                <span className="hidden sm:inline">Sign out</span>
-              </button>
-            </div>
-          </div>
-          <nav
-            className="flex gap-1 overflow-x-auto border-t border-slate-100 px-3 py-2 md:hidden"
-            aria-label="Mobile navigation"
-          >
-            {navItems.map((item) => (
-              <NavLink key={item.to} to={item.to} className={navClass}>
-                <item.icon size={15} /> {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </header>
-
-        <main className="min-w-0 flex-1 overflow-y-auto px-4 py-7 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-6xl">
-            {section === "/users" && isAdmin ? (
-              <AdminUsers localUsersEnabled={localUsersEnabled} />
-            ) : section === "/organization" && canViewOrganization ? (
-              <>
-                <AdminOrganization />
-                {config?.hierarchical_budgets_enabled && <BudgetManager />}
-              </>
-            ) : section === "/analytics" && analyticsEnabled ? (
-              <PersonalAnalytics />
-            ) : section === "/teams" && isAdmin ? (
-              <AdminTeams />
-            ) : section === "/keys" && isAdmin ? (
-              <AdminKeys
-                saveApiKeysInDb={config?.save_api_keys_in_db}
-                enterpriseEnabled={config?.litellm_enterprise_enabled}
+              {adminHome && (
+                <Link to={adminHome} className={topLink}>
+                  Admin
+                </Link>
+              )}
+              <span aria-hidden="true" className="h-5 w-px bg-navy-3" />
+              <UserMenu
+                email={user?.email}
+                role={user?.role}
+                onSignOut={signOut}
               />
-            ) : section === "/status" && isAdmin ? (
-              <AdminStatus />
-            ) : (
-              <section className="w-full space-y-6">
-                <div>
-                  <p className="text-xs font-medium text-indigo-600">
-                    Virtual keys
-                  </p>
-                  <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-                    Your API access
-                  </h1>
-                  <p className="mt-1 max-w-2xl text-sm text-slate-500">
-                    Create and manage your governed LiteLLM key.{" "}
-                    {portal.isPending
-                      ? "Loading portal configuration..."
-                      : portal.isError
-                        ? "Portal configuration is unavailable. Retry before creating or replacing a key."
-                        : config?.save_api_keys_in_db
-                          ? "Saved keys can be shown again when you need them."
-                          : "Secrets are only shown once when created or regenerated."}
-                  </p>
-                  {portal.isError && (
-                    <button
-                      type="button"
-                      disabled={portal.isFetching}
-                      onClick={() => {
-                        void portal.refetch();
-                      }}
-                      className="mt-2 text-sm font-medium text-indigo-600 disabled:opacity-50"
-                    >
-                      Retry portal configuration
-                    </button>
-                  )}
-                </div>
-
-                {mutationError && (
-                  <DismissibleMessage
-                    role="alert"
-                    messageKey={(mutationError as Error).message}
-                    className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-                  >
-                    {(mutationError as Error).message}
-                  </DismissibleMessage>
-                )}
-                {keys.isError && (
-                  <button
-                    type="button"
-                    disabled={keys.isFetching}
-                    onClick={() => {
-                      void keys.refetch();
-                    }}
-                    className="text-sm font-medium text-indigo-600 disabled:opacity-50"
-                  >
-                    Retry key information
-                  </button>
-                )}
-                {operationsBlocked && (
-                  <DismissibleMessage
-                    messageKey="key-actions-paused"
-                    className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-                  >
-                    Key actions are paused. Try again in {retryAfter || 1}{" "}
-                    seconds.
-                  </DismissibleMessage>
-                )}
-                {newKey && !newKeyIdentifier && (
-                  <div>
-                    <p className="mb-3 text-sm text-emerald-900">
-                      Your API key is ready. Copy it before leaving this page.
-                    </p>
-                    <PersonalKeySecret
-                      identifier=""
-                      canReveal={false}
-                      initialSecret={newKey}
-                      onHide={() => setNewKey(null)}
-                    />
-                  </div>
-                )}
-                {confirmRegenerate && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-5">
-                    <p className="text-sm font-semibold text-amber-950">
-                      Replace the current key?
-                    </p>
-                    <p className="mt-1 text-sm text-amber-800">
-                      The old key stops working immediately. Replacing it can
-                      take about 15 seconds while its usage is carried over.
-                    </p>
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => regenerate.mutate()}
-                        disabled={regenerate.isPending || operationsBlocked}
-                        className="rounded-md bg-amber-600 px-4 py-2 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
-                      >
-                        {regenerate.isPending
-                          ? "Replacing..."
-                          : operationsBlocked
-                            ? "Temporarily paused"
-                            : "Replace key"}
-                      </button>
-                      <button
-                        onClick={() => setConfirmRegenerate(false)}
-                        className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {keys.isLoading ? (
-                  <div className="h-44 animate-pulse rounded-lg border border-slate-200 bg-white" />
-                ) : (
-                  keyList.map((keyInfo, index) => (
-                    <KeyCard
-                      key={keyInfo.token ?? index}
-                      keyInfo={keyInfo}
-                      initialSecret={
-                        keyToken(keyInfo) === newKeyIdentifier ? newKey : null
-                      }
-                      canReveal={
-                        !!config?.save_api_keys_in_db &&
-                        !!keyInfo.secret_available
-                      }
-                      onHide={() => setNewKey(null)}
-                    />
-                  ))
-                )}
-                {!keys.isLoading && !confirmRegenerate && !newKey && (
-                  <div className="w-full">
-                    {portal.isPending ||
-                    portal.isError ? null : keys.isPending || keys.isError ? (
-                      <p className="text-sm text-slate-500">
-                        {keys.isPending
-                          ? "Loading key information…"
-                          : "Key information is unavailable. Retry before creating or replacing a key."}
-                      </p>
-                    ) : !hasKey ? (
-                      <button
-                        onClick={() => create.mutate()}
-                        disabled={create.isPending || operationsBlocked}
-                        className={primaryKeyActionClassName}
-                      >
-                        <Zap size={21} />{" "}
-                        {create.isPending
-                          ? "Creating..."
-                          : operationsBlocked
-                            ? "Key actions paused"
-                            : "Create API key"}
-                      </button>
-                    ) : config?.save_api_keys_in_db &&
-                      keyList.some((key) => key.secret_available) ? null : (
-                      <button
-                        onClick={() => setConfirmRegenerate(true)}
-                        disabled={operationsBlocked}
-                        className={primaryKeyActionClassName}
-                      >
-                        <RefreshCw size={21} />{" "}
-                        {operationsBlocked
-                          ? "Regeneration paused"
-                          : "Regenerate key"}
-                      </button>
-                    )}
-                  </div>
-                )}
-                {config?.my_key_text?.trim() && (
-                  <p
-                    aria-label="My key guidance"
-                    className="w-full whitespace-pre-wrap break-words text-sm text-slate-500"
-                  >
-                    {config.my_key_text}
-                  </p>
-                )}
-                {hasKey && (
-                  <AccessSnapshot
-                    keys={keyList}
-                    unavailable={keys.isError}
-                    loading={keys.isPending}
-                  />
-                )}
-                {(config?.litellm_ui_url || config?.support_ticket_url) && (
-                  <div className="grid w-full gap-3 border-t border-slate-200 pt-5">
-                    {config.litellm_ui_url && (
-                      <a
-                        href={config.litellm_ui_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex min-h-14 w-full items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-6 py-4 text-base font-semibold text-indigo-600 hover:bg-indigo-100 hover:text-indigo-800"
-                      >
-                        <ExternalLink size={15} /> Open LiteLLM model hub
-                      </a>
-                    )}
-                    {config.support_ticket_url && (
-                      <a
-                        href={config.support_ticket_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex min-h-16 w-full items-center justify-center gap-3 rounded-lg border-2 border-slate-300 bg-white px-8 py-5 text-lg font-semibold text-slate-800 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
-                      >
-                        <Ticket size={21} /> Support
-                      </a>
-                    )}
-                  </div>
-                )}
-              </section>
-            )}
+            </nav>
           </div>
+        </header>
+        <main className="mx-auto max-w-[1080px] px-4 pb-14 pt-9 sm:px-8">
+          {section === "/analytics" ? <PersonalAnalytics /> : myKey}
+        </main>
+      </div>
+    );
+  }
+
+  const navGroups: NavGroup[] = [
+    {
+      label: "Workspace",
+      items: [
+        { to: "/my-key", label: "My key", icon: KeyRound },
+        ...(analyticsEnabled
+          ? [{ to: "/analytics", label: "Analytics", icon: Activity }]
+          : []),
+      ],
+    },
+    {
+      label: "Manage",
+      items: [
+        { to: "/organization", label: "Organization", icon: LayoutGrid },
+        ...(isAdmin
+          ? [
+              { to: "/teams", label: "Teams", icon: Users },
+              { to: "/keys", label: "Keys", icon: List },
+              { to: "/users", label: "People", icon: UserIcon },
+            ]
+          : []),
+      ],
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: "System",
+            items: [
+              { to: "/status#audit", label: "Audit log", icon: Clock3 },
+              {
+                to: "/status",
+                label: "Status",
+                icon: Activity,
+                dot: systemStatus.data
+                  ? systemStatus.data.ready
+                    ? ("ok" as const)
+                    : ("bad" as const)
+                  : undefined,
+              },
+            ],
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div className="min-h-screen bg-canvas text-ink md:flex md:h-screen md:overflow-hidden">
+      <AdminSidebar
+        groups={navGroups}
+        logoUrl={config?.logo_url}
+        email={user?.email}
+        role={user?.role}
+        onSignOut={signOut}
+        extra={demoSwitch}
+      />
+      <div className="min-w-0 flex-1 md:flex md:flex-col">
+        <main className="min-w-0 flex-1 md:overflow-y-auto">
+          {section === "/organization" && canViewOrganization ? (
+            <>
+              <AdminOrganization
+                budgetsEnabled={!!config?.hierarchical_budgets_enabled}
+                email={user?.email}
+                isAdmin={isAdmin}
+              />
+              {config?.hierarchical_budgets_enabled && (
+                <div className="px-4 pb-8 sm:px-8">
+                  <BudgetManager />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-8">
+              {section === "/users" && isAdmin ? (
+                <AdminUsers localUsersEnabled={localUsersEnabled} />
+              ) : section === "/teams" && isAdmin ? (
+                <AdminTeams />
+              ) : section === "/keys" && isAdmin ? (
+                <AdminKeys
+                  saveApiKeysInDb={config?.save_api_keys_in_db}
+                  enterpriseEnabled={config?.litellm_enterprise_enabled}
+                />
+              ) : section === "/status" && isAdmin ? (
+                <AdminStatus />
+              ) : null}
+            </div>
+          )}
         </main>
       </div>
     </div>

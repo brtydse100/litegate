@@ -30,11 +30,17 @@ it("loads and copies the actual stored secret instead of its identifier, then hi
 it("does not offer to copy a hash when no stored secret exists", () => {
   const reveal = vi.spyOn(api, "revealKey");
   render(
-    <PersonalKeySecret identifier="hashed-identifier" canReveal={false} />,
+    <PersonalKeySecret
+      identifier="hashed-identifier"
+      canReveal={false}
+      preview="sk-••••7f3a"
+    />,
   );
+  expect(screen.getByText("sk-••••7f3a")).toBeVisible();
+  expect(screen.queryByText("hashed-identifier")).not.toBeInTheDocument();
   expect(
-    screen.getByText(/LiteGate has no saved copy of this key to show/),
-  ).toBeVisible();
+    screen.queryByRole("button", { name: "Show API key" }),
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: "Copy API key" }),
   ).not.toBeInTheDocument();

@@ -22,18 +22,18 @@ reveal their own keys and administrators can reveal them from the key list.
 The default remains one-time secret display without key storage. Rotation holds
 the owner lock from the spend snapshot through old-key revocation, preventing
 simultaneous rotations from leaving multiple replacement allowances.
-The personal key summary shows the actual stored secret in a prominent green
-panel above the information card, with 14px text and an accessible copy icon.
-The full-width **Show API key** / **Hide API key** button uses the same primary
-style as **Create API key** and spans the information card's width. Created and
-revealed secrets share the same green panel and position.
+The **My key** page has no sidebar for regular users. A budget ring shows the
+amount left in the current period, when it refills, spend per day and whether
+spend is on pace; a side column shows key status, team, models, rate limit and
+expiry. Everything comes from the single `/api/keys` response. The key card shows
+the masked key with **Show** and **Copy** controls; created and revealed
+secrets appear in the same highlighted field.
 It loads through the authorized reveal endpoint and stays in component memory.
 Hashes are never offered as usable API keys. Without stored
 secrets, newly created keys remain copyable until hidden or the page is left.
-After creating or regenerating a one-time key, the action below the information
-card switches to **Hide API key**. Hiding the secret restores the regeneration
-action, subject to the existing cooldown. The page does not show separate hide
-and regeneration buttons while that secret is visible.
+After creating or regenerating a one-time key, the **Regenerate key** button is
+hidden until the secret is hidden with **Hide**, subject to the existing
+cooldown.
 
 Personal spend is displayed to six decimal places. Regeneration uses the normal
 `name's key` name without a rotation suffix while retaining spend and verified

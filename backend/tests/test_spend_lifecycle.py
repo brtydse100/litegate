@@ -141,6 +141,21 @@ async def test_homepage_api_uses_live_spend_over_stale_zero(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_homepage_api_passes_budget_reset_and_masked_name_through(monkeypatch):
+    """The My key page shows the refill date and masked key from this response."""
+    from app.models import CurrentUser
+    from app.routers.keys import list_keys
+
+    info = {"user_id": "owner", "spend": 1, "budget_reset_at": "2026-12-01T00:00:00Z", "key_name": "sk-...7f3a"}
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[{"token": "hashed"}]))
+    monkeypatch.setattr(litellm, "get_key_info", AsyncMock(return_value=info))
+    monkeypatch.setattr(organization_personal, "personal_policy", AsyncMock(return_value=None))
+    [key] = (await list_keys(CurrentUser(user_id="owner", email="owner@example.invalid")))["keys"]
+    assert key["budget_reset_at"] == "2026-12-01T00:00:00Z"
+    assert key["key_name"] == "sk-...7f3a"
+
+
+@pytest.mark.asyncio
 async def test_ambiguous_source_counter_decrease_cannot_approve_zero_replacement(monkeypatch):
     from app.services import key_spend
 

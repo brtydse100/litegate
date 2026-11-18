@@ -94,7 +94,7 @@ test("@smoke administrator navigation has stable routes and global selection", a
   const usersRequest = page.waitForRequest(
     (request) => new URL(request.url()).pathname === "/api/v1/users",
   );
-  await page.getByRole("link", { name: "Local users" }).click();
+  await page.getByRole("link", { name: "People", exact: true }).click();
   await usersRequest;
   await expect(
     page.getByRole("heading", { name: "People and local access" }),
@@ -107,14 +107,13 @@ test("@smoke normal users cannot open administrator routes", async ({
   await mockApi(page, "user");
   await page.goto("/keys");
   await expect(page).toHaveURL(/\/my-key$/);
+  await expect(page.getByRole("heading", { name: "My key" })).toBeAttached();
   await expect(
-    page.getByRole("heading", { name: "Your API access" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("navigation", { name: "Primary navigation" }),
+    page.getByRole("navigation", { name: "Admin navigation" }),
   ).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Local users" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Admin" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
 });
 
 test("local-user navigation follows the deployment setting", async ({
@@ -132,7 +131,9 @@ test("local-user navigation follows the deployment setting", async ({
   await expect(
     page.getByRole("button", { name: "Add user", exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Local users" })).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "People", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
 });
 
 test("administrator can create, edit, move a member, and delete a team", async ({

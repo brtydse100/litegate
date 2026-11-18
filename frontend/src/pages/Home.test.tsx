@@ -11,7 +11,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import type { KeyInfo } from "../types";
-import Home, { AccessSnapshot } from "./Home";
+import Home from "./Home";
+import { BudgetCard, DetailsCard, StatusCard, keyAccessStatus } from "./MyKey";
 
 vi.mock("../hooks/useAuth", () => ({
   useAuth: () => ({
@@ -30,36 +31,36 @@ function keyWithModels(models: string[]): KeyInfo {
   return { spend: 0, models };
 }
 
-describe("model access snapshot", () => {
+describe("key status and details", () => {
   it.each([
     [{ blocked: true }, "Blocked"],
     [{ expires: "2000-01-01T00:00:00Z" }, "Expired"],
     [{ max_budget: 1, spend: 1 }, "Budget reached"],
   ])("shows known access restrictions (%j)", (state, label) => {
-    render(<AccessSnapshot keys={[{ models: [], spend: 0, ...state }]} />);
+    const key: KeyInfo = { models: [], spend: 0, ...state };
+    render(<StatusCard keyInfo={key} status={keyAccessStatus(key)} />);
     expect(screen.getByText(label)).toBeVisible();
-    expect(screen.queryByText("Ready")).not.toBeInTheDocument();
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
   });
+
   it("reveals the accessible model names when clicked", () => {
     render(
-      <AccessSnapshot
+      <DetailsCard
         keys={[
           keyWithModels(["gpt-5", "claude-sonnet-4"]),
-          keyWithModels(["gpt-5", "gemini-2.5-pro"]),
+          keyWithModels(["gpt-5", "gemini-2.5-pro", "o3"]),
         ]}
       />,
     );
-
-    const toggle = screen.getByRole("button", { name: /model access/i });
+    const toggle = screen.getByRole("button", { name: "4 models" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("gpt-5")).not.toBeInTheDocument();
-
     fireEvent.click(toggle);
-
     expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("claude-sonnet-4")).toBeVisible();
-    expect(screen.getByText("gemini-2.5-pro")).toBeVisible();
-    expect(screen.getByText("gpt-5")).toBeVisible();
+    const list = screen.getByRole("list", { name: "Accessible models" });
+    expect(within(list).getByText("claude-sonnet-4")).toBeVisible();
+    expect(within(list).getByText("gemini-2.5-pro")).toBeVisible();
+    expect(within(list).getByText("gpt-5")).toBeVisible();
   });
 
   it("interprets timezone-less expiration as UTC outside UTC browsers", () => {
@@ -67,13 +68,13 @@ describe("model access snapshot", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-11-16T12:30:00Z"));
     try {
-      render(
-        <AccessSnapshot
-          keys={[{ models: [], spend: 0, expires: "2026-11-16T12:00:00" }]}
-        />,
-      );
-      expect(screen.getByText("Expired")).toBeVisible();
-      expect(screen.queryByText("Ready")).not.toBeInTheDocument();
+      expect(
+        keyAccessStatus({
+          models: [],
+          spend: 0,
+          expires: "2026-11-16T12:00:00",
+        }),
+      ).toBe("Expired");
     } finally {
       vi.useRealTimers();
       vi.unstubAllEnvs();
@@ -81,13 +82,35 @@ describe("model access snapshot", () => {
   });
 
   it("explains unrestricted access without inventing model names", () => {
-    render(<AccessSnapshot keys={[keyWithModels([])]} />);
+    render(<DetailsCard keys={[keyWithModels(["all-proxy-models"])]} />);
+    expect(screen.getByText("All models")).toBeVisible();
+    expect(screen.queryByText("all-proxy-models")).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: /model access/i }));
-
-    expect(
-      screen.getByText(/access all models available through this LiteLLM/i),
-    ).toBeVisible();
+  it("shows the remaining budget, refill date and pace from key metadata", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-19T00:00:00Z"));
+    try {
+      render(
+        <BudgetCard
+          keyInfo={{
+            models: [],
+            spend: 18.42,
+            max_budget: 100,
+            budget_duration: "30d",
+            budget_reset_at: "2026-12-01T00:00:00Z",
+          }}
+        />,
+      );
+      expect(
+        screen.getByRole("img", { name: "82% of budget remaining" }),
+      ).toBeVisible();
+      expect(screen.getByText("$81.58")).toBeVisible();
+      expect(screen.getByText(/Refills to \$100\.00 in 12 days/)).toBeVisible();
+      expect(screen.getByText("On track")).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -188,9 +211,9 @@ describe("personal key storage", () => {
 
   it("names the mobile sign-out control even when its text is hidden", async () => {
     renderHome(false, false);
-    await screen.findByText("Virtual key");
-    const mobile = screen.getByRole("button", { name: "Sign out" });
-    expect(mobile).toHaveAttribute("aria-label", "Sign out");
+    await screen.findByText("YOUR API KEY");
+    fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
   });
 
   it("keeps plain multiline guidance beneath the action before and after key creation", async () => {
@@ -211,7 +234,7 @@ describe("personal key storage", () => {
       message,
     );
     const action = await screen.findByRole("button", {
-      name: "Create API key",
+      name: "Create my API key",
     });
     const guidance = screen.getByText(/Keep this key safe/);
     expect(guidance.textContent).toBe(message);
@@ -227,7 +250,6 @@ describe("personal key storage", () => {
     expect(
       screen.queryByRole("button", { name: /regenerat/i }),
     ).not.toBeInTheDocument();
-    expect(hide.closest("article")).toBeNull();
     expect(guidance).toBeVisible();
     expect(
       hide.compareDocumentPosition(guidance) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -237,11 +259,6 @@ describe("personal key storage", () => {
     expect(
       await screen.findByRole("button", { name: "Regenerate key" }),
     ).toBeVisible();
-    const models = screen.getByRole("button", { name: /model access/i });
-    expect(
-      guidance.compareDocumentPosition(models) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
   });
 
   it("uses one action to hide a regenerated secret and then restores regeneration", async () => {
@@ -278,7 +295,6 @@ describe("personal key storage", () => {
     expect(
       screen.queryByRole("button", { name: /regenerat/i }),
     ).not.toBeInTheDocument();
-    expect(hide.closest("article")).toBeNull();
     fireEvent.click(hide);
     expect(
       screen.queryByText("sk-synthetic-regenerated"),
@@ -325,7 +341,7 @@ describe("personal key storage", () => {
         false,
         message,
       );
-      await screen.findByText("Virtual key");
+      await screen.findByText("YOUR API KEY");
       expect(
         screen.queryByLabelText("My key guidance"),
       ).not.toBeInTheDocument();
@@ -334,22 +350,22 @@ describe("personal key storage", () => {
 
   it("offers no replacement after key lookup fails with a cached key", async () => {
     const { list, client } = renderHome(false, false);
-    await screen.findByText("Virtual key");
+    await screen.findByText("YOUR API KEY");
     list.mockRejectedValue(new Error("Lookup unavailable"));
     await act(async () => {
       await client.invalidateQueries({ queryKey: ["keys"] });
     });
     await screen.findByText(/Key information is unavailable/);
     expect(
-      screen.queryByRole("button", { name: /regenerat|create API key/i }),
+      screen.queryByRole("button", { name: /regenerat|create my API key/i }),
     ).not.toBeInTheDocument();
   });
 
   it("offers no replacement while key lookup is pending", async () => {
     renderHome(true, false, {}, undefined, false, false, undefined, true);
-    await screen.findByText(/Saved keys can be shown again/);
+    await screen.findByText(/Loading key information/);
     expect(
-      screen.queryByRole("button", { name: /regenerat|create API key/i }),
+      screen.queryByRole("button", { name: /regenerat|create my API key/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -404,7 +420,7 @@ describe("personal key storage", () => {
     expect(screen.getByRole("button", { name: "Copy API key" })).toBeEnabled();
   });
 
-  it("shows the stored key above its summary with the toggle inside the card during a cooldown", async () => {
+  it("shows the stored key in the key card with its toggle during a cooldown", async () => {
     const reveal = vi
       .spyOn(api, "revealKey")
       .mockResolvedValue({ key: "sk-synthetic-personal" });
@@ -414,12 +430,8 @@ describe("personal key storage", () => {
     ).not.toBeInTheDocument();
     expect(await screen.findByText("sk-synthetic-personal")).toBeVisible();
     expect(reveal).toHaveBeenCalledWith("hashed-key");
-    const card = screen.getByText("Virtual key").closest("article")!;
-    const secret = screen.getByText("sk-synthetic-personal");
-    expect(card.contains(secret)).toBe(false);
-    expect(
-      secret.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    const card = screen.getByRole("region", { name: "Key" });
+    expect(within(card).getByText("sk-synthetic-personal")).toBeVisible();
     expect(
       within(card).getByRole("button", { name: "Hide API key" }),
     ).toBeVisible();
@@ -430,7 +442,7 @@ describe("personal key storage", () => {
     expect(await screen.findByText("sk-synthetic-personal")).toBeVisible();
   });
 
-  it("uses the same green panel above the summary after creating and revealing a key", async () => {
+  it("uses the same highlighted field after creating and revealing a key", async () => {
     vi.spyOn(api, "createKey").mockResolvedValue({
       key: "sk-synthetic-created",
       user_id: "owner",
@@ -440,16 +452,16 @@ describe("personal key storage", () => {
     });
     renderHome(true, true, {}, undefined, false, true);
     fireEvent.click(
-      await screen.findByRole("button", { name: "Create API key" }),
+      await screen.findByRole("button", { name: "Create my API key" }),
     );
-    await screen.findByText("Virtual key");
+    await screen.findByText("YOUR API KEY");
     await waitFor(() =>
       expect(screen.getByText("sk-synthetic-created")).toBeVisible(),
     );
     const createdPanel = screen.getByText(
       "sk-synthetic-created",
     ).parentElement!;
-    expect(createdPanel).toHaveClass("bg-emerald-50", "border-emerald-200");
+    expect(createdPanel).toHaveClass("bg-mint-tint");
     fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "Show API key" }),
@@ -466,10 +478,10 @@ describe("personal key storage", () => {
       createdPanel.className,
     );
     expect(
-      revealed.compareDocumentPosition(
-        screen.getByText("Virtual key").closest("article")!,
-      ) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+      within(screen.getByRole("region", { name: "Key" })).getByText(
+        "sk-synthetic-created",
+      ),
+    ).toBeVisible();
   });
 
   it.each([
@@ -496,7 +508,8 @@ describe("personal key storage", () => {
       user_spend: 60,
       policy_error: "Budget update failed",
     });
-    expect(await screen.findByText("$200")).toBeVisible();
+    expect(await screen.findByText("of $200.00")).toBeVisible();
+    expect(screen.getByText("$140.00")).toBeVisible();
     expect(screen.getByText("$60.00")).toBeVisible();
     expect(screen.getByRole("alert")).toHaveTextContent("Budget update failed");
   });
@@ -582,7 +595,7 @@ describe("personal key storage", () => {
       expect(await screen.findByText("Key service unavailable")).toBeVisible();
       expect(
         screen.queryByRole("button", {
-          name: /Create API key|Key actions paused/,
+          name: /Create my API key|Key actions paused/,
         }),
       ).not.toBeInTheDocument();
       expect(

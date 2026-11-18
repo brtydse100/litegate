@@ -1,594 +1,964 @@
-import { useState } from "react";
-import { useQuery, useQueries } from "@tanstack/react-query";
-import { ChevronRight, Network, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { BarChart3, Network } from "lucide-react";
 import { api } from "../api/client";
-import EmailAddress from "./EmailAddress";
 import DismissibleMessage from "./DismissibleMessage";
-import type { OrganizationNode } from "../types/organization";
+import GroupPanel from "./organization/GroupPanel";
+import OrgReport from "./organization/OrgReport";
 import {
-  metricLabels,
-  metricValue,
-  SpendTrend,
-  UsageBars,
-  type UsageMetric,
-} from "./OrganizationCharts";
+  groupInitials,
+  hueFor,
+  percent,
+  plural,
+  shortMoney,
+  type Group,
+} from "./organization/orgModel";
+import type { OrganizationGroup } from "../types/organization";
 
-const inputClass =
-  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900";
-const money = (value: number | null) =>
-  value === null ? "No cap" : metricValue(value, "spend");
+const NEAR = 80;
+const ATTENTION = 85;
+/** Rows indent up to this many levels before the table re-roots. */
+const MAX_DEPTH = 3;
+const columns =
+  "grid min-w-[700px] grid-cols-[minmax(0,2fr)_minmax(0,0.7fr)_minmax(0,1.9fr)_minmax(0,0.8fr)] items-center gap-4";
+
+function greeting(email?: string) {
+  const hour = new Date().getHours();
+  const part = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+  const local = email?.split("@")[0]?.split(/[._-]/)[0] ?? "";
+  const name = local ? local[0].toUpperCase() + local.slice(1) : "";
+  return `Good ${part}${name ? `, ${name}` : ""}`;
+}
+
+function within(group: Pick<Group, "path">, ancestor: Pick<Group, "path">) {
+  return (
+    group.path.length > ancestor.path.length &&
+    ancestor.path.every((name, index) => group.path[index] === name)
+  );
+}
 
 function treeOrder(
-  groups: OrganizationNode[],
-  expanded: Set<string>,
-  parent: string | null = null,
-): OrganizationNode[] {
+  groups: Group[],
+  expanded: (id: string) => boolean,
+  parent: string | null,
+): Group[] {
   return groups
     .filter((group) => group.parent_id === parent)
     .flatMap((group) => [
       group,
-      ...(expanded.has(group.id) ? treeOrder(groups, expanded, group.id) : []),
+      ...(expanded(group.id) ? treeOrder(groups, expanded, group.id) : []),
     ]);
 }
 
-export default function AdminOrganization() {
-  const today = new Date().toISOString().slice(0, 10);
+function Metric({
+  accent,
+  caption,
+  children,
+  sub,
+  bar,
+}: {
+  accent: string;
+  caption: string;
+  children: React.ReactNode;
+  sub: string;
+  bar?: number | null;
+}) {
+  return (
+    <div
+      className={`flex flex-col gap-1 rounded-[10px] border border-t-[3px] border-line bg-card px-[18px] pb-[18px] pt-4 ${accent}`}
+    >
+      <span className="text-xs font-semibold tracking-[0.04em] text-ink-4">
+        {caption}
+      </span>
+      <span className="inline-flex items-center gap-2.5 text-[28px] font-semibold text-ink">
+        {children}
+      </span>
+      <span className="text-[13px] text-ink-3">{sub}</span>
+      {bar != null && (
+        <span className="mt-2 block h-1 rounded-sm bg-line-soft">
+          <span
+            className="block h-1 rounded-sm bg-teal"
+            style={{ width: `${Math.min(100, bar)}%` }}
+          />
+        </span>
+      )}
+    </div>
+  );
+}
+
+export default function AdminOrganization({
+  budgetsEnabled = false,
+  email,
+  isAdmin = false,
+}: {
+  budgetsEnabled?: boolean;
+  email?: string;
+  /** Global administrators also see gateway readiness. */
+  isAdmin?: boolean;
+}) {
+  const [rootChoice, setRootChoice] = useState<string | null>(null);
+  const [tableChoice, setTableChoice] = useState<string | null>(null);
   const [nodeId, setNodeId] = useState<string | null>(null);
+  const [allGroupsReport, setAllGroupsReport] = useState(false);
   const [requestedParents, setRequestedParents] = useState<Set<string>>(
     () => new Set(),
   );
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [page, setPage] = useState(1);
-  const [metric, setMetric] = useState<UsageMetric>("spend");
-  const [startDate, setStartDate] = useState(() =>
-    new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10),
-  );
-  const [endDate, setEndDate] = useState(today);
-  const overview = useQuery({
+  const [expandAll, setExpandAll] = useState(false);
+  const [showIssues, setShowIssues] = useState(false);
+
+  const rootsQuery = useQuery({
     queryKey: ["organization-children", ""],
     queryFn: () => api.organizationChildren(),
     staleTime: 60000,
     refetchInterval: 60000,
   });
+  const enabled = rootsQuery.data?.enabled === true;
   const childQueries = useQueries({
     queries: [...requestedParents].map((parent) => ({
       queryKey: ["organization-children", parent],
       queryFn: () => api.organizationChildren(parent),
       staleTime: 60000,
-      refetchInterval: expanded.has(parent) ? 60000 : false,
+      refetchInterval: expanded.has(parent) ? 60000 : (false as const),
     })),
   });
-  const enabled = overview.data?.enabled === true;
-  const groups = [
-    ...(overview.data?.groups ?? []),
+  // Descendant spend totals; the server caches each team for 60 seconds.
+  const totals = useQuery({
+    queryKey: ["organization-overview"],
+    queryFn: api.organization,
+    enabled,
+    // Once per page open (and on Refresh); served from the shared team listing.
+    staleTime: 60000,
+  });
+  const status = useQuery({
+    queryKey: ["system-status"],
+    queryFn: api.getSystemStatus,
+    enabled: enabled && isAdmin,
+    refetchInterval: 30_000,
+  });
+  const budgets = useQuery({
+    queryKey: ["organization-budgets"],
+    queryFn: api.organizationBudgets,
+    enabled: enabled && budgetsEnabled,
+    retry: false,
+  });
+
+  const levels = rootsQuery.data?.levels ?? [];
+  const roots = rootsQuery.data?.groups ?? [];
+  const loaded = new Map<string, Group>();
+  for (const group of [
+    ...roots,
     ...childQueries.flatMap((query) => query.data?.groups ?? []),
-  ];
+  ])
+    loaded.set(group.id, group);
+  const full = new Map<string, OrganizationGroup>(
+    (totals.data?.groups ?? []).map((group) => [group.id, group]),
+  );
+  // Overview groups fill in rows that were not expanded yet (e.g. from
+  // "Needs attention"); loaded nodes keep their own has_children flag.
+  for (const group of full.values())
+    if (!loaded.has(group.id))
+      loaded.set(group.id, {
+        ...group,
+        has_children: [...full.values()].some(
+          (other) => other.parent_id === group.id,
+        ),
+      });
+  const withSpend = (group: Group): Group => ({
+    ...group,
+    group_spend: full.get(group.id)?.group_spend ?? group.group_spend,
+    sync_error: full.get(group.id)?.sync_error ?? group.sync_error,
+  });
+  const groups = [...loaded.values()].map(withSpend);
+  const byId = new Map(groups.map((group) => [group.id, group]));
+
+  const root = byId.get(rootChoice ?? "") ?? roots[0];
+  const tableRoot =
+    byId.get(tableChoice ?? "") && root && within(byId.get(tableChoice!)!, root)
+      ? byId.get(tableChoice!)!
+      : root;
+  const rootChildren = groups
+    .filter((group) => group.parent_id === root?.id)
+    .map((group) => group.id);
+  const hue = (group: Group) =>
+    group.id === root?.id
+      ? hueFor(
+          group,
+          null,
+          byId,
+          roots.map((item) => item.id),
+        )
+      : hueFor(group, root?.id ?? null, byId, rootChildren);
+  const depth = (group: Group) => group.level - (tableRoot?.level ?? 0) - 1;
+  const isExpanded = (id: string) => {
+    const group = byId.get(id);
+    if (!group?.has_children) return false;
+    return expanded.has(id) || (expandAll && depth(group) < MAX_DEPTH - 1);
+  };
+  const rows = tableRoot ? treeOrder(groups, isExpanded, tableRoot.id) : [];
+
+  // Load the table root's children and, in expand-all mode, every visible branch.
+  const wanted = [
+    tableRoot?.has_children ? tableRoot.id : null,
+    ...rows
+      .filter((group) => group.has_children && isExpanded(group.id))
+      .map((group) => group.id),
+  ]
+    .filter((id): id is string => !!id && !requestedParents.has(id))
+    .join("\n");
+  useEffect(() => {
+    if (wanted)
+      setRequestedParents(
+        (current) => new Set([...current, ...wanted.split("\n")]),
+      );
+  }, [wanted]);
+
+  const selected = nodeId ? byId.get(nodeId) : undefined;
+  if (nodeId && rootsQuery.data && !selected && !totals.isPending)
+    setNodeId(null);
   const detail = useQuery({
     queryKey: ["organization-group", nodeId],
     queryFn: () => api.organizationGroup(nodeId!),
-    enabled: enabled && !!nodeId && groups.some((group) => group.id === nodeId),
+    enabled: enabled && !!selected,
     staleTime: 60000,
     refetchInterval: 60000,
   });
-  const validSelection = !nodeId || groups.some((group) => group.id === nodeId);
-  if (!validSelection) {
-    setNodeId(null);
-    setPage(1);
+
+  function request(id: string) {
+    if (byId.get(id)?.has_children)
+      setRequestedParents((current) => new Set(current).add(id));
   }
-  const reportEnabled = enabled && nodeId !== null && validSelection;
-  const usage = useQuery({
-    queryKey: ["organization-usage", nodeId, startDate, endDate],
-    queryFn: () => api.organizationUsage(nodeId ?? "", startDate, endDate),
-    enabled: reportEnabled,
-    staleTime: 60000,
-  });
-  const users = useQuery({
-    queryKey: ["organization-users", nodeId, page],
-    queryFn: () => api.organizationUsers(nodeId ?? "", page),
-    enabled: reportEnabled,
-    staleTime: 60000,
-    refetchInterval: 60000,
-  });
-  const selected = groups.find((group) => group.id === nodeId);
-  const selectedDetail = detail.data;
-  const budgetSource = groups.find(
-    (group) => group.id === selected?.budget_source,
-  );
-  const nextLevel = overview.data?.levels[(selected?.level ?? -1) + 1];
-  const showMembers = !!selected && !selected.has_children;
-  const hasMemberUsage = Array.isArray(usage.data?.by_user);
+  function select(id: string) {
+    const group = byId.get(id);
+    if (!group) return;
+    setNodeId(id);
+    setAllGroupsReport(false);
+    request(id);
+    const owner = roots.find((item) => item.id === id || within(group, item));
+    if (owner && owner.id !== root?.id) setRootChoice(owner.id);
+    // Reveal the row: expand its ancestors, re-rooting when it sits too deep.
+    const chain: Group[] = [];
+    let parent = group.parent_id ? byId.get(group.parent_id) : undefined;
+    while (parent && parent.id !== (owner?.id ?? null)) {
+      chain.unshift(parent);
+      parent = parent.parent_id ? byId.get(parent.parent_id) : undefined;
+    }
+    const base = owner ?? root;
+    const relative = group.level - (base?.level ?? 0) - 1;
+    const anchor =
+      relative >= MAX_DEPTH && group.parent_id
+        ? byId.get(group.parent_id)
+        : undefined;
+    setTableChoice(anchor?.id ?? null);
+    setExpanded((current) => {
+      const next = new Set(current);
+      chain.forEach((item) => next.add(item.id));
+      return next;
+    });
+    chain.forEach((item) => request(item.id));
+  }
+  function toggle(group: Group) {
+    if (depth(group) >= MAX_DEPTH - 1) {
+      setTableChoice(group.id);
+      request(group.id);
+      return;
+    }
+    const open = isExpanded(group.id);
+    setExpandAll(false);
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (expandAll)
+        rows
+          .filter((row) => isExpanded(row.id))
+          .forEach((row) => next.add(row.id));
+      if (open) next.delete(group.id);
+      else next.add(group.id);
+      return next;
+    });
+    if (!open) request(group.id);
+  }
+  function chooseRoot(id: string) {
+    setRootChoice(id);
+    setTableChoice(null);
+    setNodeId(null);
+  }
+
   const refreshing =
-    overview.isFetching ||
-    childQueries.some((query) => query.isFetching) ||
-    (reportEnabled &&
-      (detail.isFetching || usage.isFetching || users.isFetching));
+    rootsQuery.isFetching ||
+    totals.isFetching ||
+    childQueries.some((query) => query.isFetching);
   const refreshButton = (
     <button
       type="button"
       disabled={refreshing}
       onClick={() => {
-        void overview.refetch();
+        void rootsQuery.refetch();
+        void totals.refetch();
         childQueries.forEach((query) => {
           void query.refetch();
         });
-        if (reportEnabled) {
-          if (nodeId) void detail.refetch();
-          void usage.refetch();
-          void users.refetch();
-        }
+        if (selected) void detail.refetch();
       }}
-      className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 disabled:opacity-50"
+      className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas disabled:opacity-50"
     >
       Refresh organization
     </button>
   );
 
-  function requestChildren(id: string) {
-    if (!groups.find((group) => group.id === id)?.has_children) return;
-    setRequestedParents((current) => new Set(current).add(id));
-  }
-  function selectGroup(id: string) {
-    setNodeId(id);
-    setPage(1);
-    requestChildren(id);
-    setExpanded((current) => {
-      const next = new Set(current).add(id);
-      let parent = groups.find((group) => group.id === id)?.parent_id;
-      while (parent) {
-        next.add(parent);
-        parent = groups.find((group) => group.id === parent)?.parent_id;
-      }
-      return next;
-    });
-  }
-  function toggleGroup(id: string) {
-    if (!expanded.has(id)) selectGroup(id);
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (expanded.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-  function selectChild(id: string) {
-    const child = groups.find(
-      (group) => group.id === id && group.parent_id === (selected?.id ?? null),
-    );
-    if (child) selectGroup(child.id);
-  }
-
-  if (overview.isPending)
-    return <p className="text-sm text-slate-500">Loading organization…</p>;
-  if (overview.error)
+  if (rootsQuery.isPending)
+    return <p className="p-8 text-sm text-ink-4">Loading organization…</p>;
+  if (rootsQuery.error)
     return (
-      <div className="space-y-3">
+      <div className="flex flex-col items-start gap-3 p-8">
         <p
           role="alert"
-          className="rounded-lg bg-red-50 p-4 text-sm text-red-700"
+          className="rounded-lg border border-danger-line bg-danger-tint p-4 text-sm text-danger"
         >
-          {overview.error.message}
+          {rootsQuery.error.message}
         </p>
         {refreshButton}
       </div>
     );
   if (!enabled)
     return (
-      <section className="rounded-lg border border-slate-200 bg-white p-8">
-        <Network className="text-indigo-500" />
-        <h1 className="mt-4 text-lg font-semibold">Organization</h1>
-        <p className="mt-2 text-sm text-slate-500">
-          Configure organizationHierarchy in your deployment configuration to
-          organize users and manage their budgets.
-        </p>
-        <div className="mt-4">{refreshButton}</div>
-      </section>
+      <div className="p-8">
+        <section className="rounded-xl border border-line bg-card p-8">
+          <Network className="text-blue" aria-hidden="true" />
+          <h1 className="mt-4 text-lg font-semibold text-ink">Organization</h1>
+          <p className="mt-2 text-sm text-ink-4">
+            Configure organizationHierarchy in your deployment configuration to
+            organize users and manage their budgets.
+          </p>
+          <div className="mt-4">{refreshButton}</div>
+        </section>
+      </div>
     );
 
+  const rootTotals = root ? full.get(root.id) : undefined;
+  const subtree = [...full.values()].filter(
+    (group) => root && within(group, root),
+  );
+  const near = subtree.filter(
+    (group) => (percent(group.group_spend, group.group_total) ?? 0) >= NEAR,
+  );
+  const issues = rootsQuery.data?.issues ?? [];
+  const syncErrors = subtree.filter((group) => group.sync_error);
+  const attention: Array<{
+    key: string;
+    tone: string;
+    title: string;
+    sub: string;
+    action: string;
+    button: string;
+    onClick: () => void;
+  }> = [
+    ...subtree
+      .map((group) => ({
+        group,
+        used: percent(group.group_spend, group.group_total) ?? 0,
+      }))
+      .filter((item) => item.used >= ATTENTION)
+      .sort((left, right) => right.used - left.used)
+      .map(({ group, used }) => ({
+        key: `budget-${group.id}`,
+        tone: "bg-sand",
+        title: `${group.name} at ${used}%`,
+        sub: group.path.join(" › "),
+        action: "Review",
+        button: "bg-sand-tint text-sand-ink",
+        onClick: () => select(group.id),
+      })),
+    ...(issues.length
+      ? [
+          {
+            key: "issues",
+            tone: "bg-blue",
+            title: `${plural(issues.length, "person")} without a group`,
+            sub: issues[0].error,
+            action: showIssues ? "Hide" : "Details",
+            button: "bg-blue-tint text-blue-ink",
+            onClick: () => setShowIssues((value) => !value),
+          },
+        ]
+      : []),
+    ...syncErrors.map((group) => ({
+      key: `sync-${group.id}`,
+      tone: "bg-periwinkle",
+      title: `${group.name} policy not synced`,
+      sub: group.sync_error ?? "",
+      action: "View",
+      button: "bg-periwinkle-tint text-periwinkle-ink",
+      onClick: () => select(group.id),
+    })),
+  ].slice(0, 3);
+  const healthy =
+    (!status.data || status.data.ready) && !issues.length && !syncErrors.length;
+  const directChildren = groups.filter((group) => group.parent_id === root?.id);
+  const splitTotal = directChildren.reduce(
+    (sum, group) => sum + (group.group_spend ?? 0),
+    0,
+  );
+  const rootLevel = root ? levels[root.level] : undefined;
+  const childLevel = (group: Group) => levels[group.level + 1];
+  const tableChain: Group[] = [];
+  for (
+    let item: Group | undefined = tableRoot;
+    item && root && item.id !== root.id;
+    item = item.parent_id ? byId.get(item.parent_id) : undefined
+  )
+    tableChain.unshift(item);
+  const childCount = (group: Group) =>
+    groups.filter((item) => item.parent_id === group.id).length;
+  const reportNode = selected ? selected.id : allGroupsReport ? "" : null;
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-950">Organization</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Usage, membership, and budgets across your organization.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700">
-            Policies managed by configuration
-          </span>
-          {refreshButton}
-        </div>
-      </div>
-      {!!overview.data?.issues.length && (
-        <DismissibleMessage
-          role="alert"
-          messageKey={overview.data.issues
-            .map((issue) => `${issue.user_id}:${issue.error}`)
-            .join("|")}
-          className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
-        >
-          <p className="font-medium">Some memberships need attention</p>
-          <ul className="mt-2 space-y-1">
-            {overview.data.issues.map((issue, index) => (
-              <li key={`${issue.user_id}-${index}`}>
-                {issue.user_id}: {issue.error}
-              </li>
-            ))}
-          </ul>
-        </DismissibleMessage>
-      )}
-      <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="self-start rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <p className="px-2 pb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {overview.data?.levels.join(" / ")}
-          </p>
-          <nav aria-label="Organization groups" className="space-y-1">
-            <button
-              type="button"
-              aria-label={`All groups, ${overview.data?.total_users} users`}
-              aria-pressed={nodeId === ""}
-              onClick={() => selectGroup("")}
-              className={`flex w-full justify-between rounded-md px-3 py-2 text-sm ${nodeId === "" ? "bg-indigo-50 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-50"}`}
-            >
-              All groups<span>{overview.data?.total_users}</span>
-            </button>
-            {treeOrder(groups, expanded).map((group) => (
-              <div
-                key={group.id}
-                style={{ paddingLeft: 4 + group.level * 14 }}
-                className={`flex items-center rounded-md text-sm ${nodeId === group.id ? "bg-indigo-50 font-medium text-indigo-700" : "text-slate-600 hover:bg-slate-50"}`}
-              >
-                {group.has_children ? (
-                  <button
-                    type="button"
-                    aria-label={`${expanded.has(group.id) ? "Collapse" : "Expand"} ${group.path.join(" → ")}`}
-                    aria-expanded={expanded.has(group.id)}
-                    onClick={() => toggleGroup(group.id)}
-                    className="shrink-0 rounded p-1 hover:bg-slate-100 focus-visible:outline-indigo-500"
-                  >
-                    <ChevronRight
-                      size={16}
-                      aria-hidden="true"
-                      className={expanded.has(group.id) ? "rotate-90" : ""}
-                    />
-                  </button>
-                ) : (
-                  <span className="w-6 shrink-0" />
-                )}
-                <button
-                  type="button"
-                  aria-label={`${group.name}, ${group.members} ${group.members === 1 ? "user" : "users"}`}
-                  aria-pressed={nodeId === group.id}
-                  onClick={() => selectGroup(group.id)}
-                  className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-md py-2 pl-1 pr-3 text-left focus-visible:outline-indigo-500"
-                >
-                  <span className="truncate" title={group.path.join(" → ")}>
-                    {group.name}
-                  </span>
-                  {group.level < (overview.data?.levels.length ?? 0) - 1 && (
-                    <span className="text-xs">{group.members}</span>
-                  )}
-                </button>
-              </div>
-            ))}
-            {childQueries.map((query, index) =>
-              query.isPending || query.error ? (
-                <div
-                  key={[...requestedParents][index]}
-                  className="p-2 text-xs text-slate-500"
-                >
-                  {query.error ? (
-                    <p role="alert">
-                      {query.error.message}{" "}
-                      <button
-                        type="button"
-                        onClick={() => void query.refetch()}
-                      >
-                        Retry children
-                      </button>
-                    </p>
-                  ) : (
-                    "Loading child groups..."
-                  )}
-                </div>
-              ) : null,
-            )}
-          </nav>
-        </aside>
-        <div className="min-w-0 space-y-5">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-            {selected ? (
-              selected.path.map((name, index) => (
-                <span key={index} className="flex items-center gap-2">
-                  {index > 0 && <ChevronRight size={14} />}
-                  {name}
-                </span>
-              ))
-            ) : (
-              <span>All groups</span>
-            )}
-          </div>
-          {nodeId === null && (
-            <p className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-500">
-              Select a group to load its details, usage, and users, or choose
-              All groups for an organization report.
-            </p>
-          )}
-          {detail.isFetching && (
-            <p className="text-sm text-slate-500">Loading team details...</p>
-          )}
-          {detail.error && (
-            <p role="alert">
-              {detail.error.message}{" "}
-              <button type="button" onClick={() => void detail.refetch()}>
-                Retry details
-              </button>
-            </p>
-          )}
-          {selected && (
-            <section
-              aria-label="Effective budget policy"
-              className="rounded-lg border border-indigo-100 bg-indigo-50 p-4"
-            >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs text-slate-500">Per-key allowance</p>
-                  <p className="mt-1 font-semibold text-slate-950">
-                    {money(selected.per_user)}
-                    {selected.duration && (
-                      <span className="ml-2 text-xs font-normal text-slate-500">
-                        {" "}
-                        per {selected.duration}
-                      </span>
-                    )}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {budgetSource && budgetSource.id !== selected.id
-                      ? `Inherited from ${budgetSource.name}`
-                      : "Defined on this group"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">
-                    {selected.name} tracking target
-                  </p>
-                  <p className="mt-1 font-semibold text-slate-950">
-                    {!selectedDetail || selectedDetail.group_spend === null
-                      ? "Unavailable"
-                      : metricValue(selectedDetail.group_spend!, "spend")}{" "}
-                    / {money(selected.group_total)}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Own-team budget-period spend; excludes descendant teams.
-                    Tracking only; ancestor targets do not block keys.
-                  </p>
-                </div>
-              </div>
-              {selectedDetail?.sync_error && (
-                <p role="alert" className="mt-3 text-sm text-amber-800">
-                  {selectedDetail?.sync_error}
-                </p>
+    <div className="flex flex-wrap content-start">
+      <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-[22px] px-4 py-7 sm:px-8">
+        <div className="flex flex-wrap items-end justify-between gap-3.5">
+          <div>
+            <h1 className="text-[28px] font-bold tracking-[-0.01em] text-ink">
+              {greeting(email)}
+            </h1>
+            <p className="mt-1 text-[15px] text-ink-3">
+              {status.data && !status.data.ready
+                ? "The gateway is not ready."
+                : healthy
+                  ? "Everything is healthy."
+                  : "Some items need attention."}
+              {near.length > 0 && (
+                <>
+                  {" "}
+                  <span className="font-semibold text-sand-ink">
+                    {plural(near.length, "group")}
+                  </span>{" "}
+                  {near.length === 1 ? "is" : "are"} close to their budget
+                </>
               )}
-            </section>
-          )}
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="space-y-1 text-xs text-slate-500">
-              <span className="block">From (UTC)</span>
-              <input
-                type="date"
-                aria-label="Usage start date"
-                className={inputClass}
-                value={startDate}
-                max={endDate}
-                onChange={(event) => setStartDate(event.target.value)}
-              />
-            </label>
-            <label className="space-y-1 text-xs text-slate-500">
-              <span className="block">Through (UTC)</span>
-              <input
-                type="date"
-                aria-label="Usage end date"
-                className={inputClass}
-                value={endDate}
-                min={startDate}
-                max={today}
-                onChange={(event) => setEndDate(event.target.value)}
-              />
-            </label>
-            <label className="space-y-1 text-xs text-slate-500">
-              <span className="block">Chart metric</span>
-              <select
-                aria-label="Chart metric"
-                className={inputClass}
-                value={metric}
-                onChange={(event) =>
-                  setMetric(event.target.value as UsageMetric)
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {roots.length > 1 && (
+              <>
+                {rootLevel && (
+                  <span className="text-xs font-semibold tracking-[0.04em] text-ink-4">
+                    {rootLevel.toUpperCase()}
+                  </span>
+                )}
+                <div
+                  role="tablist"
+                  aria-label={rootLevel ?? "Organization root"}
+                  className="flex flex-wrap gap-1 rounded-[10px] bg-well p-1"
+                >
+                  {roots.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={item.id === root?.id}
+                      onClick={() => chooseRoot(item.id)}
+                      className={`min-h-9 rounded-[7px] px-3.5 text-sm ${
+                        item.id === root?.id
+                          ? "bg-card font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                          : "text-ink-3 hover:text-ink"
+                      }`}
+                    >
+                      {item.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            {refreshButton}
+          </div>
+        </div>
+
+        {root && (
+          <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+            <Metric
+              accent="border-t-teal"
+              caption="SPEND THIS PERIOD"
+              sub={`of ${root.group_total == null ? "no target" : shortMoney(root.group_total)} · ${root.name} + all sub-groups`}
+              bar={percent(rootTotals?.group_spend, root.group_total)}
+            >
+              {totals.isPending ? (
+                <span className="h-8 w-24 animate-pulse rounded bg-line-soft" />
+              ) : (
+                shortMoney(rootTotals?.group_spend)
+              )}
+            </Metric>
+            <Metric
+              accent="border-t-blue"
+              caption="PEOPLE"
+              sub={`across ${plural(subtree.length || childCount(root), "group")}`}
+            >
+              {root.members.toLocaleString()}
+            </Metric>
+            <Metric
+              accent="border-t-sand"
+              caption="NEAR BUDGET"
+              sub={`groups over ${NEAR}% used`}
+            >
+              {totals.isPending ? "—" : near.length}
+            </Metric>
+            {isAdmin && (
+              <Metric
+                accent="border-t-mint"
+                caption="LITELLM GATEWAY"
+                sub={
+                  status.data
+                    ? `DB ${status.data.dependencies?.database?.ok ? "ok" : "down"} · LiteLLM ${status.data.dependencies?.litellm?.ok ? "ok" : "down"}`
+                    : status.isError
+                      ? "Status unavailable"
+                      : "Checking…"
                 }
               >
-                {Object.entries(metricLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <span
+                  aria-hidden="true"
+                  className={`h-2 w-2 rounded-full ${
+                    status.data?.ready ? "bg-mint" : "bg-danger"
+                  }`}
+                />
+                {status.data
+                  ? status.data.ready
+                    ? "Ready"
+                    : "Not ready"
+                  : "—"}
+              </Metric>
+            )}
           </div>
-          <p className="text-xs text-slate-500">
-            Reports use current group membership and UTC daily aggregates.
-            Logged requests count upstream attempts. Reporting totals are
-            independent of budget resets. Member charts use the selected dates;
-            the table shows budget-period spending.
-          </p>
-          {usage.error && (
-            <DismissibleMessage
-              role="alert"
-              messageKey={usage.error.message}
-              className="rounded-lg bg-red-50 p-4 text-sm text-red-700"
+        )}
+
+        <div className="flex flex-wrap gap-4">
+          {root && directChildren.length > 0 && (
+            <section
+              aria-label="Spend split"
+              className="flex min-w-0 flex-[999_1_420px] flex-col gap-3.5 rounded-xl border border-line bg-card px-5 py-[18px]"
             >
-              {usage.error.message}{" "}
-              <button type="button" onClick={() => void usage.refetch()}>
-                Retry usage
-              </button>
-            </DismissibleMessage>
-          )}
-          {reportEnabled && usage.isPending && (
-            <p className="text-sm text-slate-500">Loading usage…</p>
-          )}
-          {usage.data && (
-            <>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {(["spend", "requests", "tokens"] as const).map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <p className="text-xs text-slate-500">
-                      {metricLabels[item]}
-                    </p>
-                    <p className="mt-1 text-xl font-semibold text-slate-950">
-                      {metricValue(usage.data.totals[item], item)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <SpendTrend daily={usage.data.daily} metric={metric} />
-              {showMembers && !hasMemberUsage && (
-                <p className="text-sm text-slate-500">
-                  Per-member usage is unavailable in this report. Showing group
-                  totals.
-                </p>
-              )}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <UsageBars
-                  title={
-                    showMembers && hasMemberUsage
-                      ? "Usage by member"
-                      : !showMembers && nextLevel
-                        ? `Usage by ${nextLevel}`
-                        : "Usage in this group"
-                  }
-                  values={
-                    showMembers && hasMemberUsage
-                      ? usage.data.by_user
-                      : usage.data.by_group
-                  }
-                  metric={metric}
-                  emailLabels={showMembers && hasMemberUsage}
-                  onSelect={!showMembers && nextLevel ? selectChild : undefined}
-                />
-                <UsageBars
-                  title="Usage by model"
-                  values={usage.data.by_model}
-                  metric={metric}
-                />
-              </div>
-            </>
-          )}
-          {reportEnabled && (
-            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-              <h2 className="flex items-center gap-2 border-b border-slate-200 p-4 text-sm font-semibold text-slate-950">
-                <Users size={16} /> Users{" "}
-                <span className="text-slate-500">
-                  (
-                  {users.data?.total ??
-                    selected?.members ??
-                    overview.data?.total_users}
-                  )
+              <div className="flex flex-wrap justify-between gap-2 text-sm">
+                <span className="font-semibold text-ink">
+                  Where {root.name}’s budget goes{" "}
+                  <span className="font-normal text-ink-4">
+                    · by {childLevel(root)?.toLowerCase() ?? "group"}, incl.
+                    sub-groups
+                  </span>
                 </span>
-              </h2>
-              {users.error ? (
-                <p role="alert" className="p-4 text-sm text-red-700">
-                  {users.error.message}{" "}
-                  <button type="button" onClick={() => void users.refetch()}>
-                    Retry users
-                  </button>
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-500">
-                      <tr>
-                        <th className="px-4 py-3">User</th>
-                        <th className="px-4 py-3">Organization</th>
-                        <th className="px-4 py-3">
-                          Budget-period spend / per-key allowance
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {users.data?.users.map((user) => (
-                        <tr key={user.user_id}>
-                          <td className="px-4 py-3">
-                            {user.email ? (
-                              <EmailAddress
-                                email={user.email}
-                                className="font-medium text-slate-800"
-                              />
-                            ) : (
-                              <p className="break-all font-medium text-slate-800">
-                                {user.user_id}
-                              </p>
-                            )}
-                            {user.email && (
-                              <p className="mt-1 text-slate-500">
-                                {user.user_id}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">
-                            {user.path.join(" → ")}
-                          </td>
-                          <td className="px-4 py-3">
-                            <p className="text-slate-800">
-                              {user.budget_spend === null
-                                ? "Unavailable"
-                                : metricValue(user.budget_spend, "spend")}{" "}
-                              / {money(user.per_user)}
-                            </p>
-                            {user.sync_error && (
-                              <p className="mt-1 text-amber-700">
-                                {user.sync_error}
-                              </p>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {!users.isPending && !users.data?.users.length && (
-                    <p className="p-6 text-center text-sm text-slate-500">
-                      No mapped users in this group yet. SSO users appear after
-                      signing in.
-                    </p>
-                  )}
+                <span className="text-ink-4">
+                  {totals.isPending
+                    ? "Loading…"
+                    : `${shortMoney(rootTotals?.group_spend)} spent`}
+                </span>
+              </div>
+              {totals.isPending ? (
+                <span className="h-3.5 animate-pulse rounded-[7px] bg-line-soft" />
+              ) : splitTotal > 0 ? (
+                <div
+                  role="img"
+                  aria-label={`Spend split across ${plural(directChildren.length, childLevel(root) ?? "group")}`}
+                  className="flex h-3.5 gap-0.5 overflow-hidden rounded-[7px]"
+                >
+                  {directChildren
+                    .filter((group) => (group.group_spend ?? 0) > 0)
+                    .map((group) => (
+                      <span
+                        key={group.id}
+                        className={hue(group).bar}
+                        style={{ flex: `${group.group_spend} 1 0` }}
+                      />
+                    ))}
                 </div>
+              ) : (
+                <p className="text-sm text-ink-4">No spend this period yet.</p>
               )}
-              <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                  className="disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <span>
-                  Page {page} of {users.data?.total_pages ?? 1}
-                </span>
-                <button
-                  type="button"
-                  disabled={page >= (users.data?.total_pages ?? 1)}
-                  onClick={() => setPage(page + 1)}
-                  className="disabled:opacity-40"
-                >
-                  Next
-                </button>
+              <div className="flex flex-wrap gap-x-[18px] gap-y-2 text-[13px] text-ink-2">
+                {directChildren.map((group) => (
+                  <span
+                    key={group.id}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`h-[9px] w-[9px] rounded-[3px] ${hue(group).bar}`}
+                    />
+                    {group.name}{" "}
+                    <span className="text-ink-4">
+                      {shortMoney(group.group_spend)}
+                    </span>
+                  </span>
+                ))}
               </div>
             </section>
           )}
+
+          <section
+            aria-label="Needs attention"
+            className="flex flex-[1_1_300px] flex-col rounded-xl border border-line bg-card px-5 py-4"
+          >
+            <h2 className="mb-1.5 text-sm font-semibold text-ink">
+              Needs attention
+            </h2>
+            {attention.length ? (
+              attention.map((item) => (
+                <div
+                  key={item.key}
+                  className="flex items-center justify-between gap-2.5 border-t border-line-soft py-2.5"
+                >
+                  <span className="inline-flex min-w-0 items-center gap-2.5">
+                    <span
+                      aria-hidden="true"
+                      className={`h-2 w-2 shrink-0 rounded-full ${item.tone}`}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-ink">
+                        {item.title}
+                      </span>
+                      <span className="block truncate text-xs text-ink-4">
+                        {item.sub}
+                      </span>
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={item.onClick}
+                    aria-label={`${item.action}: ${item.title}`}
+                    className={`min-h-9 shrink-0 rounded-lg px-3 text-[13px] font-semibold ${item.button}`}
+                  >
+                    {item.action}
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="border-t border-line-soft py-2.5 text-sm text-ink-4">
+                {totals.isPending ? "Checking…" : "Nothing needs attention."}
+              </p>
+            )}
+          </section>
         </div>
+
+        {showIssues && issues.length > 0 && (
+          <DismissibleMessage
+            role="alert"
+            messageKey={issues
+              .map((issue) => `${issue.user_id}:${issue.error}`)
+              .join("|")}
+            className="rounded-xl border border-sand/40 bg-sand-tint p-4 text-sm text-sand-ink"
+          >
+            <p className="font-medium">Some memberships need attention</p>
+            <ul className="mt-2 space-y-1">
+              {issues.map((issue, index) => (
+                <li key={`${issue.user_id}-${index}`}>
+                  {issue.user_id}: {issue.error}
+                </li>
+              ))}
+            </ul>
+          </DismissibleMessage>
+        )}
+
+        {tableRoot && (
+          <section
+            aria-label="Groups"
+            className="overflow-hidden rounded-xl border border-line bg-card"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line px-5 py-3.5">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-base font-bold text-ink">
+                  Groups in {tableRoot.name}
+                </h2>
+                <button
+                  type="button"
+                  aria-pressed={nodeId === tableRoot.id}
+                  aria-label={`${tableRoot.name}, ${plural(tableRoot.members, "user")}`}
+                  onClick={() => select(tableRoot.id)}
+                  className="min-h-8 rounded-lg px-2 text-[13px] font-semibold text-blue-ink hover:bg-blue-tint"
+                >
+                  Open {tableRoot.name}
+                </button>
+                <nav
+                  aria-label={tableChain.length ? "Table path" : "Levels"}
+                  className="inline-flex flex-wrap items-center gap-1.5 text-xs text-ink-3"
+                >
+                  {tableChain.length
+                    ? [root!, ...tableChain].map((item, index, all) => (
+                        <span key={item.id} className="inline-flex gap-1.5">
+                          {index > 0 && <span aria-hidden="true">›</span>}
+                          {index < all.length - 1 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setTableChoice(
+                                  item.id === root!.id ? null : item.id,
+                                )
+                              }
+                              className="rounded-md bg-line-soft px-2 py-[3px] text-blue-ink hover:underline"
+                            >
+                              {item.name}
+                            </button>
+                          ) : (
+                            <span
+                              aria-current="location"
+                              className="rounded-md bg-line-soft px-2 py-[3px]"
+                            >
+                              {item.name}
+                            </span>
+                          )}
+                        </span>
+                      ))
+                    : levels.slice(tableRoot.level).map((level, index) => (
+                        <span key={level} className="inline-flex gap-1.5">
+                          {index > 0 && <span aria-hidden="true">›</span>}
+                          <span className="rounded-md bg-line-soft px-2 py-[3px]">
+                            {level}
+                          </span>
+                        </span>
+                      ))}
+                </nav>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (expandAll) setExpanded(new Set());
+                    setExpandAll((value) => !value);
+                  }}
+                  className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas"
+                >
+                  {expandAll ? "Collapse all" : "Expand all"}
+                </button>
+                {!selected && (
+                  <button
+                    type="button"
+                    onClick={() => setAllGroupsReport(true)}
+                    aria-label={`All groups, ${plural(rootsQuery.data?.total_users ?? 0, "user")}`}
+                    aria-pressed={allGroupsReport}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal px-3.5 text-sm font-semibold text-paper hover:brightness-110"
+                  >
+                    <BarChart3 size={15} aria-hidden="true" />
+                    Usage report
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <div
+                className={`${columns} border-b border-line-soft bg-canvas/60 px-5 py-2.5 text-xs font-semibold tracking-[0.04em] text-ink-4`}
+              >
+                <span>GROUP</span>
+                <span>PEOPLE</span>
+                <span>SPEND · INCL. SUB-GROUPS</span>
+                <span>PER PERSON</span>
+              </div>
+              <div role="list" aria-label="Organization groups">
+                {rows.map((group) => {
+                  const level = levels[group.level];
+                  const children = childLevel(group);
+                  const count = childCount(group);
+                  const used = percent(group.group_spend, group.group_total);
+                  const parent = group.parent_id
+                    ? byId.get(group.parent_id)
+                    : undefined;
+                  const tag =
+                    group.budget_source && group.budget_source !== group.id
+                      ? "inherited"
+                      : parent
+                        ? "override"
+                        : "set here";
+                  const color = hue(group);
+                  const active = group.id === nodeId;
+                  const open = isExpanded(group.id);
+                  return (
+                    <div
+                      role="listitem"
+                      key={group.id}
+                      className={`relative ${columns} border-b border-line-soft px-5 py-[11px] text-sm text-ink ${
+                        active
+                          ? "bg-blue-tint/60 shadow-[inset_3px_0_0_rgb(var(--blue))]"
+                          : "hover:bg-canvas/70"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={active}
+                        aria-label={`${group.name}, ${plural(group.members, "user")}`}
+                        onClick={() => select(group.id)}
+                        className="absolute inset-0 z-0 w-full"
+                      />
+                      <span
+                        className="pointer-events-none relative inline-flex min-w-0 items-center gap-2"
+                        style={{
+                          paddingLeft: Math.max(0, depth(group)) * 34,
+                        }}
+                      >
+                        {group.has_children ? (
+                          <button
+                            type="button"
+                            aria-expanded={open}
+                            aria-label={`${open ? "Collapse" : "Expand"} ${group.path.join(" → ")}`}
+                            onClick={() => toggle(group)}
+                            className="pointer-events-auto relative z-10 -ml-1.5 inline-flex h-7 w-7 items-center justify-center rounded text-sm text-ink-3 hover:bg-well"
+                          >
+                            <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+                          </button>
+                        ) : (
+                          <span className="w-4" />
+                        )}
+                        <span
+                          aria-hidden="true"
+                          className={`inline-flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] text-[11px] font-bold ${
+                            depth(group) === 0
+                              ? `${color.tint} ${color.ink}`
+                              : `bg-canvas ${color.ink}`
+                          }`}
+                        >
+                          {groupInitials(group.name)}
+                        </span>
+                        <span className="min-w-0">
+                          <span
+                            className={`block truncate ${group.has_children ? "font-semibold" : "font-medium"}`}
+                          >
+                            {group.name}
+                          </span>
+                          <span className="block text-xs text-ink-4">
+                            {[
+                              level,
+                              group.has_children && children && count
+                                ? plural(count, children)
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="pointer-events-none relative text-ink-3">
+                        {group.members}
+                      </span>
+                      <span className="pointer-events-none relative flex flex-col gap-[5px]">
+                        {totals.isPending ? (
+                          <>
+                            <span className="h-3.5 w-28 animate-pulse rounded bg-line-soft" />
+                            <span className="h-[5px] animate-pulse rounded-[3px] bg-line-soft" />
+                          </>
+                        ) : (
+                          <>
+                            <span className="flex justify-between text-[13px]">
+                              <span>
+                                {shortMoney(group.group_spend)}{" "}
+                                <span className="text-ink-4">
+                                  /{" "}
+                                  {group.group_total == null
+                                    ? "no target"
+                                    : shortMoney(group.group_total)}
+                                </span>
+                              </span>
+                              {used != null && (
+                                <span
+                                  className={`font-semibold ${used >= NEAR ? "text-sand-ink" : "text-ink-3"}`}
+                                >
+                                  {used}%
+                                </span>
+                              )}
+                            </span>
+                            <span className="block h-[5px] rounded-[3px] bg-line-soft">
+                              <span
+                                className={`block h-[5px] rounded-[3px] ${color.bar}`}
+                                style={{
+                                  width: `${Math.min(100, used ?? 0)}%`,
+                                }}
+                              />
+                            </span>
+                          </>
+                        )}
+                      </span>
+                      <span className="pointer-events-none relative text-[13px] text-ink-3">
+                        {group.per_user == null
+                          ? "No limit"
+                          : shortMoney(group.per_user)}{" "}
+                        <span className="text-xs text-ink-4">{tag}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {childQueries.map((query, index) =>
+                query.error ? (
+                  <p
+                    key={[...requestedParents][index]}
+                    role="alert"
+                    className="px-5 py-2.5 text-[13px] text-danger"
+                  >
+                    {query.error.message}{" "}
+                    <button
+                      type="button"
+                      className="font-semibold underline"
+                      onClick={() => void query.refetch()}
+                    >
+                      Retry children
+                    </button>
+                  </p>
+                ) : query.isPending ? (
+                  <p
+                    key={[...requestedParents][index]}
+                    className="px-5 py-2.5 text-[13px] text-ink-4"
+                  >
+                    Loading child groups...
+                  </p>
+                ) : null,
+              )}
+              {totals.error && (
+                <p role="alert" className="px-5 py-2.5 text-[13px] text-danger">
+                  Spend totals are unavailable: {totals.error.message}
+                </p>
+              )}
+              <p className="px-5 pb-3 pt-2.5 text-[13px] text-ink-4">
+                Sub-groups load when you open them
+                {levels.length - tableRoot.level - 1 > MAX_DEPTH
+                  ? " · deeper levels open in their own view"
+                  : ""}
+              </p>
+            </div>
+          </section>
+        )}
+
+        {reportNode !== null && (
+          <OrgReport
+            key={reportNode}
+            nodeId={reportNode}
+            selected={selected}
+            nextLevel={selected ? childLevel(selected) : levels[0]}
+            totalUsers={rootsQuery.data?.total_users}
+            onSelectChild={select}
+          />
+        )}
       </div>
+
+      {selected && (
+        <GroupPanel
+          key={selected.id}
+          group={selected}
+          hue={hue(selected)}
+          parent={selected.parent_id ? byId.get(selected.parent_id) : undefined}
+          source={
+            selected.budget_source && selected.budget_source !== selected.id
+              ? byId.get(selected.budget_source)
+              : undefined
+          }
+          levelName={levels[selected.level]}
+          childLevelName={childLevel(selected)}
+          subGroups={groups
+            .filter((group) => group.parent_id === selected.id)
+            .map((group) => ({ group, hue: hue(group) }))}
+          totalSpend={totals.isPending ? undefined : selected.group_spend}
+          ownSpend={detail.data?.group_spend}
+          ownSpendState={
+            detail.isPending ? "loading" : detail.error ? "error" : "ready"
+          }
+          budgetGroup={budgets.data?.groups.find(
+            (group) => group.id === selected.id,
+          )}
+          revision={budgets.data?.revision}
+          onClose={() => setNodeId(null)}
+          onSelect={select}
+        />
+      )}
     </div>
   );
 }
