@@ -12,7 +12,8 @@ from app.config import settings
 from app.organization import MembershipConflict, OrganizationNode
 from app.services import audit, budget_enforcement, key_cleanup, key_spend, litellm, organization_key_policy as key_policy
 from app.services import budget_key_guards, budget_pass, key_rotation_freeze
-from app.services import organization_client as upstream, organization_store as store, organization_discovery as discovery
+from app.services import organization_client as upstream, organization_store as store
+from app.services import organization_discovery as discovery  # noqa: F401 - used by organization_reconcile and tests
 
 _logger = logging.getLogger(__name__)
 _locks: WeakValueDictionary[tuple[str, str], asyncio.Lock] = WeakValueDictionary()
@@ -77,11 +78,32 @@ async def remember(user_id: str, email: str, source: str, groups: list[str]) -> 
     return await synchronize_user(user_id)
 
 
-@budget_pass.serialized
+def settled(identity: dict) -> OrganizationNode | None:
+    """The member's group when the last synchronization already applied it."""
+    if identity.get("sync_error"):
+        return None
+    try:
+        node = resolve_identity(identity)
+    except HTTPException:
+        return None
+    if node is None or identity.get("team_id") != node.team_id or identity.get("policy") != policy(node):
+        return None
+    return node
+
+
 async def synchronize_user(user_id: str) -> OrganizationNode | None:
     """Finish provisioning from current stored claims without rewriting them."""
     if not settings.organization_hierarchy.levels:
         return None
+    identity = await asyncio.to_thread(store.get, user_id)
+    # A returning member whose group, share and team are unchanged needs no
+    # budget pass; the minute-by-minute synchronization keeps them current.
+    node = settled(identity) if identity else None
+    return node or await _synchronize_user(user_id)
+
+
+@budget_pass.serialized
+async def _synchronize_user(user_id: str) -> OrganizationNode | None:
     async with lock_for("user", user_id):
         identity = await asyncio.to_thread(store.get, user_id)
         return await synchronize(identity) if identity else None
@@ -129,14 +151,14 @@ async def sync_identity(identity: dict, info: dict, *, defer_finalization: bool 
     for key in existing:
         await key_policy.apply_key(node, key)
     if not defer_finalization:
-        await finalize_identity(identity, node, bool(existing))
+        await finalize_identity(identity, node, existing)
     return node
 
 
-async def finalize_identity(identity: dict, node: OrganizationNode, has_keys: bool) -> None:
-    if has_keys:
+async def finalize_identity(identity: dict, node: OrganizationNode, keys: list[dict]) -> None:
+    if keys:
         async with lock_for("team", node.team_id):
-            await key_policy.normalize_individual_caps(node, identity["user_id"])
+            await key_policy.normalize_individual_caps(node, identity["user_id"], keys)
     changed = identity.get("policy") != policy(node) or identity.get("team_id") != node.team_id
     await asyncio.to_thread(store.synced, identity["user_id"], node.team_id, policy(node))
     if changed:
@@ -275,71 +297,10 @@ async def _rotate_key(user_id: str, email: str, team_id: str | None, *, key_alia
         return result
 
 
-@budget_pass.serialized
 async def reconcile() -> None:
-    if not settings.organization_hierarchy.levels:
-        return
-    identities = await asyncio.to_thread(store.list_identities)
-    blocked = await discovery.refresh(identities, lock_for, resolve)
-    identities = await asyncio.to_thread(store.list_identities)
-    ready: set[str] = set()
-    prepared: dict[str, OrganizationNode] = {}
-    semaphore = asyncio.Semaphore(5)
+    from app.services import organization_reconcile
 
-    async def prepare_root(root):
-        async with semaphore:
-            try:
-                async with lock_for("team", root.team_id):
-                    await upstream.sync_root(root)
-                ready.add(root.team_id)
-            except HTTPException as exc:
-                _logger.warning("Organization root %s synchronization failed: %s", root.team_id, exc.detail)
-
-    await asyncio.gather(*(prepare_root(root) for root in settings.organization_hierarchy.nodes.values()))
-    token = await budget_enforcement.pin()
-    try:
-
-        async def sync_one(user_id: str):
-            async with semaphore, lock_for("user", user_id):
-                try:
-                    identity = await asyncio.to_thread(store.get, user_id)
-                    node = resolve_identity(identity)
-                    if node is None or node.team_id not in ready:
-                        raise HTTPException(status_code=409, detail="Organization mapping or its LiteLLM team is unavailable")
-                    await sync_identity(identity, await upstream.team_info(node.team_id), defer_finalization=True)
-                    prepared[user_id] = node
-                except HTTPException as exc:
-                    await asyncio.to_thread(store.failed, user_id, str(exc.detail))
-
-        await asyncio.gather(*(sync_one(identity["user_id"]) for identity in identities if identity["user_id"] not in blocked))
-
-        # Establish every user's key policy before attempting to remove shared caps.
-        # Otherwise the first users in a team stay failed until the next minute.
-        async def finalize_one(user_id: str):
-            async with semaphore, lock_for("user", user_id):
-                try:
-                    identity = await asyncio.to_thread(store.get, user_id)
-                    node = resolve_identity(identity)
-                    if node is None or (node.id, node.team_id) != (prepared[user_id].id, prepared[user_id].team_id):
-                        raise HTTPException(status_code=409, detail="Organization assignment changed during migration; retrying next pass")
-                    await finalize_identity(identity, node, bool(await litellm.list_user_keys(user_id)))
-                except HTTPException as exc:
-                    await asyncio.to_thread(store.failed, user_id, str(exc.detail))
-
-        await asyncio.gather(*(finalize_one(user_id) for user_id in prepared))
-
-        async def finish_team(node):
-            async with semaphore, lock_for("team", node.team_id):
-                if node.team_id in ready:
-                    try:
-                        await key_policy.finish_team(node)
-                    except HTTPException as exc:
-                        _logger.warning("Organization team %s migration pending: %s", node.team_id, exc.detail)
-
-        await asyncio.gather(*(finish_team(node) for node in settings.organization_hierarchy.nodes.values()))
-
-    finally:
-        budget_enforcement.unpin(token)
+    await organization_reconcile.reconcile()
 
 
 async def reconciliation_attempt() -> None:

@@ -43,7 +43,12 @@ async function saveRootBudget(page: Page, team: string, amount: string) {
   await page.goto("/organization");
   const input = page.getByLabel(`${team} assigned budget`);
   await input.fill(amount);
+  // The input shows the draft at once; wait for the saved response itself.
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === "PATCH" && r.url().includes("/budgets/"),
+  );
   await page.getByRole("button", { name: `Save ${team} budget` }).click();
+  expect((await saved).status()).toBe(200);
   await expect(input).toHaveValue(amount);
   const editor = page.locator("article", { has: input });
   await expect(editor.getByRole("alert")).toHaveCount(0);

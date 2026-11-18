@@ -36,7 +36,7 @@ def litellm_keys(monkeypatch):
             {"levels": [{"name": "Group", "groups": [{"members": [{"name": "Eng", "litellmTeamId": "eng", "budget": {"groupTotal": 90}}]}]}]}
         ),
     )
-    monkeypatch.setattr(freeze, "SETTLE_SECONDS", 0)
+    monkeypatch.setattr(settings, "key_rotation_settle_seconds", 0)
     monkeypatch.setattr(freeze, "active", set())
     organization_store.remember("ann", "ann@example.invalid", "sso", [])
 

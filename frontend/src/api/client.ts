@@ -130,6 +130,11 @@ export const api = {
       `/v1/organization/budgets/groups/${encodeURIComponent(group)}/users/${encodeURIComponent(user)}`,
       { method: "PATCH", body: JSON.stringify({ revision, amount }) },
     ),
+  setGroupPerUser: (group: string, amount: string | null) =>
+    request<import("../types/budgets").PerUserLimit>(
+      `/v1/organization/groups/${encodeURIComponent(group)}/per-user`,
+      { method: "PATCH", body: JSON.stringify({ amount }) },
+    ),
   organizationAccess: () =>
     request<{ organization: boolean; global_admin: boolean; roots: string[] }>(
       "/v1/organization/access",

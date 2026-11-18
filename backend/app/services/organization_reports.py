@@ -11,7 +11,10 @@ from app.services import litellm, organization_client as upstream, organization_
 from app.services.organization_sync import resolve_identity
 from app.services.organization_access import GLOBAL_SCOPE, OrganizationScope
 
-_usage_cache: dict[tuple[str, str, str], tuple[float, list[dict]]] = {}
+_usage_cache: dict[tuple, tuple[float, list[dict]]] = {}
+# Team status on the overview, reused for a minute; failures are not kept.
+_status_cache: dict[str, tuple[float, dict]] = {}
+USAGE_TEAM_BATCH = 50
 
 
 async def identities(scope: OrganizationScope = GLOBAL_SCOPE) -> tuple[list[tuple[dict, object]], list[dict]]:
@@ -99,16 +102,23 @@ async def overview(scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     semaphore = asyncio.Semaphore(5)
 
     async def root_status(root):
+        cached = _status_cache.get(root.team_id)
+        if cached and monotonic() - cached[0] < 60:
+            return root.team_id, cached[1]
         async with semaphore:
             try:
                 info = await upstream.team_info(root.team_id)
                 team = info.get("team_info", {})
                 policy = {"max_budget": None, "budget_duration": root.duration}
                 mismatch = any(team.get(key) != value for key, value in policy.items())
-                return root.team_id, {
+                status = {
                     "spend": upstream.finite_number(team.get("spend")),
                     "error": "LiteLLM's team policy migration is pending" if mismatch else None,
                 }
+                if len(_status_cache) >= 5000:
+                    _status_cache.clear()
+                _status_cache[root.team_id] = (monotonic(), status)
+                return root.team_id, status
             except HTTPException as exc:
                 return root.team_id, {"spend": None, "error": str(exc.detail) if scope.global_admin else "Could not read group status"}
 
@@ -186,18 +196,36 @@ async def users(node_id: str | None, page: int, size: int, scope: OrganizationSc
     return {"users": result, "page": page, "page_size": size, "total": len(selected), "total_pages": max(1, (len(selected) + size - 1) // size)}
 
 
-async def cached_usage(user_id: str, start: str, end: str) -> list[dict]:
-    key = (user_id, start, end)
+async def cached_team_usage(team_ids: tuple[str, ...], start: str, end: str) -> list[dict]:
+    key = (team_ids, start, end)
     now = monotonic()
     cached = _usage_cache.get(key)
     if cached and now - cached[0] < 60:
         return cached[1]
-    rows = await upstream.daily_usage(user_id, start, end)
+    rows = await upstream.team_daily_usage(list(team_ids), start, end)
     validate_usage(rows, start, end)
     if len(_usage_cache) >= 1000:
         _usage_cache.clear()
     _usage_cache[key] = (now, rows)
     return rows
+
+
+def key_entries(breakdown: dict, *, model: str | None = None) -> list[tuple[str, dict]]:
+    """(owner, metrics) per key from a team activity breakdown."""
+    source = breakdown.get("api_keys") if model is None else (breakdown.get("models") or {}).get(model, {}).get("api_key_breakdown")
+    if source is None:
+        return []
+    if not isinstance(source, dict):
+        raise HTTPException(status_code=502, detail="LiteLLM returned an invalid per-key usage aggregate")
+    entries = []
+    for entry in source.values():
+        metadata = entry.get("metadata") if isinstance(entry, dict) else None
+        if not isinstance(metadata, dict) or not isinstance(entry.get("metrics"), dict):
+            raise HTTPException(status_code=502, detail="LiteLLM returned an invalid per-key usage aggregate")
+        owner = metadata.get("user_id")
+        if isinstance(owner, str) and owner:
+            entries.append((owner, entry["metrics"]))
+    return entries
 
 
 def zero_metrics() -> dict:
@@ -246,22 +274,31 @@ def add_metrics(target: dict, source: dict) -> None:
 
 
 async def usage(node_id: str | None, start: date, end: date, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
+    """Usage of the selected members across every managed team.
+
+    LiteLLM aggregates per team, one request for up to 50 teams, and attributes
+    each key's usage to its owner, so members are counted wherever their keys
+    were (including a previous group). Usage of keys outside managed teams is
+    not part of the organization report.
+    """
     if end < start or (end - start).days > 90 or end > datetime.now(timezone.utc).date():
         raise HTTPException(status_code=422, detail="Select a past or current date range of at most 90 days")
     ancestor = selected_nodes(node_id, scope)
     records, issues = await identities(scope)
     selected = [(identity, node) for identity, node in records if within(node, ancestor)]
-    if len(selected) > 500:
-        raise HTTPException(status_code=422, detail="Select a smaller group; one report supports at most 500 users")
-    semaphore = asyncio.Semaphore(8)
+    if len(selected) > 5000:
+        raise HTTPException(status_code=422, detail="Select a smaller group; one report supports at most 5000 users")
+    teams = sorted({node.team_id for node in settings.organization_hierarchy.nodes.values()})
+    batches = [tuple(teams[index : index + USAGE_TEAM_BATCH]) for index in range(0, len(teams), USAGE_TEAM_BATCH)]
+    semaphore = asyncio.Semaphore(4)
 
-    async def fetch(identity, node):
+    async def fetch(batch):
         async with semaphore:
-            return identity, node, await cached_usage(identity["user_id"], start.isoformat(), end.isoformat())
+            return await cached_team_usage(batch, start.isoformat(), end.isoformat())
 
-    tasks = [asyncio.create_task(fetch(identity, node)) for identity, node in selected]
+    tasks = [asyncio.create_task(fetch(batch)) for batch in batches]
     try:
-        batches = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
     except BaseException:
         for task in tasks:
             task.cancel()
@@ -269,7 +306,8 @@ async def usage(node_id: str | None, start: date, end: date, scope: Organization
         raise
     daily = {(start + timedelta(days=offset)).isoformat(): zero_metrics() for offset in range((end - start).days + 1)}
     total, by_group, by_model, by_user = zero_metrics(), {}, {}, []
-    for identity, node, rows in batches:
+    members, groups = {}, {}
+    for identity, node in selected:
         member = {"id": identity["user_id"], "name": identity.get("email") or identity["user_id"], **zero_metrics()}
         by_user.append(member)
         root = scope.root_for(node)
@@ -279,26 +317,22 @@ async def usage(node_id: str | None, start: date, end: date, scope: Organization
             child = settings.organization_hierarchy.nodes[child.parent_id]
         group_id = child.id if child.level == depth else None
         group_name = child.member.name if group_id is not None else "Direct members"
-        group = by_group.setdefault(group_id, {"id": group_id, "name": group_name, **zero_metrics()})
+        members[identity["user_id"]] = member
+        groups[identity["user_id"]] = by_group.setdefault(group_id, {"id": group_id, "name": group_name, **zero_metrics()})
+    for rows in results:
         for row in rows:
-            if not isinstance(row, dict):
-                raise HTTPException(status_code=502, detail="LiteLLM returned an invalid daily usage aggregate")
             day = row.get("date")
-            if day not in daily or not isinstance(row.get("metrics"), dict):
-                raise HTTPException(status_code=502, detail="LiteLLM returned an invalid daily usage aggregate")
-            metrics = row["metrics"]
-            for target in (daily[day], total, group, member):
-                add_metrics(target, metrics)
             breakdown = row.get("breakdown") or {}
-            if not isinstance(breakdown, dict):
-                raise HTTPException(status_code=502, detail="LiteLLM returned an invalid model usage aggregate")
-            models = breakdown.get("models") or {}
-            if not isinstance(models, dict):
-                raise HTTPException(status_code=502, detail="LiteLLM returned an invalid model usage aggregate")
-            for model, values in models.items():
-                if not isinstance(values, dict) or not isinstance(values.get("metrics", values), dict):
-                    raise HTTPException(status_code=502, detail="LiteLLM returned an invalid model usage aggregate")
-                add_metrics(by_model.setdefault(model, zero_metrics()), values.get("metrics", values))
+            if day not in daily or not isinstance(breakdown, dict):
+                raise HTTPException(status_code=502, detail="LiteLLM returned an invalid daily usage aggregate")
+            for owner, metrics in key_entries(breakdown):
+                if owner in members:
+                    for target in (daily[day], total, groups[owner], members[owner]):
+                        add_metrics(target, metrics)
+            for model in breakdown.get("models") or {}:
+                for owner, metrics in key_entries(breakdown, model=model):
+                    if owner in members:
+                        add_metrics(by_model.setdefault(model, zero_metrics()), metrics)
     return {
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),

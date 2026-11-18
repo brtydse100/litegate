@@ -100,6 +100,7 @@ Raw logs, key secrets/hashes, and upstream API-key breakdowns are not returned.
 | `analytics_batch_concurrency` | `ANALYTICS_BATCH_CONCURRENCY` | `analyticsBatchConcurrency` | `5` |
 | `hierarchical_budgets_enabled` | `HIERARCHICAL_BUDGETS_ENABLED` | `hierarchicalBudgetsEnabled` | `false` |
 | `hierarchical_budgets_enforced` | `HIERARCHICAL_BUDGETS_ENFORCED` | `hierarchicalBudgetsEnforced` | `false` |
+| `key_rotation_settle_seconds` | `KEY_ROTATION_SETTLE_SECONDS` | `keyRotationSettleSeconds` | `12` |
 
 Environment mappings use JSON objects. Retention accepts 1–366 days; concurrency
 accepts 1–20. Helm validates these types and rolls the pod when ConfigMap-backed
@@ -199,7 +200,8 @@ values on top.
 - Enforced accounts support **one key**. Multiple-key owners stop the operation
   before existing controls are removed. Additional key creation is rejected.
 - Members replace their own key with **Regenerate key**. LiteGate first blocks the
-  old key, waits about 12 seconds for LiteLLM's batched spend writes, then creates
+  old key, waits `KEY_ROTATION_SETTLE_SECONDS` (12 by default; keep it above
+  LiteLLM's `proxy_batch_write_at`) for batched spend writes, then creates
   the replacement starting from that spend and deletes the old key. If any step
   fails, the old key is unblocked and kept. A key left blocked by an interrupted
   replacement (for example a restart) is unblocked at the member's next sign-in
@@ -212,6 +214,14 @@ values on top.
 - Each pass uses one fixed set of shares. A sign-in or budget edit during a pass
   applies on the next pass, about a minute later; it never caps a key at zero.
   A temporary synchronization error does not remove a member from the split.
+- Budget writes lock only the groups they can change: the member's current
+  group, the group they came from and any group holding their key. Each reads
+  only those members' keys, so sign-ins and key replacements in different groups
+  run in parallel, and the minute-by-minute synchronization releases each group
+  before the next. A returning member whose group and share are unchanged signs
+  in without a budget pass. After an assigned total changes (money moves between
+  groups), operations read and lower every member first until the next full
+  synchronization has applied it.
 - A member moved to another managed group keeps their key: sign-in or the next
   synchronization moves it to the new group. Consumed spend follows the member,
   so the new group counts it and the previous group's share is released to its

@@ -1,6 +1,7 @@
 """LiteLLM contracts for organization budgets, keys, and daily aggregates."""
 
 import asyncio
+import copy
 import math
 from uuid import uuid4
 
@@ -10,7 +11,7 @@ from fastapi import HTTPException
 from app.config import settings
 from app.organization import OrganizationNode
 from app.services import key_cleanup, key_secrets, litellm
-from app.services.litellm_client import client, headers, transport_error
+from app.services.litellm_client import cached_teams, client, headers, transport_error
 
 
 async def request(method: str, path: str, *, payload: dict | None = None, params: dict | None = None) -> dict:
@@ -30,7 +31,13 @@ async def request(method: str, path: str, *, payload: dict | None = None, params
 
 
 async def team_info(team_id: str) -> dict:
-    return await request("GET", "/team/info", params={"team_id": team_id, "key_limit": 1})
+    cache = cached_teams()
+    if cache is not None and team_id in cache:
+        return copy.deepcopy(cache[team_id])
+    info = await request("GET", "/team/info", params={"team_id": team_id, "key_limit": 1})
+    if cache is not None:
+        cache[team_id] = copy.deepcopy(info)
+    return info
 
 
 async def sync_root(root: OrganizationNode) -> dict:
@@ -173,16 +180,25 @@ def finite_number(value, *, integer: bool = False) -> float | int:
 
 
 async def daily_usage(user_id: str, start: str, end: str) -> list[dict]:
+    return await _daily_activity("/user/daily/activity", {"user_id": user_id}, start, end, "one user")
+
+
+async def team_daily_usage(team_ids: list[str], start: str, end: str) -> list[dict]:
+    """Daily activity of several teams, broken down per key with each key's owner."""
+    return await _daily_activity("/team/daily/activity", {"team_ids": ",".join(team_ids)}, start, end, "these teams")
+
+
+async def _daily_activity(path: str, scope: dict, start: str, end: str, subject: str) -> list[dict]:
     rows, expected_pages = [], None
     page_size, max_pages = 1000, 20
-    limit_error = f"Usage exceeds {max_pages} upstream pages for one user; select a shorter date range"
+    limit_error = f"Usage exceeds {max_pages} upstream pages for {subject}; select a shorter date range"
     try:
         async with asyncio.timeout(60):
             for page in range(1, max_pages + 1):
                 data = await request(
                     "GET",
-                    "/user/daily/activity",
-                    params={"user_id": user_id, "start_date": start, "end_date": end, "page": page, "page_size": page_size},
+                    path,
+                    params={**scope, "start_date": start, "end_date": end, "page": page, "page_size": page_size},
                 )
                 batch, metadata = data.get("results"), data.get("metadata") or {}
                 if not isinstance(batch, list) or len(batch) > page_size or not isinstance(metadata, dict):

@@ -101,6 +101,21 @@ see the [real SSO harness](testing-sso.md) and
 [governance guide](governance-and-analytics.md). Never run this against a
 production proxy.
 
+### Large organizations
+
+`scripts/org_load.py` measures LiteGate against a large synthetic organization on
+the local integration LiteLLM (`127.0.0.1:4001`) with enforced budgets. It runs
+LiteGate's services in-process and reports time and LiteLLM requests for a sync
+pass, sign-ins (returning, during a sync, after a move), simultaneous
+regenerations and the organization pages:
+
+```bash
+python scripts/org_load.py --users 400 --teams 20 --output results.json
+python scripts/org_load.py --cleanup   # removes the litegate-load-* fixtures
+```
+
+It creates only synthetic `litegate-load-*` users, keys and teams.
+
 ## Spend lifecycle regressions
 
 `python -m pytest tests/test_spend_lifecycle.py` exercises creation, simulated

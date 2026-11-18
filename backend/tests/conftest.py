@@ -23,3 +23,13 @@ def isolated_organization_admin_cache(monkeypatch):
     from app.services import organization_access
 
     monkeypatch.setattr(organization_access, "_admin_cache", {})
+
+
+@pytest.fixture(autouse=True)
+def isolated_report_and_pass_state(monkeypatch):
+    """Overview status caching and verified budget passes are process-wide."""
+    from app.services import budget_pass, organization_reports
+
+    monkeypatch.setattr(organization_reports, "_status_cache", {})
+    monkeypatch.setattr(budget_pass, "_generation", 1)
+    monkeypatch.setattr(budget_pass, "_clean", 0)

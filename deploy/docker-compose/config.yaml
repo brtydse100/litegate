@@ -111,6 +111,8 @@ analytics_batch_concurrency: 5
 hierarchical_budgets_enabled: false
 # Split each groupTotal equally among signed-in members and cap their keys.
 hierarchical_budgets_enforced: false
+# Seconds an enforced key is paused during regeneration so LiteLLM records its spend.
+key_rotation_settle_seconds: 12
 # key_max_budget: 10.0
 # key_budget_duration: "30d"
 # key_models:

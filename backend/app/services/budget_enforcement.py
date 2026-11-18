@@ -187,6 +187,12 @@ def refresh() -> dict:
         return _snapshot
 
 
+def membership(user_id: str) -> str | None:
+    """The member's group in the latest snapshot, before any change being applied."""
+    snapshot = _snapshot
+    return snapshot["memberships"].get(user_id) if snapshot else None
+
+
 async def refresh_async() -> None:
     if enforced():
         await asyncio.to_thread(refresh)

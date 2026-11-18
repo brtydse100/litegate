@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PerUserLimitEditor from "./PerUserLimitEditor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { BudgetGroup, BudgetView } from "../types/budgets";
@@ -70,6 +71,7 @@ function BudgetGroupEditor({
           </div>
         ))}
       </dl>
+      <PerUserLimitEditor group={group} />
       {group.can_edit_envelope ? (
         <form
           onSubmit={(event) => {

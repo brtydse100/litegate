@@ -110,6 +110,9 @@ class Settings(BaseSettings):
     analytics_batch_concurrency: int = Field(default=5, ge=1, le=20)
     hierarchical_budgets_enabled: bool = False
     hierarchical_budgets_enforced: bool = False
+    # Seconds a member's old key stays paused before its spend is copied;
+    # match LiteLLM's proxy_batch_write_at (10 seconds by default) plus a margin.
+    key_rotation_settle_seconds: float = Field(default=12, ge=0, le=120)
 
     root_url: str = "http://localhost"
     cors_origins: str = "http://localhost,http://localhost:5173,http://localhost:3000"

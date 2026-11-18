@@ -13,8 +13,6 @@ from app.config import settings
 from app.services import litellm
 
 MARK = "litegate_rotation_freeze"
-# LiteLLM batches spend writes (about every 10 seconds by default).
-SETTLE_SECONDS = 12.0
 _RESTORED = ("blocked", "metadata")
 active: set[str] = set()
 
@@ -85,4 +83,5 @@ async def recover(user_id: str, keys: list[dict]) -> list[dict]:
 
 
 async def settle() -> None:
-    await asyncio.sleep(SETTLE_SECONDS)
+    # LiteLLM batches spend writes (about every 10 seconds by default).
+    await asyncio.sleep(settings.key_rotation_settle_seconds)

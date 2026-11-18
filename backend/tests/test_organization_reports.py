@@ -27,11 +27,25 @@ def setup(monkeypatch, tmp_path):
     return tree
 
 
-def row(day, spend, tokens=100, requests=2):
+def row(day, spend, tokens=100, requests=2, owners=("alice",)):
+    """One day of team activity in which each owner's key used ``spend``."""
+    usage = {owner: spend for owner in owners} if not isinstance(spend, dict) else spend
+
+    def keys():
+        return {
+            f"key-{owner}": {
+                "metrics": {"spend": value, "total_tokens": tokens, "api_requests": requests},
+                "metadata": {"user_id": owner, "team_id": "team"},
+            }
+            for owner, value in usage.items()
+        }
+
+    first = next(iter(usage.values()))
+    totals = {"spend": first, "total_tokens": tokens, "api_requests": requests}
     return {
         "date": day.isoformat(),
-        "metrics": {"spend": spend, "total_tokens": tokens, "api_requests": requests},
-        "breakdown": {"models": {"model-a": {"spend": spend, "total_tokens": tokens, "api_requests": requests}}},
+        "metrics": totals,
+        "breakdown": {"api_keys": keys(), "models": {"model-a": {"metrics": dict(totals), "api_key_breakdown": keys()}}},
     }
 
 
@@ -70,7 +84,7 @@ async def test_invalid_aggregates_are_not_cached_and_a_corrected_retry_succeeds(
             invalid
         ]
     fetch = AsyncMock(side_effect=[[bad], [row(day, 5)]])
-    monkeypatch.setattr(upstream, "daily_usage", fetch)
+    monkeypatch.setattr(upstream, "team_daily_usage", fetch)
     node = setup.resolve("alice", ["squad1"])
     with pytest.raises(HTTPException) as exc:
         await reports.usage(node.id, day, day)
@@ -84,8 +98,8 @@ async def test_invalid_aggregates_are_not_cached_and_a_corrected_retry_succeeds(
 @pytest.mark.asyncio
 async def test_usage_aggregates_users_by_current_path_and_includes_zero_days(monkeypatch, setup):
     day = datetime.now(timezone.utc).date() - timedelta(days=1)
-    fetch = AsyncMock(side_effect=[[row(day, 10)], [row(day, 5)]])
-    monkeypatch.setattr(upstream, "daily_usage", fetch)
+    fetch = AsyncMock(return_value=[row(day, {"alice": 10, "bob": 5})])
+    monkeypatch.setattr(upstream, "team_daily_usage", fetch)
     node = next(node for node in setup.nodes.values() if node.member.name == "Digital")
     result = await reports.usage(node.id, day - timedelta(days=1), day)
     assert result["totals"] == {"spend": 15, "tokens": 200, "requests": 4}
@@ -96,18 +110,21 @@ async def test_usage_aggregates_users_by_current_path_and_includes_zero_days(mon
     assert sum(value["tokens"] for value in result["by_user"]) == result["totals"]["tokens"]
     assert result["attribution"] == "current_membership"
     await reports.usage(node.id, day - timedelta(days=1), day)
-    assert fetch.await_count == 2
+    assert fetch.await_count == 1
 
 
 @pytest.mark.asyncio
-async def test_leaf_selection_queries_only_members_in_that_group(monkeypatch, setup):
+async def test_leaf_selection_counts_only_members_in_that_group(monkeypatch, setup):
     day = datetime.now(timezone.utc).date()
-    fetch = AsyncMock(return_value=[row(day, 10)])
-    monkeypatch.setattr(upstream, "daily_usage", fetch)
+    fetch = AsyncMock(return_value=[row(day, {"alice": 10, "bob": 7, "not-a-member": 50})])
+    monkeypatch.setattr(upstream, "team_daily_usage", fetch)
     node = setup.resolve("alice", ["squad1"])
     result = await reports.usage(node.id, day, day)
     assert result["users"] == 1
-    fetch.assert_awaited_once_with("alice", day.isoformat(), day.isoformat())
+    # One request covers every managed team, whatever the selection.
+    teams = sorted({item.team_id for item in setup.nodes.values()})
+    fetch.assert_awaited_once_with(teams, day.isoformat(), day.isoformat())
+    assert result["totals"] == {"spend": 10, "tokens": 100, "requests": 2}
     assert result["by_group"] == [{"id": None, "name": "Direct members", "spend": 10, "tokens": 100, "requests": 2}]
     assert result["by_user"] == [{"id": "alice", "name": "alice@example.com", "spend": 10, "tokens": 100, "requests": 2}]
 
@@ -116,7 +133,7 @@ async def test_leaf_selection_queries_only_members_in_that_group(monkeypatch, se
 async def test_member_breakdown_includes_inactive_members_and_falls_back_to_user_id(monkeypatch, setup):
     store.remember("charlie", "", "sso", ["squad1"])
     day = datetime.now(timezone.utc).date()
-    monkeypatch.setattr(upstream, "daily_usage", AsyncMock(return_value=[]))
+    monkeypatch.setattr(upstream, "team_daily_usage", AsyncMock(return_value=[]))
     result = await reports.usage(setup.resolve("alice", ["squad1"]).id, day, day)
     assert result["by_user"] == [
         {"id": "alice", "name": "alice@example.com", "spend": 0, "tokens": 0, "requests": 0},
@@ -126,7 +143,7 @@ async def test_member_breakdown_includes_inactive_members_and_falls_back_to_user
 
 @pytest.mark.asyncio
 async def test_a_failed_upstream_report_never_returns_partial_totals(monkeypatch):
-    monkeypatch.setattr(upstream, "daily_usage", AsyncMock(side_effect=HTTPException(status_code=502, detail="Aggregate unavailable")))
+    monkeypatch.setattr(upstream, "team_daily_usage", AsyncMock(side_effect=HTTPException(status_code=502, detail="Aggregate unavailable")))
     with pytest.raises(HTTPException) as exc:
         await reports.usage(None, datetime.now(timezone.utc).date(), datetime.now(timezone.utc).date())
     assert exc.value.status_code == 502
@@ -143,12 +160,12 @@ async def test_incomplete_daily_response_is_rejected(monkeypatch, data):
 @pytest.mark.asyncio
 async def test_invalid_upstream_dates_and_nan_do_not_pollute_reports(monkeypatch):
     day = datetime.now(timezone.utc).date()
-    monkeypatch.setattr(upstream, "daily_usage", AsyncMock(return_value=[row(day + timedelta(days=1), 5)]))
+    monkeypatch.setattr(upstream, "team_daily_usage", AsyncMock(return_value=[row(day + timedelta(days=1), 5)]))
     with pytest.raises(HTTPException):
         await reports.usage(None, day, day)
     assert reports._usage_cache == {}
     reports._usage_cache.clear()
-    monkeypatch.setattr(upstream, "daily_usage", AsyncMock(return_value=[row(day, float("nan"))]))
+    monkeypatch.setattr(upstream, "team_daily_usage", AsyncMock(return_value=[row(day, float("nan"))]))
     with pytest.raises(HTTPException):
         await reports.usage(None, day, day)
 
@@ -156,7 +173,7 @@ async def test_invalid_upstream_dates_and_nan_do_not_pollute_reports(monkeypatch
 @pytest.mark.asyncio
 async def test_range_and_group_validation_happens_before_reading_usage(monkeypatch):
     fetch = AsyncMock()
-    monkeypatch.setattr(upstream, "daily_usage", fetch)
+    monkeypatch.setattr(upstream, "team_daily_usage", fetch)
     with pytest.raises(HTTPException):
         await reports.usage("missing", datetime.now(timezone.utc).date(), datetime.now(timezone.utc).date())
     with pytest.raises(HTTPException):
@@ -191,11 +208,10 @@ async def test_root_outage_is_visible_without_inventing_zero_spend(monkeypatch):
 @pytest.mark.asyncio
 async def test_current_litellm_nested_model_metrics_are_used(monkeypatch):
     day = datetime.now(timezone.utc).date()
-    value = row(day, 10)
-    metrics = value["breakdown"]["models"]["model-a"]
-    value["breakdown"]["models"]["model-a"] = {"metrics": metrics, "metadata": {"api_key": "redacted"}}
-    monkeypatch.setattr(upstream, "daily_usage", AsyncMock(return_value=[value]))
+    value = row(day, {"alice": 10, "bob": 10, "not-a-member": 99})
+    monkeypatch.setattr(upstream, "team_daily_usage", AsyncMock(return_value=[value]))
     result = await reports.usage(None, day, day)
+    # Model totals are counted per key owner, so non-members never appear.
     assert result["by_model"] == [{"name": "model-a", "spend": 20, "tokens": 200, "requests": 4}]
 
 
@@ -297,22 +313,26 @@ async def test_failed_or_cancelled_report_cancels_and_awaits_active_and_queued_f
     ready, fail, cleanup_started, cleanup_release = (asyncio.Event() for _ in range(4))
     error = HTTPException(status_code=502, detail="Analytics failed")
 
-    async def fetch(user_id, start, end):
-        started.add(user_id)
-        if len(started) == 8:
+    teams = sorted({node.team_id for node in settings.organization_hierarchy.nodes.values()})
+    monkeypatch.setattr(reports, "USAGE_TEAM_BATCH", 1)
+
+    async def fetch(team_ids, start, end):
+        (team,) = team_ids
+        started.add(team)
+        if len(started) == 4:
             ready.set()
         try:
             await fail.wait()
-            if user_id == "alice" and not cancel_caller:
+            if team == teams[0] and not cancel_caller:
                 raise error
             await asyncio.Event().wait()
         except asyncio.CancelledError:
-            cancelled.add(user_id)
+            cancelled.add(team)
             cleanup_started.set()
             await cleanup_release.wait()
             raise
 
-    monkeypatch.setattr(upstream, "daily_usage", fetch)
+    monkeypatch.setattr(upstream, "team_daily_usage", fetch)
     day = datetime.now(timezone.utc).date()
     report = asyncio.create_task(reports.usage(None, day, day))
     try:
@@ -328,8 +348,8 @@ async def test_failed_or_cancelled_report_cancels_and_awaits_active_and_queued_f
             await asyncio.wait_for(report, 2)
         if not cancel_caller:
             assert exc.value is error
-        assert cancelled == started - (set() if cancel_caller else {"alice"})
-        assert len(started) < 20
+        assert cancelled == started - (set() if cancel_caller else {teams[0]})
+        assert len(started) < len(teams)
         completed = set(started)
         await asyncio.sleep(0)
         assert started == completed
@@ -350,10 +370,7 @@ async def test_direct_members_and_a_child_with_that_name_have_distinct_group_ids
     store.remember("bob", "bob@example.com", "sso", ["squad1"])
     day = datetime.now(timezone.utc).date()
 
-    async def fetch(user_id, start, end):
-        return [row(day, 10 if user_id == "alice" else 5)]
-
-    monkeypatch.setattr(upstream, "daily_usage", fetch)
+    monkeypatch.setattr(upstream, "team_daily_usage", AsyncMock(return_value=[row(day, {"alice": 10, "bob": 5})]))
     parent = tree.resolve("alice", ["digital"])
     child = tree.resolve("bob", ["squad1"])
     result = await reports.usage(parent.id, day, day)

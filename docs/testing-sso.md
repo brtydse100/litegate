@@ -66,7 +66,10 @@ warnings. The other keeps the database and checks that budgets and the saved key
 survive. Another moves a member to a different Keycloak group, wipes the
 database, signs them in again and regenerates their key: the new key is in the
 new team with the consumed spend carried over, and the old key stops working.
-A further test
+Two more tests have a system administrator set a per-user limit on Budget
+planning and on the Teams page (a team administrator only sees it, and the
+member's key follows), and have five members replace their keys at the same time
+(all succeed in parallel, with the old keys deleted). A further test
 signs in real team administrators and checks, in the page and through the API,
 that they can redistribute within their team's total (child teams and member
 overrides) but never change that total, over-allocate it, or raise their own

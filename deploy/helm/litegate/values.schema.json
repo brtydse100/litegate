@@ -197,6 +197,11 @@
         "hierarchicalBudgetsEnforced": {
           "type": "boolean"
         },
+        "keyRotationSettleSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 120
+        },
         "organizationGroupAdmins": {
           "type": "object",
           "additionalProperties": {
