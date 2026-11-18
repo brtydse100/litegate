@@ -11,7 +11,7 @@ from app.config import settings
 
 from app.organization import MembershipConflict, OrganizationNode
 from app.services import audit, budget_enforcement, key_cleanup, key_spend, litellm, organization_key_policy as key_policy
-from app.services import budget_key_guards, budget_pass
+from app.services import budget_key_guards, budget_pass, key_rotation_freeze
 from app.services import organization_client as upstream, organization_store as store, organization_discovery as discovery
 
 _logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ async def synchronize(identity: dict) -> OrganizationNode:
 
 
 async def sync_identity(identity: dict, info: dict, *, defer_finalization: bool = False) -> OrganizationNode:
-    existing = await budget_pass.keys(identity["user_id"])
+    existing = await key_rotation_freeze.recover(identity["user_id"], await budget_pass.keys(identity["user_id"]))
     budget_key_guards.guard_single_key(existing)
     await budget_enforcement.observe(identity["user_id"], existing)
     node = resolve_identity(identity)
@@ -173,12 +173,13 @@ async def generate_key(user_id: str, email: str, team_id: str | None, **options)
         return await _generate_key(user_id, email, team_id, **options)
 
 
-async def _generate_key(user_id: str, email: str, team_id: str | None, **options) -> dict:
+async def _generate_key(user_id: str, email: str, team_id: str | None, *, replacing: bool = False, **options) -> dict:
     await asyncio.to_thread(budget_enforcement.mark_participant, user_id)
     node = await prepare_user(user_id, email)
     if node is None:
         return await litellm.generate_key(user_id, email, team_id, **options)
-    budget_key_guards.guard_new_key(await litellm.list_user_keys(user_id))
+    if not replacing:
+        budget_key_guards.guard_new_key(await litellm.list_user_keys(user_id))
     identity = await asyncio.to_thread(store.get, user_id)
     if identity and identity["auth_source"] == "sso":
         email = identity["email"].strip().casefold()
@@ -194,16 +195,41 @@ async def _generate_key(user_id: str, email: str, team_id: str | None, **options
     return result
 
 
-@budget_pass.serialized
 async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias: str) -> dict:
+    """Replace keys; under enforced budgets, pause the old key until its spend settles."""
+    if not budget_enforcement.enforced():
+        return await _rotate_key(user_id, email, team_id, key_alias=key_alias)
+    if user_id in key_rotation_freeze.active:
+        raise HTTPException(status_code=409, detail="A key replacement is already in progress")
+    key_rotation_freeze.active.add(user_id)
+    try:
+        async with lock_for("user", user_id):
+            existing = await key_spend.current_keys(user_id)
+            await budget_key_guards.guard_rotation(user_id, existing)
+            froze = await key_rotation_freeze.freeze(user_id, existing)
+        try:
+            if froze:
+                # Outside every lock: other members keep working meanwhile.
+                await key_rotation_freeze.settle()
+            return await _rotate_key(user_id, email, team_id, key_alias=key_alias)
+        except BaseException:
+            if froze:
+                async with lock_for("user", user_id):
+                    await key_rotation_freeze.thaw(user_id)
+            raise
+    finally:
+        key_rotation_freeze.active.discard(user_id)
+
+
+@budget_pass.serialized
+async def _rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias: str) -> dict:
     """Serialize the spend snapshot, replacement, and old-key revocation together."""
     from app.services import key_budgets, key_rotation_policy
 
     async with lock_for("user", user_id):
         existing = await key_spend.current_keys(user_id)
-        if any(settings.organization_hierarchy.is_managed_team(key.get("team_id")) for key in existing):
-            budget_key_guards.guard_new_key(existing)
-        controls = await key_rotation_policy.snapshot(user_id, existing)
+        await budget_key_guards.guard_rotation(user_id, existing)
+        controls = await key_rotation_policy.snapshot(user_id, [key_rotation_freeze.original(key) for key in existing])
         if key_rotation_policy.requires_assistance(existing):
             raise HTTPException(
                 status_code=409,
@@ -218,12 +244,17 @@ async def rotate_key(user_id: str, email: str, team_id: str | None, *, key_alias
                     renamed_key = token
                     await litellm.update_key(token, {"key_alias": f"litegate-rotation-{token_hex(16)}"})
                     break
-            result = await _generate_key(user_id, email, team_id, initial_spend=litellm.total_key_spend(existing), key_alias=key_alias)
+            result = await _generate_key(
+                user_id, email, team_id, replacing=True, initial_spend=litellm.total_key_spend(existing), key_alias=key_alias
+            )
             try:
                 await key_budgets.preserve_rotation_budget(user_id, existing, result["key"])
                 verified = await key_rotation_policy.preserve(user_id, controls, result["key"])
                 source = await key_spend.verify_replacement(user_id, existing, result["key"])
-                if key_rotation_policy.requires_assistance(source) or await key_rotation_policy.snapshot(user_id, source) != controls:
+                if (
+                    key_rotation_policy.requires_assistance(source)
+                    or await key_rotation_policy.snapshot(user_id, [key_rotation_freeze.original(key) for key in source]) != controls
+                ):
                     raise HTTPException(
                         status_code=409, detail="Source key policy changed during rotation; original keys were kept. Retry the operation."
                     )

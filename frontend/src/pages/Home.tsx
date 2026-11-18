@@ -784,7 +784,8 @@ export default function Home() {
                       Replace the current key?
                     </p>
                     <p className="mt-1 text-sm text-amber-800">
-                      The old key stops working immediately.
+                      The old key stops working immediately. Replacing it can
+                      take about 15 seconds while its usage is carried over.
                     </p>
                     <div className="mt-4 flex gap-2">
                       <button
@@ -848,17 +849,7 @@ export default function Home() {
                             : "Create API key"}
                       </button>
                     ) : config?.save_api_keys_in_db &&
-                      keyList.some(
-                        (key) => key.secret_available,
-                      ) ? null : keyList.some(
-                        (key) => key.rotation_available === false,
-                      ) ? (
-                      <p className="rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-                        Your key keeps working. Organization budgets are
-                        enforced, so it can't be replaced here; ask an
-                        administrator if you need a new one.
-                      </p>
-                    ) : (
+                      keyList.some((key) => key.secret_available) ? null : (
                       <button
                         onClick={() => setConfirmRegenerate(true)}
                         disabled={operationsBlocked}

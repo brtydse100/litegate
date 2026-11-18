@@ -658,7 +658,13 @@ See [current enforcement and retirement limitations](docs/governance-and-analyti
 ### Enforced budget mutation guards
 
 When `hierarchical_budgets_enforced` is enabled, managed key deletion, manual
-spend reset, additional key creation and overlapping rotation return 409.
+spend reset and additional key creation return 409. `POST /api/keys/regenerate`
+blocks the managed key, waits about 12 seconds for spend to settle, then replaces
+it with the spend carried over; on failure the original key is unblocked and kept.
+It returns 409 while another replacement for the same user is running, for
+several managed keys, or when the user must sign in again after a restart that
+lost their organization details. A key in a member's previous managed group is
+moved to the current group rather than blocking budget writes.
 Multiple-key owners block enforcement migration until aggregate accounting is
 reviewed. Existing controls remain in place. Budget writes collect current spend
 and verify decreases before permitting increases; failed verification prevents

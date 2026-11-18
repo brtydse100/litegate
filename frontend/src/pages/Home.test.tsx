@@ -556,18 +556,17 @@ describe("personal key storage", () => {
     expect(screen.queryByText(/Policy unavailable/)).not.toBeInTheDocument();
   });
 
-  it("explains instead of offering replacement when enforced budgets forbid it", async () => {
+  it("offers replacement for an organization-managed key", async () => {
     renderHome(false, false, {
       organization_managed: true,
       user_budget_available: true,
-      rotation_available: false,
     });
-    expect(await screen.findByText(/it can't be replaced here/)).toBeVisible();
     expect(
-      screen.queryByRole("button", {
+      await screen.findByRole("button", {
         name: /Regenerate key|Regeneration paused/,
       }),
-    ).not.toBeInTheDocument();
+    ).toBeVisible();
+    expect(screen.queryByText(/can't be replaced/)).not.toBeInTheDocument();
   });
 
   it.each([false, true])(

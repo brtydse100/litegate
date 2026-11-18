@@ -61,9 +61,12 @@ npx playwright test --config playwright.sso-restart.config.ts
 
 It saves budgets for two teams across backend restarts. One test deletes the
 test database on each restart, like a deployment without persistent storage, and
-checks that the key page shows one dismissible info notice (sign in again), no
-warnings, and no **Regenerate key** action the backend would reject. The other
-keeps the database and checks that budgets and the saved key survive. A third
+checks that the key page shows one dismissible info notice (sign in again) and no
+warnings. The other keeps the database and checks that budgets and the saved key
+survive. Another moves a member to a different Keycloak group, wipes the
+database, signs them in again and regenerates their key: the new key is in the
+new team with the consumed spend carried over, and the old key stops working.
+A further test
 signs in real team administrators and checks, in the page and through the API,
 that they can redistribute within their team's total (child teams and member
 overrides) but never change that total, over-allocate it, or raise their own

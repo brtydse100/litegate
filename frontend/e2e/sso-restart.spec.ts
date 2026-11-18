@@ -85,8 +85,7 @@ test("two team budgets saved across restarts without persistence never break the
     await restartBackend("wipe");
     await saveRootBudget(admin, "Engineering", "90");
 
-    // The member's surviving session sees one calm info message, no warnings,
-    // and no replacement action the backend would reject.
+    // The member's surviving session sees one calm info message and no warnings.
     await user.goto("/my-key");
     const notice = user.getByText(
       "Sign out and sign in again to restore your organization details.",
@@ -98,17 +97,15 @@ test("two team budgets saved across restarts without persistence never break the
     await expect(user.getByText(/mapping was removed/)).toHaveCount(0);
     await expect(user.getByText(/Key status:/)).toHaveCount(0);
     await expect(
-      user.getByRole("button", { name: /Regenerate key|Regeneration paused/ }),
-    ).toHaveCount(0);
-    await expect(user.getByText(/it can't be replaced here/)).toBeVisible();
-    // The backend still refuses replacement; the page just no longer offers it.
-    expect(
-      (
-        await user.request.post("/api/keys/regenerate", {
-          headers: mutationHeaders,
-        })
-      ).status(),
-    ).toBe(409);
+      user.getByRole("button", { name: "Regenerate key" }),
+    ).toBeVisible();
+    // Until they sign in again LiteGate cannot tell which team the new key
+    // belongs to, so replacement asks for that and changes nothing.
+    const early = await user.request.post("/api/keys/regenerate", {
+      headers: mutationHeaders,
+    });
+    expect(early.status()).toBe(409);
+    expect((await early.json()).detail).toMatch(/sign in again/i);
 
     // The message closes with its ×.
     await user
@@ -137,7 +134,8 @@ test("two team budgets saved across restarts without persistence never break the
       )
       .toBeGreaterThan(0);
 
-    // The original credential kept working throughout.
+    // The original credential kept working throughout (the refused
+    // replacement above did not pause it).
     const inference = await user.request.post(
       `${upstreamOrigin}/v1/chat/completions`,
       {
@@ -220,5 +218,125 @@ test("with persistent storage a restart keeps team budgets and shows no messages
     }
     await adminContext.close();
     await userContext.close();
+  }
+});
+
+// Keycloak's administration API moves a synthetic user between SSO groups.
+const keycloak = "http://127.0.0.1:8082";
+async function setGroups(page: Page, userId: string, groups: string[]) {
+  const login = await page.request.post(
+    `${keycloak}/realms/master/protocol/openid-connect/token`,
+    {
+      form: {
+        grant_type: "password",
+        client_id: "admin-cli",
+        username: "litegate-test-admin",
+        password: "litegate-test-admin-password",
+      },
+    },
+  );
+  expect(login.status()).toBe(200);
+  const headers = {
+    Authorization: `Bearer ${(await login.json()).access_token}`,
+  };
+  const admin = `${keycloak}/admin/realms/litegate-sso`;
+  const all: { id: string; name: string }[] = await (
+    await page.request.get(`${admin}/groups`, { headers })
+  ).json();
+  const current: { id: string; name: string }[] = await (
+    await page.request.get(`${admin}/users/${userId}/groups`, { headers })
+  ).json();
+  for (const group of current.filter((g) => !groups.includes(g.name)))
+    await page.request.delete(`${admin}/users/${userId}/groups/${group.id}`, {
+      headers,
+    });
+  for (const group of all.filter((g) => groups.includes(g.name)))
+    await page.request.put(`${admin}/users/${userId}/groups/${group.id}`, {
+      headers,
+    });
+}
+
+test("a member moved to another team regenerates their key after a restart without persistence", async ({
+  browser,
+}) => {
+  test.setTimeout(240_000);
+  const userId = "10000000-0000-4000-8000-000000000004";
+  const context = await browser.newContext({ baseURL: origin });
+  const user = await context.newPage();
+  const created: string[] = [];
+  try {
+    await login(user, "ordinary-user");
+    for (const old of (await (await user.request.get("/api/keys")).json())
+      .keys) {
+      await user.request.post(`${upstreamOrigin}/key/delete`, {
+        headers: { Authorization: `Bearer ${master}` },
+        data: { keys: [old.token] },
+      });
+    }
+    const first = await user.request.post("/api/keys", {
+      headers: mutationHeaders,
+    });
+    expect(first.status()).toBe(201);
+    const oldSecret: string = (await first.json()).key;
+    created.push(oldSecret);
+    // Usage already consumed on the old key must follow the member.
+    await user.request.post(`${upstreamOrigin}/key/update`, {
+      headers: { Authorization: `Bearer ${master}` },
+      data: { key: oldSecret, spend: 0.25 },
+    });
+
+    // The member moves to Marketing; the backend restarts and loses its
+    // database together with the saved copy of the key.
+    await setGroups(user, userId, ["marketing"]);
+    await restartBackend("wipe");
+    await context.clearCookies();
+    await login(user, "ordinary-user");
+    await user.goto("/my-key");
+    await expect(user.getByText(/Marketing/).first()).toBeVisible();
+
+    // Self-service replacement, no administrator involved.
+    await user.getByRole("button", { name: "Regenerate key" }).click();
+    const replaced = user.waitForResponse(
+      (r) => r.url().endsWith("/api/keys/regenerate"),
+      { timeout: 60_000 },
+    );
+    await user.getByRole("button", { name: "Replace key" }).click();
+    const response = await replaced;
+    expect(response.status()).toBe(201);
+    const newSecret: string = (await response.json()).key;
+    created.push(newSecret);
+    await expect(user.getByText(newSecret)).toBeVisible();
+
+    // The new key lives in the new team and carries the consumed spend; the
+    // old key is gone.
+    const info = await (
+      await user.request.get(
+        `${upstreamOrigin}/key/info?key=${encodeURIComponent(newSecret)}`,
+        { headers: { Authorization: `Bearer ${master}` } },
+      )
+    ).json();
+    expect(info.info.team_id).toBe("sso-test-marketing");
+    expect(info.info.spend).toBeGreaterThanOrEqual(0.25);
+    expect(info.info.blocked).toBeFalsy();
+    const chat = (secret: string) =>
+      user.request.post(`${upstreamOrigin}/v1/chat/completions`, {
+        headers: { Authorization: `Bearer ${secret}` },
+        data: {
+          model: "litegate-integration-mock",
+          messages: [{ role: "user", content: "Synthetic rotation check" }],
+        },
+      });
+    expect((await chat(newSecret)).status()).toBe(200);
+    expect((await chat(oldSecret)).status()).toBe(401);
+    expect(
+      (await (await user.request.get("/api/keys")).json()).keys,
+    ).toHaveLength(1);
+  } finally {
+    await setGroups(user, userId, ["engineering"]);
+    await user.request.post(`${upstreamOrigin}/key/delete`, {
+      headers: { Authorization: `Bearer ${master}` },
+      data: { keys: created },
+    });
+    await context.close();
   }
 });

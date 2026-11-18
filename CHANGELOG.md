@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Members with enforced organization budgets can replace their own key again,
+  including after moving to another group or a restart without persistent
+  storage. The old key is paused while its spend settles, so the replacement
+  carries the full spend; any failure keeps the old key.
+- A member moved to another group with an existing key no longer blocks sign-in
+  and budget updates for everyone; their key and spend move to the new group.
+
 ## [2.20.2] - 2026-11-18
 
 ### Fixed

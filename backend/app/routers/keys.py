@@ -29,10 +29,6 @@ async def list_keys(current_user: CurrentUser = Depends(get_current_user)):
             }
             for key in keys
         ]
-    # Enforced organization budgets forbid replacing a managed key; say so up front
-    # instead of offering an action the backend rejects.
-    enforced = settings.hierarchical_budgets_enforced
-    keys = [{**key, "rotation_available": not (enforced and settings.organization_hierarchy.is_managed_team(key.get("team_id")))} for key in keys]
     return {"keys": await asyncio.to_thread(key_secrets.annotate, keys)}
 
 
