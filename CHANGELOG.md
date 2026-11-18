@@ -30,6 +30,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - The nightly browser run no longer runs the real-SSO tests without their
   Keycloak and LiteLLM services.
+- OIDC sign-in no longer fails with a server error when the identity
+  provider's clock runs slightly ahead of LiteGate's; ID-token times tolerate
+  10 seconds of clock difference.
 
 ## [2.20.3] - 2026-11-18
 
