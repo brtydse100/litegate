@@ -7,6 +7,7 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.20.3](v2.20.3.md) | Self-service key replacement with enforced budgets and automatic group transfers |
 | [2.20.2](v2.20.2.md) | Clear key-page messages after restarts, dismissible notices, and verified team budget authority |
 | [2.20.1](v2.20.1.md) | Two-decimal currency displays and clearer team budget allocation authority |
 | [2.20.0](v2.20.0.md) | Opt-in equal budget splits, verified cap decreases, and accounting safeguards |
