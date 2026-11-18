@@ -151,6 +151,8 @@ and the configuration options listed above. LiteLLM custom Python SSO handlers,
 custom request headers, static state values, token-claim merging, and its role
 mapping options are not interpreted. OIDC mode continues to verify ID-token
 signatures and claims; generic mode authenticates identity through UserInfo.
+ID-token times (`iat`, `exp`) tolerate up to 10 seconds of clock difference
+between the identity provider and LiteGate; keep both synchronized (NTP).
 
 ## Assigning administrators
 
