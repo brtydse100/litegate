@@ -485,9 +485,12 @@ export default function AdminOrganization({
       <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-[22px] px-4 py-7 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3.5">
           <div>
-            <h1 className="text-[28px] font-bold tracking-[-0.01em] text-ink">
-              {greeting(email)}
+            <h1 className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-4">
+              Organization
             </h1>
+            <p className="mt-0.5 text-[28px] font-bold tracking-[-0.01em] text-ink">
+              {greeting(email)}
+            </p>
             <p className="mt-1 text-[15px] text-ink-3">
               {status.data && !status.data.ready
                 ? "The gateway is not ready."

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { UserMenu } from "./AppChrome";
+import { MemoryRouter } from "react-router-dom";
+import { AdminSidebar, UserMenu } from "./AppChrome";
 
 describe("UserMenu", () => {
   it("supports the menu keyboard pattern", () => {
@@ -19,5 +20,23 @@ describe("UserMenu", () => {
     fireEvent.keyDown(items[1], { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+});
+
+describe("account email", () => {
+  it("is copyable from the sidebar footer", () => {
+    render(
+      <MemoryRouter>
+        <AdminSidebar
+          groups={[]}
+          email="ann@example.test"
+          role="admin"
+          onSignOut={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByRole("button", { name: "Copy email ann@example.test" }),
+    ).toBeInTheDocument();
   });
 });

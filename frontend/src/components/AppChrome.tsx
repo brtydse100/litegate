@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type React from "react";
 import { NavLink } from "react-router-dom";
 import { LogOut, Zap, type LucideIcon } from "lucide-react";
+import EmailAddress from "./EmailAddress";
 import ThemeToggle from "./ThemeToggle";
 
 /** Logo tile and product name; a configured logo replaces the default mark. */
@@ -137,7 +138,9 @@ export function UserMenu({
           className={`absolute z-30 rounded-xl ${up ? "bottom-full left-0 mb-2 w-52" : "right-0 mt-2 w-60 max-w-[calc(100vw-2rem)]"} border border-line bg-card p-1.5 shadow-lg`}
         >
           <div className="border-b border-line-soft px-3 py-2.5 text-sm">
-            <p className="truncate font-medium text-ink">{email}</p>
+            {email && (
+              <EmailAddress email={email} className="font-medium text-ink" />
+            )}
             {role && <p className="capitalize text-ink-4">{role}</p>}
           </div>
           <div className="pt-1.5">
@@ -268,8 +271,8 @@ export function AdminSidebar({
       <div className="mt-auto hidden items-center gap-1 border-t border-navy-3 pt-3.5 md:flex">
         <UserMenu email={email} role={role} onSignOut={onSignOut} compact up />
         <span className="min-w-0 text-[13px] leading-tight">
-          <span className="block truncate">{email}</span>
-          <span className="capitalize text-navy-muted">{role}</span>
+          {email && <EmailAddress email={email} className="block" />}
+          <span className="block capitalize text-navy-muted">{role}</span>
         </span>
       </div>
     </nav>
