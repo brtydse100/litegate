@@ -242,8 +242,8 @@ export function AdminSidebar({
       <div className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:gap-0.5 md:overflow-visible md:pb-0">
         {groups.map((group) => (
           <div key={group.label} className="contents md:block">
-            <p className="mx-2.5 mb-1.5 mt-4 hidden text-[11px] font-semibold tracking-[0.06em] text-navy-muted md:block">
-              {group.label.toUpperCase()}
+            <p className="mx-2.5 mb-1.5 mt-4 hidden text-[11px] font-semibold uppercase tracking-[0.06em] text-navy-muted md:block">
+              {group.label}
             </p>
             {group.items.map((item) => (
               <NavLink key={item.to} to={item.to} className={navLink} end>

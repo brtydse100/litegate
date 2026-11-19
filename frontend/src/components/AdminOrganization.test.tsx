@@ -157,7 +157,7 @@ describe("organization dashboard contracts", () => {
     expect(
       await screen.findByRole("region", { name: "Spend split" }),
     ).toHaveTextContent("Infrastructure");
-    expect(screen.getByText("SPEND THIS PERIOD")).toBeVisible();
+    expect(screen.getByText("Spend this period")).toBeVisible();
     expect(api.organization).toHaveBeenCalledTimes(1);
   });
 
