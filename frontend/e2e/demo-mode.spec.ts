@@ -173,6 +173,21 @@ for (const width of [390, 1280]) {
   });
 }
 
+test("the top-bar account menu stays on a phone screen", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("./my-key");
+  // The top bar belongs to the user layout; admins get the sidebar.
+  await page.getByRole("button", { name: "View demo as user" }).click();
+  await expect(
+    page.getByRole("navigation", { name: "Primary navigation" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  const box = await page.getByRole("menu").boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+});
+
 test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("./");
