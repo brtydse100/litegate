@@ -105,6 +105,8 @@ class Settings(BaseSettings):
     organization_access_designations: dict[str, list[str]] = Field(default_factory=dict)
     organization_group_admins: dict[str, list[str]] = Field(default_factory=dict)
     organization_cleanup_enabled: bool = False
+    # Full organization sweep cadence; sign-ins and budget edits sync sooner.
+    organization_sync_interval_seconds: int = Field(default=900, ge=60, le=86_400)
     analytics_enabled: bool = True
     analytics_retention_days: int = Field(default=90, ge=1, le=366)
     analytics_batch_concurrency: int = Field(default=5, ge=1, le=20)

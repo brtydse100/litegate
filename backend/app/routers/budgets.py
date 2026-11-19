@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictStr
 from app.config import settings
 from app.routers.api_actor import ApiActor, get_api_actor, record_audit
 from app.services import budget_allocations as allocation, budget_native as native, budget_store as store
-from app.services import budget_enforcement as enforcement, budget_pass, organization_access as access, organization_limits
+from app.services import budget_enforcement as enforcement, budget_pass, organization_access as access, organization_limits, organization_sync
 
 router = APIRouter(prefix="/v1/organization/budgets", tags=["organization budgets"])
 
@@ -147,6 +147,7 @@ async def edit_envelope(node_id: str, body: EnvelopeEdit, actor: ApiActor = Depe
     # Money may have moved between groups: apply every decrease before any raise.
     budget_pass.mark_cross_group_edit()
     await record_audit(actor, "organization.budget_preview", node_id, details={"revision": state["revision"], "kind": "envelope"})
+    organization_sync.request_reconciliation()
     return await _response(state, scope, actor)
 
 
@@ -163,6 +164,7 @@ async def edit_override(node_id: str, user_id: str, body: UserEdit, actor: ApiAc
 
     state = await asyncio.to_thread(_edit, body.revision, actor, scope, change)
     await record_audit(actor, "organization.budget_preview", user_id, details={"revision": state["revision"], "kind": "override"})
+    organization_sync.request_reconciliation()
     return await _response(state, scope, actor)
 
 

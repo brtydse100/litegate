@@ -49,6 +49,7 @@ data:
   ORGANIZATION_ACCESS_DESIGNATIONS: {{ .Values.config.organizationAccessDesignations | toJson | quote }}
   ORGANIZATION_GROUP_ADMINS: {{ .Values.config.organizationGroupAdmins | toJson | quote }}
   ORGANIZATION_CLEANUP_ENABLED: {{ .Values.config.organizationCleanupEnabled | quote }}
+  ORGANIZATION_SYNC_INTERVAL_SECONDS: {{ .Values.config.organizationSyncIntervalSeconds | quote }}
   ANALYTICS_ENABLED: {{ .Values.config.analyticsEnabled | quote }}
   ANALYTICS_RETENTION_DAYS: {{ .Values.config.analyticsRetentionDays | quote }}
   ANALYTICS_BATCH_CONCURRENCY: {{ .Values.config.analyticsBatchConcurrency | quote }}

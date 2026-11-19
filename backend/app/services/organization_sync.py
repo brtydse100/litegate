@@ -314,9 +314,33 @@ async def reconciliation_attempt() -> None:
         _logger.exception("Organization synchronization failed")
 
 
+# Set by budget and limit edits so their changes apply without waiting for a sweep.
+_wake: asyncio.Event | None = None
+MIN_PASS_SPACING = 60
+
+
+def request_reconciliation() -> None:
+    """Run the next organization pass soon (at most once a minute)."""
+    if _wake is not None:
+        _wake.set()
+
+
 async def run_reconciliation() -> None:
+    """Sweep every ``organization_sync_interval_seconds``, or sooner when woken.
+
+    Passes are at least a minute apart. Sign-ins and key operations already
+    synchronize their own user, so the full sweep only repairs drift.
+    """
+    global _wake
+    _wake = asyncio.Event()
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(MIN_PASS_SPACING)
+        remaining = max(0, settings.organization_sync_interval_seconds - MIN_PASS_SPACING)
+        try:
+            await asyncio.wait_for(_wake.wait(), timeout=remaining)
+        except TimeoutError:
+            pass
+        _wake.clear()
         await reconciliation_attempt()
 
 

@@ -173,7 +173,10 @@ paths reject access rather than selecting one by order. Ancestor membership,
 key migration, and enforced allowances use the existing hierarchy lifecycle.
 
 Startup awaits the first hierarchy reconciliation attempt before serving requests,
-then retries every 60 seconds. Exact existing user IDs take precedence, including
+then sweeps every `organization_sync_interval_seconds` (default `900`, allowed
+`60`–`86400`). Budget and per-user limit edits wake the sweep early, with passes
+at least 60 seconds apart; sign-in and key operations synchronize their own user
+immediately. Exact existing user IDs take precedence, including
 IDs containing `@`. Unresolved email selectors search all matching LiteLLM pages
 (case-insensitive substring search), then require one normalized exact match and
 a fresh lookup by actual user ID. Discovery uses at most five concurrent lookups,

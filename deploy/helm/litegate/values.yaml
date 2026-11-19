@@ -175,6 +175,8 @@ config:
   organizationGroupAdmins: {}
   # Assessment/audit only for removed, installation-owned teams; never deletes teams.
   organizationCleanupEnabled: false
+  # Seconds between full organization sweeps (60-86400); budget edits wake it sooner.
+  organizationSyncIntervalSeconds: 900
   analyticsEnabled: true
   analyticsRetentionDays: 90
   analyticsBatchConcurrency: 5

@@ -6,6 +6,7 @@ os.environ.setdefault("LITELLM_MASTER_KEY", "sk-test")
 os.environ.setdefault("JWT_SECRET", "test-secret-at-least-32-characters")
 
 import pytest
+from fastapi import HTTPException
 
 
 @pytest.fixture(autouse=True)
@@ -28,8 +29,17 @@ def isolated_organization_admin_cache(monkeypatch):
 @pytest.fixture(autouse=True)
 def isolated_report_and_pass_state(monkeypatch):
     """Overview status caching and verified budget passes are process-wide."""
-    from app.services import budget_pass, organization_reports
+    from app.services import budget_pass, litellm_snapshot, organization_reports
 
     monkeypatch.setattr(organization_reports, "_status_cache", {})
+    litellm_snapshot.clear()
+
+    # Bulk listings are unavailable unless a test provides them, so existing
+    # tests exercise the per-item fallback without network access.
+    async def unavailable():
+        raise HTTPException(status_code=503, detail="Bulk listing disabled in tests")
+
+    for snapshot in (litellm_snapshot.teams, litellm_snapshot.keys_by_user):
+        monkeypatch.setattr(snapshot, "_load", unavailable)
     monkeypatch.setattr(budget_pass, "_generation", 1)
     monkeypatch.setattr(budget_pass, "_clean", 0)

@@ -191,6 +191,11 @@
           "minimum": 1,
           "maximum": 20
         },
+        "organizationSyncIntervalSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400
+        },
         "hierarchicalBudgetsEnabled": {
           "type": "boolean"
         },

@@ -7,7 +7,7 @@ from time import monotonic
 from fastapi import HTTPException
 
 from app.config import settings
-from app.services import litellm, organization_client as upstream, organization_store as store, organization_discovery as discovery
+from app.services import litellm, litellm_snapshot, organization_client as upstream, organization_store as store, organization_discovery as discovery
 from app.services.organization_sync import resolve_identity
 from app.services.organization_access import GLOBAL_SCOPE, OrganizationScope
 
@@ -100,21 +100,32 @@ async def overview(scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     records, errors = await identities(scope)
     visible = [node for node in tree.nodes.values() if scope.allows(node)]
     semaphore = asyncio.Semaphore(5)
+    # One bulk team listing replaces a /team/info request per group. Teams it
+    # omits (or a LiteLLM without spend in the listing) fall back to team info.
+    try:
+        listed = await litellm_snapshot.teams.get()
+    except HTTPException:
+        listed = {}
+
+    def team_status(root, team: dict) -> dict:
+        policy = {"max_budget": None, "budget_duration": root.duration}
+        mismatch = any(team.get(key) != value for key, value in policy.items())
+        return {
+            "spend": upstream.finite_number(team.get("spend")),
+            "error": "LiteLLM's team policy migration is pending" if mismatch else None,
+        }
 
     async def root_status(root):
+        team = listed.get(root.team_id)
+        if team is not None and "spend" in team:
+            return root.team_id, team_status(root, team)
         cached = _status_cache.get(root.team_id)
         if cached and monotonic() - cached[0] < 60:
             return root.team_id, cached[1]
         async with semaphore:
             try:
                 info = await upstream.team_info(root.team_id)
-                team = info.get("team_info", {})
-                policy = {"max_budget": None, "budget_duration": root.duration}
-                mismatch = any(team.get(key) != value for key, value in policy.items())
-                status = {
-                    "spend": upstream.finite_number(team.get("spend")),
-                    "error": "LiteLLM's team policy migration is pending" if mismatch else None,
-                }
+                status = team_status(root, info.get("team_info", {}))
                 if len(_status_cache) >= 5000:
                     _status_cache.clear()
                 _status_cache[root.team_id] = (monotonic(), status)
@@ -163,8 +174,15 @@ async def users(node_id: str | None, page: int, size: int, scope: OrganizationSc
     selected = [(identity, node) for identity, node in records if within(node, ancestor)]
     batch = selected[(page - 1) * size : page * size]
     semaphore = asyncio.Semaphore(5)
+    # Spend for the page comes from one shared key listing when available.
+    try:
+        owners = await litellm_snapshot.keys_by_user.get()
+    except HTTPException:
+        owners = None
 
     async def get_info(user_id):
+        if owners is not None:
+            return user_id, owners.get(user_id, [])
         async with semaphore:
             try:
                 return user_id, await litellm.list_user_keys(user_id)

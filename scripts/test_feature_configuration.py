@@ -25,6 +25,11 @@ FIELDS = {
         "ORGANIZATION_CLEANUP_ENABLED",
         False,
     ),
+    "organizationSyncIntervalSeconds": (
+        "organization_sync_interval_seconds",
+        "ORGANIZATION_SYNC_INTERVAL_SECONDS",
+        900,
+    ),
     "analyticsEnabled": ("analytics_enabled", "ANALYTICS_ENABLED", True),
     "analyticsRetentionDays": (
         "analytics_retention_days",
@@ -82,6 +87,7 @@ class FeatureConfiguration(unittest.TestCase):
             "organizationAccessDesignations": {"alice": ["engineering", "platform"]},
             "organizationGroupAdmins": {"engineering": ["alice", "bob"]},
             "organizationCleanupEnabled": True,
+            "organizationSyncIntervalSeconds": 60,
             "analyticsEnabled": False,
             "analyticsRetentionDays": 366,
             "analyticsBatchConcurrency": 20,
@@ -117,6 +123,8 @@ class FeatureConfiguration(unittest.TestCase):
             ("analyticsBatchConcurrency", 21),
             ("analyticsEnabled", "true"),
             ("organizationCleanupEnabled", "false"),
+            ("organizationSyncIntervalSeconds", 59),
+            ("organizationSyncIntervalSeconds", 86401),
             ("hierarchicalBudgetsEnabled", "true"),
             ("hierarchicalBudgetsEnforced", "true"),
             ("keyRotationSettleSeconds", -1),
