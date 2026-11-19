@@ -340,11 +340,14 @@ export default function AdminOrganization({
   const subtree = [...full.values()].filter(
     (group) => root && within(group, root),
   );
-  const near = subtree.filter((group) =>
+  // Health checks cover the selected root group itself, not only its
+  // descendants: its own LiteLLM team can fail or near its budget too.
+  const checked = rootTotals ? [rootTotals, ...subtree] : subtree;
+  const near = checked.filter((group) =>
     reached(group.group_spend, group.group_total, NEAR),
   );
   const issues = rootsQuery.data?.issues ?? [];
-  const syncErrors = subtree.filter((group) => group.sync_error);
+  const syncErrors = checked.filter((group) => group.sync_error);
   const attention: Array<{
     key: string;
     tone: string;
@@ -445,7 +448,8 @@ export default function AdminOrganization({
                   <span className="font-semibold text-sand-ink">
                     {plural(near.length, "group")}
                   </span>{" "}
-                  {near.length === 1 ? "is" : "are"} close to their budget
+                  {near.length === 1 ? "is" : "are"} at {NEAR}% or more of their
+                  budget
                 </>
               )}
             </p>

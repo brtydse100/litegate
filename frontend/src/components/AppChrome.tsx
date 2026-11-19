@@ -252,7 +252,7 @@ export function AdminSidebar({
                 {item.dot && (
                   <span
                     className={`h-2 w-2 rounded-full ${
-                      item.dot === "ok" ? "bg-ready" : "bg-danger"
+                      item.dot === "ok" ? "bg-ready" : "bg-alert"
                     }`}
                   >
                     <span className="sr-only">

@@ -132,6 +132,12 @@ function SecretContent({
           </button>
         )}
       </div>
+      {!secret && !canReveal && (
+        <p className="text-xs text-ink-4">
+          LiteGate has no saved copy of this key to show. The key itself still
+          works.
+        </p>
+      )}
       {error && (
         <DismissibleMessage
           role="alert"
