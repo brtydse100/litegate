@@ -15,9 +15,11 @@ usage or users before a selection.
 Organization spend totals and the member table's budget-period spend come from
 two shared bulk listings (all teams and all keys), each refreshed at most once a
 minute and shared by every open page. Opening the page therefore sends a few
-paged LiteLLM requests instead of one per group or member. When a listing is
-unavailable or omits a team's spend, LiteGate falls back to reading that team or
-member individually. Key changes and budget enforcement always read live data.
+paged LiteLLM requests instead of one per group or member. When the team listing
+is unavailable, or a team's entry lacks its spend, budget or period, LiteGate
+reads that team individually. When the key listing is unavailable, it reads each
+member's keys individually; a member absent from a successful listing has no keys
+and shows no spend. Key changes and budget enforcement always read live data.
 
 Select or expand a group to fetch its direct children and that team's current
 details. Deeper groups load the same way as you open them. Child lists, team
