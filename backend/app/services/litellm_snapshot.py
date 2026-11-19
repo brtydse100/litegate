@@ -9,6 +9,7 @@ Key writes and budget enforcement keep reading live.
 """
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from time import monotonic
 from weakref import WeakKeyDictionary
@@ -16,6 +17,8 @@ from weakref import WeakKeyDictionary
 from fastapi import HTTPException
 
 from app.services import litellm
+
+_logger = logging.getLogger(__name__)
 
 TTL = 60
 PAGE_SIZE = 100
@@ -52,6 +55,7 @@ class Snapshot:
                     self._value, self._error = None, exc
                 except (TypeError, ValueError):
                     # A malformed listing must fall back like an outage, not 500.
+                    _logger.warning("LiteLLM bulk listing was unreadable; reports fall back to per-item reads", exc_info=True)
                     self._value, self._error = None, HTTPException(status_code=502, detail="LiteLLM returned an unreadable listing")
                 self._loaded_at = monotonic()
             return self._result()
@@ -83,7 +87,9 @@ async def _load_keys() -> dict:
     owners: dict[str, list[dict]] = {}
     seen: set[str] = set()
     for key in keys:
-        # Offset paging can repeat a key when keys change mid-listing.
+        # Offset paging can repeat a key when one is added mid-listing (counted
+        # once here) or skip one when a key is deleted; either corrects itself on
+        # the next refresh, at most TTL seconds later.
         token = key.get("token")
         if isinstance(token, str):
             if token in seen:

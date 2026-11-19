@@ -211,7 +211,7 @@ describe("personal key storage", () => {
 
   it("names the mobile sign-out control even when its text is hidden", async () => {
     renderHome(false, false);
-    await screen.findByText("YOUR API KEY");
+    await screen.findByText("Your API key");
     fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
   });
@@ -341,7 +341,7 @@ describe("personal key storage", () => {
         false,
         message,
       );
-      await screen.findByText("YOUR API KEY");
+      await screen.findByText("Your API key");
       expect(
         screen.queryByLabelText("My key guidance"),
       ).not.toBeInTheDocument();
@@ -350,7 +350,7 @@ describe("personal key storage", () => {
 
   it("offers no replacement after key lookup fails with a cached key", async () => {
     const { list, client } = renderHome(false, false);
-    await screen.findByText("YOUR API KEY");
+    await screen.findByText("Your API key");
     list.mockRejectedValue(new Error("Lookup unavailable"));
     await act(async () => {
       await client.invalidateQueries({ queryKey: ["keys"] });
@@ -454,7 +454,7 @@ describe("personal key storage", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Create my API key" }),
     );
-    await screen.findByText("YOUR API KEY");
+    await screen.findByText("Your API key");
     await waitFor(() =>
       expect(screen.getByText("sk-synthetic-created")).toBeVisible(),
     );
