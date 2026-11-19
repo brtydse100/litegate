@@ -223,7 +223,7 @@ export default function AdminUsers({
         {users.isLoading ? (
           <div className="h-32 animate-pulse bg-canvas" />
         ) : users.data?.length ? (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className={tableHead}>
                 <tr>

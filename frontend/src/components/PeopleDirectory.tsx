@@ -85,7 +85,7 @@ export default function PeopleDirectory() {
       {people.data && (
         <>
           {people.data.users.length ? (
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className={tableHead}>
                   <tr>

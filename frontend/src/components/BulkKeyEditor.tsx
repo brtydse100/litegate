@@ -516,7 +516,7 @@ export default function BulkKeyEditor({
               </p>
             ) : visibleKeys.length ? (
               <>
-                <div className="overflow-x-auto">
+                <div className="relative overflow-x-auto">
                   <div className="space-y-1 p-2 md:min-w-[860px]">
                     {visibleKeys.map((key, index) => {
                       const token = keyToken(key);
@@ -676,7 +676,7 @@ export default function BulkKeyEditor({
               <p className="text-xs font-medium text-sand-ink">
                 Reset accumulated spend
               </p>
-              <p className="mt-0.5 text-[11px] text-ink-4">
+              <p className="mt-0.5 text-[11px] text-ink-3">
                 Select one or more keys. Their budgets, limits, and spend
                 histories are kept.
               </p>

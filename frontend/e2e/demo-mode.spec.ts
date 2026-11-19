@@ -179,11 +179,17 @@ test("pages fit a phone screen without sideways scrolling", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./");
   await page.getByRole("link", { name: "Admin", exact: true }).click();
-  for (const route of ["organization", "teams", "keys", "users", "status"]) {
+  const admin = ["organization", "teams", "keys", "users", "status"];
+  for (const route of [...admin, "analytics", "my-key"]) {
     await page.goto(`./${route}`);
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
-    // The status dot and its hidden text render once system status loads.
-    await expect(page.getByText(/^(Ready|Not ready)$/).first()).toBeAttached();
+    // Admin pages show a status dot once system status loads; wait for it,
+    // and for page data, so late content is measured too.
+    if (admin.includes(route))
+      await expect(
+        page.getByText(/^(Ready|Not ready)$/).first(),
+      ).toBeAttached();
+    await page.waitForLoadState("networkidle");
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
     );

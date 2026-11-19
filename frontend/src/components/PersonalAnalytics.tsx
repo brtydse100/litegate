@@ -178,7 +178,7 @@ export default function PersonalAnalytics() {
         <div className={cardHeader}>
           <h2 className={cardTitle}>Usage by model</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[480px] text-left text-sm">
             <thead className={tableHead}>
               <tr>

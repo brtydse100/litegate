@@ -653,7 +653,7 @@ export default function AdminTeams() {
         {teams.isLoading ? (
           <div className="h-48 animate-pulse bg-canvas" />
         ) : teams.data?.teams.length ? (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <div
               className={`${teamColumns} px-5 py-2.5 ${tableHead}`}
               aria-hidden="true"

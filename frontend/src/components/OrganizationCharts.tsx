@@ -50,7 +50,7 @@ export function SpendTrend({
               y1={y(scale * ratio)}
               y2={y(scale * ratio)}
               stroke="currentColor"
-              className="text-ink"
+              className="text-line"
             />
             <text
               x="82"
