@@ -80,8 +80,8 @@ authoritative protection.
 | `user` | Sign in, create or regenerate a personal key, and view its access snapshot, including the accessible model list |
 | `admin` | Everything a user can do, plus manage local users, LiteLLM teams, installation keys, and bulk key policy |
 
-Administrators work from a sidebar grouped into **Workspace** (My key,
-Analytics), **Manage** (Organization, Teams, Keys, People) and **System**
+Administrators work from a sidebar grouped into **Workspace** (My key, and
+Analytics when enabled), **Manage** (Organization, Teams, Keys, People) and **System**
 (Audit log, Status). On phones the sidebar becomes a scrolling row at the top.
 **Audit log** opens the audit table on the Status page. The sign-in page shows
 the logo and custom login text in a navy panel beside the sign-in form; on

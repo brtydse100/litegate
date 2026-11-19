@@ -31,7 +31,11 @@ describe("uses of shared buttons", () => {
     const offenders = Object.entries(sources).flatMap(([file, text]) =>
       [...text.matchAll(/\$\{button\w*\}([^`]*)`/g)]
         .filter(([, extra]) =>
-          extra.split(/\s+/).some((name) => colour.test(name)),
+          extra
+            .replace(/["'{}]/g, " ")
+            .split(/\s+/)
+            .map((name) => name.replace(/^([a-z-]+:)+/, ""))
+            .some((name) => colour.test(name)),
         )
         .map(([match]) => `${file}: ${match}`),
     );

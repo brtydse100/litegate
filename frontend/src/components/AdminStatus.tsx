@@ -15,14 +15,15 @@ function Dependency({
   loading,
 }: {
   name: string;
-  ok: boolean;
+  /** `null` when no status response arrived, so the state is unknown. */
+  ok: boolean | null;
   detail: string;
   loading: boolean;
 }) {
   return (
     <MetricCard
       accent={
-        loading
+        loading || ok === null
           ? "border-t-line-input"
           : ok
             ? "border-t-mint"
@@ -33,9 +34,15 @@ function Dependency({
         <>
           <span
             aria-hidden="true"
-            className={`h-2 w-2 rounded-full ${loading ? "bg-ink-5" : ok ? "bg-mint" : "bg-danger"}`}
+            className={`h-2 w-2 rounded-full ${loading || ok === null ? "bg-ink-5" : ok ? "bg-mint" : "bg-danger"}`}
           />
-          {loading ? "Checking…" : ok ? "Operational" : "Unavailable"}
+          {loading
+            ? "Checking…"
+            : ok === null
+              ? "Unknown"
+              : ok
+                ? "Operational"
+                : "Unavailable"}
         </>
       }
       sub={detail}
@@ -138,7 +145,7 @@ export default function AdminStatus() {
         <Dependency
           name="LiteLLM gateway"
           loading={status.isLoading}
-          ok={status.data?.dependencies.litellm.ok ?? false}
+          ok={status.data ? status.data.dependencies.litellm.ok : null}
           detail={
             status.isLoading
               ? "Checking connection..."
@@ -149,7 +156,7 @@ export default function AdminStatus() {
         <Dependency
           name="Local account database"
           loading={status.isLoading}
-          ok={status.data?.dependencies.database.ok ?? false}
+          ok={status.data ? status.data.dependencies.database.ok : null}
           detail={
             status.isLoading
               ? "Checking storage..."
@@ -194,7 +201,7 @@ export default function AdminStatus() {
             {(audit.error as Error).message}
           </p>
         ) : audit.data?.events.length ? (
-          <div className="max-h-[36rem] overflow-auto">
+          <div className="relative max-h-[36rem] overflow-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className={`sticky top-0 ${tableHead}`}>
                 <tr>
