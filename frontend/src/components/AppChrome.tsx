@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { LogOut, Zap, type LucideIcon } from "lucide-react";
@@ -230,14 +236,21 @@ export function AdminSidebar({
   onSignOut: () => void;
 }) {
   const location = useLocation();
-  const nav = useRef<HTMLElement>(null);
-  // On phones the links form a scrolling row; keep the current one visible.
-  useEffect(() => {
-    nav.current
-      ?.querySelector('[aria-current="page"]')
-      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  }, [location.pathname, location.hash]);
+  const row = useRef<HTMLDivElement>(null);
   const items = groups.flatMap((group) => group.items);
+  const links = items.map((item) => `${item.to}:${item.dot ?? ""}`).join("|");
+  // On phones the links form a scrolling row; keep the current one visible,
+  // including after late links or status dots shift the row.
+  useLayoutEffect(() => {
+    const box = row.current;
+    const current = box?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!box || !current || box.scrollWidth <= box.clientWidth) return;
+    const link = current.getBoundingClientRect();
+    const edges = box.getBoundingClientRect();
+    if (link.left < edges.left) box.scrollLeft -= edges.left - link.left + 8;
+    else if (link.right > edges.right)
+      box.scrollLeft += link.right - edges.right + 8;
+  }, [location.pathname, location.hash, links]);
   // A link with a #section is active only on that section, and the plain
   // link to the same page steps aside while the section is shown.
   const pathname = location.pathname.replace(/(.)\/+$/, "$1");
@@ -251,7 +264,6 @@ export function AdminSidebar({
   };
   return (
     <nav
-      ref={nav}
       aria-label="Admin navigation"
       className="flex shrink-0 flex-col gap-0.5 bg-navy px-3.5 py-3 text-sm text-navy-ink md:h-screen md:w-[236px] md:overflow-y-auto md:py-5"
     >
@@ -262,7 +274,10 @@ export function AdminSidebar({
         </div>
       </div>
       {extra && <div className="px-2 pb-2">{extra}</div>}
-      <div className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:gap-0.5 md:overflow-visible md:pb-0">
+      <div
+        ref={row}
+        className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:gap-0.5 md:overflow-visible md:pb-0"
+      >
         {groups.map((group) => (
           <div key={group.label} className="contents md:block">
             <p className="mx-2.5 mb-1.5 mt-4 hidden text-[11px] font-semibold uppercase tracking-[0.06em] text-navy-muted md:block">

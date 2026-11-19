@@ -566,7 +566,7 @@ export default function BulkKeyEditor({
                                 </span>
                               </span>
                             </span>
-                            <span className="col-start-2 flex min-w-0 items-center gap-1.5 text-[13px] text-ink-3 md:col-start-auto">
+                            <span className="col-span-2 col-start-2 flex min-w-0 items-center gap-1.5 text-[13px] text-ink-3 md:col-span-1 md:col-start-auto">
                               <UserRound
                                 size={13}
                                 aria-hidden="true"
@@ -580,7 +580,7 @@ export default function BulkKeyEditor({
                                 </span>
                               )}
                             </span>
-                            <span className="col-start-2 min-w-0 md:col-start-auto">
+                            <span className="col-span-2 col-start-2 min-w-0 md:col-span-1 md:col-start-auto">
                               {key.team_id ? (
                                 <span
                                   className="inline-block max-w-full truncate rounded-md bg-cyan-tint px-2 py-0.5 text-xs font-medium text-cyan-ink"
@@ -594,7 +594,7 @@ export default function BulkKeyEditor({
                                 </span>
                               )}
                             </span>
-                            <span className="col-start-2 flex min-w-0 flex-col gap-1.5 md:col-start-auto">
+                            <span className="col-span-2 col-start-2 flex min-w-0 flex-col gap-1.5 md:col-span-1 md:col-start-auto">
                               <span className="text-[13px] text-ink-2">
                                 <span>
                                   {metricValue(key.spend ?? 0, "spend")} spent

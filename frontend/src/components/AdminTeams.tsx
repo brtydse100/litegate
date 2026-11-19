@@ -39,7 +39,7 @@ import {
 
 /** Team list columns, shared by the caption row and each team. */
 const teamColumns =
-  "grid min-w-[980px] grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] items-center gap-4";
+  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] items-center gap-4";
 import { metricValue } from "./OrganizationCharts";
 import { durationLabel } from "../keyBudget";
 import {

@@ -223,6 +223,27 @@ test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
+test("the current sidebar link is visible on phones", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("./");
+  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  for (const [route, label] of [
+    ["teams", "Teams"],
+    ["keys", "Keys"],
+    ["users", "People"],
+    ["status", "Status"],
+  ]) {
+    await page.goto(`./${route}`);
+    const nav = page.getByRole("navigation", { name: "Admin navigation" });
+    await expect(nav.getByText(/^(Ready|Not ready)$/).first()).toBeAttached();
+    await page.waitForLoadState("networkidle");
+    await expect(
+      // The Status link's name also carries its hidden Ready text.
+      nav.getByRole("link", { name: new RegExp(`^${label}`) }),
+    ).toBeInViewport({ ratio: 0.95 });
+  }
+});
+
 test("pages fit a phone screen without sideways scrolling", async ({
   page,
 }) => {
