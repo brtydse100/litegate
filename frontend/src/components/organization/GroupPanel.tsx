@@ -7,6 +7,7 @@ import { durationLabel } from "../../keyBudget";
 import type { BudgetGroup } from "../../types/budgets";
 import {
   groupInitials,
+  limitOrigin,
   money,
   percent,
   plural,
@@ -272,11 +273,7 @@ export default function GroupPanel({
           </div>
         )}
         <p className="col-span-2 -mt-1 text-xs text-ink-4">
-          {inheritedFrom
-            ? `Inherited from ${inheritedFrom.name}`
-            : parent
-              ? `Overrides ${parent.name} (${parent.per_user == null ? "no limit" : shortMoney(parent.per_user)})`
-              : "Defined on this group"}
+          {limitOrigin(group, parent, inheritedFrom).description}
           {childLevelName && subGroups.length
             ? ` · ${pluralWord(childLevelName)} can override`
             : ""}

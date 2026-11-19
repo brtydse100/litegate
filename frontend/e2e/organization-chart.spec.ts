@@ -87,7 +87,7 @@ test("organization fetches direct children and selected data progressively", asy
   await expect(
     page.getByRole("button", { name: "Engineering, 3 users" }),
   ).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Marketing" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Marketing", pressed: false })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Infrastructure, 2 users" }),
   ).toHaveCount(0);

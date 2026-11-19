@@ -9,6 +9,12 @@ const hue = (name: string) => ({
   ink: token(`${name}-ink`),
 });
 
+/** A hue that also fills solid buttons with white text. */
+const solidHue = (name: string) => ({
+  ...hue(name),
+  solid: token(`${name}-solid`),
+});
+
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
@@ -65,16 +71,18 @@ export default {
         },
         ice: token("ice"),
         blue: hue("blue"),
-        teal: hue("teal"),
+        teal: solidHue("teal"),
         cyan: hue("cyan"),
         periwinkle: hue("periwinkle"),
         mint: hue("mint"),
-        sand: hue("sand"),
+        sand: solidHue("sand"),
         danger: {
           DEFAULT: token("danger"),
           line: token("danger-line"),
           tint: token("danger-tint"),
+          solid: token("danger-solid"),
         },
+        ready: token("ready"),
       },
       fontFamily: {
         sans: ['"IBM Plex Sans"', "system-ui", "ui-sans-serif", "sans-serif"],

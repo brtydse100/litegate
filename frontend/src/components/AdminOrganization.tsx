@@ -8,8 +8,10 @@ import OrgReport from "./organization/OrgReport";
 import {
   groupInitials,
   hueFor,
+  limitOrigin,
   percent,
   plural,
+  reached,
   shortMoney,
   type Group,
 } from "./organization/orgModel";
@@ -338,8 +340,8 @@ export default function AdminOrganization({
   const subtree = [...full.values()].filter(
     (group) => root && within(group, root),
   );
-  const near = subtree.filter(
-    (group) => (percent(group.group_spend, group.group_total) ?? 0) >= NEAR,
+  const near = subtree.filter((group) =>
+    reached(group.group_spend, group.group_total, NEAR),
   );
   const issues = rootsQuery.data?.issues ?? [];
   const syncErrors = subtree.filter((group) => group.sync_error);
@@ -391,8 +393,14 @@ export default function AdminOrganization({
       onClick: () => select(group.id),
     })),
   ].slice(0, 3);
+  // Only claim health once every signal shown here has actually loaded.
+  const gatewayReady = isAdmin ? status.data?.ready === true : true;
   const healthy =
-    (!status.data || status.data.ready) && !issues.length && !syncErrors.length;
+    gatewayReady &&
+    !totals.isPending &&
+    !totals.isError &&
+    !issues.length &&
+    !syncErrors.length;
   const directChildren = groups.filter((group) => group.parent_id === root?.id);
   const splitTotal = directChildren.reduce(
     (sum, group) => sum + (group.group_spend ?? 0),
@@ -424,7 +432,13 @@ export default function AdminOrganization({
                 ? "The gateway is not ready."
                 : healthy
                   ? "Everything is healthy."
-                  : "Some items need attention."}
+                  : issues.length || syncErrors.length
+                    ? "Some items need attention."
+                    : isAdmin && status.isError
+                      ? "Gateway status is unavailable."
+                      : totals.isError
+                        ? "Group spend is unavailable."
+                        : "Checking status…"}
               {near.length > 0 && (
                 <>
                   {" "}
@@ -445,7 +459,7 @@ export default function AdminOrganization({
                   </span>
                 )}
                 <div
-                  role="tablist"
+                  role="group"
                   aria-label={rootLevel ?? "Organization root"}
                   className="flex flex-wrap gap-1 rounded-[10px] bg-well p-1"
                 >
@@ -453,8 +467,7 @@ export default function AdminOrganization({
                     <button
                       key={item.id}
                       type="button"
-                      role="tab"
-                      aria-selected={item.id === root?.id}
+                      aria-pressed={item.id === root?.id}
                       onClick={() => chooseRoot(item.id)}
                       className={`min-h-9 rounded-[7px] px-3.5 text-sm ${
                         item.id === root?.id
@@ -496,7 +509,7 @@ export default function AdminOrganization({
             <Metric
               accent="border-t-sand"
               caption="NEAR BUDGET"
-              sub={`groups over ${NEAR}% used`}
+              sub={`groups at ${NEAR}% or more used`}
             >
               {totals.isPending ? "—" : near.length}
             </Metric>
@@ -506,7 +519,7 @@ export default function AdminOrganization({
                 caption="LITELLM GATEWAY"
                 sub={
                   status.data
-                    ? `DB ${status.data.dependencies?.database?.ok ? "ok" : "down"} · LiteLLM ${status.data.dependencies?.litellm?.ok ? "ok" : "down"}`
+                    ? `DB ${status.data.dependencies?.database?.ok ? "ok" : "not ok"} · LiteLLM ${status.data.dependencies?.litellm?.ok ? "ok" : "not ok"}`
                     : status.isError
                       ? "Status unavailable"
                       : "Checking…"
@@ -729,7 +742,7 @@ export default function AdminOrganization({
                     onClick={() => setAllGroupsReport(true)}
                     aria-label={`All groups, ${plural(rootsQuery.data?.total_users ?? 0, "user")}`}
                     aria-pressed={allGroupsReport}
-                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal px-3.5 text-sm font-semibold text-paper hover:brightness-110"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-110"
                   >
                     <BarChart3 size={15} aria-hidden="true" />
                     Usage report
@@ -755,12 +768,7 @@ export default function AdminOrganization({
                   const parent = group.parent_id
                     ? byId.get(group.parent_id)
                     : undefined;
-                  const tag =
-                    group.budget_source && group.budget_source !== group.id
-                      ? "inherited"
-                      : parent
-                        ? "override"
-                        : "set here";
+                  const tag = limitOrigin(group, parent).tag;
                   const color = hue(group);
                   const active = group.id === nodeId;
                   const open = isExpanded(group.id);
