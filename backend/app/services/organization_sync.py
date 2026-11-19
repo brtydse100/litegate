@@ -303,15 +303,17 @@ async def reconcile() -> None:
     await organization_reconcile.reconcile()
 
 
-async def reconciliation_attempt() -> None:
+async def reconciliation_attempt() -> bool:
     try:
         await reconcile()
         if settings.organization_cleanup_enabled:
             from app.services import organization_retirement
 
             await organization_retirement.assess_removed_teams()
+        return True
     except Exception:
         _logger.exception("Organization synchronization failed")
+        return False
 
 
 # Set by budget and limit edits so their changes apply without waiting for a sweep.
@@ -333,15 +335,19 @@ async def run_reconciliation() -> None:
     """
     global _wake
     _wake = asyncio.Event()
+    failed = False
     while True:
         await asyncio.sleep(MIN_PASS_SPACING)
-        remaining = max(0, settings.organization_sync_interval_seconds - MIN_PASS_SPACING)
+        # Until a pass verifies budget state, every sign-in reads the whole
+        # installation, so failed or unverified passes retry after the spacing.
+        unverified = bool(settings.organization_hierarchy.levels) and budget_pass.cross_group_pending()
+        remaining = 0 if failed or unverified else max(0, settings.organization_sync_interval_seconds - MIN_PASS_SPACING)
         try:
             await asyncio.wait_for(_wake.wait(), timeout=remaining)
         except TimeoutError:
             pass
         _wake.clear()
-        await reconciliation_attempt()
+        failed = await reconciliation_attempt() is False
 
 
 def changes_inherited_allowance(changes: dict) -> bool:

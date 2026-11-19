@@ -186,8 +186,8 @@ values on top.
 - **Participants** are members who signed in or already hold a key. Nobody is
   reserved a share before they use LiteGate. When someone signs in for the first
   time, every share in their group is recalculated. Sign-in lowers the
-  affected caps at once; the next organization sweep applies any increases. Upgrading counts users who already signed
-  in.
+  affected caps at once; the next organization sweep applies any increases.
+  Upgrading counts users who already signed in.
 - `perUser` remains a **ceiling** on each share. Members of unbudgeted groups
   keep their fixed `perUser` allowance, and those groups are not deducted from
   their parent.
