@@ -236,8 +236,9 @@ export default function AdminOrganization({
   function select(id: string) {
     const group = byId.get(id);
     if (!group) return;
-    if (!nodeId && document.activeElement instanceof HTMLElement)
-      opener.current = document.activeElement;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && !active.closest("[data-group-panel]"))
+      opener.current = active;
     setNodeId(id);
     setAllGroupsReport(false);
     request(id);
@@ -406,6 +407,8 @@ export default function AdminOrganization({
       })),
   ];
   const attentionExpanded = showAllAttention && attention.length > 3;
+  // A list that shrinks to three or fewer starts collapsed when it grows again.
+  if (showAllAttention && attention.length <= 3) setShowAllAttention(false);
   const shownAttention = attentionExpanded ? attention : attention.slice(0, 3);
   // Only claim health once every signal shown here has actually loaded.
   const gatewayReady = isAdmin ? status.data?.ready === true : true;

@@ -257,7 +257,7 @@ export function RegenerateButton({
         {paused ? "Regeneration paused" : "Regenerate key"}
       </button>
       <p className="-mt-1 text-center text-[13px] text-ink-4">
-        Lost it or think it leaked? Your spend and refill date stay the same.
+        Lost it or think it leaked? Your spend carries over.
       </p>
     </>
   );

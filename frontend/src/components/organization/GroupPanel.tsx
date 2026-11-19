@@ -116,6 +116,7 @@ export default function GroupPanel({
 
   return (
     <aside
+      data-group-panel
       aria-label={`Edit ${group.name}`}
       className="flex flex-[1_1_340px] flex-col gap-[18px] border-l border-line bg-card p-6 lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto"
     >
@@ -263,7 +264,7 @@ export default function GroupPanel({
               min="0"
               step="0.000001"
               aria-label={`${group.name} per-person limit`}
-              placeholder="Inherited"
+              placeholder="No limit"
               value={
                 perUser ??
                 (budgetGroup!.per_user == null
