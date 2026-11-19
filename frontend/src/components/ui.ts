@@ -3,9 +3,9 @@
 const button =
   "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
 
-export const buttonPrimary = `${button} bg-blue text-paper hover:brightness-110`;
-export const buttonCreate = `${button} bg-teal-solid text-paper hover:brightness-110`;
-export const buttonDanger = `${button} bg-danger-solid text-paper hover:brightness-110`;
+export const buttonPrimary = `${button} bg-blue text-paper hover:brightness-90`;
+export const buttonCreate = `${button} bg-teal-solid text-paper hover:brightness-90`;
+export const buttonDanger = `${button} bg-danger-solid text-paper hover:brightness-90`;
 export const buttonSecondary = `${button} border border-line-input bg-card font-medium text-ink-2 hover:bg-canvas`;
 export const buttonGhost = `${button} font-medium text-ink-3 hover:bg-well hover:text-ink`;
 export const buttonSmall =

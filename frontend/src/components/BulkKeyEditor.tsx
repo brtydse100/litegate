@@ -4,6 +4,7 @@ import AdvancedPolicySettings, {
 } from "./AdvancedPolicySettings";
 import EmailAddress from "./EmailAddress";
 import { Pill, UsageBar } from "./Page";
+import { parseLiteLLMDate } from "../keyBudget";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -485,7 +486,7 @@ export default function BulkKeyEditor({
                     type="button"
                     onClick={toggleAllKeys}
                     disabled={!adminKeys.data?.total || selectAll.isPending}
-                    className="rounded-lg border border-cyan/40 bg-cyan-tint px-2.5 py-1.5 text-[11px] font-medium text-cyan-ink hover:bg-cyan-tint disabled:cursor-not-allowed disabled:opacity-35"
+                    className="rounded-lg border border-cyan/40 bg-cyan-tint px-2.5 py-1.5 text-[11px] font-medium text-cyan-ink hover:border-cyan disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     {selectAll.isPending
                       ? "Selecting..."
@@ -497,7 +498,7 @@ export default function BulkKeyEditor({
                     type="button"
                     onClick={toggleVisible}
                     disabled={!visibleTokens.length}
-                    className="rounded-lg border border-blue/30 bg-blue-tint px-2.5 py-1.5 text-[11px] font-medium text-blue-ink hover:bg-blue-tint disabled:cursor-not-allowed disabled:opacity-35"
+                    className="rounded-lg border border-blue/30 bg-blue-tint px-2.5 py-1.5 text-[11px] font-medium text-blue-ink hover:border-blue disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     {allVisibleSelected
                       ? "Deselect page"
@@ -616,6 +617,10 @@ export default function BulkKeyEditor({
                             <span className="justify-self-end">
                               {key.blocked ? (
                                 <Pill tone="bad">Blocked</Pill>
+                              ) : key.expires &&
+                                parseLiteLLMDate(key.expires).getTime() <
+                                  Date.now() ? (
+                                <Pill tone="warn">Expired</Pill>
                               ) : (
                                 <Pill tone="ok">Active</Pill>
                               )}
@@ -638,7 +643,7 @@ export default function BulkKeyEditor({
                     type="button"
                     onClick={() => setPage((value) => Math.max(1, value - 1))}
                     disabled={page <= 1 || adminKeys.isFetching}
-                    className="rounded px-2 py-1 text-ink-3 hover:bg-canvas hover:text-ink disabled:opacity-30"
+                    className="rounded px-2 py-1 text-ink-3 hover:bg-well hover:text-ink disabled:opacity-30"
                   >
                     Previous
                   </button>
@@ -653,7 +658,7 @@ export default function BulkKeyEditor({
                       page >= (adminKeys.data?.total_pages ?? 1) ||
                       adminKeys.isFetching
                     }
-                    className="rounded px-2 py-1 text-ink-3 hover:bg-canvas hover:text-ink disabled:opacity-30"
+                    className="rounded px-2 py-1 text-ink-3 hover:bg-well hover:text-ink disabled:opacity-30"
                   >
                     Next
                   </button>
@@ -932,7 +937,7 @@ export default function BulkKeyEditor({
                 disabled={
                   update.isPending || operationsBlocked || targetCount === 0
                 }
-                className="rounded-lg bg-blue px-4 py-3 text-sm font-semibold text-paper shadow-lg hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+                className="rounded-lg bg-blue px-4 py-3 text-sm font-semibold text-paper shadow-lg hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
               >
                 {update.isPending
                   ? "Updating..."
@@ -1081,7 +1086,7 @@ function ResetSpendDialog({
             type="button"
             onClick={onReset}
             disabled={pending || operationsBlocked}
-            className="rounded-lg bg-sand-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-sand-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending
               ? "Resetting..."

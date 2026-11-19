@@ -122,6 +122,13 @@ describe("audit log navigation", () => {
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(2));
   });
 
+  it("still scrolls to the audit section when the audit request fails", async () => {
+    vi.mocked(api.listAuditEvents).mockRejectedValue(new Error("Forbidden"));
+    renderAt("/status#audit");
+    expect(await screen.findByText("Forbidden")).toBeVisible();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
   it("returns to the top for plain Status", async () => {
     const navigate = renderAt("/status#audit");
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));

@@ -215,7 +215,8 @@ export default function AdminUsers({
           </div>
           {users.data && (
             <span className="text-[13px] text-ink-4">
-              {users.data.length} accounts
+              {users.data.length}{" "}
+              {users.data.length === 1 ? "account" : "accounts"}
             </span>
           )}
         </div>

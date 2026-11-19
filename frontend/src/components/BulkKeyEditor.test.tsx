@@ -312,6 +312,35 @@ describe("BulkKeyEditor", () => {
     });
   });
 
+  it("labels blocked, expired and working keys from their own fields", async () => {
+    vi.mocked(api.listAllKeys).mockResolvedValue({
+      keys: [
+        { ...keys[0], blocked: true },
+        { ...keys[1], expires: "2000-01-01T00:00:00Z" },
+        {
+          token: "key-3",
+          key_alias: "Cara",
+          spend: 0,
+          models: [],
+          user_id: "cara",
+          expires: "2999-01-01T00:00:00Z",
+        },
+      ],
+      page: 1,
+      size: 25,
+      total: 3,
+      total_pages: 1,
+    });
+    renderEditor();
+    const row = async (name: string) =>
+      (await screen.findByRole("checkbox", { name: `Select ${name}` })).closest(
+        "label",
+      ) as HTMLElement;
+    expect(within(await row("Alice")).getByText("Blocked")).toBeVisible();
+    expect(within(await row("Bob")).getByText("Expired")).toBeVisible();
+    expect(within(await row("Cara")).getByText("Active")).toBeVisible();
+  });
+
   it("hides settings until a key is selected and opens them for a new selection", async () => {
     renderEditor();
     const alice = await screen.findByRole("checkbox", { name: "Select Alice" });

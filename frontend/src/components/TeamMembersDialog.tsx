@@ -12,9 +12,9 @@ import { api } from "../api/client";
 import EmailAddress from "./EmailAddress";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import type { TeamInfo, TeamMember } from "../types";
+import { fieldInput } from "./ui";
 
-const fieldClass =
-  "w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink focus:border-blue focus:outline-none";
+const fieldClass = fieldInput;
 
 export default function TeamMembersDialog({
   team,
@@ -247,7 +247,7 @@ export default function TeamMembersDialog({
                   !destinationId ||
                   !acknowledged
                 }
-                className="rounded-lg bg-blue px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-lg bg-blue px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {pending
                   ? "Moving safely..."

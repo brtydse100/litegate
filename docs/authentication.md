@@ -6,7 +6,7 @@ API access through a portal JWT, LiteLLM virtual key, or management API key.
 ## Local accounts
 
 Set `local_auth_username` and `local_auth_password` to enable the bootstrap
-administrator. After signing in, an administrator can use the **Users** tab to
+administrator. After signing in, an administrator can use the **People** page to
 create persistent local accounts, assign `user` or `admin`, reset passwords, and
 enable or disable accounts.
 

@@ -114,7 +114,7 @@ budget-reset durations. Saved models remain selectable even if they are missing
 from the current catalog. Custom durations remain supported.
 Numeric budget and rate-limit fields use styled minus/plus buttons alongside
 direct numeric input. Model selections stay readable in light and dark themes.
-Checkboxes follow the selected theme, with muted backgrounds, indigo checks,
+Checkboxes follow the selected theme, with muted backgrounds, blue checks,
 and visible keyboard focus. System high-contrast mode uses native checkboxes.
 
 A move deliberately changes the policy applied to that user's source-team keys.

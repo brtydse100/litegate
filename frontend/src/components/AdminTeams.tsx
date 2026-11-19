@@ -189,7 +189,7 @@ function TeamEditor({
 
   return (
     <div
-      className="!m-0 fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
       role="dialog"
       ref={dialogRef}
       aria-modal="true"
@@ -378,7 +378,7 @@ function TeamEditor({
             disabled={
               pending || savingPerUser || operationsBlocked || !alias.trim()
             }
-            className="rounded-lg bg-blue px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-blue px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {pending
               ? "Saving..."
@@ -468,7 +468,7 @@ function DeleteTeamDialog({
             disabled={
               pending || operationsBlocked || confirmation !== team.team_id
             }
-            className="rounded-lg bg-danger-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-danger-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending
               ? "Deleting..."
@@ -738,7 +738,11 @@ export default function AdminTeams() {
                       {used != null && <UsageBar percent={used} />}
                       {team.budget_duration && (
                         <p className="text-xs text-ink-4">
-                          resets every {durationLabel(team.budget_duration)}
+                          resets every{" "}
+                          {durationLabel(team.budget_duration)?.replace(
+                            /^1 /,
+                            "",
+                          )}
                         </p>
                       )}
                     </div>

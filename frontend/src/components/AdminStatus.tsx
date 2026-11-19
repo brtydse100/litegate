@@ -58,7 +58,7 @@ export default function AdminStatus() {
   // has its own key, so clicking the link again scrolls back to the audit.
   // Scrolling happens once per navigation, never when data arrives later.
   const location = useLocation();
-  const auditLoaded = !!audit.data;
+  const auditLoaded = !!audit.data || audit.isError;
   const handled = useRef<string | null>(null);
   useEffect(() => {
     if (handled.current === location.key) return;

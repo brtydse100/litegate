@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import {
   Activity,
+  Clock3,
   KeyRound,
   LayoutGrid,
   List,
@@ -458,6 +459,7 @@ export default function Home() {
           {
             label: "System",
             items: [
+              { to: "/status#audit", label: "Audit log", icon: Clock3 },
               {
                 to: "/status",
                 label: "Status",
