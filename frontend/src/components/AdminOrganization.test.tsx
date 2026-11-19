@@ -202,6 +202,25 @@ describe("organization dashboard contracts", () => {
     await waitFor(() => expect(row).toHaveFocus());
   });
 
+  it("returns focus to the latest row used when groups are switched", async () => {
+    renderOrganization();
+    const rows = await groupList();
+    const first = await within(rows).findByRole("button", {
+      name: "Infrastructure, 2 users",
+    });
+    first.focus();
+    fireEvent.click(first);
+    await panel("Edit Infrastructure");
+    const second = await within(rows).findByRole("button", {
+      name: /^Applications, /,
+    });
+    second.focus();
+    fireEvent.click(second);
+    const edit = await screen.findByRole("complementary", { name: /^Edit / });
+    fireEvent.click(within(edit).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(second).toHaveFocus());
+  });
+
   it("keeps sync problems visible ahead of budget warnings", async () => {
     const overview = organizationOverview();
     // Every group is over its budget, and one group's policy is not synced.

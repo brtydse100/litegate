@@ -260,6 +260,55 @@ async def test_budget_edits_wake_the_sweep_early(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("cause", ["failed", "unverified"])
+async def test_a_failed_or_unverified_pass_retries_after_the_spacing(org, monkeypatch, cause):
+    org()
+    monkeypatch.setattr(settings, "organization_sync_interval_seconds", 900)
+    monkeypatch.setattr(sync.budget_pass, "cross_group_pending", lambda: cause == "unverified")
+    monkeypatch.setattr(sync, "reconciliation_attempt", AsyncMock(return_value=cause != "failed"))
+    timeouts = []
+
+    async def sleep(seconds):
+        if len(timeouts) == 2:
+            raise asyncio.CancelledError
+
+    async def wait_for(awaitable, timeout):
+        timeouts.append(timeout)
+        awaitable.close()
+        raise TimeoutError
+
+    monkeypatch.setattr(sync.asyncio, "sleep", sleep)
+    monkeypatch.setattr(sync.asyncio, "wait_for", wait_for)
+    with pytest.raises(asyncio.CancelledError):
+        await sync.run_reconciliation()
+    # The first wait follows a successful startup pass in the failed case.
+    assert timeouts == ([840, 0] if cause == "failed" else [0, 0])
+
+
+@pytest.mark.asyncio
+async def test_without_a_hierarchy_unverified_state_keeps_the_full_interval(monkeypatch):
+    monkeypatch.setattr(settings, "organization_sync_interval_seconds", 900)
+    monkeypatch.setattr(sync.budget_pass, "cross_group_pending", lambda: True)
+    monkeypatch.setattr(sync, "reconciliation_attempt", AsyncMock(return_value=True))
+    timeouts = []
+
+    async def sleep(seconds):
+        if timeouts:
+            raise asyncio.CancelledError
+
+    async def wait_for(awaitable, timeout):
+        timeouts.append(timeout)
+        awaitable.close()
+        raise TimeoutError
+
+    monkeypatch.setattr(sync.asyncio, "sleep", sleep)
+    monkeypatch.setattr(sync.asyncio, "wait_for", wait_for)
+    with pytest.raises(asyncio.CancelledError):
+        await sync.run_reconciliation()
+    assert timeouts == [840]
+
+
+@pytest.mark.asyncio
 async def test_an_edit_during_a_pass_triggers_exactly_one_more_pass(monkeypatch):
     monkeypatch.setattr(settings, "organization_sync_interval_seconds", 86_400)
     monkeypatch.setattr(sync, "MIN_PASS_SPACING", 0)
