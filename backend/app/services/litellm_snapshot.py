@@ -22,7 +22,10 @@ _logger = logging.getLogger(__name__)
 
 TTL = 60
 PAGE_SIZE = 100
-MAX_PAGES = 200  # 20,000 records; larger installations fall back to per-item reads.
+# Larger installations fall back to per-item reads. Keys stop at the same 5,000
+# as the administrative key listing, so a cold load stays a few seconds long.
+TEAM_PAGES = 200
+KEY_PAGES = 50
 
 
 class Snapshot:
@@ -49,27 +52,31 @@ class Snapshot:
         lock = self._locks.setdefault(asyncio.get_running_loop(), asyncio.Lock())
         async with lock:
             if not self._fresh():
+                # Age counts from the start of the load, so data is never older
+                # than TTL seconds when it is served.
+                started = monotonic()
                 try:
                     self._value, self._error = await self._load(), None
                 except HTTPException as exc:
+                    _logger.warning("LiteLLM bulk listing unavailable (%s); reports fall back to per-item reads", exc.detail)
                     self._value, self._error = None, exc
                 except (TypeError, ValueError):
                     # A malformed listing must fall back like an outage, not 500.
                     _logger.warning("LiteLLM bulk listing was unreadable; reports fall back to per-item reads", exc_info=True)
                     self._value, self._error = None, HTTPException(status_code=502, detail="LiteLLM returned an unreadable listing")
-                self._loaded_at = monotonic()
+                self._loaded_at = started
             return self._result()
 
     def clear(self) -> None:
         self._value, self._error, self._loaded_at = None, None, None
 
 
-async def _pages(fetch: Callable[[int], Awaitable[dict]], items: str) -> list[dict]:
+async def _pages(fetch: Callable[[int], Awaitable[dict]], items: str, max_pages: int) -> list[dict]:
     records: list[dict] = []
-    for page in range(1, MAX_PAGES + 1):
+    for page in range(1, max_pages + 1):
         result = await fetch(page)
         total_pages = max(1, int(result.get("total_pages") or 1))
-        if total_pages > MAX_PAGES:
+        if total_pages > max_pages:
             break
         records.extend(item for item in result.get(items) or [] if isinstance(item, dict))
         if page >= total_pages:
@@ -78,12 +85,12 @@ async def _pages(fetch: Callable[[int], Awaitable[dict]], items: str) -> list[di
 
 
 async def _load_teams() -> dict:
-    teams = await _pages(lambda page: litellm.list_teams(page=page, page_size=PAGE_SIZE), "teams")
+    teams = await _pages(lambda page: litellm.list_teams(page=page, page_size=PAGE_SIZE), "teams", TEAM_PAGES)
     return {team["team_id"]: team for team in teams if isinstance(team.get("team_id"), str)}
 
 
 async def _load_keys() -> dict:
-    keys = await _pages(lambda page: litellm.list_keys(page=page, size=PAGE_SIZE), "keys")
+    keys = await _pages(lambda page: litellm.list_keys(page=page, size=PAGE_SIZE), "keys", KEY_PAGES)
     owners: dict[str, list[dict]] = {}
     seen: set[str] = set()
     for key in keys:

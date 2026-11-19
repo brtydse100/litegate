@@ -18,10 +18,11 @@ Until it arrives, spend cells show placeholders and navigation stays usable.
 The page does not request installation-wide usage or users before a selection.
 
 Organization spend totals and the member table's budget-period spend come from
-two shared bulk listings (all teams and all keys), each refreshed at most once a
-minute and shared by every open page. Opening the page therefore sends a few
-paged LiteLLM requests instead of one per group or member. When the team listing
-is unavailable, or a team's entry lacks its spend, budget or period, LiteGate
+two shared bulk listings (all teams and all keys). Each is at most a minute old,
+is shared by every open page, and a failed listing is retried after a minute.
+Opening the page therefore sends a few paged LiteLLM requests instead of one per
+group or member. Installations with more than 5,000 keys or 20,000 teams skip the
+bulk listing and read per item, as before. When the team listing is unavailable, or a team's entry lacks its spend, budget or period, LiteGate
 reads that team individually. When the key listing is unavailable, it reads each
 member's keys individually; a member absent from a successful listing has no keys
 and shows no spend. Key changes and budget enforcement always read live data.

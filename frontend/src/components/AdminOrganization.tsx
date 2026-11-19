@@ -108,6 +108,7 @@ export default function AdminOrganization({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [expandAll, setExpandAll] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
+  const [showAllAttention, setShowAllAttention] = useState(false);
 
   const rootsQuery = useQuery({
     queryKey: ["organization-children", ""],
@@ -124,13 +125,14 @@ export default function AdminOrganization({
       refetchInterval: expanded.has(parent) ? 60000 : (false as const),
     })),
   });
-  // Descendant spend totals; the server caches each team for 60 seconds.
+  // Descendant spend totals from the server's shared, minute-old team listing.
   const totals = useQuery({
     queryKey: ["organization-overview"],
     queryFn: api.organization,
     enabled,
     // Once per page open (and on Refresh); served from the shared team listing.
     staleTime: 60000,
+    refetchOnWindowFocus: false,
   });
   const status = useQuery({
     queryKey: ["system-status"],
@@ -357,22 +359,6 @@ export default function AdminOrganization({
     button: string;
     onClick: () => void;
   }> = [
-    ...checked
-      .map((group) => ({
-        group,
-        used: percent(group.group_spend, group.group_total) ?? 0,
-      }))
-      .filter((item) => item.used >= ATTENTION)
-      .sort((left, right) => right.used - left.used)
-      .map(({ group, used }) => ({
-        key: `budget-${group.id}`,
-        tone: "bg-sand",
-        title: `${group.name} at ${used}%`,
-        sub: group.path.join(" › "),
-        action: "Review",
-        button: "bg-sand-tint text-sand-ink",
-        onClick: () => select(group.id),
-      })),
     ...(issues.length
       ? [
           {
@@ -395,7 +381,27 @@ export default function AdminOrganization({
       button: "bg-periwinkle-tint text-periwinkle-ink",
       onClick: () => select(group.id),
     })),
-  ].slice(0, 3);
+    // Budget warnings come last so they never push problems out of view.
+    ...checked
+      .filter((group) =>
+        reached(group.group_spend, group.group_total, ATTENTION),
+      )
+      .map((group) => ({
+        group,
+        used: percent(group.group_spend, group.group_total) ?? 0,
+      }))
+      .sort((left, right) => right.used - left.used)
+      .map(({ group, used }) => ({
+        key: `budget-${group.id}`,
+        tone: "bg-sand",
+        title: `${group.name} at ${used}%`,
+        sub: group.path.join(" › "),
+        action: "Review",
+        button: "bg-sand-tint text-sand-ink",
+        onClick: () => select(group.id),
+      })),
+  ];
+  const shownAttention = showAllAttention ? attention : attention.slice(0, 3);
   // Only claim health once every signal shown here has actually loaded.
   const gatewayReady = isAdmin ? status.data?.ready === true : true;
   const healthy =
@@ -614,7 +620,7 @@ export default function AdminOrganization({
               Needs attention
             </h2>
             {attention.length ? (
-              attention.map((item) => (
+              shownAttention.map((item) => (
                 <div
                   key={item.key}
                   className="flex items-center justify-between gap-2.5 border-t border-line-soft py-2.5"
@@ -647,6 +653,18 @@ export default function AdminOrganization({
               <p className="border-t border-line-soft py-2.5 text-sm text-ink-4">
                 {totals.isPending ? "Checking…" : "Nothing needs attention."}
               </p>
+            )}
+            {attention.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAllAttention((value) => !value)}
+                aria-expanded={showAllAttention}
+                className="mt-1 self-start rounded-lg px-1 py-1.5 text-[13px] font-semibold text-blue-ink hover:underline"
+              >
+                {showAllAttention
+                  ? "Show fewer"
+                  : `Show ${attention.length - 3} more`}
+              </button>
             )}
           </section>
         </div>
@@ -744,7 +762,7 @@ export default function AdminOrganization({
                   <button
                     type="button"
                     onClick={() => setAllGroupsReport(true)}
-                    aria-label={`All groups, ${plural(rootsQuery.data?.total_users ?? 0, "user")}`}
+                    aria-label={`Usage report, all groups, ${plural(rootsQuery.data?.total_users ?? 0, "user")}`}
                     aria-pressed={allGroupsReport}
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-110"
                   >

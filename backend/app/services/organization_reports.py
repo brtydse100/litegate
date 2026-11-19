@@ -104,7 +104,7 @@ async def overview(scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     # omits, or listings without every field the status compares, fall back to
     # team info so a sparse listing never reports a false policy mismatch.
     try:
-        listed = await litellm_snapshot.teams.get()
+        listed = await litellm_snapshot.teams.get() if visible else {}
     except HTTPException:
         listed = {}
 
@@ -176,8 +176,9 @@ async def users(node_id: str | None, page: int, size: int, scope: OrganizationSc
     batch = selected[(page - 1) * size : page * size]
     semaphore = asyncio.Semaphore(5)
     # Spend for the page comes from one shared key listing when available.
+    # An empty page needs no listing at all.
     try:
-        owners = await litellm_snapshot.keys_by_user.get()
+        owners = await litellm_snapshot.keys_by_user.get() if batch else {}
     except HTTPException:
         owners = None
 

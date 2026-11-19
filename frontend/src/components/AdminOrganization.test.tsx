@@ -189,10 +189,38 @@ describe("organization dashboard contracts", () => {
     expect(screen.queryByText(/Everything is healthy/)).toBeNull();
   });
 
+  it("keeps sync problems visible ahead of budget warnings", async () => {
+    const overview = organizationOverview();
+    // Every group is over its budget, and one group's policy is not synced.
+    const groups = overview.groups.map((group) => ({
+      ...group,
+      group_total: 10,
+      group_spend: 20,
+      sync_error: group.id === "engineering" ? "Not synced" : null,
+    }));
+    vi.mocked(api.organization).mockResolvedValue({ ...overview, groups });
+    renderOrganization();
+    const attention = await screen.findByRole("region", {
+      name: "Needs attention",
+    });
+    await waitFor(() =>
+      expect(attention).toHaveTextContent("Engineering policy not synced"),
+    );
+    const more = within(attention).getByRole("button", {
+      name: /Show \d+ more/,
+    });
+    fireEvent.click(more);
+    expect(
+      within(attention).getByRole("button", { name: "Show fewer" }),
+    ).toBeVisible();
+  });
+
   it("refreshes All groups reports without requesting a group with an empty ID", async () => {
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "All groups, 4 users" }),
+      await screen.findByRole("button", {
+        name: "Usage report, all groups, 4 users",
+      }),
     );
     await screen.findByRole("img", { name: "Spend (USD) over time" });
     const refresh = screen.getByRole("button", {
@@ -220,6 +248,9 @@ describe("organization dashboard contracts", () => {
       await within(rows).findByRole("button", { name: "Platform, 1 user" }),
     );
     const edit = await panel("Edit Platform");
+    expect(
+      within(edit).getByRole("heading", { name: "Platform" }),
+    ).toHaveFocus();
     expect(within(edit).getByText("$100")).toBeVisible();
     expect(within(edit).getByText(/Overrides Infrastructure/)).toBeVisible();
     await waitFor(() =>
@@ -287,7 +318,9 @@ describe("organization dashboard contracts", () => {
   it("changes the queried date range and surfaces upstream failures", async () => {
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "All groups, 4 users" }),
+      await screen.findByRole("button", {
+        name: "Usage report, all groups, 4 users",
+      }),
     );
     await screen.findByRole("img", { name: "Spend (USD) over time" });
     const start = await screen.findByLabelText("Usage start date");
@@ -596,7 +629,9 @@ describe("organization dashboard contracts", () => {
     }));
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "All groups, 4 users" }),
+      await screen.findByRole("button", {
+        name: "Usage report, all groups, 4 users",
+      }),
     );
     expect(await screen.findByText("sam@example.com")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));

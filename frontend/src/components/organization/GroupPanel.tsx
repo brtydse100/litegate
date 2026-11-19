@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { api } from "../../api/client";
@@ -62,6 +62,11 @@ export default function GroupPanel({
   onSelect: (id: string) => void;
 }) {
   const client = useQueryClient();
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Opening a group moves focus to its panel, which renders after the report.
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
   const [envelope, setEnvelope] = useState<string | null>(null);
   const [perUser, setPerUser] = useState<string | null>(null);
   const editEnvelope = !!budgetGroup?.can_edit_envelope && revision != null;
@@ -107,7 +112,7 @@ export default function GroupPanel({
         color: child.hue.color,
       })),
   ];
-  const scale = Math.max(total ?? 0, totalSpend ?? 0, 1);
+  const scale = Math.max(total ?? 0, totalSpend ?? 0) || 1;
 
   return (
     <aside
@@ -132,7 +137,13 @@ export default function GroupPanel({
               {groupInitials(group.name)}
             </span>
             <div>
-              <h2 className="text-lg font-bold text-ink">{group.name}</h2>
+              <h2
+                ref={heading}
+                tabIndex={-1}
+                className="text-lg font-bold text-ink outline-none"
+              >
+                {group.name}
+              </h2>
               <p className="mt-0.5 text-[13px] text-ink-4">
                 {[
                   levelName,
@@ -232,8 +243,7 @@ export default function GroupPanel({
         <div className={label}>
           Group budget
           <span className="text-sm font-normal text-ink-3">
-            {total == null ? "No target" : shortMoney(total)} · set in
-            configuration
+            {total == null ? "No target" : shortMoney(total)}
           </span>
         </div>
       )}
@@ -252,8 +262,12 @@ export default function GroupPanel({
               type="number"
               min="0"
               step="0.000001"
-              aria-label={`${group.name} per-user limit`}
-              placeholder="No limit"
+              aria-label={`${group.name} per-person limit`}
+              placeholder={`Configured: ${
+                budgetGroup!.per_user_config == null
+                  ? "no limit"
+                  : shortMoney(budgetGroup!.per_user_config)
+              }`}
               value={
                 perUser ??
                 (budgetGroup!.per_user == null
@@ -271,6 +285,11 @@ export default function GroupPanel({
               {group.per_user == null ? "No limit" : shortMoney(group.per_user)}
             </span>
           </div>
+        )}
+        {editPerUser && budgetGroup!.per_user_override != null && (
+          <p className="col-span-2 -mt-1 text-xs text-ink-4">
+            Set here; leave empty and save to use the configured value.
+          </p>
         )}
         <p className="col-span-2 -mt-1 text-xs text-ink-4">
           {limitOrigin(group, parent, inheritedFrom).description}
