@@ -212,36 +212,6 @@ for (const width of [390, 768, 1024, 1100, 1280]) {
   });
 }
 
-for (const width of [1136, 1139, 1140, 1150, 1157]) {
-  test(`the group panel stays visible with classic scrollbars at ${width}px`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width, height: 844 });
-    await page.goto("./organization");
-    // Headless Chromium hides scrollbars; give scroll areas a 17px one like
-    // Windows so the layout loses that width as it would for real users.
-    await page.addStyleTag({ content: "::-webkit-scrollbar { width: 17px; }" });
-    const groups = page.getByRole("list", { name: "Organization groups" });
-    await groups.getByRole("button", { name: /^Infrastructure,/ }).click();
-    const panel = page.getByRole("complementary", {
-      name: "Edit Infrastructure",
-    });
-    await expect(
-      page.getByText(/Usage in Infrastructure/).first(),
-    ).toBeVisible();
-    await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1000);
-    await expect(
-      panel.getByRole("heading", { name: "Infrastructure" }),
-    ).toBeInViewport();
-    // Either a full row above the report, or a 340px column beside it.
-    const box = (await panel.boundingBox())!;
-    expect(width >= 1140 ? box.width : width - box.width).toBeLessThanOrEqual(
-      340,
-    );
-  });
-}
-
 test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("./");

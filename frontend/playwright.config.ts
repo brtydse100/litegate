@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: "./e2e",
   testIgnore: [
     "demo-mode.spec.ts",
+    "demo-scrollbars.spec.ts",
     "litellm-integration.spec.ts",
     "sso-integration.spec.ts",
     "sso-restart.spec.ts",

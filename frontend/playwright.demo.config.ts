@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "demo-mode.spec.ts",
+  testMatch: ["demo-mode.spec.ts", "demo-scrollbars.spec.ts"],
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
