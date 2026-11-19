@@ -35,7 +35,9 @@ class Snapshot:
 
     def _result(self) -> dict:
         if self._error is not None:
-            raise self._error
+            # A fresh exception per caller, so tracebacks do not pile up on one
+            # cached object for the whole TTL.
+            raise HTTPException(status_code=self._error.status_code, detail=self._error.detail)
         return self._value
 
     async def get(self) -> dict:
@@ -48,6 +50,9 @@ class Snapshot:
                     self._value, self._error = await self._load(), None
                 except HTTPException as exc:
                     self._value, self._error = None, exc
+                except (TypeError, ValueError):
+                    # A malformed listing must fall back like an outage, not 500.
+                    self._value, self._error = None, HTTPException(status_code=502, detail="LiteLLM returned an unreadable listing")
                 self._loaded_at = monotonic()
             return self._result()
 
@@ -76,7 +81,14 @@ async def _load_teams() -> dict:
 async def _load_keys() -> dict:
     keys = await _pages(lambda page: litellm.list_keys(page=page, size=PAGE_SIZE), "keys")
     owners: dict[str, list[dict]] = {}
+    seen: set[str] = set()
     for key in keys:
+        # Offset paging can repeat a key when keys change mid-listing.
+        token = key.get("token")
+        if isinstance(token, str):
+            if token in seen:
+                continue
+            seen.add(token)
         if isinstance(key.get("user_id"), str):
             owners.setdefault(key["user_id"], []).append(key)
     return owners

@@ -59,6 +59,7 @@ export default {
           solid: token("danger-solid"),
         },
         ready: token("ready"),
+        alert: token("alert"),
       },
       fontFamily: {
         sans: ['"IBM Plex Sans"', "system-ui", "ui-sans-serif", "sans-serif"],

@@ -90,6 +90,31 @@ async def test_a_failed_refresh_is_remembered_until_the_ttl_expires(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_a_malformed_listing_is_cached_as_an_upstream_failure(monkeypatch):
+    load = AsyncMock(side_effect=ValueError("not json"))
+    monkeypatch.setattr(litellm_snapshot.teams, "_load", load)
+    errors = []
+    for _ in range(2):
+        with pytest.raises(HTTPException) as raised:
+            await litellm_snapshot.teams.get()
+        errors.append(raised.value)
+    assert {error.status_code for error in errors} == {502}
+    assert errors[0] is not errors[1]
+    assert load.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_keys_repeated_across_pages_are_counted_once(monkeypatch):
+    pages = {
+        1: {"keys": [{"token": "a", "user_id": "ann", "spend": 1}], "total_pages": 2},
+        2: {"keys": [{"token": "a", "user_id": "ann", "spend": 1}, {"token": "b", "user_id": "ann", "spend": 2}], "total_pages": 2},
+    }
+    monkeypatch.setattr(litellm, "list_keys", AsyncMock(side_effect=lambda page, size: pages[page]))
+    owners = await litellm_snapshot._load_keys()
+    assert [key["token"] for key in owners["ann"]] == ["a", "b"]
+
+
+@pytest.mark.asyncio
 async def test_concurrent_waiters_share_one_failed_refresh(monkeypatch):
     calls = 0
 

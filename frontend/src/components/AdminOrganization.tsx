@@ -69,7 +69,7 @@ function Metric({
     <div
       className={`flex flex-col gap-1 rounded-[10px] border border-t-[3px] border-line bg-card px-[18px] pb-[18px] pt-4 ${accent}`}
     >
-      <span className="text-xs font-semibold tracking-[0.04em] text-ink-4">
+      <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-4">
         {caption}
       </span>
       <span className="inline-flex items-center gap-2.5 text-[28px] font-semibold text-ink">
@@ -340,11 +340,14 @@ export default function AdminOrganization({
   const subtree = [...full.values()].filter(
     (group) => root && within(group, root),
   );
-  const near = subtree.filter((group) =>
+  // Health checks cover the selected root group itself, not only its
+  // descendants: its own LiteLLM team can fail or near its budget too.
+  const checked = rootTotals ? [rootTotals, ...subtree] : subtree;
+  const near = checked.filter((group) =>
     reached(group.group_spend, group.group_total, NEAR),
   );
   const issues = rootsQuery.data?.issues ?? [];
-  const syncErrors = subtree.filter((group) => group.sync_error);
+  const syncErrors = checked.filter((group) => group.sync_error);
   const attention: Array<{
     key: string;
     tone: string;
@@ -445,7 +448,8 @@ export default function AdminOrganization({
                   <span className="font-semibold text-sand-ink">
                     {plural(near.length, "group")}
                   </span>{" "}
-                  {near.length === 1 ? "is" : "are"} close to their budget
+                  {near.length === 1 ? "is" : "are"} at {NEAR}% or more of their
+                  budget
                 </>
               )}
             </p>
@@ -454,8 +458,8 @@ export default function AdminOrganization({
             {roots.length > 1 && (
               <>
                 {rootLevel && (
-                  <span className="text-xs font-semibold tracking-[0.04em] text-ink-4">
-                    {rootLevel.toUpperCase()}
+                  <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-4">
+                    {rootLevel}
                   </span>
                 )}
                 <div
@@ -489,7 +493,7 @@ export default function AdminOrganization({
           <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
             <Metric
               accent="border-t-teal"
-              caption="SPEND THIS PERIOD"
+              caption="Spend this period"
               sub={`of ${root.group_total == null ? "no target" : shortMoney(root.group_total)} · ${root.name} + all sub-groups`}
               bar={percent(rootTotals?.group_spend, root.group_total)}
             >
@@ -501,14 +505,14 @@ export default function AdminOrganization({
             </Metric>
             <Metric
               accent="border-t-blue"
-              caption="PEOPLE"
+              caption="People"
               sub={`across ${plural(subtree.length || childCount(root), "group")}`}
             >
               {root.members.toLocaleString()}
             </Metric>
             <Metric
               accent="border-t-sand"
-              caption="NEAR BUDGET"
+              caption="Near budget"
               sub={`groups at ${NEAR}% or more used`}
             >
               {totals.isPending ? "—" : near.length}
@@ -516,7 +520,7 @@ export default function AdminOrganization({
             {isAdmin && (
               <Metric
                 accent="border-t-mint"
-                caption="LITELLM GATEWAY"
+                caption="LiteLLM gateway"
                 sub={
                   status.data
                     ? `DB ${status.data.dependencies?.database?.ok ? "ok" : "not ok"} · LiteLLM ${status.data.dependencies?.litellm?.ok ? "ok" : "not ok"}`
@@ -752,12 +756,12 @@ export default function AdminOrganization({
             </div>
             <div className="overflow-x-auto">
               <div
-                className={`${columns} border-b border-line-soft bg-canvas/60 px-5 py-2.5 text-xs font-semibold tracking-[0.04em] text-ink-4`}
+                className={`${columns} border-b border-line-soft bg-canvas px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-ink-4`}
               >
-                <span>GROUP</span>
-                <span>PEOPLE</span>
-                <span>SPEND · INCL. SUB-GROUPS</span>
-                <span>PER PERSON</span>
+                <span>Group</span>
+                <span>People</span>
+                <span>Spend · incl. sub-groups</span>
+                <span>Per person</span>
               </div>
               <div role="list" aria-label="Organization groups">
                 {rows.map((group) => {

@@ -55,8 +55,9 @@
   --teal-solid: 31 112 107;
   --sand-solid: 134 92 50;
   --danger-solid: 160 72 72;
-  /* Status dot on navy surfaces. */
+  /* Status dots on navy surfaces (cards use mint and danger). */
   --ready: 111 211 168;
+  --alert: 240 138 138;
   /* Body text on navy surfaces. */
   --navy-ink: 230 236 243;
 }

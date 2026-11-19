@@ -157,8 +157,36 @@ describe("organization dashboard contracts", () => {
     expect(
       await screen.findByRole("region", { name: "Spend split" }),
     ).toHaveTextContent("Infrastructure");
-    expect(screen.getByText("SPEND THIS PERIOD")).toBeVisible();
+    expect(screen.getByText("Spend this period")).toBeVisible();
     expect(api.organization).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call the organization healthy when only the root group fails", async () => {
+    const overview = organizationOverview();
+    vi.mocked(api.organization).mockResolvedValue({
+      ...overview,
+      groups: overview.groups.map((group) =>
+        group.id === "engineering"
+          ? { ...group, sync_error: "Could not read group status" }
+          : group,
+      ),
+    });
+    vi.mocked(api.organizationChildren).mockImplementation(async (parent) => {
+      const result = organizationChildren(parent);
+      return {
+        ...result,
+        groups: result.groups.map((group) =>
+          group.id === "engineering"
+            ? { ...group, sync_error: "Could not read group status" }
+            : group,
+        ),
+      };
+    });
+    renderOrganization();
+    expect(
+      await screen.findByText(/Some items need attention\./),
+    ).toBeVisible();
+    expect(screen.queryByText(/Everything is healthy/)).toBeNull();
   });
 
   it("refreshes All groups reports without requesting a group with an empty ID", async () => {
