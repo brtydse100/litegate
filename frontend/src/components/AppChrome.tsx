@@ -114,7 +114,7 @@ export function UserMenu({
   const item =
     "flex w-full min-h-11 items-center gap-2.5 rounded-lg px-3 text-left text-sm text-ink-2 hover:bg-canvas";
   return (
-    <div ref={root} className="relative">
+    <div ref={root} className="relative flex items-center gap-1">
       <button
         ref={trigger}
         type="button"
@@ -131,12 +131,14 @@ export function UserMenu({
         className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 text-sm text-navy-ink hover:bg-navy-2"
       >
         <Avatar email={email} />
-        {!compact && (
-          <span className="hidden max-w-[220px] truncate sm:inline">
-            {email}
-          </span>
-        )}
       </button>
+      {/* Beside the button, not inside it: the address has its own copy
+          button, as it did before the redesign. */}
+      {!compact && email && (
+        <span className="hidden max-w-[240px] text-sm text-navy-ink sm:inline">
+          <EmailAddress email={email} />
+        </span>
+      )}
       {open && (
         <div
           ref={menu}

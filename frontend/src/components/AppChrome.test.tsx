@@ -58,6 +58,14 @@ describe("AdminSidebar", () => {
 });
 
 describe("account email", () => {
+  it("is copyable beside the top-bar account button", () => {
+    render(<UserMenu email="ann@example.test" onSignOut={vi.fn()} />);
+    expect(screen.getByText("ann@example.test")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy email ann@example.test" }),
+    ).toBeInTheDocument();
+  });
+
   it("is copyable from the sidebar footer", () => {
     render(
       <MemoryRouter>
