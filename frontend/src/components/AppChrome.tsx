@@ -136,7 +136,7 @@ export function UserMenu({
           role="menu"
           aria-label="Account"
           onKeyDown={onMenuKey}
-          className={`absolute z-30 w-60 rounded-xl ${up ? "bottom-full left-0 mb-2" : "right-0 mt-2"} border border-line bg-card p-1.5 shadow-lg`}
+          className={`absolute z-30 rounded-xl ${up ? "bottom-full left-0 mb-2 w-52" : "right-0 mt-2 w-60"} border border-line bg-card p-1.5 shadow-lg`}
         >
           <div className="border-b border-line-soft px-3 py-2.5 text-sm">
             <p className="truncate font-medium text-ink">{email}</p>

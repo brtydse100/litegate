@@ -331,7 +331,9 @@ async def run_reconciliation(failed: bool = False) -> None:
     """Sweep every ``organization_sync_interval_seconds``, or sooner when woken.
 
     Passes are at least a minute apart. Sign-ins and key operations already
-    synchronize their own user, so the full sweep only repairs drift.
+    synchronize their own user, so the full sweep only repairs drift. A failed
+    pass (``failed`` covers the startup attempt) or unverified budget state
+    retries after a minute, doubling up to the interval until a pass is clean.
     """
     global _wake
     _wake = asyncio.Event()
