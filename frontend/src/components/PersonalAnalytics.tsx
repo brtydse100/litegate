@@ -65,8 +65,12 @@ export default function PersonalAnalytics() {
     ["Usage cost", dollars(data.totals.cost)],
   ];
   const maxCost = Math.max(0.000001, ...data.daily.map((day) => day.cost));
-  // Thin bars for long ranges; a few days must not fill the whole chart.
-  const barWidth = Math.min(600 / Math.max(1, data.daily.length), 40);
+  // Each day gets an equal slot across the chart; bars stay at most 40 wide
+  // and sit centred in their slot, so a few days spread out evenly.
+  const slot = 600 / Math.max(1, data.daily.length);
+  const barWidth = Math.max(1, Math.min(slot - 2, 40));
+  const centre = (index: number) => ((index + 0.5) * slot) / 6;
+  const lastIndex = data.daily.length - 1;
   return (
     <section className="flex flex-col gap-6" aria-label="Personal analytics">
       <div>
@@ -126,9 +130,9 @@ export default function PersonalAnalytics() {
           {data.daily.map((day, index) => (
             <rect
               key={day.date}
-              x={index * barWidth + 1}
+              x={index * slot + (slot - barWidth) / 2}
               y={150 - (day.cost / maxCost) * 140}
-              width={Math.max(1, barWidth - 2)}
+              width={barWidth}
               height={(day.cost / maxCost) * 140}
               rx={Math.min(3, barWidth / 4)}
               fill="currentColor"
@@ -146,10 +150,27 @@ export default function PersonalAnalytics() {
             stroke="rgb(var(--line-input))"
           />
         </svg>
-        <div className="mt-1 flex justify-between text-xs text-ink-4">
-          <span>{data.daily[0]?.date}</span>
-          <span>{data.daily[data.daily.length - 1]?.date}</span>
-        </div>
+        {data.daily.length >= 8 ? (
+          <div className="mt-1 flex justify-between text-xs text-ink-4">
+            <span>{data.daily[0]?.date}</span>
+            <span>{data.daily[lastIndex]?.date}</span>
+          </div>
+        ) : (
+          // Few days: label the first and last bars directly beneath them.
+          <div className="relative mt-1 h-4 text-xs text-ink-4">
+            {[...new Set([0, lastIndex])]
+              .filter((index) => index >= 0)
+              .map((index) => (
+                <span
+                  key={index}
+                  className="absolute -translate-x-1/2 whitespace-nowrap"
+                  style={{ left: `${centre(index)}%` }}
+                >
+                  {data.daily[index].date}
+                </span>
+              ))}
+          </div>
+        )}
       </div>
       <div className={`overflow-hidden ${card}`}>
         <div className={cardHeader}>

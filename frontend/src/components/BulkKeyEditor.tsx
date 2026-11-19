@@ -1081,7 +1081,7 @@ function ResetSpendDialog({
             type="button"
             onClick={onReset}
             disabled={pending || operationsBlocked}
-            className="rounded-lg bg-sand px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-sand-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending
               ? "Resetting..."

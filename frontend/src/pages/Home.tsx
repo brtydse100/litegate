@@ -380,7 +380,7 @@ export default function Home() {
       "rounded-md px-1 py-2 text-navy-text no-underline hover:text-paper";
     return (
       <div className="min-h-screen bg-canvas text-ink">
-        <header className="bg-navy text-[#E6ECF3]">
+        <header className="bg-navy text-navy-ink">
           <div className="mx-auto flex max-w-[1040px] flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-8">
             <Link to="/my-key" className="no-underline">
               <BrandMark logoUrl={config?.logo_url} />

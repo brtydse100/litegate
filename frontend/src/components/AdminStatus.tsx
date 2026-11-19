@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { api } from "../api/client";
@@ -53,13 +54,16 @@ export default function AdminStatus() {
     queryFn: () => api.listAuditEvents(100),
   });
   const refreshing = status.isFetching || audit.isFetching;
-  // The sidebar's Audit log link opens this page at #audit.
-  const hash = window.location.hash;
+  // The sidebar's Audit log link opens this page at #audit. Each navigation
+  // has its own key, so clicking the link again scrolls back to the audit.
+  const location = useLocation();
   const auditLoaded = !!audit.data;
   useEffect(() => {
-    if (hash === "#audit" && auditLoaded)
-      document.getElementById("audit")?.scrollIntoView?.({ block: "start" });
-  }, [hash, auditLoaded]);
+    const section = document.getElementById("audit");
+    if (location.hash === "#audit") {
+      if (auditLoaded) section?.scrollIntoView?.({ block: "start" });
+    } else section?.closest("main")?.scrollTo?.({ top: 0 });
+  }, [location.key, location.hash, auditLoaded]);
   const warnings = status.data?.security_warnings ?? [];
 
   return (

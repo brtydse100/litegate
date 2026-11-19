@@ -81,11 +81,13 @@ export default function Login() {
       >
         <div className="flex flex-col gap-6 lg:gap-10">
           {cfg?.logo_url ? (
-            <img
-              src={cfg.logo_url}
-              alt="Organization logo"
-              className="h-11 max-w-[220px] self-start object-contain"
-            />
+            <span className="inline-flex h-14 items-center self-start rounded-xl bg-paper px-3">
+              <img
+                src={cfg.logo_url}
+                alt="Organization logo"
+                className="h-10 max-w-[220px] object-contain"
+              />
+            </span>
           ) : (
             <span
               aria-hidden="true"

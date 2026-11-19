@@ -9,11 +9,13 @@ export function BrandMark({ logoUrl }: { logoUrl?: string }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-2.5 text-[17px] font-bold text-paper">
       {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt=""
-          className="h-7 max-w-[120px] object-contain"
-        />
+        <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-paper px-1.5">
+          <img
+            src={logoUrl}
+            alt=""
+            className="h-6 max-w-[120px] object-contain"
+          />
+        </span>
       ) : (
         <span
           aria-hidden="true"
@@ -45,7 +47,7 @@ export function Avatar({
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex ${size} shrink-0 items-center justify-center rounded-full bg-[#E5F0F4] text-[11px] font-bold text-[#3F6878]`}
+      className={`inline-flex ${size} shrink-0 items-center justify-center rounded-full bg-cyan-tint text-[11px] font-bold text-cyan-ink`}
     >
       {initials(email)}
     </span>
@@ -119,7 +121,7 @@ export function UserMenu({
             setOpen(true);
           }
         }}
-        className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 text-sm text-[#E6ECF3] hover:bg-navy-2"
+        className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 text-sm text-navy-ink hover:bg-navy-2"
       >
         <Avatar email={email} />
         {!compact && (
@@ -238,9 +240,10 @@ export function AdminSidebar({
   const items = groups.flatMap((group) => group.items);
   // A link with a #section is active only on that section, and the plain
   // link to the same page steps aside while the section is shown.
+  const pathname = location.pathname.replace(/(.)\/+$/, "$1");
   const isActive = (to: string) => {
     const [path, hash = ""] = to.split("#");
-    if (location.pathname !== path) return false;
+    if (pathname !== path) return false;
     if (hash) return location.hash === `#${hash}`;
     return !items.some(
       (item) => item.to === `${path}${location.hash}` && location.hash,
@@ -250,7 +253,7 @@ export function AdminSidebar({
     <nav
       ref={nav}
       aria-label="Admin navigation"
-      className="flex shrink-0 flex-col gap-0.5 bg-navy px-3.5 py-3 text-sm text-[#E6ECF3] md:h-screen md:w-[236px] md:overflow-y-auto md:py-5"
+      className="flex shrink-0 flex-col gap-0.5 bg-navy px-3.5 py-3 text-sm text-navy-ink md:h-screen md:w-[236px] md:overflow-y-auto md:py-5"
     >
       <div className="flex items-center justify-between gap-3 px-2 pb-2 md:pb-4">
         <BrandMark logoUrl={logoUrl} />

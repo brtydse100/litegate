@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Info, UserPlus } from "lucide-react";
+import { Bot, Info, Shield, UserPlus } from "lucide-react";
 import { api } from "../api/client";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
@@ -131,16 +131,53 @@ export default function AdminUsers({
         }
       />
 
-      <div className="flex items-start gap-3 rounded-xl border border-blue/30 bg-blue-tint px-4 py-3 text-[13px] leading-relaxed text-blue-ink">
-        <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
-        <p>
-          Local accounts are for contractors, emergency access, or anyone
-          without SSO; people covered by SSO should keep using it.{" "}
-          <strong>Users</strong> create or regenerate their own key;{" "}
-          <strong>admins</strong> manage all keys and local accounts. Give
-          automation agents the management API key, never a shared human
-          password.
-        </p>
+      <PeopleDirectory />
+
+      <div className="grid gap-3.5 md:grid-cols-3">
+        {[
+          {
+            icon: Info,
+            title: "When to use this",
+            body: (
+              <>
+                Create a local account for contractors, emergency access, or
+                anyone without SSO. People covered by SSO should keep using SSO.
+              </>
+            ),
+          },
+          {
+            icon: Shield,
+            title: "User or admin?",
+            body: (
+              <>
+                <strong className="text-ink-2">Users</strong> create or
+                regenerate their own key.{" "}
+                <strong className="text-ink-2">Admins</strong> manage all keys
+                and local accounts.
+              </>
+            ),
+          },
+          {
+            icon: Bot,
+            title: "Automation agents",
+            body: (
+              <>
+                Use the management API key for trusted agents that need admin
+                automation. Never give an agent a shared human password.
+              </>
+            ),
+          },
+        ].map(({ icon: Icon, title, body }) => (
+          <div key={title} className={`${card} px-4 py-3.5`}>
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <Icon size={15} aria-hidden="true" className="text-blue" />
+              {title}
+            </h2>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
+              {body}
+            </p>
+          </div>
+        ))}
       </div>
 
       {error && (
@@ -359,8 +396,6 @@ export default function AdminUsers({
           </div>
         </div>
       </form>
-
-      <PeopleDirectory />
 
       {resetUsername && (
         <div

@@ -384,6 +384,8 @@ portal. Both settings are optional: an empty or whitespace-only `login_text`
 keeps **Sign in to your LiteLLM access portal**, and an empty `logo_url` keeps the
 default lightning icon. The page title, sign-in methods, and access rules stay
 the same.
+The logo sits on a small white tile over the navy sign-in panel and sidebar,
+so dark artwork stays visible; a transparent PNG or SVG fits best.
 
 Use these backend settings in `config.yaml` (for Docker Compose, edit
 `deploy/docker-compose/config.yaml`):

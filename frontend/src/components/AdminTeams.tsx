@@ -40,6 +40,7 @@ import {
 const teamColumns =
   "grid min-w-[980px] grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] items-center gap-4";
 import { metricValue } from "./OrganizationCharts";
+import { durationLabel } from "../keyBudget";
 import {
   CurrentPolicySettings,
   DurationChoices,
@@ -467,7 +468,7 @@ function DeleteTeamDialog({
             disabled={
               pending || operationsBlocked || confirmation !== team.team_id
             }
-            className="rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-danger-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending
               ? "Deleting..."
@@ -724,33 +725,39 @@ export default function AdminTeams() {
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <p className="text-[13px]">
+                        <span className="sr-only">Spend: </span>
                         <span className="font-semibold text-ink">
                           {metricValue(team.spend ?? 0, "spend")}
                         </span>{" "}
                         <span className="text-ink-4">
                           {team.max_budget != null
-                            ? `of $${team.max_budget}`
+                            ? `of ${metricValue(team.max_budget, "spend")}`
                             : "· Unlimited"}
                         </span>
                       </p>
                       {used != null && <UsageBar percent={used} />}
                       {team.budget_duration && (
                         <p className="text-xs text-ink-4">
-                          resets every {team.budget_duration}
+                          resets every {durationLabel(team.budget_duration)}
                         </p>
                       )}
                     </div>
                     <p className="text-[13px] text-ink-2">
+                      <span className="sr-only">Models: </span>
                       {team.models?.length
                         ? `${team.models.length} models`
                         : "All"}
                     </p>
                     <p className="text-[13px] text-ink-2">
+                      <span className="sr-only">
+                        Requests per minute / tokens per minute:{" "}
+                      </span>
                       {team.rpm_limit?.toLocaleString() ?? "Default"}
                       <span className="text-ink-4"> / </span>
                       {team.tpm_limit?.toLocaleString() ?? "Default"}
                     </p>
                     <p className="text-[13px] text-ink-2">
+                      <span className="sr-only">Members / keys: </span>
                       {team.members_count ?? 0} / {team.keys_count ?? 0}
                     </p>
                     <div className="flex flex-wrap justify-end gap-1.5">
