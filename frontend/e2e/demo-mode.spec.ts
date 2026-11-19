@@ -172,3 +172,19 @@ for (const width of [390, 1280]) {
     );
   });
 }
+
+test("pages fit a phone screen without sideways scrolling", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("./");
+  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  for (const route of ["organization", "teams", "keys", "users", "status"]) {
+    await page.goto(`./${route}`);
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow, `${route} scrolls sideways`).toBeLessThanOrEqual(0);
+  }
+});
