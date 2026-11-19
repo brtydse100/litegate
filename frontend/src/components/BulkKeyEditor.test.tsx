@@ -316,7 +316,8 @@ describe("BulkKeyEditor", () => {
     vi.mocked(api.listAllKeys).mockResolvedValue({
       keys: [
         { ...keys[0], blocked: true },
-        { ...keys[1], expires: "2000-01-01T00:00:00Z" },
+        // LiteLLM may omit the timezone; it still means UTC.
+        { ...keys[1], expires: "2000-01-01 00:00:00" },
         {
           token: "key-3",
           key_alias: "Cara",

@@ -4,7 +4,7 @@ import AdvancedPolicySettings, {
 } from "./AdvancedPolicySettings";
 import EmailAddress from "./EmailAddress";
 import { Pill, UsageBar } from "./Page";
-import { parseLiteLLMDate } from "../keyBudget";
+import { isKeyExpired } from "../keyBudget";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -617,10 +617,8 @@ export default function BulkKeyEditor({
                             <span className="justify-self-end">
                               {key.blocked ? (
                                 <Pill tone="bad">Blocked</Pill>
-                              ) : key.expires &&
-                                parseLiteLLMDate(key.expires).getTime() <
-                                  Date.now() ? (
-                                <Pill tone="warn">Expired</Pill>
+                              ) : isKeyExpired(key.expires) ? (
+                                <Pill tone="bad">Expired</Pill>
                               ) : (
                                 <Pill tone="ok">Active</Pill>
                               )}
