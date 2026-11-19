@@ -416,7 +416,10 @@ export default function Home() {
                   Admin
                 </Link>
               )}
-              <span aria-hidden="true" className="h-5 w-px bg-navy-3" />
+              <span
+                aria-hidden="true"
+                className="hidden h-5 w-px bg-navy-3 sm:block"
+              />
               <UserMenu
                 email={user?.email}
                 role={user?.role}
