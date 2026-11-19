@@ -40,8 +40,8 @@ Fetched branches and selected data are cached for 60 seconds for quick revisits.
 
 The edit panel splits a group's spend into its own team spend and each
 sub-group's total. Usage charts aggregate the explicitly selected subtree over
-the selected date range. **All groups** is an explicit request for organization-wide reporting,
-which can be more expensive. Existing hierarchy policy and membership protections
+the selected date range. **Usage report** with no group selected is an explicit
+request for organization-wide reporting, which can be more expensive. Existing hierarchy policy and membership protections
 still apply. The legacy full-overview API remains available for existing clients;
 the page uses it for spend totals alongside the children/detail endpoints
 described in [API.md](../API.md).

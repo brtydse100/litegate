@@ -173,6 +173,17 @@ for (const width of [390, 1280]) {
   });
 }
 
+test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("./");
+  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  const nav = page.getByRole("navigation", { name: "Admin navigation" });
+  await nav.getByRole("button", { name: "Account menu" }).last().click();
+  await expect(nav.getByRole("menu")).toBeVisible();
+  const overflow = await nav.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
 test("pages fit a phone screen without sideways scrolling", async ({
   page,
 }) => {
