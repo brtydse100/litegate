@@ -32,7 +32,9 @@ test("@smoke microspend axis labels fit inside the chart", async ({ page }) => {
     await route.fulfill({ json: body });
   });
   await page.goto("/organization");
-  await page.getByRole("button", { name: "All groups, 4 users" }).click();
+  await page
+    .getByRole("button", { name: "Usage report, all groups, 4 users" })
+    .click();
   const chart = page.getByRole("img", { name: "Spend (USD) over time" });
   await expect(chart).toBeVisible();
   const bounds = await chart.locator("g text").evaluateAll((labels) =>

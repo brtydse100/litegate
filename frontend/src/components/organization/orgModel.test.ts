@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { limitOrigin, reached } from "./orgModel";
+import { limitOrigin, reached, shortMoney } from "./orgModel";
 
 describe("limitOrigin", () => {
   const parent = { name: "Engineering", per_user: 50 };
@@ -49,5 +49,13 @@ describe("reached", () => {
     expect(reached(80, 100, 80)).toBe(true);
     expect(reached(5, null, 80)).toBe(false);
     expect(reached(null, 100, 80)).toBe(false);
+  });
+});
+
+describe("shortMoney", () => {
+  it("puts the sign before the currency symbol", () => {
+    expect(shortMoney(-5)).toBe("-$5");
+    expect(shortMoney(1200)).toBe("$1,200");
+    expect(shortMoney(null)).toBe("—");
   });
 });

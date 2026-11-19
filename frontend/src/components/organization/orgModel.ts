@@ -141,12 +141,14 @@ export const money = (value: number | null | undefined) =>
   value == null ? "—" : formatUsd(value);
 
 /** Whole-dollar amounts drop their cents to keep dense tables readable. */
-export const shortMoney = (value: number | null | undefined) =>
+export const shortMoney = (value: number | null | undefined): string =>
   value == null
     ? "—"
-    : Number.isInteger(value)
-      ? `$${value.toLocaleString()}`
-      : formatUsd(value);
+    : value < 0
+      ? `-${shortMoney(-value)}`
+      : Number.isInteger(value)
+        ? `$${value.toLocaleString()}`
+        : formatUsd(value);
 
 export function pluralWord(word: string) {
   const lower = word.toLowerCase();
