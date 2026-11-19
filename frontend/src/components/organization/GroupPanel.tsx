@@ -263,11 +263,7 @@ export default function GroupPanel({
               min="0"
               step="0.000001"
               aria-label={`${group.name} per-person limit`}
-              placeholder={`Configured: ${
-                budgetGroup!.per_user_config == null
-                  ? "no limit"
-                  : shortMoney(budgetGroup!.per_user_config)
-              }`}
+              placeholder="Inherited"
               value={
                 perUser ??
                 (budgetGroup!.per_user == null
@@ -288,7 +284,8 @@ export default function GroupPanel({
         )}
         {editPerUser && budgetGroup!.per_user_override != null && (
           <p className="col-span-2 -mt-1 text-xs text-ink-4">
-            Set here; leave empty and save to use the configured value.
+            Set here; leave empty and save to return to the inherited or
+            configured limit.
           </p>
         )}
         <p className="col-span-2 -mt-1 text-xs text-ink-4">

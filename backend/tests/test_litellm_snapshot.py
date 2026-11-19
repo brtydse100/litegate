@@ -115,6 +115,31 @@ async def test_keys_repeated_across_pages_are_counted_once(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_team_listing_beyond_its_page_bound_fails_closed(monkeypatch):
+    monkeypatch.setattr(litellm_snapshot, "TEAM_PAGES", 2)
+    listing = AsyncMock(return_value=team_page([], total_pages=3))
+    monkeypatch.setattr(litellm, "list_teams", listing)
+    with pytest.raises(HTTPException) as raised:
+        await litellm_snapshot._load_teams()
+    assert raised.value.status_code == 409
+    assert listing.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_reports_with_nothing_to_show_skip_the_listings(org, monkeypatch):
+    org()
+    teams = AsyncMock(side_effect=AssertionError("team listing not needed"))
+    keys = AsyncMock(side_effect=AssertionError("key listing not needed"))
+    monkeypatch.setattr(litellm_snapshot.teams, "get", teams)
+    monkeypatch.setattr(litellm_snapshot.keys_by_user, "get", keys)
+    empty_page = await reports.users(None, 999, 25)
+    assert empty_page["users"] == []
+    nothing_visible = reports.OrganizationScope(roots=())
+    assert (await reports.overview(nothing_visible))["groups"] == []
+    assert teams.await_count == keys.await_count == 0
+
+
+@pytest.mark.asyncio
 async def test_concurrent_waiters_share_one_failed_refresh(monkeypatch):
     calls = 0
 

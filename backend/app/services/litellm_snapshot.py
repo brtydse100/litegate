@@ -52,19 +52,20 @@ class Snapshot:
         lock = self._locks.setdefault(asyncio.get_running_loop(), asyncio.Lock())
         async with lock:
             if not self._fresh():
-                # Age counts from the start of the load, so data is never older
-                # than TTL seconds when it is served.
-                started = monotonic()
                 try:
                     self._value, self._error = await self._load(), None
                 except HTTPException as exc:
-                    _logger.warning("LiteLLM bulk listing unavailable (%s); reports fall back to per-item reads", exc.detail)
+                    # An installation over the bound is a steady state, not an outage.
+                    log = _logger.info if exc.status_code == 409 else _logger.warning
+                    log("LiteLLM bulk listing unavailable (%s); reports fall back to per-item reads", exc.detail)
                     self._value, self._error = None, exc
                 except (TypeError, ValueError):
                     # A malformed listing must fall back like an outage, not 500.
                     _logger.warning("LiteLLM bulk listing was unreadable; reports fall back to per-item reads", exc_info=True)
                     self._value, self._error = None, HTTPException(status_code=502, detail="LiteLLM returned an unreadable listing")
-                self._loaded_at = started
+                # Reuse counts from the end of the load, so a slow listing is not
+                # immediately stale and reloaded back to back.
+                self._loaded_at = monotonic()
             return self._result()
 
     def clear(self) -> None:

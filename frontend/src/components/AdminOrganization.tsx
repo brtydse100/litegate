@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { BarChart3, Network } from "lucide-react";
 import { api } from "../api/client";
@@ -109,6 +109,7 @@ export default function AdminOrganization({
   const [expandAll, setExpandAll] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [showAllAttention, setShowAllAttention] = useState(false);
+  const opener = useRef<HTMLElement | null>(null);
 
   const rootsQuery = useQuery({
     queryKey: ["organization-children", ""],
@@ -235,6 +236,8 @@ export default function AdminOrganization({
   function select(id: string) {
     const group = byId.get(id);
     if (!group) return;
+    if (!nodeId && document.activeElement instanceof HTMLElement)
+      opener.current = document.activeElement;
     setNodeId(id);
     setAllGroupsReport(false);
     request(id);
@@ -285,6 +288,7 @@ export default function AdminOrganization({
     setRootChoice(id);
     setTableChoice(null);
     setNodeId(null);
+    setShowAllAttention(false);
   }
 
   const refreshing =
@@ -401,7 +405,8 @@ export default function AdminOrganization({
         onClick: () => select(group.id),
       })),
   ];
-  const shownAttention = showAllAttention ? attention : attention.slice(0, 3);
+  const attentionExpanded = showAllAttention && attention.length > 3;
+  const shownAttention = attentionExpanded ? attention : attention.slice(0, 3);
   // Only claim health once every signal shown here has actually loaded.
   const gatewayReady = isAdmin ? status.data?.ready === true : true;
   const healthy =
@@ -657,11 +662,11 @@ export default function AdminOrganization({
             {attention.length > 3 && (
               <button
                 type="button"
-                onClick={() => setShowAllAttention((value) => !value)}
-                aria-expanded={showAllAttention}
+                onClick={() => setShowAllAttention(!attentionExpanded)}
+                aria-expanded={attentionExpanded}
                 className="mt-1 self-start rounded-lg px-1 py-1.5 text-[13px] font-semibold text-blue-ink hover:underline"
               >
-                {showAllAttention
+                {attentionExpanded
                   ? "Show fewer"
                   : `Show ${attention.length - 3} more`}
               </button>
@@ -985,7 +990,14 @@ export default function AdminOrganization({
             (group) => group.id === selected.id,
           )}
           revision={budgets.data?.revision}
-          onClose={() => setNodeId(null)}
+          onClose={() => {
+            setNodeId(null);
+            // The panel unmounts; put focus back where the user started.
+            requestAnimationFrame(() => {
+              if (opener.current?.isConnected) opener.current.focus();
+              opener.current = null;
+            });
+          }}
           onSelect={select}
         />
       )}

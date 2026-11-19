@@ -4,6 +4,7 @@ import {
   budgetSummary,
   durationDays,
   durationLabel,
+  isKeyExpired,
   parseLiteLLMDate,
 } from "./keyBudget";
 import type { KeyInfo } from "./types";
@@ -139,5 +140,19 @@ describe("allowedModels", () => {
     expect(allowedModels([])).toBeNull();
     expect(allowedModels(["all-proxy-models", "gpt"])).toBeNull();
     expect(allowedModels(["b", "a", "b"])).toEqual(["a", "b"]);
+  });
+});
+
+describe("isKeyExpired", () => {
+  it("expires at the instant, reading timezone-less dates as UTC", () => {
+    expect(isKeyExpired("2026-03-11 00:00:00", NOW)).toBe(true);
+    expect(isKeyExpired("2026-03-11T00:00:01Z", NOW)).toBe(false);
+    expect(isKeyExpired("2026-03-10T23:59:59", NOW)).toBe(true);
+  });
+
+  it("never expires a key without a valid date", () => {
+    expect(isKeyExpired(null, NOW)).toBe(false);
+    expect(isKeyExpired("", NOW)).toBe(false);
+    expect(isKeyExpired("not a date", NOW)).toBe(false);
   });
 });
