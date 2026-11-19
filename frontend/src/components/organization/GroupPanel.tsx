@@ -63,7 +63,8 @@ export default function GroupPanel({
 }) {
   const client = useQueryClient();
   const heading = useRef<HTMLHeadingElement>(null);
-  // Opening a group moves focus to its panel, which renders after the report.
+  // Opening a group moves focus to its panel: beside the report on wide
+  // screens, above it on narrower ones.
   useEffect(() => {
     heading.current?.focus();
   }, []);
@@ -118,7 +119,7 @@ export default function GroupPanel({
     <aside
       data-group-panel
       aria-label={`Edit ${group.name}`}
-      className="flex flex-[1_1_340px] flex-col gap-[18px] border-l border-line bg-card p-6 lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto"
+      className="order-first flex flex-[1_1_340px] flex-col gap-[18px] border-b border-line bg-card p-6 lg:order-none lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto lg:border-b-0 lg:border-l"
     >
       <div className="flex flex-col gap-2.5">
         <nav aria-label="Group path" className="text-xs text-ink-4">

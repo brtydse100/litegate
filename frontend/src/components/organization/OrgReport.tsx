@@ -198,7 +198,7 @@ export default function OrgReport({
             </button>
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-canvas text-ink-4">
                 <tr>
@@ -212,7 +212,7 @@ export default function OrgReport({
               <tbody className="divide-y divide-line-soft">
                 {users.data?.users.map((user) => (
                   <tr key={user.user_id}>
-                    <td className="px-4 py-3">
+                    <td className="min-w-[13rem] px-4 py-3">
                       {user.email ? (
                         <EmailAddress
                           email={user.email}

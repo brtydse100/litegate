@@ -188,6 +188,30 @@ test("the top-bar account menu stays on a phone screen", async ({ page }) => {
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
 });
 
+for (const width of [390, 768]) {
+  test(`an opened group's panel is on screen at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("./organization");
+    const groups = page.getByRole("list", { name: "Organization groups" });
+    await groups.getByRole("button", { name: /^Infrastructure,/ }).click();
+    const panel = page.getByRole("complementary", {
+      name: "Edit Infrastructure",
+    });
+    await expect(panel).toBeVisible();
+    // Let the group's report finish rendering, then check the panel stayed put.
+    await expect(
+      page.getByText(/Usage in Infrastructure/).first(),
+    ).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(1500);
+    await expect(
+      panel.getByRole("heading", { name: "Infrastructure" }),
+    ).toBeInViewport();
+  });
+}
+
 test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("./");
