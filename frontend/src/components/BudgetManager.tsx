@@ -10,7 +10,7 @@ import { formatUsd } from "../formatUsd";
 const money = (value: number | null) =>
   value === null ? "Unavailable" : formatUsd(value);
 const inputClass =
-  "w-32 rounded border border-slate-300 bg-white p-2 text-sm text-slate-900";
+  "w-32 rounded border border-line-input bg-card p-2 text-sm text-ink";
 
 function BudgetGroupEditor({
   group,
@@ -46,14 +46,14 @@ function BudgetGroupEditor({
   });
   const envelopeValue = envelope ?? String(group.assigned);
   return (
-    <article className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
-      <h3 className="font-semibold text-slate-950">{group.name}</h3>
+    <article className="space-y-4 rounded-lg border border-line bg-card p-5">
+      <h3 className="font-semibold text-ink">{group.name}</h3>
       {group.allocation_error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {group.allocation_error}
         </p>
       )}
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-4">
         {group.path.join(" / ")}
         {group.duration ? ` · ${group.duration}` : " · No automatic reset"}
       </p>
@@ -66,7 +66,7 @@ function BudgetGroupEditor({
           ["Remaining", group.remaining],
         ].map(([label, value]) => (
           <div key={label}>
-            <dt className="text-xs text-slate-500">{label}</dt>
+            <dt className="text-xs text-ink-4">{label}</dt>
             <dd>{money(value as number | null)}</dd>
           </div>
         ))}
@@ -80,7 +80,7 @@ function BudgetGroupEditor({
           }}
           className="flex flex-wrap items-end gap-2"
         >
-          <label className="text-xs text-slate-600">
+          <label className="text-xs text-ink-3">
             {group.parent_id ? "Child allocation" : "Assigned budget"}
             <input
               aria-label={`${group.name} ${group.parent_id ? "child allocation" : "assigned budget"}`}
@@ -95,13 +95,13 @@ function BudgetGroupEditor({
           </label>
           <button
             disabled={mutation.isPending}
-            className="rounded bg-indigo-600 px-3 py-2 text-sm text-white"
+            className="rounded bg-blue px-3 py-2 text-sm text-paper"
           >
             Save {group.name} budget
           </button>
         </form>
       ) : (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-ink-4">
           This assigned total is read-only. Redistribute it among members and
           child teams below. A parent or system administrator assigns the total.
         </p>
@@ -110,7 +110,7 @@ function BudgetGroupEditor({
         {group.users.map((user) => (
           <li
             key={user.user_id}
-            className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3"
+            className="flex flex-wrap items-center gap-3 border-t border-line-soft pt-3"
           >
             <div className="min-w-0 flex-1">
               {user.email ? (
@@ -118,7 +118,7 @@ function BudgetGroupEditor({
               ) : (
                 <span className="break-all">{user.user_id}</span>
               )}
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-ink-4">
                 {user.mode === "automatic"
                   ? "Automatic"
                   : user.mode === "fixed"
@@ -161,7 +161,7 @@ function BudgetGroupEditor({
                 />
                 <button
                   disabled={mutation.isPending}
-                  className="rounded border border-slate-300 px-3 py-2 text-sm"
+                  className="rounded border border-line-input px-3 py-2 text-sm"
                 >
                   Save user budget
                 </button>
@@ -174,7 +174,7 @@ function BudgetGroupEditor({
         <DismissibleMessage
           role="alert"
           messageKey={mutation.error.message}
-          className="text-sm text-red-600"
+          className="text-sm text-danger"
         >
           {mutation.error.message}
         </DismissibleMessage>
@@ -201,17 +201,17 @@ export default function BudgetManager() {
   const data = query.data;
   return (
     <section className="mt-8 space-y-5" aria-label="Budget management">
-      <h2 className="text-xl font-semibold text-slate-950">Budget planning</h2>
+      <h2 className="text-xl font-semibold text-ink">Budget planning</h2>
       {data.applied ? (
         <div
           role="status"
-          className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900"
+          className="rounded-lg border border-mint/40 bg-mint-tint p-4 text-sm text-mint-ink"
         >
           Enforced: these allowances cap members' keys. Changes and new members
           apply within about a minute.
         </div>
       ) : (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-lg border border-sand/40 bg-sand-tint p-4 text-sm text-sand-ink">
           <p>
             These allocations are proposals, not applied to inference. Existing
             enforced policies remain active.
@@ -223,13 +223,13 @@ export default function BudgetManager() {
           </ul>
           <button
             disabled
-            className="mt-3 rounded border border-amber-300 px-3 py-2 disabled:opacity-60"
+            className="mt-3 rounded border border-sand/40 px-3 py-2 disabled:opacity-60"
           >
             Activate budget enforcement
           </button>
         </div>
       )}
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-ink-3">
         Child allocations and manual overrides are reserved first. The remainder
         is shared equally by other signed-in direct members, never above the
         group's per-user limit. Members of groups without a budget keep their

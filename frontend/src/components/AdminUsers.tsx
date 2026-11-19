@@ -1,15 +1,25 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Info, Shield, UserPlus } from "lucide-react";
+import { Info, UserPlus } from "lucide-react";
 import { api } from "../api/client";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import EmailAddress from "./EmailAddress";
 import PeopleDirectory from "./PeopleDirectory";
 import DismissibleMessage from "./DismissibleMessage";
-
-const inputClass =
-  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
+import { Avatar } from "./AppChrome";
+import { PageHeader, Pill } from "./Page";
+import {
+  buttonPrimary,
+  buttonSecondary,
+  buttonSmall,
+  card,
+  cardHeader,
+  cardTitle,
+  fieldInput,
+  fieldLabel,
+  tableHead,
+} from "./ui";
 
 export default function AdminUsers({
   localUsersEnabled = true,
@@ -98,63 +108,46 @@ export default function AdminUsers({
 
   if (!localUsersEnabled)
     return (
-      <section className="space-y-5">
-        <h1 className="text-2xl font-semibold">People</h1>
+      <section className="flex w-full flex-col gap-6">
+        <PageHeader
+          eyebrow="Manage"
+          title="People"
+          description="Everyone registered in LiteLLM, including SSO accounts and people without keys."
+        />
         <PeopleDirectory />
       </section>
     );
 
   return (
-    <section className="w-full space-y-5">
-      <div>
-        <p className="text-xs font-medium text-indigo-600">Users</p>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-          People and local access
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Manage password-based accounts for people who cannot sign in with your
-          organization&apos;s SSO.
+    <section className="flex w-full flex-col gap-6">
+      <PageHeader
+        eyebrow="Manage"
+        title="People and local access"
+        description={
+          <>
+            Manage password-based accounts for people who cannot sign in with
+            your organization&apos;s SSO.
+          </>
+        }
+      />
+
+      <div className="flex items-start gap-3 rounded-xl border border-blue/30 bg-blue-tint px-4 py-3 text-[13px] leading-relaxed text-blue-ink">
+        <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+        <p>
+          Local accounts are for contractors, emergency access, or anyone
+          without SSO; people covered by SSO should keep using it.{" "}
+          <strong>Users</strong> create or regenerate their own key;{" "}
+          <strong>admins</strong> manage all keys and local accounts. Give
+          automation agents the management API key, never a shared human
+          password.
         </p>
-      </div>
-
-      <PeopleDirectory />
-
-      <div className="grid overflow-hidden rounded-xl border border-[#2A2E42] bg-[#2A2E42] md:grid-cols-3 md:gap-px">
-        <div className="bg-[#1A1D27] p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-gray-200">
-            <Info size={15} className="text-sky-400" /> When to use this
-          </div>
-          <p className="mt-1.5 text-xs leading-5 text-gray-500">
-            Create a local account for contractors, emergency access, or anyone
-            without SSO. People covered by SSO should keep using SSO.
-          </p>
-        </div>
-        <div className="border-y border-[#2A2E42] bg-[#1A1D27] p-4 md:border-x md:border-y-0">
-          <div className="flex items-center gap-2 text-sm font-medium text-gray-200">
-            <Shield size={15} className="text-indigo-400" /> User or admin?
-          </div>
-          <p className="mt-1.5 text-xs leading-5 text-gray-500">
-            <span className="text-gray-300">Users</span> create or regenerate
-            their own key. <span className="text-gray-300">Admins</span> manage
-            all keys and local accounts.
-          </p>
-        </div>
-        <div className="bg-[#1A1D27] p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-gray-200">
-            <Bot size={15} className="text-emerald-400" /> Automation agents
-          </div>
-          <p className="mt-1.5 text-xs leading-5 text-gray-500">
-            Use the management API key for trusted agents that need admin
-            automation. Never give an agent a shared human password.
-          </p>
-        </div>
       </div>
 
       {error && (
         <DismissibleMessage
           role="alert"
           messageKey={(error as Error).message}
-          className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+          className="rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger"
         >
           {(error as Error).message}
         </DismissibleMessage>
@@ -162,175 +155,216 @@ export default function AdminUsers({
       {operationsBlocked && (
         <DismissibleMessage
           messageKey="account-actions-paused"
-          className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+          className="rounded-xl border border-sand/40 bg-sand-tint px-4 py-3 text-sm text-sand-ink"
         >
           Account actions are paused. Try again in {retryAfter || 1} seconds.
         </DismissibleMessage>
       )}
 
-      <form
-        onSubmit={submit}
-        className="grid gap-3 rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-5 md:grid-cols-2"
+      <section
+        aria-label="Local accounts"
+        className={`overflow-hidden ${card}`}
       >
-        <div className="md:col-span-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-gray-200">
-            <UserPlus size={16} /> Add local user
+        <div className={cardHeader}>
+          <div>
+            <h2 className={cardTitle}>Local accounts</h2>
+            <p className="mt-0.5 text-[13px] text-ink-4">
+              <span className="text-ink-2">Reset password</span> replaces the
+              current password.{" "}
+              <span className="text-ink-2">Make admin/user</span> changes
+              management access. <span className="text-ink-2">Disable</span>{" "}
+              immediately blocks portal access without deleting the account.
+            </p>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
-            Creates a separate username and password for this portal.
-          </p>
-        </div>
-        <label className="space-y-1 text-xs text-gray-400">
-          <span>Username</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="off"
-            minLength={3}
-            required
-          />
-        </label>
-        <label className="space-y-1 text-xs text-gray-400">
-          <span>Email</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            type="email"
-            required
-          />
-        </label>
-        <label className="space-y-1 text-xs text-gray-400">
-          <span>Temporary password</span>
-          <input
-            className={`${inputClass} w-full`}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 10 characters"
-            type="password"
-            autoComplete="new-password"
-            minLength={10}
-            maxLength={256}
-            required
-          />
-        </label>
-        <label className="space-y-1 text-xs text-gray-400">
-          <span>Portal role</span>
-          <select
-            className={`${inputClass} w-full`}
-            value={role}
-            onChange={(e) => setRole(e.target.value as "user" | "admin")}
-          >
-            <option value="user">User — own API access only</option>
-            <option value="admin">Admin — full management access</option>
-          </select>
-        </label>
-        <button
-          disabled={create.isPending || update.isPending || operationsBlocked}
-          className="md:col-span-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {create.isPending
-            ? "Adding..."
-            : operationsBlocked
-              ? "Account actions paused"
-              : "Add user"}
-        </button>
-      </form>
-
-      <div className="overflow-hidden rounded-xl border border-[#2A2E42] bg-[#1A1D27]">
-        <div className="border-b border-[#2A2E42] px-4 py-3">
-          <p className="text-sm font-medium text-gray-200">Account actions</p>
-          <p className="mt-1 text-xs leading-5 text-gray-500">
-            <span className="text-gray-300">Reset password</span> replaces the
-            current password.{" "}
-            <span className="text-gray-300">Make admin/user</span> changes
-            management access. <span className="text-gray-300">Disable</span>{" "}
-            immediately blocks portal access without deleting the account.
-          </p>
+          {users.data && (
+            <span className="text-[13px] text-ink-4">
+              {users.data.length} accounts
+            </span>
+          )}
         </div>
         {users.isLoading ? (
-          <div className="h-32 animate-pulse bg-[#22263A]" />
+          <div className="h-32 animate-pulse bg-canvas" />
         ) : users.data?.length ? (
-          <div className="divide-y divide-[#2A2E42]">
-            {users.data.map((account) => (
-              <div
-                key={account.username}
-                className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-center ${account.active ? "" : "opacity-55"}`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-white">
-                      {account.username}
-                    </span>
-                    {account.role === "admin" && (
-                      <span className="flex items-center gap-1 rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300">
-                        <Shield size={10} /> Admin
-                      </span>
-                    )}
-                    {!account.active && (
-                      <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">
-                        Disabled
-                      </span>
-                    )}
-                  </div>
-                  <EmailAddress
-                    email={account.email}
-                    className="text-xs text-gray-500"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <button
-                    onClick={() => {
-                      update.reset();
-                      setResetUsername(account.username);
-                      setReplacementPassword("");
-                    }}
-                    disabled={update.isPending || operationsBlocked}
-                    className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Reset password
-                  </button>
-                  <button
-                    onClick={() =>
-                      update.mutate({
-                        name: account.username,
-                        payload: {
-                          role: account.role === "admin" ? "user" : "admin",
-                        },
-                      })
-                    }
-                    disabled={update.isPending || operationsBlocked}
-                    className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Make {account.role === "admin" ? "user" : "admin"}
-                  </button>
-                  <button
-                    onClick={() =>
-                      update.mutate({
-                        name: account.username,
-                        payload: { active: !account.active },
-                      })
-                    }
-                    disabled={update.isPending || operationsBlocked}
-                    className="rounded border border-[#2A2E42] px-2.5 py-1.5 text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {account.active ? "Disable" : "Enable"}
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className={tableHead}>
+                <tr>
+                  <th className="px-5 py-2.5 font-semibold">ACCOUNT</th>
+                  <th className="px-3 py-2.5 font-semibold">ROLE</th>
+                  <th className="px-3 py-2.5 font-semibold">STATUS</th>
+                  <th className="px-5 py-2.5 text-right font-semibold">
+                    ACTIONS
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-soft">
+                {users.data.map((account) => (
+                  <tr key={account.username}>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar email={account.email} size="h-8 w-8" />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-ink">
+                            {account.username}
+                          </p>
+                          <EmailAddress
+                            email={account.email}
+                            className="text-[13px] text-ink-4"
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      {account.role === "admin" ? (
+                        <Pill tone="info">Admin</Pill>
+                      ) : (
+                        <Pill>User</Pill>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {account.active ? (
+                        <Pill tone="ok">Active</Pill>
+                      ) : (
+                        <Pill tone="bad">Disabled</Pill>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            update.reset();
+                            setResetUsername(account.username);
+                            setReplacementPassword("");
+                          }}
+                          disabled={update.isPending || operationsBlocked}
+                          className={buttonSmall}
+                        >
+                          Reset password
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            update.mutate({
+                              name: account.username,
+                              payload: {
+                                role:
+                                  account.role === "admin" ? "user" : "admin",
+                              },
+                            })
+                          }
+                          disabled={update.isPending || operationsBlocked}
+                          className={buttonSmall}
+                        >
+                          Make {account.role === "admin" ? "user" : "admin"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            update.mutate({
+                              name: account.username,
+                              payload: { active: !account.active },
+                            })
+                          }
+                          disabled={update.isPending || operationsBlocked}
+                          className={buttonSmall}
+                        >
+                          {account.active ? "Disable" : "Enable"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <p className="p-6 text-center text-sm text-gray-500">
+          <p className="p-6 text-center text-sm text-ink-4">
             No local users yet.
           </p>
         )}
-      </div>
+      </section>
+
+      <form onSubmit={submit} className={`overflow-hidden ${card}`}>
+        <div className={cardHeader}>
+          <div>
+            <h2 className={`${cardTitle} flex items-center gap-2`}>
+              <UserPlus size={17} aria-hidden="true" /> Add local user
+            </h2>
+            <p className="mt-0.5 text-[13px] text-ink-4">
+              Creates a separate username and password for this portal.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-3.5 p-5 md:grid-cols-2">
+          <label className={fieldLabel}>
+            <span>Username</span>
+            <input
+              className={fieldInput}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="off"
+              minLength={3}
+              required
+            />
+          </label>
+          <label className={fieldLabel}>
+            <span>Email</span>
+            <input
+              className={fieldInput}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
+            />
+          </label>
+          <label className={fieldLabel}>
+            <span>Temporary password</span>
+            <input
+              className={fieldInput}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 10 characters"
+              type="password"
+              autoComplete="new-password"
+              minLength={10}
+              maxLength={256}
+              required
+            />
+          </label>
+          <label className={fieldLabel}>
+            <span>Portal role</span>
+            <select
+              className={fieldInput}
+              value={role}
+              onChange={(e) => setRole(e.target.value as "user" | "admin")}
+            >
+              <option value="user">User — own API access only</option>
+              <option value="admin">Admin — full management access</option>
+            </select>
+          </label>
+          <div className="md:col-span-2">
+            <button
+              disabled={
+                create.isPending || update.isPending || operationsBlocked
+              }
+              className={buttonPrimary}
+            >
+              {create.isPending
+                ? "Adding..."
+                : operationsBlocked
+                  ? "Account actions paused"
+                  : "Add user"}
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <PeopleDirectory />
 
       {resetUsername && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !update.isPending)
@@ -343,24 +377,24 @@ export default function AdminUsers({
             role="dialog"
             aria-modal="true"
             aria-labelledby="reset-password-title"
-            className="max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto rounded-xl border border-[#2A2E42] bg-[#1A1D27] p-5 shadow-2xl"
+            className="flex max-h-[90vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-2xl"
           >
             <div>
               <h3
                 id="reset-password-title"
-                className="text-lg font-semibold text-white"
+                className="text-lg font-bold text-ink"
               >
                 Reset {resetUsername}&apos;s password
               </h3>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-[13px] text-ink-4">
                 Their current password stops working as soon as this change
                 succeeds.
               </p>
             </div>
-            <label className="block space-y-1 text-xs text-gray-400">
+            <label className={fieldLabel}>
               <span>New password</span>
               <input
-                className={`${inputClass} w-full`}
+                className={fieldInput}
                 type="password"
                 autoComplete="new-password"
                 minLength={10}
@@ -371,12 +405,12 @@ export default function AdminUsers({
               />
             </label>
             {update.error && (
-              <p role="alert" className="text-sm text-red-700">
+              <p role="alert" className="text-sm text-danger">
                 {update.error.message}
               </p>
             )}
             {operationsBlocked && (
-              <p role="alert" className="text-sm text-amber-800">
+              <p role="alert" className="text-sm text-sand-ink">
                 Account actions are paused. Try again in {retryAfter || 1}{" "}
                 seconds.
               </p>
@@ -386,7 +420,7 @@ export default function AdminUsers({
                 type="button"
                 disabled={update.isPending}
                 onClick={closeReset}
-                className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
+                className={buttonSecondary}
               >
                 Cancel
               </button>
@@ -397,7 +431,7 @@ export default function AdminUsers({
                   replacementPassword.length < 10 ||
                   replacementPassword.length > 256
                 }
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                className={buttonPrimary}
               >
                 {update.isPending ? "Saving..." : "Reset password"}
               </button>

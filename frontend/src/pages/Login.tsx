@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import { useAuth } from "../hooks/useAuth";
+import { buttonPrimary, fieldInput, fieldLabel } from "../components/ui";
 
 interface AuthConfig {
   sso_enabled: boolean;
@@ -73,125 +74,141 @@ export default function Login() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-10">
-      <div className="absolute right-4 top-4 z-10 rounded-md border border-slate-200 bg-white shadow-sm">
-        <ThemeToggle />
-      </div>
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-indigo-50 to-transparent" />
-      <div className="relative flex w-full max-w-sm flex-col items-center gap-6 rounded-xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/60 sm:p-10">
-        {/* Logo */}
-        {cfg?.logo_url ? (
-          <img
-            src={cfg.logo_url}
-            alt="Organization logo"
-            className="h-11 max-w-full object-contain"
-          />
-        ) : (
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-lg shadow-indigo-200">
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+    <div className="flex min-h-screen flex-col bg-canvas lg:flex-row">
+      <section
+        aria-label="LiteGate"
+        className="flex flex-col justify-between gap-6 bg-navy px-6 py-8 text-paper sm:px-10 lg:w-[44%] lg:max-w-[560px] lg:px-14 lg:py-14"
+      >
+        <div className="flex flex-col gap-6 lg:gap-10">
+          {cfg?.logo_url ? (
+            <img
+              src={cfg.logo_url}
+              alt="Organization logo"
+              className="h-11 max-w-[220px] self-start object-contain"
+            />
+          ) : (
+            <span
+              aria-hidden="true"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-ice text-navy"
             >
-              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-            </svg>
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </span>
+          )}
+          <div>
+            <h1 className="text-[28px] font-bold tracking-[-0.01em] lg:text-4xl">
+              LiteGate
+            </h1>
+            <p className="mt-2 max-w-md whitespace-pre-line break-words text-[15px] leading-relaxed text-navy-text">
+              {cfg?.login_text?.trim()
+                ? cfg.login_text
+                : "Sign in to your LiteLLM access portal"}
+            </p>
           </div>
-        )}
-
-        <div className="w-full text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-            LiteGate
-          </h1>
-          <p className="mt-1.5 whitespace-pre-line break-words text-sm text-slate-500">
-            {cfg?.login_text?.trim()
-              ? cfg.login_text
-              : "Sign in to your LiteLLM access portal"}
-          </p>
         </div>
-
-        {isLoading && (
-          <div className="h-10 w-full animate-pulse rounded-md bg-slate-100" />
-        )}
-
-        {isError && (
-          <div className="w-full rounded-md border border-red-200 bg-red-50 p-3 text-center text-sm text-red-800">
-            <p>Sign-in configuration is temporarily unavailable.</p>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="mt-2 font-medium underline underline-offset-2"
-            >
-              Try again
-            </button>
-          </div>
-        )}
-
-        {/* SSO button */}
-        {showSso && (
-          <a
-            href="/api/auth/login"
-            className="w-full rounded-md bg-indigo-600 px-4 py-2.5 text-center text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
-          >
-            Sign in with SSO
-          </a>
-        )}
-
-        {showDivider && (
-          <div className="flex w-full items-center gap-3">
-            <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs text-slate-400">or</span>
-            <div className="h-px flex-1 bg-slate-200" />
-          </div>
-        )}
-
-        {/* Local login — always visible when enabled, no toggle */}
-        {showLocal && (
-          <form onSubmit={handleLocal} className="w-full space-y-3">
-            <label className="block space-y-1.5 text-xs font-medium text-slate-700">
-              <span>Username</span>
-              <input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                autoFocus={!showSso}
-                autoComplete="username"
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-              />
-            </label>
-            <label className="block space-y-1.5 text-xs font-medium text-slate-700">
-              <span>Password</span>
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-              />
-            </label>
-            {error && <p className="text-xs text-red-700">{error}</p>}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {submitting ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
-        )}
-
-        <p className="text-center text-xs leading-5 text-slate-400">
+        <p className="hidden text-[13px] text-navy-muted lg:block">
           Access is granted through your organization
         </p>
-      </div>
+      </section>
+
+      <main className="relative flex flex-1 items-center justify-center px-4 py-10 sm:px-8">
+        <div className="absolute right-4 top-4 rounded-lg border border-line bg-card">
+          <ThemeToggle />
+        </div>
+        <div className="flex w-full max-w-[380px] flex-col gap-5 rounded-2xl border border-line bg-card p-7 sm:p-9">
+          <h2 className="text-xl font-bold text-ink">Sign in</h2>
+
+          {isLoading && (
+            <div className="h-11 w-full animate-pulse rounded-lg bg-well" />
+          )}
+
+          {isError && (
+            <div className="rounded-lg border border-danger-line bg-danger-tint p-3 text-sm text-danger">
+              <p>Sign-in configuration is temporarily unavailable.</p>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="mt-2 font-semibold underline underline-offset-2"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {showSso && (
+            <a
+              href="/api/auth/login"
+              className={`${buttonPrimary} w-full no-underline`}
+            >
+              Sign in with SSO
+            </a>
+          )}
+
+          {showDivider && (
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-line" />
+              <span className="text-xs text-ink-4">or</span>
+              <div className="h-px flex-1 bg-line" />
+            </div>
+          )}
+
+          {showLocal && (
+            <form onSubmit={handleLocal} className="flex flex-col gap-3.5">
+              <label className={fieldLabel}>
+                <span>Username</span>
+                <input
+                  type="text"
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoFocus={!showSso}
+                  autoComplete="username"
+                  className={fieldInput}
+                />
+              </label>
+              <label className={fieldLabel}>
+                <span>Password</span>
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className={fieldInput}
+                />
+              </label>
+              {error && (
+                <p role="alert" className="text-sm text-danger">
+                  {error}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={submitting}
+                className={`${buttonPrimary} mt-1 w-full`}
+              >
+                {submitting ? "Signing in…" : "Sign in"}
+              </button>
+            </form>
+          )}
+
+          <p className="text-center text-xs text-ink-4 lg:hidden">
+            Access is granted through your organization
+          </p>
+        </div>
+      </main>
     </div>
   );
 }

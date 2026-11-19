@@ -96,7 +96,7 @@ export default function GroupPanel({
   const inheritedFrom = source;
   const segments = [
     ...(ownSpend != null && ownSpend > 0
-      ? [{ name: "own", value: ownSpend, color: "rgb(var(--navy))" }]
+      ? [{ name: "own", value: ownSpend, color: "rgb(var(--ink-3))" }]
       : []),
     ...subGroups
       .filter((child) => (child.group.group_spend ?? 0) > 0)
@@ -194,7 +194,7 @@ export default function GroupPanel({
         <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3">
           {ownSpendState === "ready" ? (
             <span>
-              <span style={{ color: "rgb(var(--navy))" }}>■</span> own{" "}
+              <span style={{ color: "rgb(var(--ink-3))" }}>■</span> own{" "}
               {shortMoney(ownSpend)}
             </span>
           ) : ownSpendState === "loading" ? (

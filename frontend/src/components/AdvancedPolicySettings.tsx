@@ -20,7 +20,7 @@ interface Draft {
   clear: boolean;
 }
 const inputClass =
-  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900";
+  "w-full rounded-md border border-line-input bg-card px-3 py-2 text-sm text-ink";
 // Defense in depth: schema discovery never makes credentials or identity selectors editable.
 const restrictedField =
   /(?:secret|password|api_key|authorization|credential)|^(?:key|token|team_id|user_id|organization_id|members|members_with_roles|spend)$/i;
@@ -120,25 +120,23 @@ const AdvancedPolicySettings = forwardRef<
   return (
     <details
       onToggle={(event) => setOpen(event.currentTarget.open)}
-      className="rounded-lg border border-slate-300 p-3 sm:col-span-2"
+      className="rounded-lg border border-line-input p-3 sm:col-span-2"
     >
-      <summary className="cursor-pointer text-sm font-medium text-slate-600">
+      <summary className="cursor-pointer text-sm font-medium text-ink-3">
         Advanced settings
       </summary>
       {open && (
         <div className="mt-3 space-y-3">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-4">
             Fields advertised by this LiteLLM installation. Enable each field to
             change it; untouched fields are preserved. JSON values replace the
             complete field.
           </p>
           {discovery.isFetching && (
-            <p className="text-xs text-slate-500">
-              Loading available settings...
-            </p>
+            <p className="text-xs text-ink-4">Loading available settings...</p>
           )}
           {!discovery.isFetching && (!schema || discovery.isError) && (
-            <div className="space-y-2 text-xs text-amber-600">
+            <div className="space-y-2 text-xs text-sand-ink">
               <p>
                 Advanced settings are unavailable. Familiar controls remain
                 available.
@@ -172,9 +170,9 @@ const AdvancedPolicySettings = forwardRef<
             return (
               <div
                 key={name}
-                className="space-y-2 rounded border border-slate-200 p-3"
+                className="space-y-2 rounded border border-line p-3"
               >
-                <label className="flex items-center gap-2 text-xs text-slate-600">
+                <label className="flex items-center gap-2 text-xs text-ink-3">
                   <input
                     type="checkbox"
                     aria-label={`Edit ${name}`}
@@ -209,12 +207,12 @@ const AdvancedPolicySettings = forwardRef<
                   Edit {name}
                 </label>
                 {typeof field.description === "string" && (
-                  <p className="text-xs text-slate-500">{field.description}</p>
+                  <p className="text-xs text-ink-4">{field.description}</p>
                 )}
                 {edit && (
                   <>
                     {allowsNull(field) && (
-                      <label className="flex items-center gap-2 text-xs text-slate-500">
+                      <label className="flex items-center gap-2 text-xs text-ink-4">
                         <input
                           type="checkbox"
                           aria-label={`Clear ${name}`}
@@ -290,7 +288,7 @@ const AdvancedPolicySettings = forwardRef<
                   <p
                     id={`${id}-${name}-error`}
                     role="alert"
-                    className="text-xs text-red-600"
+                    className="text-xs text-danger"
                   >
                     {failures
                       .map(
@@ -304,12 +302,12 @@ const AdvancedPolicySettings = forwardRef<
             );
           })}
           {schema && !fields.length && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-4">
               No additional settings advertised.
             </p>
           )}
           {error && (
-            <p role="alert" className="text-xs text-red-500">
+            <p role="alert" className="text-xs text-danger">
               {error}
             </p>
           )}

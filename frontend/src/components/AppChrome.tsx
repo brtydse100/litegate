@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { LogOut, Zap, type LucideIcon } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 
@@ -176,7 +176,7 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-const navLink = ({ isActive }: { isActive: boolean }) =>
+const navLink = (isActive: boolean) =>
   `flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm no-underline ${
     isActive
       ? "bg-navy-2 font-semibold text-paper shadow-[inset_3px_0_0_rgb(var(--ice))]"
@@ -199,8 +199,28 @@ export function AdminSidebar({
   role?: string;
   onSignOut: () => void;
 }) {
+  const location = useLocation();
+  const nav = useRef<HTMLElement>(null);
+  // On phones the links form a scrolling row; keep the current one visible.
+  useEffect(() => {
+    nav.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [location.pathname, location.hash]);
+  const items = groups.flatMap((group) => group.items);
+  // A link with a #section is active only on that section, and the plain
+  // link to the same page steps aside while the section is shown.
+  const isActive = (to: string) => {
+    const [path, hash = ""] = to.split("#");
+    if (location.pathname !== path) return false;
+    if (hash) return location.hash === `#${hash}`;
+    return !items.some(
+      (item) => item.to === `${path}${location.hash}` && location.hash,
+    );
+  };
   return (
     <nav
+      ref={nav}
       aria-label="Admin navigation"
       className="flex shrink-0 flex-col gap-0.5 bg-navy px-3.5 py-3 text-sm text-[#E6ECF3] md:h-screen md:w-[236px] md:overflow-y-auto md:py-5"
     >
@@ -218,7 +238,12 @@ export function AdminSidebar({
               {group.label.toUpperCase()}
             </p>
             {group.items.map((item) => (
-              <NavLink key={item.to} to={item.to} className={navLink} end>
+              <Link
+                key={item.to}
+                to={item.to}
+                aria-current={isActive(item.to) ? "page" : undefined}
+                className={navLink(isActive(item.to))}
+              >
                 <item.icon size={16} aria-hidden />
                 <span className="flex-1">{item.label}</span>
                 {item.dot && (
@@ -232,7 +257,7 @@ export function AdminSidebar({
                     </span>
                   </span>
                 )}
-              </NavLink>
+              </Link>
             ))}
           </div>
         ))}

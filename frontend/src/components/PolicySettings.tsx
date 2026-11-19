@@ -26,9 +26,9 @@ export function NumericPolicyInput({
     if (Number.isFinite(next)) onValueChange(String(next));
   }
   return (
-    <div className="space-y-1 text-xs text-slate-600">
+    <div className="space-y-1 text-xs text-ink-3">
       <label htmlFor={id}>{label}</label>
-      <div className="flex overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+      <div className="flex overflow-hidden rounded-md border border-line-input bg-card shadow-sm focus-within:border-blue focus-within:ring-2 focus-within:ring-blue/20">
         <input
           {...props}
           id={id}
@@ -37,15 +37,15 @@ export function NumericPolicyInput({
           value={value}
           disabled={disabled}
           onChange={(event) => onValueChange(event.target.value)}
-          className="policy-number-input min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400 disabled:opacity-50"
+          className="policy-number-input min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-4 disabled:opacity-50"
         />
-        <div className="flex items-stretch border-l border-slate-200">
+        <div className="flex items-stretch border-l border-line">
           <button
             type="button"
             aria-label={`Decrease ${label}`}
             disabled={disabled || current <= 0}
             onClick={() => adjust(-1)}
-            className="px-2 text-slate-600 hover:bg-slate-100 focus-visible:outline-indigo-500 disabled:opacity-30"
+            className="px-2 text-ink-3 hover:bg-well focus-visible:outline-blue disabled:opacity-30"
           >
             <Minus size={14} />
           </button>
@@ -54,7 +54,7 @@ export function NumericPolicyInput({
             aria-label={`Increase ${label}`}
             disabled={disabled}
             onClick={() => adjust(1)}
-            className="border-l border-slate-200 px-2 text-slate-600 hover:bg-slate-100 focus-visible:outline-indigo-500 disabled:opacity-30"
+            className="border-l border-line px-2 text-ink-3 hover:bg-well focus-visible:outline-blue disabled:opacity-30"
           >
             <Plus size={14} />
           </button>
@@ -111,17 +111,17 @@ export function ModelChoices({
     ]),
   ].sort();
   return (
-    <fieldset className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 sm:col-span-2">
+    <fieldset className="min-w-0 space-y-3 rounded-xl border border-line bg-card p-3 text-xs text-ink-2 sm:col-span-2">
       <legend className="px-1 font-semibold">Allowed models</legend>
       {status && (
-        <p className="text-slate-500">
+        <p className="text-ink-4">
           {status}. Choose a replacement model policy for the selected keys.
         </p>
       )}
-      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-3 py-2">
         <input
           type="checkbox"
-          className="h-4 w-4 shrink-0 accent-indigo-600"
+          className="h-4 w-4 shrink-0 accent-blue"
           checked={value.all}
           onChange={(event) =>
             onChange({ models: [], all: event.target.checked })
@@ -130,17 +130,17 @@ export function ModelChoices({
         All allowed models
       </label>
       <div
-        className={`grid gap-1 rounded-lg border border-slate-200 bg-white p-1 sm:grid-cols-2 ${scrollable ? "max-h-48 overflow-y-auto" : ""}`}
+        className={`grid gap-1 rounded-lg border border-line bg-card p-1 sm:grid-cols-2 ${scrollable ? "max-h-48 overflow-y-auto" : ""}`}
       >
         {options.map((model) => (
           <label
             key={model}
             data-selected={!value.all && value.models.includes(model)}
-            className="policy-model-option flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-transparent px-2 py-2 hover:bg-slate-50"
+            className="policy-model-option flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-transparent px-2 py-2 hover:bg-canvas"
           >
             <input
               type="checkbox"
-              className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-blue"
               checked={!value.all && value.models.includes(model)}
               onChange={(event) =>
                 onChange({
@@ -155,17 +155,17 @@ export function ModelChoices({
           </label>
         ))}
       </div>
-      <p className="text-[11px] text-slate-500">
+      <p className="text-[11px] text-ink-4">
         {value.all ? "All models allowed" : `${value.models.length} selected`}
       </p>
       {catalog.isPending && <p>Loading models...</p>}
       {catalog.isError && (
-        <p className="text-xs text-amber-600">
+        <p className="text-xs text-sand-ink">
           Model choices are unavailable. Saved selections are still shown.
         </p>
       )}
       {!status && !value.all && !value.models.length && (
-        <p className="text-amber-600">
+        <p className="text-sand-ink">
           Select at least one model or allow all models.
         </p>
       )}
@@ -220,8 +220,8 @@ export function CurrentPolicySettings({
     <dl className="grid gap-2 text-xs sm:grid-cols-2">
       {entries.map(([label, value]) => (
         <div key={label}>
-          <dt className="text-gray-500">{label}</dt>
-          <dd className="break-words text-gray-300">{value}</dd>
+          <dt className="text-ink-4">{label}</dt>
+          <dd className="break-words text-ink-2">{value}</dd>
         </div>
       ))}
     </dl>

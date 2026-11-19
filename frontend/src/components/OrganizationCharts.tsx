@@ -31,15 +31,15 @@ export function SpendTrend({
     .map((day, index) => `${x(index)},${y(day[metric])}`)
     .join(" ");
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-950">
+    <section className="rounded-lg border border-line bg-card p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-ink">
         {metricLabels[metric]} over time
       </h2>
       <svg
         role="img"
         aria-label={`${metricLabels[metric]} over time`}
         viewBox="0 0 656 216"
-        className="mt-3 w-full text-indigo-600"
+        className="mt-3 w-full text-blue-ink"
       >
         <title>{metricLabels[metric]} by day</title>
         {[0, 0.5, 1].map((ratio) => (
@@ -50,7 +50,7 @@ export function SpendTrend({
               y1={y(scale * ratio)}
               y2={y(scale * ratio)}
               stroke="currentColor"
-              className="text-slate-200"
+              className="text-ink"
             />
             <text
               x="82"
@@ -58,7 +58,7 @@ export function SpendTrend({
               textAnchor="end"
               fontSize="10"
               fill="currentColor"
-              className="text-slate-500"
+              className="text-ink-4"
             >
               {max * ratio >= 1000
                 ? `${metric === "spend" ? "$" : ""}${(max * ratio).toLocaleString(undefined, { notation: "compact", minimumFractionDigits: metric === "spend" ? 2 : 0, maximumFractionDigits: metric === "spend" ? 2 : 6 })}`
@@ -90,7 +90,7 @@ export function SpendTrend({
           y="203"
           fontSize="11"
           fill="currentColor"
-          className="text-slate-500"
+          className="text-ink-4"
         >
           {daily[0]?.date}
         </text>
@@ -100,17 +100,15 @@ export function SpendTrend({
           textAnchor="end"
           fontSize="11"
           fill="currentColor"
-          className="text-slate-500"
+          className="text-ink-4"
         >
           {daily[daily.length - 1]?.date}
         </text>
       </svg>
       {max === 0 && (
-        <p className="text-xs text-slate-500">
-          No recorded usage in this period.
-        </p>
+        <p className="text-xs text-ink-4">No recorded usage in this period.</p>
       )}
-      <details className="mt-2 text-xs text-slate-500">
+      <details className="mt-2 text-xs text-ink-4">
         <summary className="cursor-pointer">View daily values</summary>
         <div className="mt-2 max-h-52 overflow-auto">
           <table className="w-full text-left">
@@ -153,8 +151,8 @@ export function UsageBars({
   const sorted = [...values].sort((a, b) => b[metric] - a[metric]);
   const max = Math.max(...sorted.map((row) => row[metric]), 0) || 1;
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-950">{title}</h2>
+    <section className="rounded-lg border border-line bg-card p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-ink">{title}</h2>
       <div className="mt-4 space-y-4">
         {sorted.map((row) => {
           const groupId = row.id;
@@ -166,20 +164,20 @@ export function UsageBars({
                 {emailLabels && row.name.includes("@") && !onSelect ? (
                   <EmailAddress
                     email={row.name}
-                    className="font-medium text-slate-700"
+                    className="font-medium text-ink-2"
                   />
                 ) : (
-                  <span className="truncate font-medium text-slate-700">
+                  <span className="truncate font-medium text-ink-2">
                     {row.name}
                   </span>
                 )}
-                <span className="shrink-0 text-slate-500">
+                <span className="shrink-0 text-ink-4">
                   {metricValue(row[metric], metric)}
                 </span>
               </span>
-              <span className="mt-2 block h-2 overflow-hidden rounded-full bg-slate-100">
+              <span className="mt-2 block h-2 overflow-hidden rounded-full bg-well">
                 <span
-                  className="block h-full rounded-full bg-indigo-500"
+                  className="block h-full rounded-full bg-blue"
                   style={{ width: `${(row[metric] / max) * 100}%` }}
                 />
               </span>
@@ -200,7 +198,7 @@ export function UsageBars({
           );
         })}
         {!sorted.length && (
-          <p className="text-sm text-slate-500">No recorded usage.</p>
+          <p className="text-sm text-ink-4">No recorded usage.</p>
         )}
       </div>
     </section>
