@@ -5,8 +5,15 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
-from app.services import budget_enforcement as enforcement, litellm, organization_store as store, organization_sync as sync
+from app.services import budget_enforcement as enforcement, litellm, litellm_snapshot, organization_store as store, organization_sync as sync
 from tests.test_budget_enforcement import org, join
+
+
+@pytest.fixture(autouse=True)
+def enforcement_reads_live(monkeypatch):
+    """Budget passes must never decide caps from the shared report snapshot."""
+    for snapshot in (litellm_snapshot.teams, litellm_snapshot.keys_by_user):
+        monkeypatch.setattr(snapshot, "get", AsyncMock(side_effect=AssertionError("enforcement read the report snapshot")))
 
 
 @pytest.mark.asyncio

@@ -75,21 +75,59 @@ async def test_concurrent_readers_share_one_refresh(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_failed_refresh_is_not_cached(monkeypatch):
+async def test_a_failed_refresh_is_remembered_until_the_ttl_expires(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(litellm_snapshot, "monotonic", lambda: now[0])
     load = AsyncMock(side_effect=[HTTPException(status_code=503, detail="down"), {"ok": {}}])
     monkeypatch.setattr(litellm_snapshot.teams, "_load", load)
-    with pytest.raises(HTTPException):
-        await litellm_snapshot.teams.get()
+    for _ in range(3):
+        with pytest.raises(HTTPException):
+            await litellm_snapshot.teams.get()
+    assert load.await_count == 1
+    now[0] += litellm_snapshot.TTL
     assert await litellm_snapshot.teams.get() == {"ok": {}}
+    assert load.await_count == 2
 
 
 @pytest.mark.asyncio
-async def test_listing_beyond_the_page_bound_fails_closed(monkeypatch):
+async def test_concurrent_waiters_share_one_failed_refresh(monkeypatch):
+    calls = 0
+
+    async def load():
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.01)
+        raise HTTPException(status_code=503, detail="down")
+
+    monkeypatch.setattr(litellm_snapshot.teams, "_load", load)
+    results = await asyncio.gather(*(litellm_snapshot.teams.get() for _ in range(10)), return_exceptions=True)
+    assert calls == 1
+    assert all(isinstance(result, HTTPException) for result in results)
+
+
+@pytest.mark.asyncio
+async def test_listing_beyond_the_page_bound_fails_closed_on_the_first_page(monkeypatch):
     monkeypatch.setattr(litellm_snapshot, "MAX_PAGES", 2)
-    monkeypatch.setattr(litellm, "list_keys", AsyncMock(return_value={"keys": [], "total_pages": 3}))
+    listing = AsyncMock(return_value={"keys": [], "total_pages": 3})
+    monkeypatch.setattr(litellm, "list_keys", listing)
     with pytest.raises(HTTPException) as raised:
         await litellm_snapshot._load_keys()
     assert raised.value.status_code == 409
+    assert listing.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_listed_teams_without_budget_fields_fall_back_to_team_info(org, monkeypatch):
+    hierarchy = org()
+    use_bulk_listings(monkeypatch)
+    node = next(iter(hierarchy.nodes.values()))
+    # Spend alone is not enough: a missing duration must not read as a mismatch.
+    monkeypatch.setattr(litellm, "list_teams", AsyncMock(return_value=team_page([{"team_id": node.team_id, "spend": 1}])))
+    info = AsyncMock(return_value={"team_info": {"max_budget": None, "budget_duration": node.duration, "spend": 1}})
+    monkeypatch.setattr(upstream, "team_info", info)
+    result = await reports.overview()
+    assert node.team_id in {call.args[0] for call in info.await_args_list}
+    assert next(group for group in result["groups"] if group["id"] == node.id)["sync_error"] is None
 
 
 @pytest.mark.asyncio
@@ -166,6 +204,31 @@ async def test_budget_edits_wake_the_sweep_early(monkeypatch):
         assert not ran.is_set()
         sync.request_reconciliation()
         await asyncio.wait_for(ran.wait(), timeout=1)
+    finally:
+        loop.cancel()
+        await asyncio.gather(loop, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_an_edit_during_a_pass_triggers_exactly_one_more_pass(monkeypatch):
+    monkeypatch.setattr(settings, "organization_sync_interval_seconds", 86_400)
+    monkeypatch.setattr(sync, "MIN_PASS_SPACING", 0)
+    passes = 0
+
+    async def attempt():
+        nonlocal passes
+        passes += 1
+        if passes == 1:
+            sync.request_reconciliation()  # an edit lands while this pass runs
+
+    monkeypatch.setattr(sync, "reconciliation_attempt", attempt)
+    loop = asyncio.create_task(sync.run_reconciliation())
+    try:
+        await asyncio.sleep(0.01)
+        sync.request_reconciliation()
+        for _ in range(50):
+            await asyncio.sleep(0.01)
+        assert passes == 2
     finally:
         loop.cancel()
         await asyncio.gather(loop, return_exceptions=True)

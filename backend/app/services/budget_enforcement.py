@@ -8,7 +8,8 @@ unbudgeted groups keep ``perUser``.
 
 Participants are users who signed in or already hold a key, so nothing is
 reserved for people who never use LiteGate. A new participant changes every
-share in the group; the 60-second reconciliation applies the new caps.
+share in the group. The sign-in pass lowers affected caps at once; the next
+organization sweep applies the rest.
 
 Shares come from a snapshot. Each reconciliation pass pins one snapshot for
 all of its members, so a sign-in or budget edit during a pass cannot make the
