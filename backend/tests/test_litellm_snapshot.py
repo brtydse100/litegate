@@ -132,7 +132,7 @@ async def test_concurrent_waiters_share_one_failed_refresh(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_listing_beyond_the_page_bound_fails_closed_on_the_first_page(monkeypatch):
-    monkeypatch.setattr(litellm_snapshot, "MAX_PAGES", 2)
+    monkeypatch.setattr(litellm_snapshot, "KEY_PAGES", 2)
     listing = AsyncMock(return_value={"keys": [], "total_pages": 3})
     monkeypatch.setattr(litellm, "list_keys", listing)
     with pytest.raises(HTTPException) as raised:

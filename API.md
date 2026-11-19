@@ -583,7 +583,8 @@ dependency diagnostics.
 ### Startup hierarchy reconciliation and stored keys
 
 When hierarchy policy is configured, startup awaits its first reconciliation
-attempt and retries every 60 seconds. Existing accounts may be discovered by an
+attempt, then sweeps every `ORGANIZATION_SYNC_INTERVAL_SECONDS` (default 900)
+and sooner after budget edits. Existing accounts may be discovered by an
 unresolved configured email after complete paginated exact-match validation.
 This is an operator assignment, not proof of an SSO login identity; unknown users
 are skipped. Ambiguity, local/admin conflicts and failed revalidation block
