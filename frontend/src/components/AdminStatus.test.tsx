@@ -1,7 +1,7 @@
 import { MemoryRouter, useNavigate } from "react-router-dom";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import AdminStatus from "./AdminStatus";
 
@@ -74,6 +74,8 @@ describe("administrator status contract", () => {
 });
 
 describe("audit log navigation", () => {
+  const scrollIntoView = vi.fn();
+
   beforeEach(() => {
     vi.mocked(api.getSystemStatus).mockResolvedValue({
       ready: true,
@@ -83,6 +85,13 @@ describe("audit log navigation", () => {
       },
     } as never);
     vi.mocked(api.listAuditEvents).mockResolvedValue({ events: [] });
+    scrollIntoView.mockReset();
+    // jsdom has no scrollIntoView; add it for these tests only.
+    Element.prototype.scrollIntoView = scrollIntoView;
+  });
+
+  afterEach(() => {
+    delete (Element.prototype as Partial<Element>).scrollIntoView;
   });
 
   function renderAt(entry: string) {
@@ -107,22 +116,34 @@ describe("audit log navigation", () => {
   }
 
   it("scrolls to the audit once loaded and again on each repeat click", async () => {
-    const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
     const navigate = renderAt("/status#audit");
-    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
     navigate("/status#audit");
-    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(2));
   });
 
-  it("returns to the top for plain Status without jumping when data arrives", async () => {
-    const top = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  it("returns to the top for plain Status", async () => {
     const navigate = renderAt("/status#audit");
-    await waitFor(() => expect(api.listAuditEvents).toHaveBeenCalled());
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
     navigate("/status");
-    await waitFor(() => expect(top).toHaveBeenCalledTimes(1));
-    await act(async () => {});
-    expect(top).toHaveBeenCalledTimes(1);
-    top.mockRestore();
+    expect(window.scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not jump back to the top when audit data arrives later", async () => {
+    let finish: (value: { events: never[] }) => void = () => undefined;
+    vi.mocked(api.listAuditEvents).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderAt("/status");
+    expect(window.scrollTo).toHaveBeenCalledTimes(1);
+    await act(async () => finish({ events: [] }));
+    expect(
+      await screen.findByText(
+        /No administrator actions have been recorded yet/,
+      ),
+    ).toBeVisible();
+    expect(window.scrollTo).toHaveBeenCalledTimes(1);
   });
 });
