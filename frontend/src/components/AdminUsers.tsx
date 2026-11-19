@@ -226,11 +226,11 @@ export default function AdminUsers({
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className={tableHead}>
                 <tr>
-                  <th className="px-5 py-2.5 font-semibold">ACCOUNT</th>
-                  <th className="px-3 py-2.5 font-semibold">ROLE</th>
-                  <th className="px-3 py-2.5 font-semibold">STATUS</th>
+                  <th className="px-5 py-2.5 font-semibold">Account</th>
+                  <th className="px-3 py-2.5 font-semibold">Role</th>
+                  <th className="px-3 py-2.5 font-semibold">Status</th>
                   <th className="px-5 py-2.5 text-right font-semibold">
-                    ACTIONS
+                    Actions
                   </th>
                 </tr>
               </thead>

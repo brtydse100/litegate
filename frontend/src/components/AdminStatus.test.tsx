@@ -1,5 +1,5 @@
-import { MemoryRouter } from "react-router-dom";
-import { render, screen } from "@testing-library/react";
+import { MemoryRouter, useNavigate } from "react-router-dom";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
@@ -70,5 +70,59 @@ describe("administrator status contract", () => {
     ).toBeVisible();
     expect(screen.getByText("Use HTTPS.")).toBeVisible();
     expect(screen.getByText("Rotate the bootstrap password.")).toBeVisible();
+  });
+});
+
+describe("audit log navigation", () => {
+  beforeEach(() => {
+    vi.mocked(api.getSystemStatus).mockResolvedValue({
+      ready: true,
+      dependencies: {
+        database: { ok: true, detail: "ok" },
+        litellm: { ok: true, detail: "ok" },
+      },
+    } as never);
+    vi.mocked(api.listAuditEvents).mockResolvedValue({ events: [] });
+  });
+
+  function renderAt(entry: string) {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    let go: (to: string) => void = () => undefined;
+    function Navigator() {
+      const navigate = useNavigate();
+      go = (to) => navigate(to);
+      return null;
+    }
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[entry]}>
+          <Navigator />
+          <AdminStatus />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    return (to: string) => act(() => go(to));
+  }
+
+  it("scrolls to the audit once loaded and again on each repeat click", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const navigate = renderAt("/status#audit");
+    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
+    navigate("/status#audit");
+    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(2));
+  });
+
+  it("returns to the top for plain Status without jumping when data arrives", async () => {
+    const top = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+    const navigate = renderAt("/status#audit");
+    await waitFor(() => expect(api.listAuditEvents).toHaveBeenCalled());
+    navigate("/status");
+    await waitFor(() => expect(top).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+    expect(top).toHaveBeenCalledTimes(1);
+    top.mockRestore();
   });
 });

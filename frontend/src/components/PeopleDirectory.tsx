@@ -89,9 +89,9 @@ export default function PeopleDirectory() {
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className={tableHead}>
                   <tr>
-                    <th className="px-5 py-2.5 font-semibold">PERSON</th>
-                    <th className="px-3 py-2.5 font-semibold">USER ID</th>
-                    <th className="px-5 py-2.5 font-semibold">LITELLM ROLE</th>
+                    <th className="px-5 py-2.5 font-semibold">Person</th>
+                    <th className="px-3 py-2.5 font-semibold">User ID</th>
+                    <th className="px-5 py-2.5 font-semibold">LiteLLM role</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line-soft">

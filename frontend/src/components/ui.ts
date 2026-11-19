@@ -23,7 +23,7 @@ export const cardTitle = "text-base font-bold text-ink";
 
 /** Column captions above a list or table. */
 export const tableHead =
-  "border-b border-line-soft bg-canvas text-xs font-semibold tracking-[0.04em] text-ink-4";
+  "border-b border-line-soft bg-canvas text-xs font-semibold uppercase tracking-[0.04em] text-ink-4";
 export const tableRow = "border-b border-line-soft last:border-b-0";
 
 export type Tone = "ok" | "warn" | "bad" | "info" | "neutral";

@@ -658,12 +658,12 @@ export default function AdminTeams() {
               className={`${teamColumns} px-5 py-2.5 ${tableHead}`}
               aria-hidden="true"
             >
-              <span>TEAM</span>
-              <span>SPEND / BUDGET</span>
-              <span>MODELS</span>
+              <span>Team</span>
+              <span>Spend / budget</span>
+              <span>Models</span>
               <span>RPM / TPM</span>
-              <span>MEMBERS / KEYS</span>
-              <span className="text-right">ACTIONS</span>
+              <span>Members / keys</span>
+              <span className="text-right">Actions</span>
             </div>
             <div className="divide-y divide-line-soft">
               {teams.data.teams.map((team) => {
@@ -745,7 +745,7 @@ export default function AdminTeams() {
                     <p className="text-[13px] text-ink-2">
                       <span className="sr-only">Models: </span>
                       {team.models?.length
-                        ? `${team.models.length} models`
+                        ? `${team.models.length} ${team.models.length === 1 ? "model" : "models"}`
                         : "All"}
                     </p>
                     <p className="text-[13px] text-ink-2">

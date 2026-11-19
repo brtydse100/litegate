@@ -17,8 +17,8 @@ export function PageHeader({
     <div className="flex flex-wrap items-end justify-between gap-3.5">
       <div className="min-w-0">
         {eyebrow && (
-          <p className="text-xs font-semibold tracking-[0.06em] text-ink-4">
-            {eyebrow.toUpperCase()}
+          <p className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-4">
+            {eyebrow}
           </p>
         )}
         <h1 className="mt-0.5 text-[28px] font-bold tracking-[-0.01em] text-ink">
@@ -111,8 +111,8 @@ export function MetricCard({
     <div
       className={`flex flex-col gap-1 rounded-[10px] border border-t-[3px] border-line bg-card px-[18px] pb-[18px] pt-4 ${accent}`}
     >
-      <span className="text-xs font-semibold tracking-[0.04em] text-ink-4">
-        {caption.toUpperCase()}
+      <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-4">
+        {caption}
       </span>
       <span className="inline-flex items-center gap-2.5 text-[26px] font-semibold text-ink">
         {value}

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
@@ -56,13 +56,21 @@ export default function AdminStatus() {
   const refreshing = status.isFetching || audit.isFetching;
   // The sidebar's Audit log link opens this page at #audit. Each navigation
   // has its own key, so clicking the link again scrolls back to the audit.
+  // Scrolling happens once per navigation, never when data arrives later.
   const location = useLocation();
   const auditLoaded = !!audit.data;
+  const handled = useRef<string | null>(null);
   useEffect(() => {
-    const section = document.getElementById("audit");
+    if (handled.current === location.key) return;
     if (location.hash === "#audit") {
-      if (auditLoaded) section?.scrollIntoView?.({ block: "start" });
-    } else section?.closest("main")?.scrollTo?.({ top: 0 });
+      if (!auditLoaded) return;
+      document.getElementById("audit")?.scrollIntoView?.({ block: "start" });
+    } else {
+      // Wide screens scroll the main column; phones scroll the window.
+      document.querySelector("main")?.scrollTo?.({ top: 0 });
+      window.scrollTo?.({ top: 0 });
+    }
+    handled.current = location.key;
   }, [location.key, location.hash, auditLoaded]);
   const warnings = status.data?.security_warnings ?? [];
 
@@ -190,12 +198,12 @@ export default function AdminStatus() {
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className={`sticky top-0 ${tableHead}`}>
                 <tr>
-                  <th className="px-5 py-2.5 font-semibold">TIME</th>
-                  <th className="px-3 py-2.5 font-semibold">ACTION</th>
-                  <th className="px-3 py-2.5 font-semibold">ACTOR</th>
-                  <th className="px-3 py-2.5 font-semibold">DETAILS</th>
+                  <th className="px-5 py-2.5 font-semibold">Time</th>
+                  <th className="px-3 py-2.5 font-semibold">Action</th>
+                  <th className="px-3 py-2.5 font-semibold">Actor</th>
+                  <th className="px-3 py-2.5 font-semibold">Details</th>
                   <th className="px-5 py-2.5 text-right font-semibold">
-                    OUTCOME
+                    Outcome
                   </th>
                 </tr>
               </thead>
