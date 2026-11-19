@@ -56,3 +56,21 @@ describe("AdminSidebar", () => {
     expect(activeAt(entry)).toEqual(expected);
   });
 });
+
+describe("account email", () => {
+  it("is copyable from the sidebar footer", () => {
+    render(
+      <MemoryRouter>
+        <AdminSidebar
+          groups={[]}
+          email="ann@example.test"
+          role="admin"
+          onSignOut={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByRole("button", { name: "Copy email ann@example.test" }),
+    ).toBeInTheDocument();
+  });
+});
