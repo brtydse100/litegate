@@ -89,7 +89,8 @@ export function budgetSummary(key: KeyInfo, now = Date.now()): BudgetSummary {
       : null;
   let perDay: number | null = null;
   let onTrack: boolean | null = null;
-  if (periodDays && resetAt) {
+  // A daily pace is meaningless for periods shorter than a day.
+  if (periodDays && periodDays >= 1 && resetAt) {
     const start = resetAt.getTime() - periodDays * DAY_MS;
     const elapsedDays = Math.max((now - start) / DAY_MS, 1);
     if (now >= start && elapsedDays <= periodDays + 1) {

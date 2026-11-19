@@ -357,7 +357,7 @@ export function CreateKeyCard({
 }
 
 const statusTone: Record<string, { label: string; dot: string }> = {
-  Ready: { label: "Active", dot: "bg-[#6FD3A8]" },
+  Ready: { label: "Active", dot: "bg-ready" },
   "No key": { label: "No key yet", dot: "bg-navy-muted" },
   Blocked: { label: "Blocked", dot: "bg-danger" },
   Expired: { label: "Expired", dot: "bg-danger" },

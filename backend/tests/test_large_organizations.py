@@ -1,7 +1,7 @@
 """Large organizations: scoped budget passes, cached reads and per-user limits."""
 
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
@@ -209,6 +209,17 @@ async def test_a_per_user_limit_overrides_configuration_and_is_inherited(limits)
         await http.patch(f"/api/v1/organization/groups/{ids['eng']}/per-user", json={"amount": None})
     assert per_user() == 50
     assert organization_limits.base().nodes[ids["eng"]].per_user == 50
+
+
+@pytest.mark.asyncio
+async def test_a_per_user_limit_edit_wakes_the_organization_sweep(limits, monkeypatch):
+    ids, _ = limits
+    wake = Mock()
+    monkeypatch.setattr(sync, "request_reconciliation", wake)
+    async with client() as http:
+        await http.patch(f"/api/v1/organization/groups/{ids['eng']}/per-user", json={"amount": "30"})
+        await http.patch(f"/api/v1/organization/groups/{ids['eng']}/per-user", json={"amount": None})
+    assert wake.call_count == 2
 
 
 @pytest.mark.asyncio

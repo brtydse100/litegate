@@ -94,6 +94,49 @@ export const percent = (
   total: number | null,
 ) => (spend == null || !total ? null : Math.round((spend / total) * 100));
 
+/** True when spend has reached `threshold` percent of a set total (unrounded). */
+export const reached = (
+  spend: number | null | undefined,
+  total: number | null,
+  threshold: number,
+) => spend != null && !!total && spend * 100 >= total * threshold;
+
+/**
+ * Where a group's per-person limit comes from. The API names the source
+ * group only when the viewer may see it, and leaves it empty both when no
+ * limit is set anywhere above and when the source is outside the viewer's
+ * scope, so those cases never claim an override.
+ */
+export function limitOrigin(
+  group: Pick<Group, "id" | "budget_source" | "per_user">,
+  parent?: Pick<Group, "name" | "per_user">,
+  source?: Pick<Group, "name">,
+): { tag: string; description: string } {
+  if (group.budget_source === group.id)
+    return parent
+      ? {
+          tag: "override",
+          description: `Overrides ${parent.name} (${parent.per_user == null ? "no limit" : shortMoney(parent.per_user)})`,
+        }
+      : { tag: "set here", description: "Defined on this group" };
+  if (group.budget_source)
+    return {
+      tag: "inherited",
+      description: source
+        ? `Inherited from ${source.name}`
+        : "Inherited from a parent group",
+    };
+  if (group.per_user == null)
+    return {
+      tag: "",
+      description: "No limit is set on this group or above it",
+    };
+  return {
+    tag: "inherited",
+    description: "Inherited from a group outside your view",
+  };
+}
+
 export const money = (value: number | null | undefined) =>
   value == null ? "—" : formatUsd(value);
 

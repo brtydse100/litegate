@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import type React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { LogOut, Zap, type LucideIcon } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
@@ -68,32 +69,56 @@ export function UserMenu({
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const items = () =>
+    Array.from(
+      menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    );
   useEffect(() => {
     if (!open) return;
-    function close(event: MouseEvent | KeyboardEvent) {
-      if (event instanceof KeyboardEvent) {
-        if (event.key === "Escape") setOpen(false);
-        return;
-      }
+    items()[0]?.focus();
+    function close(event: MouseEvent) {
       if (!root.current?.contains(event.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", close);
-    };
+    return () => document.removeEventListener("mousedown", close);
   }, [open]);
+  // Menu keyboard pattern: arrows move, Home/End jump, Escape returns focus.
+  function onMenuKey(event: React.KeyboardEvent) {
+    const list = items();
+    const index = list.indexOf(document.activeElement as HTMLElement);
+    const move = (next: number) => {
+      event.preventDefault();
+      list[(next + list.length) % list.length]?.focus();
+    };
+    if (event.key === "ArrowDown") move(index + 1);
+    else if (event.key === "ArrowUp") move(index - 1);
+    else if (event.key === "Home") move(0);
+    else if (event.key === "End") move(list.length - 1);
+    else if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      trigger.current?.focus();
+    } else if (event.key === "Tab") setOpen(false);
+  }
   const item =
     "flex w-full min-h-11 items-center gap-2.5 rounded-lg px-3 text-left text-sm text-ink-2 hover:bg-canvas";
   return (
     <div ref={root} className="relative">
       <button
+        ref={trigger}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account menu"
         onClick={() => setOpen((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
         className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 text-sm text-[#E6ECF3] hover:bg-navy-2"
       >
         <Avatar email={email} />
@@ -105,7 +130,10 @@ export function UserMenu({
       </button>
       {open && (
         <div
+          ref={menu}
           role="menu"
+          aria-label="Account"
+          onKeyDown={onMenuKey}
           className={`absolute z-30 w-60 rounded-xl ${up ? "bottom-full left-0 mb-2" : "right-0 mt-2"} border border-line bg-card p-1.5 shadow-lg`}
         >
           <div className="border-b border-line-soft px-3 py-2.5 text-sm">
@@ -113,7 +141,7 @@ export function UserMenu({
             {role && <p className="capitalize text-ink-4">{role}</p>}
           </div>
           <div className="pt-1.5">
-            <ThemeToggle className={item} showLabel />
+            <ThemeToggle className={item} showLabel role="menuitem" />
             <button
               type="button"
               role="menuitem"
@@ -249,7 +277,7 @@ export function AdminSidebar({
                 {item.dot && (
                   <span
                     className={`h-2 w-2 rounded-full ${
-                      item.dot === "ok" ? "bg-[#6FD3A8]" : "bg-danger"
+                      item.dot === "ok" ? "bg-ready" : "bg-danger"
                     }`}
                   >
                     <span className="sr-only">

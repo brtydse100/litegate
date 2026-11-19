@@ -50,6 +50,13 @@
   --danger: 160 72 72;
   --danger-line: 232 207 207;
   --danger-tint: 250 238 238;
+  /* Solid button fills keep white labels at 4.5:1 or better in both themes,
+     so they are not redefined for dark mode. */
+  --teal-solid: 31 112 107;
+  --sand-solid: 134 92 50;
+  --danger-solid: 160 72 72;
+  /* Status dot on navy surfaces. */
+  --ready: 111 211 168;
 }
 
 html.dark {

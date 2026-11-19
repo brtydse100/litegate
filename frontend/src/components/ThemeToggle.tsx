@@ -15,9 +15,12 @@ export function applyStoredTheme() {
 export default function ThemeToggle({
   className = "flex h-8 w-8 items-center justify-center rounded-md text-ink-4 transition-colors hover:bg-well hover:text-ink",
   showLabel = false,
+  role,
 }: {
   className?: string;
   showLabel?: boolean;
+  /** Set to `menuitem` when the toggle sits inside a menu. */
+  role?: "menuitem";
 }) {
   const [theme, setTheme] = useState<Theme>(() =>
     document.documentElement.classList.contains("dark") ? "dark" : "light",
@@ -36,6 +39,7 @@ export default function ThemeToggle({
   return (
     <button
       type="button"
+      role={role}
       onClick={toggleTheme}
       aria-label={label}
       title={label}

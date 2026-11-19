@@ -1,4 +1,4 @@
-"""Minute-by-minute organization reconciliation, one group at a time."""
+"""Periodic organization reconciliation sweep, one group at a time."""
 
 import asyncio
 
