@@ -119,7 +119,7 @@ export default function GroupPanel({
     <aside
       data-group-panel
       aria-label={`Edit ${group.name}`}
-      className="flex flex-[1_1_340px] flex-col gap-[18px] border-b border-line bg-card p-6 min-[1140px]:sticky min-[1140px]:top-0 min-[1140px]:order-last min-[1140px]:max-h-screen min-[1140px]:overflow-y-auto min-[1140px]:border-b-0 min-[1140px]:border-l"
+      className="flex basis-full flex-col gap-[18px] border-b border-line bg-card p-6 min-[1140px]:w-[340px] min-[1140px]:shrink-0 min-[1140px]:basis-auto min-[1140px]:sticky min-[1140px]:top-0 min-[1140px]:order-last min-[1140px]:max-h-screen min-[1140px]:overflow-y-auto min-[1140px]:border-b-0 min-[1140px]:border-l"
     >
       <div className="flex flex-col gap-2.5">
         <nav aria-label="Group path" className="text-xs text-ink-4">

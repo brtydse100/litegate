@@ -438,7 +438,7 @@ export default function AdminOrganization({
   const reportNode = selected ? selected.id : allGroupsReport ? "" : null;
 
   return (
-    <div className="flex flex-wrap content-start">
+    <div className="flex flex-wrap content-start min-[1140px]:flex-nowrap">
       {/* First in the page so narrow screens show it above the report;
           wide screens move it beside the report. */}
       {selected && (
