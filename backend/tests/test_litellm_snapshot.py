@@ -269,7 +269,7 @@ async def test_a_failed_or_unverified_pass_retries_after_the_spacing(org, monkey
     timeouts = []
 
     async def sleep(seconds):
-        if len(timeouts) == 2:
+        if len(timeouts) == 6:
             raise asyncio.CancelledError
 
     async def wait_for(awaitable, timeout):
@@ -281,8 +281,32 @@ async def test_a_failed_or_unverified_pass_retries_after_the_spacing(org, monkey
     monkeypatch.setattr(sync.asyncio, "wait_for", wait_for)
     with pytest.raises(asyncio.CancelledError):
         await sync.run_reconciliation()
-    # The first wait follows a successful startup pass in the failed case.
-    assert timeouts == ([840, 0] if cause == "failed" else [0, 0])
+    # Retries start a minute apart and double up to the interval. The first
+    # wait follows a successful startup pass in the failed case.
+    backoff = [0, 60, 180, 420, 840]
+    assert timeouts == ([840, *backoff] if cause == "failed" else [*backoff, 840])
+
+
+@pytest.mark.asyncio
+async def test_a_failed_startup_pass_retries_after_a_minute_and_success_resets(monkeypatch):
+    monkeypatch.setattr(settings, "organization_sync_interval_seconds", 900)
+    monkeypatch.setattr(sync, "reconciliation_attempt", AsyncMock(side_effect=[False, True, True]))
+    timeouts = []
+
+    async def sleep(seconds):
+        if len(timeouts) == 3:
+            raise asyncio.CancelledError
+
+    async def wait_for(awaitable, timeout):
+        timeouts.append(timeout)
+        awaitable.close()
+        raise TimeoutError
+
+    monkeypatch.setattr(sync.asyncio, "sleep", sleep)
+    monkeypatch.setattr(sync.asyncio, "wait_for", wait_for)
+    with pytest.raises(asyncio.CancelledError):
+        await sync.run_reconciliation(failed=True)
+    assert timeouts == [0, 60, 840]
 
 
 @pytest.mark.asyncio
