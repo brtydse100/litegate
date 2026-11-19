@@ -73,11 +73,11 @@ test("interactive demo keeps its key views consistent and supports local sign-in
   await expect(page.getByRole("region", { name: "Budget" })).toBeVisible();
 
   await page.getByRole("button", { name: "Account menu" }).click();
-  await page.getByRole("button", { name: "Use dark theme" }).click();
+  await page.getByRole("menuitem", { name: "Use dark theme" }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
   await page.reload();
   await page.getByRole("button", { name: "Account menu" }).click();
-  await page.getByRole("button", { name: "Use light theme" }).click();
+  await page.getByRole("menuitem", { name: "Use light theme" }).click();
 
   await page.getByRole("button", { name: "Regenerate key" }).click();
   await page.getByRole("button", { name: "Replace key" }).click();
