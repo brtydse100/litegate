@@ -264,7 +264,11 @@ export default function GroupPanel({
               min="0"
               step="0.000001"
               aria-label={`${group.name} per-person limit`}
-              placeholder="No limit"
+              placeholder={
+                budgetGroup!.per_user_override != null
+                  ? "Inherited or configured"
+                  : "No limit"
+              }
               value={
                 perUser ??
                 (budgetGroup!.per_user == null
