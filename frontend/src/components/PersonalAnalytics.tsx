@@ -150,7 +150,11 @@ export default function PersonalAnalytics() {
             stroke="rgb(var(--line-input))"
           />
         </svg>
-        {data.daily.length >= 8 ? (
+        {!data.daily.length ? (
+          <p className="mt-1 text-xs text-ink-4">
+            No usage recorded in this period.
+          </p>
+        ) : data.daily.length >= 8 ? (
           <div className="mt-1 flex justify-between text-xs text-ink-4">
             <span>{data.daily[0]?.date}</span>
             <span>{data.daily[lastIndex]?.date}</span>
@@ -158,17 +162,15 @@ export default function PersonalAnalytics() {
         ) : (
           // Few days: label the first and last bars directly beneath them.
           <div className="relative mt-1 h-4 text-xs text-ink-4">
-            {[...new Set([0, lastIndex])]
-              .filter((index) => index >= 0)
-              .map((index) => (
-                <span
-                  key={index}
-                  className="absolute -translate-x-1/2 whitespace-nowrap"
-                  style={{ left: `${centre(index)}%` }}
-                >
-                  {data.daily[index].date}
-                </span>
-              ))}
+            {[...new Set([0, lastIndex])].map((index) => (
+              <span
+                key={index}
+                className="absolute -translate-x-1/2 whitespace-nowrap"
+                style={{ left: `${centre(index)}%` }}
+              >
+                {data.daily[index].date}
+              </span>
+            ))}
           </div>
         )}
       </div>

@@ -517,7 +517,7 @@ export default function BulkKeyEditor({
             ) : visibleKeys.length ? (
               <>
                 <div className="overflow-x-auto">
-                  <div className="min-w-[860px] space-y-1 p-2">
+                  <div className="space-y-1 p-2 md:min-w-[860px]">
                     {visibleKeys.map((key, index) => {
                       const token = keyToken(key);
                       const isSelected = Boolean(
@@ -532,7 +532,7 @@ export default function BulkKeyEditor({
                           className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border px-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue/50 ${!token ? "opacity-40" : isSelected ? "border-blue/60 bg-blue-tint/60" : "border-transparent hover:border-line hover:bg-canvas"}`}
                         >
                           <label
-                            className={`group grid min-w-0 grid-cols-[auto_minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] items-center gap-3 py-2.5 transition ${!token ? "cursor-not-allowed" : "cursor-pointer"}`}
+                            className={`group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 transition md:grid-cols-[auto_minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] md:gap-3 ${!token ? "cursor-not-allowed" : "cursor-pointer"}`}
                           >
                             <input
                               className="sr-only"
@@ -566,7 +566,7 @@ export default function BulkKeyEditor({
                                 </span>
                               </span>
                             </span>
-                            <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-ink-3">
+                            <span className="col-start-2 flex min-w-0 items-center gap-1.5 text-[13px] text-ink-3 md:col-start-auto">
                               <UserRound
                                 size={13}
                                 aria-hidden="true"
@@ -580,7 +580,7 @@ export default function BulkKeyEditor({
                                 </span>
                               )}
                             </span>
-                            <span className="min-w-0">
+                            <span className="col-start-2 min-w-0 md:col-start-auto">
                               {key.team_id ? (
                                 <span
                                   className="inline-block max-w-full truncate rounded-md bg-cyan-tint px-2 py-0.5 text-xs font-medium text-cyan-ink"
@@ -594,7 +594,7 @@ export default function BulkKeyEditor({
                                 </span>
                               )}
                             </span>
-                            <span className="flex min-w-0 flex-col gap-1.5">
+                            <span className="col-start-2 flex min-w-0 flex-col gap-1.5 md:col-start-auto">
                               <span className="text-[13px] text-ink-2">
                                 <span>
                                   {metricValue(key.spend ?? 0, "spend")} spent
@@ -614,7 +614,7 @@ export default function BulkKeyEditor({
                                 />
                               ) : null}
                             </span>
-                            <span className="justify-self-end">
+                            <span className="col-start-3 row-start-1 justify-self-end md:col-start-auto md:row-start-auto">
                               {key.blocked ? (
                                 <Pill tone="bad">Blocked</Pill>
                               ) : isKeyExpired(key.expires) ? (
