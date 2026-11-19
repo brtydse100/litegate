@@ -189,6 +189,19 @@ describe("organization dashboard contracts", () => {
     expect(screen.queryByText(/Everything is healthy/)).toBeNull();
   });
 
+  it("returns focus to the opening row when the group panel closes", async () => {
+    renderOrganization();
+    const rows = await groupList();
+    const row = await within(rows).findByRole("button", {
+      name: "Infrastructure, 2 users",
+    });
+    row.focus();
+    fireEvent.click(row);
+    const edit = await panel("Edit Infrastructure");
+    fireEvent.click(within(edit).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(row).toHaveFocus());
+  });
+
   it("keeps sync problems visible ahead of budget warnings", async () => {
     const overview = organizationOverview();
     // Every group is over its budget, and one group's policy is not synced.

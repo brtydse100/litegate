@@ -50,6 +50,14 @@ export function parseLiteLLMDate(value: string) {
   );
 }
 
+/** A key stops working at its expiry instant; invalid dates never expire it. */
+export function isKeyExpired(
+  expires?: string | null,
+  now = Date.now(),
+): boolean {
+  return !!expires && parseLiteLLMDate(expires).getTime() <= now;
+}
+
 export interface BudgetSummary {
   managed: boolean;
   available: boolean;

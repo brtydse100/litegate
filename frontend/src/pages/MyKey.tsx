@@ -7,6 +7,7 @@ import { formatUsd } from "../formatUsd";
 import {
   allowedModels,
   budgetSummary,
+  isKeyExpired,
   parseLiteLLMDate,
   type BudgetSummary,
 } from "../keyBudget";
@@ -14,8 +15,7 @@ import type { KeyInfo } from "../types";
 
 export function keyAccessStatus(key: KeyInfo) {
   if (key.blocked) return "Blocked";
-  if (key.expires && parseLiteLLMDate(key.expires).getTime() <= Date.now())
-    return "Expired";
+  if (isKeyExpired(key.expires)) return "Expired";
   if (key.policy_error) return "Needs attention";
   if (key.user_budget_available === false)
     return key.policy_notice ? "Updating" : "Budget details unavailable";
