@@ -251,7 +251,7 @@ export function AdminSidebar({
                 <span className="flex-1">{item.label}</span>
                 {item.dot && (
                   <span
-                    className={`h-2 w-2 rounded-full ${
+                    className={`relative h-2 w-2 rounded-full ${
                       item.dot === "ok" ? "bg-ready" : "bg-alert"
                     }`}
                   >
