@@ -8,8 +8,12 @@ export const buttonCreate = `${button} bg-teal-solid text-paper hover:brightness
 export const buttonDanger = `${button} bg-danger-solid text-paper hover:brightness-90`;
 export const buttonSecondary = `${button} border border-line-input bg-card font-medium text-ink-2 hover:bg-canvas`;
 export const buttonGhost = `${button} font-medium text-ink-3 hover:bg-well hover:text-ink`;
-export const buttonSmall =
-  "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line-input bg-card px-3 text-[13px] font-medium text-ink-2 transition hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50";
+// Colours live only in the variants: Tailwind resolves two colour classes on
+// one element by stylesheet order, not by their order in the class string.
+const small =
+  "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border bg-card px-3 text-[13px] font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
+export const buttonSmall = `${small} border-line-input text-ink-2 hover:bg-canvas`;
+export const buttonSmallDanger = `${small} border-danger-line text-danger hover:bg-danger-tint`;
 
 export const fieldInput =
   "min-h-11 w-full rounded-lg border border-line-input bg-card px-3 text-sm text-ink placeholder:text-ink-4 focus:border-blue focus:outline-none focus:ring-2 focus:ring-blue/20 disabled:opacity-60";

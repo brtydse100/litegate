@@ -29,6 +29,7 @@ import {
   buttonCreate,
   buttonSecondary,
   buttonSmall,
+  buttonSmallDanger,
   card,
   cardHeader,
   cardTitle,
@@ -792,7 +793,7 @@ export default function AdminTeams() {
                               ? "Wait for the operation cooldown"
                               : "Delete team"
                         }
-                        className={`${buttonSmall} border-danger-line text-danger hover:bg-danger-tint`}
+                        className={buttonSmallDanger}
                       >
                         <Trash2 size={13} aria-hidden="true" /> Delete
                       </button>
