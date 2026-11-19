@@ -340,7 +340,9 @@ records block normalization rather than being interpreted as an unlimited budget
 LiteGate reconciles all group teams and known users on a full sweep every
 `organization_sync_interval_seconds` (default 15 minutes) with bounded
 concurrency, sooner after a budget or per-user limit edit, and again during
-managed login/key creation.
+managed login/key creation. Changes that are not edits wait for the next full
+sweep: caps raised after a budget-period reset, newly listed explicit users, and
+key budgets changed directly in LiteLLM are repaired within one interval.
 An explicit-user discovery failure is logged independently and does not prevent
 that cycle from updating teams and known users.
 Synchronization and key issuance serialize per user. A slow user's key update

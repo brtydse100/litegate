@@ -3,7 +3,9 @@
 Organization reports read these instead of sending one LiteLLM request per
 group or person. Each snapshot refreshes at most once per ``TTL`` seconds and
 concurrent callers share a single refresh, so the number of open pages does not
-multiply upstream load. Key writes and budget enforcement keep reading live.
+multiply upstream load. A failed refresh is remembered for the same ``TTL`` so
+an outage or an oversized installation does not trigger a listing per caller.
+Key writes and budget enforcement keep reading live.
 """
 
 import asyncio
@@ -24,32 +26,44 @@ class Snapshot:
     def __init__(self, load: Callable[[], Awaitable[dict]]):
         self._load = load
         self._value: dict | None = None
+        self._error: HTTPException | None = None
         self._loaded_at: float | None = None
         self._locks: WeakKeyDictionary = WeakKeyDictionary()
 
     def _fresh(self) -> bool:
         return self._loaded_at is not None and monotonic() - self._loaded_at < TTL
 
+    def _result(self) -> dict:
+        if self._error is not None:
+            raise self._error
+        return self._value
+
     async def get(self) -> dict:
         if self._fresh():
-            return self._value
+            return self._result()
         lock = self._locks.setdefault(asyncio.get_running_loop(), asyncio.Lock())
         async with lock:
             if not self._fresh():
-                self._value = await self._load()
+                try:
+                    self._value, self._error = await self._load(), None
+                except HTTPException as exc:
+                    self._value, self._error = None, exc
                 self._loaded_at = monotonic()
-            return self._value
+            return self._result()
 
     def clear(self) -> None:
-        self._value, self._loaded_at = None, None
+        self._value, self._error, self._loaded_at = None, None, None
 
 
 async def _pages(fetch: Callable[[int], Awaitable[dict]], items: str) -> list[dict]:
     records: list[dict] = []
     for page in range(1, MAX_PAGES + 1):
         result = await fetch(page)
+        total_pages = max(1, int(result.get("total_pages") or 1))
+        if total_pages > MAX_PAGES:
+            break
         records.extend(item for item in result.get(items) or [] if isinstance(item, dict))
-        if page >= max(1, int(result.get("total_pages") or 1)):
+        if page >= total_pages:
             return records
     raise HTTPException(status_code=409, detail="Too many LiteLLM records for a bulk snapshot")
 

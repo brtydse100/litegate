@@ -1,7 +1,7 @@
 """Budget previews obey delegated roots and never activate on version alone."""
 
 from importlib import import_module, util
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
@@ -81,6 +81,18 @@ async def test_delegate_cannot_increase_own_allowance_indirectly(monkeypatch, co
         await routes.edit_envelope(child.id, routes.EnvelopeEdit(revision=0, amount=40), actor)
     assert denied.value.status_code == 403
     assert (await routes.budget_view(actor))["revision"] == 0
+
+
+@pytest.mark.asyncio
+async def test_budget_edits_wake_the_organization_sweep(monkeypatch, context):
+    tree, root, child, actor = context
+    routes = router(monkeypatch)
+    wake = Mock()
+    monkeypatch.setattr(routes.organization_sync, "request_reconciliation", wake)
+    monkeypatch.setattr(organization_access, "resolve_scope", AsyncMock(return_value=organization_access.GLOBAL_SCOPE))
+    await routes.edit_envelope(child.id, routes.EnvelopeEdit(revision=0, amount=40), actor)
+    await routes.edit_override(child.id, "alice", routes.UserEdit(revision=1, amount=0), actor)
+    assert wake.call_count == 2
 
 
 @pytest.mark.asyncio

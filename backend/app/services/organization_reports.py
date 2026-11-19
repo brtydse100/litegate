@@ -101,7 +101,8 @@ async def overview(scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     visible = [node for node in tree.nodes.values() if scope.allows(node)]
     semaphore = asyncio.Semaphore(5)
     # One bulk team listing replaces a /team/info request per group. Teams it
-    # omits (or a LiteLLM without spend in the listing) fall back to team info.
+    # omits, or listings without every field the status compares, fall back to
+    # team info so a sparse listing never reports a false policy mismatch.
     try:
         listed = await litellm_snapshot.teams.get()
     except HTTPException:
@@ -117,7 +118,7 @@ async def overview(scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
 
     async def root_status(root):
         team = listed.get(root.team_id)
-        if team is not None and "spend" in team:
+        if team is not None and all(field in team for field in ("spend", "max_budget", "budget_duration")):
             return root.team_id, team_status(root, team)
         cached = _status_cache.get(root.team_id)
         if cached and monotonic() - cached[0] < 60:
