@@ -189,7 +189,10 @@ test("the signed-in email is visible and copyable on My key", async ({
   );
   await expect(page.getByText(email, { exact: true }).first()).toBeVisible();
   await copy.click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(email);
+  // Copying is asynchronous; wait for the clipboard instead of racing it.
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(email);
 });
 
 test("the top-bar account menu stays on a phone screen", async ({ page }) => {
