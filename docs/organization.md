@@ -12,6 +12,17 @@ configured hierarchy and local identity records. It does not wait for live
 LiteLLM data for every internal team, and it does not request installation-wide
 usage or users before a selection.
 
+Organization spend totals and the member table's budget-period spend come from
+two shared bulk listings (all teams and all keys). Each listing is reused for a
+minute after it arrives and shared by every open page; a failed listing is
+retried after a minute. Opening the page therefore sends a few paged LiteLLM
+requests instead of one per group or member. Installations with more than 5,000
+keys or 20,000 teams skip the bulk listing and read per item, as before. When
+the team listing is unavailable, or a team's entry lacks its spend, budget or
+period, LiteGate reads that team individually. When the key listing is unavailable, it reads each
+member's keys individually; a member absent from a successful listing has no keys
+and shows no spend. Key changes and budget enforcement always read live data.
+
 Select or expand a group to fetch its direct children and that team's current
 details. Deeper groups load the same way as you open them. Child lists, team
 details, users and usage have separate loading/error states and retry controls;
@@ -267,7 +278,7 @@ does not add SCIM, LDAP, or identity-provider polling.
    complete together in the same pass. Shared caps remain until every affected
    credential is protected; unknown or conflicting assignments require review.
 
-Transient failures retry automatically every 60 seconds and after restart,
+Transient failures retry automatically on the next sweep and after restart,
 continuing from the existing identities and key policies. Successful updates are
 idempotent. Fix reported identity conflicts or unsupported upstream policy rather
 than deleting/recreating users. Secrets, key IDs, aliases, spend, model access and
@@ -330,8 +341,12 @@ credentials keep that old cap in place and produce a synchronization warning.
 Spend, model access, roles and rate limits are preserved. Missing verification
 records block normalization rather than being interpreted as an unlimited budget.
 
-LiteGate reconciles all group teams and known users every 60 seconds with bounded
-concurrency, and again during managed login/key creation.
+LiteGate reconciles all group teams and known users on a full sweep every
+`organization_sync_interval_seconds` (default 15 minutes) with bounded
+concurrency, sooner after a budget or per-user limit edit, and again during
+managed login/key creation. Changes that are not edits wait for the next full
+sweep: caps raised after a budget-period reset, newly listed explicit users, and
+key budgets changed directly in LiteLLM are repaired within one interval.
 An explicit-user discovery failure is logged independently and does not prevent
 that cycle from updating teams and known users.
 Synchronization and key issuance serialize per user. A slow user's key update
@@ -464,7 +479,15 @@ paths reject access rather than selecting one by order. Ancestor membership,
 key migration, and enforced allowances use the existing hierarchy lifecycle.
 
 Startup awaits the first hierarchy reconciliation attempt before serving requests,
-then retries every 60 seconds. Exact existing user IDs take precedence, including
+then sweeps every `organization_sync_interval_seconds` (default `900`, allowed
+`60`–`86400`). Budget and per-user limit edits wake the sweep early. A failed or
+unverified pass retries after a minute, then backs off by doubling up to the
+interval while the problem persists; passes are always at least 60 seconds
+apart. Sign-in and key operations synchronize their own user immediately. Period
+resets, newly listed explicit users and drift made directly in LiteLLM are
+repaired on the next full sweep.
+
+Exact existing user IDs take precedence, including
 IDs containing `@`. Unresolved email selectors search all matching LiteLLM pages
 (case-insensitive substring search), then require one normalized exact match and
 a fresh lookup by actual user ID. Discovery uses at most five concurrent lookups,

@@ -303,21 +303,59 @@ async def reconcile() -> None:
     await organization_reconcile.reconcile()
 
 
-async def reconciliation_attempt() -> None:
+async def reconciliation_attempt() -> bool:
     try:
         await reconcile()
         if settings.organization_cleanup_enabled:
             from app.services import organization_retirement
 
             await organization_retirement.assess_removed_teams()
+        return True
     except Exception:
         _logger.exception("Organization synchronization failed")
+        return False
 
 
-async def run_reconciliation() -> None:
+# Set by budget and limit edits so their changes apply without waiting for a sweep.
+_wake: asyncio.Event | None = None
+MIN_PASS_SPACING = 60
+
+
+def request_reconciliation() -> None:
+    """Run the next organization pass soon (at most once a minute)."""
+    if _wake is not None:
+        _wake.set()
+
+
+async def run_reconciliation(failed: bool = False) -> None:
+    """Sweep every ``organization_sync_interval_seconds``, or sooner when woken.
+
+    Passes are at least a minute apart. Sign-ins and key operations already
+    synchronize their own user, so the full sweep only repairs drift. A failed
+    pass (``failed`` covers the startup attempt) or unverified budget state
+    retries after a minute, doubling up to the interval until a pass is clean.
+    """
+    global _wake
+    _wake = asyncio.Event()
+    retry = MIN_PASS_SPACING
     while True:
-        await asyncio.sleep(60)
-        await reconciliation_attempt()
+        await asyncio.sleep(MIN_PASS_SPACING)
+        interval = settings.organization_sync_interval_seconds
+        # Until a pass verifies budget state, every sign-in reads the whole
+        # installation, so failed or unverified passes retry after a minute,
+        # doubling up to the interval while the problem persists.
+        unverified = bool(settings.organization_hierarchy.levels) and budget_pass.cross_group_pending()
+        if failed or unverified:
+            wait, retry = retry, min(retry * 2, interval)
+        else:
+            wait, retry = interval, MIN_PASS_SPACING
+        remaining = max(0, wait - MIN_PASS_SPACING)
+        try:
+            await asyncio.wait_for(_wake.wait(), timeout=remaining)
+        except TimeoutError:
+            pass
+        _wake.clear()
+        failed = await reconciliation_attempt() is False
 
 
 def changes_inherited_allowance(changes: dict) -> bool:

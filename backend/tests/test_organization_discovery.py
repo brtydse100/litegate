@@ -240,6 +240,7 @@ async def test_lifespan_awaits_first_attempt_then_retry_waits(monkeypatch):
         await asyncio.sleep(0)
         assert order == ["first", "done"]
     waits = []
+    monkeypatch.setattr(settings, "organization_sync_interval_seconds", 60)
     monkeypatch.setattr(sync, "reconciliation_attempt", AsyncMock())
 
     async def sleep(seconds):

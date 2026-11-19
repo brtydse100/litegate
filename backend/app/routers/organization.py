@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, StrictFloat, StrictInt, StrictStr
 
 from app.routers.api_actor import ApiActor, get_api_actor, record_audit
-from app.services import budget_allocations as allocation, organization_access, organization_limits, organization_reports
+from app.services import budget_allocations as allocation, organization_access, organization_limits, organization_reports, organization_sync
 
 router = APIRouter(prefix="/v1/organization", tags=["organization"])
 
@@ -75,4 +75,5 @@ async def set_group_per_user(node_id: str, body: PerUserLimit, actor: ApiActor =
     amount = allocation.units(body.amount) if body.amount is not None else None
     result = await asyncio.to_thread(organization_limits.save, node_id, amount)
     await record_audit(actor, "organization.per_user_limit", node_id, details={"per_user_override": result["per_user_override"]})
+    organization_sync.request_reconciliation()
     return result

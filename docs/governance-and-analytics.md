@@ -95,6 +95,7 @@ Raw logs, key secrets/hashes, and upstream API-key breakdowns are not returned.
 | `organization_access_designations` | `ORGANIZATION_ACCESS_DESIGNATIONS` | `organizationAccessDesignations` | `{}` |
 | `organization_group_admins` | `ORGANIZATION_GROUP_ADMINS` | `organizationGroupAdmins` | `{}` |
 | `organization_cleanup_enabled` | `ORGANIZATION_CLEANUP_ENABLED` | `organizationCleanupEnabled` | `false` |
+| `organization_sync_interval_seconds` | `ORGANIZATION_SYNC_INTERVAL_SECONDS` | `organizationSyncIntervalSeconds` | `900` |
 | `analytics_enabled` | `ANALYTICS_ENABLED` | `analyticsEnabled` | `true` |
 | `analytics_retention_days` | `ANALYTICS_RETENTION_DAYS` | `analyticsRetentionDays` | `90` |
 | `analytics_batch_concurrency` | `ANALYTICS_BATCH_CONCURRENCY` | `analyticsBatchConcurrency` | `5` |
@@ -184,9 +185,9 @@ values on top.
   members. No administrator action is needed.
 - **Participants** are members who signed in or already hold a key. Nobody is
   reserved a share before they use LiteGate. When someone signs in for the first
-  time, every share in their group is recalculated; the 60-second
-  reconciliation applies the new caps. Upgrading counts users who already signed
-  in.
+  time, every share in their group is recalculated. Sign-in lowers the
+  affected caps at once; the next organization sweep applies any increases.
+  Upgrading counts users who already signed in.
 - `perUser` remains a **ceiling** on each share. Members of unbudgeted groups
   keep their fixed `perUser` allowance, and those groups are not deducted from
   their parent.
@@ -271,7 +272,7 @@ rewriting users, keys, or SSO identities. Already applied migrations are skipped
 Ordinary reads/authentication/audit writes and readiness checks do not issue DDL;
 connection contexts now close their handles. Failed migrations roll back.
 
-Organization reconciliation remains separate and runs every 60 seconds. Its
+Organization reconciliation remains separate and runs on its configured sweep. Its
 warnings concern upstream policy synchronization, not repeated SQLite schema
 migrations. The specific reported crash after three attempts has not been
 reproduced; capture the actual traceback and previous-container events before

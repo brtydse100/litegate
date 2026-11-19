@@ -26,8 +26,8 @@ async def lifespan(_: FastAPI):
     analytics_task = None
     try:
         if settings.organization_hierarchy.levels or settings.organization_cleanup_enabled:
-            await organization_sync.reconciliation_attempt()
-            organization_task = asyncio.create_task(organization_sync.run_reconciliation())
+            started = await organization_sync.reconciliation_attempt()
+            organization_task = asyncio.create_task(organization_sync.run_reconciliation(failed=started is False))
         if settings.analytics_enabled:
             analytics_task = asyncio.create_task(analytics.run())
         yield

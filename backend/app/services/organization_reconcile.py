@@ -1,4 +1,4 @@
-"""Minute-by-minute organization reconciliation, one group at a time."""
+"""Periodic organization reconciliation sweep, one group at a time."""
 
 import asyncio
 
@@ -84,7 +84,7 @@ async def _reconcile_group(node_id: str, members: list[str]) -> None:
                 await asyncio.to_thread(store.failed, user_id, str(exc.detail))
 
     # Establish every member's key policy before attempting to remove shared caps.
-    # Otherwise the first users in a team stay failed until the next minute.
+    # Otherwise the first users in a team stay failed until the next sweep.
     async def finalize_one(user_id: str):
         async with semaphore, sync.lock_for("user", user_id):
             try:

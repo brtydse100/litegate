@@ -105,6 +105,8 @@ save_api_keys_in_db: false
 organization_access_designations: {}
 organization_group_admins: {}
 organization_cleanup_enabled: false
+# Seconds between full organization sweeps; budget edits wake it sooner.
+organization_sync_interval_seconds: 900
 analytics_enabled: true
 analytics_retention_days: 90
 analytics_batch_concurrency: 5
