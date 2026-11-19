@@ -173,6 +173,25 @@ for (const width of [390, 1280]) {
   });
 }
 
+test("the signed-in email is visible and copyable on My key", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("./my-key");
+  await page.getByRole("button", { name: "View demo as user" }).click();
+  const copy = page.getByRole("button", { name: /^Copy email / }).first();
+  await expect(copy).toBeVisible();
+  const email = (await copy.getAttribute("aria-label"))!.replace(
+    "Copy email ",
+    "",
+  );
+  await expect(page.getByText(email, { exact: true }).first()).toBeVisible();
+  await copy.click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(email);
+});
+
 test("the top-bar account menu stays on a phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./my-key");
