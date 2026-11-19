@@ -9,7 +9,7 @@ from app.config import settings
 from app.services import audit, local_users, organization_client as upstream, organization_store
 
 
-# Last reason audited per team. The 60-second reconciler would otherwise record
+# Last reason audited per team. The periodic reconciler would otherwise record
 # an identical event every pass. Production is single-replica, so process-local
 # state suffices; a restart re-reports each candidate once.
 _reported: dict[str, str] = {}

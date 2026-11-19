@@ -9,11 +9,16 @@ from app.services import budget_enforcement as enforcement, litellm, litellm_sna
 from tests.test_budget_enforcement import org, join
 
 
+class _Forbidden:
+    def __getattr__(self, name):
+        raise AssertionError(f"enforcement read the report snapshot ({name})")
+
+
 @pytest.fixture(autouse=True)
 def enforcement_reads_live(monkeypatch):
     """Budget passes must never decide caps from the shared report snapshot."""
-    for snapshot in (litellm_snapshot.teams, litellm_snapshot.keys_by_user):
-        monkeypatch.setattr(snapshot, "get", AsyncMock(side_effect=AssertionError("enforcement read the report snapshot")))
+    monkeypatch.setattr(litellm_snapshot, "teams", _Forbidden())
+    monkeypatch.setattr(litellm_snapshot, "keys_by_user", _Forbidden())
 
 
 @pytest.mark.asyncio
