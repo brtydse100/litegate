@@ -327,7 +327,7 @@ def request_reconciliation() -> None:
         _wake.set()
 
 
-async def run_reconciliation() -> None:
+async def run_reconciliation(failed: bool = False) -> None:
     """Sweep every ``organization_sync_interval_seconds``, or sooner when woken.
 
     Passes are at least a minute apart. Sign-ins and key operations already
@@ -335,13 +335,19 @@ async def run_reconciliation() -> None:
     """
     global _wake
     _wake = asyncio.Event()
-    failed = False
+    retry = MIN_PASS_SPACING
     while True:
         await asyncio.sleep(MIN_PASS_SPACING)
+        interval = settings.organization_sync_interval_seconds
         # Until a pass verifies budget state, every sign-in reads the whole
-        # installation, so failed or unverified passes retry after the spacing.
+        # installation, so failed or unverified passes retry after a minute,
+        # doubling up to the interval while the problem persists.
         unverified = bool(settings.organization_hierarchy.levels) and budget_pass.cross_group_pending()
-        remaining = 0 if failed or unverified else max(0, settings.organization_sync_interval_seconds - MIN_PASS_SPACING)
+        if failed or unverified:
+            wait, retry = retry, min(retry * 2, interval)
+        else:
+            wait, retry = interval, MIN_PASS_SPACING
+        remaining = max(0, wait - MIN_PASS_SPACING)
         try:
             await asyncio.wait_for(_wake.wait(), timeout=remaining)
         except TimeoutError:

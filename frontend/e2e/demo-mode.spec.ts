@@ -182,6 +182,8 @@ test("pages fit a phone screen without sideways scrolling", async ({
   for (const route of ["organization", "teams", "keys", "users", "status"]) {
     await page.goto(`./${route}`);
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    // The status dot and its hidden text render once system status loads.
+    await expect(page.getByText(/^(Ready|Not ready)$/).first()).toBeAttached();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
     );

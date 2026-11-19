@@ -247,6 +247,45 @@ describe("organization dashboard contracts", () => {
     ).toBeVisible();
   });
 
+  it("collapses Needs attention again after the list shrinks", async () => {
+    const overview = organizationOverview();
+    const overBudget = {
+      ...overview,
+      groups: overview.groups.map((group) => ({
+        ...group,
+        group_total: 10,
+        group_spend: 20,
+      })),
+    };
+    vi.mocked(api.organization).mockResolvedValue(overBudget);
+    const { client } = renderOrganization();
+    const attention = await screen.findByRole("region", {
+      name: "Needs attention",
+    });
+    fireEvent.click(
+      await within(attention).findByRole("button", { name: /Show \d+ more/ }),
+    );
+    expect(
+      within(attention).getByRole("button", { name: "Show fewer" }),
+    ).toBeVisible();
+    vi.mocked(api.organization).mockResolvedValue(overview);
+    await act(() =>
+      client.invalidateQueries({ queryKey: ["organization-overview"] }),
+    );
+    await waitFor(() =>
+      expect(
+        within(attention).queryByRole("button", { name: "Show fewer" }),
+      ).toBeNull(),
+    );
+    vi.mocked(api.organization).mockResolvedValue(overBudget);
+    await act(() =>
+      client.invalidateQueries({ queryKey: ["organization-overview"] }),
+    );
+    expect(
+      await within(attention).findByRole("button", { name: /Show \d+ more/ }),
+    ).toBeVisible();
+  });
+
   it("refreshes All groups reports without requesting a group with an empty ID", async () => {
     renderOrganization();
     fireEvent.click(
