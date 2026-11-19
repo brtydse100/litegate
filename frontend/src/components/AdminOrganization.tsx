@@ -357,7 +357,7 @@ export default function AdminOrganization({
     button: string;
     onClick: () => void;
   }> = [
-    ...subtree
+    ...checked
       .map((group) => ({
         group,
         used: percent(group.group_spend, group.group_total) ?? 0,

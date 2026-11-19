@@ -201,8 +201,8 @@ export function KeyCard({
 }) {
   return (
     <section aria-label="Key" className={`${card} flex flex-col gap-4 p-6`}>
-      <h2 className="text-[13px] font-semibold tracking-[0.05em] text-ink-4">
-        YOUR API KEY
+      <h2 className="text-[13px] font-semibold uppercase tracking-[0.05em] text-ink-4">
+        Your API key
         {keyInfo.key_alias && (
           <span className="ml-2 font-mono font-normal normal-case tracking-normal">
             {keyInfo.key_alias}
@@ -391,8 +391,8 @@ export function StatusCard({
       </span>
       {team && (
         <div>
-          <p className="text-xs font-semibold tracking-[0.05em] text-navy-muted">
-            TEAM
+          <p className="text-xs font-semibold uppercase tracking-[0.05em] text-navy-muted">
+            Team
           </p>
           <p className="mt-1 break-words text-[22px] font-semibold">{team}</p>
           {parents.length > 0 && (

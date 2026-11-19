@@ -39,6 +39,9 @@ it("does not offer to copy a hash when no stored secret exists", () => {
   expect(screen.getByText("sk-••••7f3a")).toBeVisible();
   expect(screen.queryByText("hashed-identifier")).not.toBeInTheDocument();
   expect(
+    screen.getByText(/LiteGate has no saved copy of this key to show/),
+  ).toBeVisible();
+  expect(
     screen.queryByRole("button", { name: "Show API key" }),
   ).not.toBeInTheDocument();
   expect(
