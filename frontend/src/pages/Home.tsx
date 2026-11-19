@@ -320,6 +320,7 @@ export default function Home() {
             <CreateKeyCard
               pending={create.isPending}
               paused={operationsBlocked}
+              savedKeys={!!config?.save_api_keys_in_db}
               onCreate={() => create.mutate()}
             />
           ) : (
@@ -387,7 +388,7 @@ export default function Home() {
             </Link>
             <nav
               aria-label="Primary navigation"
-              className="flex flex-wrap items-center gap-x-[18px] gap-y-1 text-sm"
+              className="ml-auto flex flex-wrap items-center justify-end gap-x-[18px] gap-y-1 text-sm"
             >
               {demoSwitch}
               {analyticsEnabled &&

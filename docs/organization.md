@@ -12,8 +12,8 @@ configured hierarchy and local identity records, then fills in spend. Root
 groups appear as tabs; the selected root's direct children load immediately and
 deeper groups load as you open them. The group table, budget split, metric cards
 and **Needs attention** list take descendant spend totals from one request to
-the organization overview, made once when the page opens and again on
-**Refresh organization**; it reads the shared team listing described below.
+the organization overview, made once when the page opens, again on
+**Refresh organization** and after a save in the edit panel; it reads the shared team listing described below.
 Until it arrives, spend cells show placeholders and navigation stays usable.
 The page does not request installation-wide usage or users before a selection.
 

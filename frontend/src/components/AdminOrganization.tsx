@@ -8,6 +8,7 @@ import OrgReport from "./organization/OrgReport";
 import {
   groupInitials,
   hueFor,
+  palette,
   limitOrigin,
   percent,
   plural,
@@ -546,7 +547,11 @@ export default function AdminOrganization({
                 <span
                   aria-hidden="true"
                   className={`h-2 w-2 rounded-full ${
-                    status.data?.ready ? "bg-mint" : "bg-danger"
+                    !status.data
+                      ? "bg-ink-5"
+                      : status.data.ready
+                        ? "bg-mint"
+                        : "bg-danger"
                   }`}
                 />
                 {status.data
@@ -983,7 +988,12 @@ export default function AdminOrganization({
           childLevelName={childLevel(selected)}
           subGroups={groups
             .filter((group) => group.parent_id === selected.id)
-            .map((group) => ({ group, hue: hue(group) }))}
+            // Descendants share their branch colour in the table; in the
+            // panel each sub-group needs its own to tell segments apart.
+            .map((group, index) => ({
+              group,
+              hue: palette[index % palette.length],
+            }))}
           totalSpend={totals.isPending ? undefined : selected.group_spend}
           ownSpend={detail.data?.group_spend}
           ownSpendState={

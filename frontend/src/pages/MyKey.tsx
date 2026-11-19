@@ -313,10 +313,13 @@ export function RegenerateConfirm({
 export function CreateKeyCard({
   pending,
   paused,
+  savedKeys,
   onCreate,
 }: {
   pending: boolean;
   paused: boolean;
+  /** LiteGate stores key secrets, so they can be shown again later. */
+  savedKeys: boolean;
   onCreate: () => void;
 }) {
   return (
@@ -350,7 +353,9 @@ export function CreateKeyCard({
             : "Create my API key"}
       </button>
       <p className="text-[13px] text-ink-4">
-        The secret is shown once, so copy it straight away.
+        {savedKeys
+          ? "Saved keys can be shown again when you need them."
+          : "The secret is shown once, so copy it straight away."}
       </p>
     </section>
   );
