@@ -439,6 +439,49 @@ export default function AdminOrganization({
 
   return (
     <div className="flex flex-wrap content-start">
+      {/* First in the page so narrow screens show it above the report;
+          wide screens move it beside the report. */}
+      {selected && (
+        <GroupPanel
+          key={selected.id}
+          group={selected}
+          hue={hue(selected)}
+          parent={selected.parent_id ? byId.get(selected.parent_id) : undefined}
+          source={
+            selected.budget_source && selected.budget_source !== selected.id
+              ? byId.get(selected.budget_source)
+              : undefined
+          }
+          levelName={levels[selected.level]}
+          childLevelName={childLevel(selected)}
+          subGroups={groups
+            .filter((group) => group.parent_id === selected.id)
+            // Descendants share their branch colour in the table; in the
+            // panel each sub-group needs its own to tell segments apart.
+            .map((group, index) => ({
+              group,
+              hue: palette[index % palette.length],
+            }))}
+          totalSpend={totals.isPending ? undefined : selected.group_spend}
+          ownSpend={detail.data?.group_spend}
+          ownSpendState={
+            detail.isPending ? "loading" : detail.error ? "error" : "ready"
+          }
+          budgetGroup={budgets.data?.groups.find(
+            (group) => group.id === selected.id,
+          )}
+          revision={budgets.data?.revision}
+          onClose={() => {
+            setNodeId(null);
+            // The panel unmounts; put focus back where the user started.
+            requestAnimationFrame(() => {
+              if (opener.current?.isConnected) opener.current.focus();
+              opener.current = null;
+            });
+          }}
+          onSelect={select}
+        />
+      )}
       <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-[22px] px-4 py-7 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3.5">
           <div>
@@ -972,48 +1015,6 @@ export default function AdminOrganization({
           />
         )}
       </div>
-
-      {selected && (
-        <GroupPanel
-          key={selected.id}
-          group={selected}
-          hue={hue(selected)}
-          parent={selected.parent_id ? byId.get(selected.parent_id) : undefined}
-          source={
-            selected.budget_source && selected.budget_source !== selected.id
-              ? byId.get(selected.budget_source)
-              : undefined
-          }
-          levelName={levels[selected.level]}
-          childLevelName={childLevel(selected)}
-          subGroups={groups
-            .filter((group) => group.parent_id === selected.id)
-            // Descendants share their branch colour in the table; in the
-            // panel each sub-group needs its own to tell segments apart.
-            .map((group, index) => ({
-              group,
-              hue: palette[index % palette.length],
-            }))}
-          totalSpend={totals.isPending ? undefined : selected.group_spend}
-          ownSpend={detail.data?.group_spend}
-          ownSpendState={
-            detail.isPending ? "loading" : detail.error ? "error" : "ready"
-          }
-          budgetGroup={budgets.data?.groups.find(
-            (group) => group.id === selected.id,
-          )}
-          revision={budgets.data?.revision}
-          onClose={() => {
-            setNodeId(null);
-            // The panel unmounts; put focus back where the user started.
-            requestAnimationFrame(() => {
-              if (opener.current?.isConnected) opener.current.focus();
-              opener.current = null;
-            });
-          }}
-          onSelect={select}
-        />
-      )}
     </div>
   );
 }

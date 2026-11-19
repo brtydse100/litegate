@@ -188,7 +188,7 @@ test("the top-bar account menu stays on a phone screen", async ({ page }) => {
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
 });
 
-for (const width of [390, 768]) {
+for (const width of [390, 768, 1024, 1100, 1280]) {
   test(`an opened group's panel is on screen at ${width}px`, async ({
     page,
   }) => {
