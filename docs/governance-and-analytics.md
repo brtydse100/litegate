@@ -144,7 +144,9 @@ Currency displays use exactly two decimal places for readability. Sub-cent
 charges round to `$0.00` on screen; stored usage, allocation calculations and
 numeric editing retain their full precision.
 
-The opt-in budget page stores allocations. Without enforcement they are
+Opt-in budget planning stores allocations: team budgets are edited in a group's
+**Organization** panel and member allowances in its **People** list. Without
+enforcement they are
 **proposals**; with `hierarchical_budgets_enforced` they cap members' keys (see
 [Enforced equal splits](#enforced-equal-splits)). Child envelopes and manual direct-user overrides reserve
 funds first; the remainder is divided equally among other direct users using
@@ -176,10 +178,10 @@ They are not called from proposal editing.
 Set `hierarchical_budgets_enforced: true` (environment
 `HIERARCHICAL_BUDGETS_ENFORCED`, Helm `config.hierarchicalBudgetsEnforced`) to
 turn group budgets into key caps. It is off by default because it can lower
-existing caps. It works without the Budget planning page, which only adds manual
-values on top.
+existing caps. It works without budget planning, which only adds manual values
+on top.
 
-- A group is **budgeted** when it has `groupTotal`, a planning-page envelope, or
+- A group is **budgeted** when it has `groupTotal`, a planned envelope, or
   a manual override for one of its members. Its amount, minus budgeted child
   groups and manual overrides, is shared **equally** by its participating direct
   members. No administrator action is needed.
@@ -235,7 +237,7 @@ values on top.
   explicit `null` means the key is unassigned.
 - Manual overrides saved for someone who has not signed in stay saved but
   inactive, and apply when that person first signs in. That can push the group
-  into a deficit, which the Budget planning page shows. If manual values exceed the group amount, automatic
+  into a deficit, which the Organization page's People list shows. If manual values exceed the group amount, automatic
   members are held at their current spend until an administrator fixes it.
 - Each key keeps its own `duration` reset, so a group's total holds within each
   member's budget period rather than one aligned period. Until the next pass,

@@ -158,16 +158,17 @@ export const api = {
     request<import("../types/organization").OrganizationOverview>(
       "/v1/organization",
     ),
-  organizationUsers: (node: string, page = 1) => {
+  /** One group, several groups (combined), or "" / [] for every group. */
+  organizationUsers: (node: string | string[], page = 1) => {
     const params = new URLSearchParams({ page: String(page), page_size: "25" });
-    if (node) params.set("node", node);
+    for (const id of [node].flat()) if (id) params.append("node", id);
     return request<import("../types/organization").OrganizationUserPage>(
       `/v1/organization/users?${params}`,
     );
   },
-  organizationUsage: (node: string, start: string, end: string) => {
+  organizationUsage: (node: string | string[], start: string, end: string) => {
     const params = new URLSearchParams({ start_date: start, end_date: end });
-    if (node) params.set("node", node);
+    for (const id of [node].flat()) if (id) params.append("node", id);
     return request<import("../types/organization").OrganizationUsage>(
       `/v1/organization/usage?${params}`,
     );

@@ -154,6 +154,19 @@ const members = [
     node: "platform",
     budget_spend: 18.42,
   },
+  // Platform's teammates, so its owner has a budget to split.
+  {
+    user_id: "noa",
+    email: "noa@example.com",
+    node: "platform",
+    budget_spend: 12.4,
+  },
+  {
+    user_id: "lee",
+    email: "lee@example.com",
+    node: "platform",
+    budget_spend: 7.85,
+  },
   {
     user_id: "priya",
     email: "priya@example.com",
@@ -174,6 +187,10 @@ const members = [
   },
 ];
 
+/** Read-only demo hierarchy and membership, for the budget emulation. */
+export const demoGroups: readonly (typeof groups)[number][] = groups;
+export const demoMembers: readonly (typeof members)[number][] = members;
+
 export function organizationOverview(): OrganizationOverview {
   return {
     enabled: true,
@@ -182,6 +199,8 @@ export function organizationOverview(): OrganizationOverview {
       ...group,
       team_id: `demo-${group.id}`,
       group_total: group.parent_id ? null : group.group_total,
+      // Everyone in the group and its sub-groups.
+      members: selectedMembers(group.id).length,
       group_spend: selectedMembers(group.id).reduce(
         (total, member) => total + member.budget_spend,
         0,
@@ -227,19 +246,29 @@ export function organizationTeams(): TeamInfo[] {
   }));
 }
 
-function selectedMembers(nodeId: string | null) {
-  const ancestor = groups.find((group) => group.id === nodeId);
+/** Selected groups: one id, several ids (combined) or none for every group. */
+type Selection = string | string[] | null;
+
+function selectedGroups(nodeIds: Selection) {
+  const ids = [nodeIds ?? []].flat().filter(Boolean);
+  return groups.filter((group) => ids.includes(group.id));
+}
+
+function selectedMembers(nodeIds: Selection) {
+  const ancestors = selectedGroups(nodeIds);
   return members.filter((member) => {
     const group = groups.find((value) => value.id === member.node)!;
     return (
-      !ancestor ||
-      ancestor.path.every((name, index) => group.path[index] === name)
+      !ancestors.length ||
+      ancestors.some((ancestor) =>
+        ancestor.path.every((name, index) => group.path[index] === name),
+      )
     );
   });
 }
 
 export function organizationUsers(
-  nodeId: string | null,
+  nodeId: Selection,
   page: number,
 ): OrganizationUserPage {
   const selected = selectedMembers(nodeId);
@@ -282,11 +311,18 @@ function memberDailyUsage(
 }
 
 export function organizationUsage(
-  nodeId: string | null,
+  nodeId: Selection,
   start: string,
   end: string,
 ): OrganizationUsage {
-  const ancestor = groups.find((group) => group.id === nodeId);
+  const ancestors = selectedGroups(nodeId);
+  // One group breaks down by its children; several by the groups themselves.
+  const breakdownLevel =
+    ancestors.length === 1
+      ? ancestors[0].level + 1
+      : ancestors.length
+        ? Math.min(...ancestors.map((group) => group.level))
+        : 0;
   const selected = selectedMembers(nodeId);
   const totals = zero();
   const byGroup = new Map<
@@ -311,7 +347,7 @@ export function organizationUsage(
     const metrics = zero();
     selected.forEach((member, memberIndex) => {
       const group = groups.find((value) => value.id === member.node)!;
-      const depth = (ancestor?.level ?? -1) + 1;
+      const depth = breakdownLevel;
       const child = groups.find(
         (candidate) =>
           candidate.level === depth &&
@@ -336,8 +372,17 @@ export function organizationUsage(
         id,
         name: child?.name ?? "Direct members",
         ...zero(),
+        daily: [],
       };
       add(bucket, value);
+      // Each group keeps its own days, like the real report.
+      const date = new Date(time).toISOString().slice(0, 10);
+      let day = bucket.daily!.find((entry) => entry.date === date);
+      if (!day) {
+        day = { date, ...zero() };
+        bucket.daily!.push(day);
+      }
+      add(day, value);
       byGroup.set(id, bucket);
     });
     add(totals, metrics);

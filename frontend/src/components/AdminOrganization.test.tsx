@@ -154,7 +154,7 @@ describe("organization dashboard contracts", () => {
     const rows = await groupList();
     expect(
       await within(rows).findByRole("button", {
-        name: "Infrastructure, 2 users",
+        name: "Infrastructure, 4 users",
       }),
     ).toBeVisible();
     expect(
@@ -196,7 +196,7 @@ describe("organization dashboard contracts", () => {
     renderOrganization();
     const rows = await groupList();
     const row = await within(rows).findByRole("button", {
-      name: "Infrastructure, 2 users",
+      name: "Infrastructure, 4 users",
     });
     row.focus();
     fireEvent.click(row);
@@ -209,7 +209,7 @@ describe("organization dashboard contracts", () => {
     renderOrganization();
     const rows = await groupList();
     const first = await within(rows).findByRole("button", {
-      name: "Infrastructure, 2 users",
+      name: "Infrastructure, 4 users",
     });
     first.focus();
     fireEvent.click(first);
@@ -291,12 +291,13 @@ describe("organization dashboard contracts", () => {
 
   it("refreshes All groups reports without requesting a group with an empty ID", async () => {
     renderOrganization();
+    fireEvent.click(await screen.findByRole("button", { name: "All" }));
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Usage report, all groups, 4 users",
+        name: "Usage report, all groups, 6 users",
       }),
     );
-    await screen.findByRole("img", { name: "Spend (USD) over time" });
+    await screen.findByRole("region", { name: "Spend history" });
     const refresh = screen.getByRole("button", {
       name: "Refresh organization",
     });
@@ -304,14 +305,14 @@ describe("organization dashboard contracts", () => {
     fireEvent.click(refresh);
     await waitFor(() => expect(api.organizationChildren).toHaveBeenCalled());
     expect(api.organizationGroup).not.toHaveBeenCalled();
-    expect(api.organizationUsers).toHaveBeenLastCalledWith("", 1);
+    expect(api.organizationUsers).toHaveBeenLastCalledWith([], 1);
   });
 
   it("filters users, charts, and the edit panel together when selecting a squad", async () => {
     renderOrganization();
     const rows = await groupList();
     expect(
-      within(rows).queryByRole("button", { name: "Platform, 1 user" }),
+      within(rows).queryByRole("button", { name: "Platform, 3 users" }),
     ).not.toBeInTheDocument();
     fireEvent.click(
       await within(rows).findByRole("button", {
@@ -319,7 +320,7 @@ describe("organization dashboard contracts", () => {
       }),
     );
     fireEvent.click(
-      await within(rows).findByRole("button", { name: "Platform, 1 user" }),
+      await within(rows).findByRole("button", { name: "Platform, 3 users" }),
     );
     const edit = await panel("Edit Platform");
     expect(
@@ -329,17 +330,17 @@ describe("organization dashboard contracts", () => {
     expect(within(edit).getByText(/Overrides Infrastructure/)).toBeVisible();
     await waitFor(() =>
       expect(api.organizationUsage).toHaveBeenLastCalledWith(
-        "platform",
+        ["platform"],
         expect.any(String),
         expect.any(String),
       ),
     );
     await waitFor(() =>
-      expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1),
+      expect(api.organizationUsers).toHaveBeenLastCalledWith(["platform"], 1),
     );
     expect(
       await within(
-        screen.getByRole("heading", { name: /^Users/ }).closest("section")!,
+        screen.getByRole("region", { name: "People in Platform" }),
       ).findByText("alex@example.com"),
     ).toBeVisible();
     await waitFor(() =>
@@ -351,17 +352,17 @@ describe("organization dashboard contracts", () => {
       }),
     );
     expect(
-      within(rows).queryByRole("button", { name: "Platform, 1 user" }),
+      within(rows).queryByRole("button", { name: "Platform, 3 users" }),
     ).not.toBeInTheDocument();
     expect(within(edit).getByText("$100")).toBeVisible();
-    expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1);
+    expect(api.organizationUsers).toHaveBeenLastCalledWith(["platform"], 1);
   });
 
-  it("shows inherited allowance and switches the plotted metric", async () => {
+  it("shows inherited allowance and the usage report cards", async () => {
     renderOrganization();
     const rows = await groupList();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -378,14 +379,16 @@ describe("organization dashboard contracts", () => {
         name: "Collapse Engineering → Infrastructure",
       }),
     ).toHaveAttribute("aria-expanded", "true");
-    fireEvent.change(screen.getByRole("combobox", { name: "Chart metric" }), {
-      target: { value: "tokens" },
-    });
+    // Small cards: weekly spend and requests, top token users and models.
+    for (const name of [
+      "Spend history",
+      "Tokens by member",
+      "Spend by model",
+      "Requests history",
+    ])
+      expect(await screen.findByRole("region", { name })).toBeVisible();
     expect(
-      await screen.findByRole("img", { name: "Tokens over time" }),
-    ).toBeVisible();
-    expect(
-      screen.queryByRole("img", { name: "Spend (USD) over time" }),
+      screen.queryByRole("combobox", { name: "Chart metric" }),
     ).not.toBeInTheDocument();
   });
 
@@ -393,10 +396,10 @@ describe("organization dashboard contracts", () => {
     renderOrganization();
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Usage report, all groups, 4 users",
+        name: "Usage report, Engineering, 5 users",
       }),
     );
-    await screen.findByRole("img", { name: "Spend (USD) over time" });
+    await screen.findByRole("region", { name: "Spend history" });
     const start = await screen.findByLabelText("Usage start date");
     vi.mocked(api.organizationUsage).mockRejectedValue(
       new Error("Aggregate unavailable"),
@@ -406,7 +409,7 @@ describe("organization dashboard contracts", () => {
       "Aggregate unavailable",
     );
     expect(
-      screen.queryByRole("img", { name: "Spend (USD) over time" }),
+      screen.queryByRole("region", { name: "Spend history" }),
     ).not.toBeInTheDocument();
   });
 
@@ -432,7 +435,7 @@ describe("organization dashboard contracts", () => {
     vi.mocked(api.organizationUsage).mockImplementation(
       async (node, start, end) => {
         const usage = organizationUsage(node, start, end);
-        return node === "infrastructure"
+        return String(node) === "infrastructure"
           ? {
               ...usage,
               by_group: [
@@ -457,7 +460,7 @@ describe("organization dashboard contracts", () => {
     );
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -472,11 +475,11 @@ describe("organization dashboard contracts", () => {
       within(chart).getByRole("button", { name: "Select Direct members" }),
     );
     await waitFor(() =>
-      expect(api.organizationUsers).toHaveBeenLastCalledWith("platform", 1),
+      expect(api.organizationUsers).toHaveBeenLastCalledWith(["platform"], 1),
     );
     expect(
       await within(await groupList()).findByRole("button", {
-        name: "Direct members, 1 user",
+        name: "Direct members, 3 users",
       }),
     ).toHaveAttribute("aria-pressed", "true");
   });
@@ -484,7 +487,7 @@ describe("organization dashboard contracts", () => {
   it("shows each leaf member's selected-period metrics without a Direct members bucket", async () => {
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -498,19 +501,16 @@ describe("organization dashboard contracts", () => {
     expect(await within(chart).findByText("priya@example.com")).toBeVisible();
     expect(within(chart).getByText("$29.93")).toBeVisible();
     expect(within(chart).queryByText("Direct members")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Chart metric"), {
-      target: { value: "requests" },
-    });
     const calls = vi.mocked(api.organizationUsage).mock.calls;
     const [node, start, end] = calls[calls.length - 1];
     const report = organizationUsage(node, start, end);
     expect(
-      within(chart).getByText(
-        metricValue(report.by_user[0].requests, "requests"),
-      ),
+      within(
+        screen.getByRole("region", { name: "Requests history" }),
+      ).getByText(metricValue(report.totals.requests, "requests")),
     ).toBeVisible();
     expect(
-      screen.getByText("Budget-period spend / per-key allowance"),
+      screen.getByRole("columnheader", { name: "Per-key allowance" }),
     ).toBeVisible();
   });
 
@@ -524,7 +524,7 @@ describe("organization dashboard contracts", () => {
     );
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -584,7 +584,7 @@ describe("organization dashboard contracts", () => {
     );
     renderOrganization();
     const engineering = await screen.findByRole("button", {
-      name: "Engineering, 3 users",
+      name: "Engineering, 5 users",
     });
     expect(
       screen.getByRole("button", { name: "Marketing", pressed: false }),
@@ -602,11 +602,11 @@ describe("organization dashboard contracts", () => {
     const rows = await groupList();
     expect(
       await within(rows).findByRole("button", {
-        name: "Infrastructure, 2 users",
+        name: "Infrastructure, 4 users",
       }),
     ).toBeVisible();
     expect(
-      within(rows).queryByRole("button", { name: "Platform, 1 user" }),
+      within(rows).queryByRole("button", { name: "Platform, 3 users" }),
     ).not.toBeInTheDocument();
     fireEvent.click(
       within(rows).getByRole("button", {
@@ -618,7 +618,7 @@ describe("organization dashboard contracts", () => {
       pending.get("infrastructure")!(organizationChildren("infrastructure"));
     });
     expect(
-      await within(rows).findByRole("button", { name: "Platform, 1 user" }),
+      await within(rows).findByRole("button", { name: "Platform, 3 users" }),
     ).toBeVisible();
     fireEvent.click(
       within(rows).getByRole("button", {
@@ -626,7 +626,7 @@ describe("organization dashboard contracts", () => {
       }),
     );
     expect(
-      within(rows).queryByRole("button", { name: "Platform, 1 user" }),
+      within(rows).queryByRole("button", { name: "Platform, 3 users" }),
     ).not.toBeInTheDocument();
     fireEvent.click(
       within(rows).getByRole("button", {
@@ -634,7 +634,7 @@ describe("organization dashboard contracts", () => {
       }),
     );
     expect(
-      await within(rows).findByRole("button", { name: "Platform, 1 user" }),
+      await within(rows).findByRole("button", { name: "Platform, 3 users" }),
     ).toBeVisible();
     expect(
       vi
@@ -661,17 +661,17 @@ describe("organization dashboard contracts", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Retry children" }));
     expect(
-      await screen.findByRole("button", { name: "Infrastructure, 2 users" }),
+      await screen.findByRole("button", { name: "Infrastructure, 4 users" }),
     ).toBeVisible();
   });
 
   it("does not flash a previous branch report while the next branch is loading", async () => {
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     expect(
-      await screen.findByRole("img", { name: "Spend (USD) over time" }),
+      await screen.findByRole("region", { name: "Spend history" }),
     ).toBeVisible();
     vi.mocked(api.organizationUsage).mockImplementation(
       () => new Promise(() => {}),
@@ -689,7 +689,7 @@ describe("organization dashboard contracts", () => {
       await screen.findByRole("button", { name: "Marketing, 1 user" }),
     );
     expect(
-      screen.queryByRole("img", { name: "Spend (USD) over time" }),
+      screen.queryByRole("region", { name: "Spend history" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("alex@example.com")).not.toBeInTheDocument();
     expect(screen.getByText("Loading team details...")).toBeVisible();
@@ -702,24 +702,173 @@ describe("organization dashboard contracts", () => {
       total_pages: 2,
     }));
     renderOrganization();
+    expect(
+      await screen.findByRole("button", {
+        name: "Usage report, Engineering, 5 users",
+      }),
+    ).toBeVisible();
+    expect(api.organizationUsage).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "All" }));
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Usage report, all groups, 4 users",
+        name: "Usage report, all groups, 6 users",
       }),
     );
     expect(await screen.findByText("sam@example.com")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() =>
-      expect(api.organizationUsers).toHaveBeenLastCalledWith("", 2),
+      expect(api.organizationUsers).toHaveBeenLastCalledWith([], 2),
     );
+    fireEvent.click(
+      await within(await groupList()).findByRole("button", {
+        name: "Marketing, 1 user",
+      }),
+    );
+    await waitFor(() =>
+      expect(api.organizationUsers).toHaveBeenLastCalledWith(["marketing"], 1),
+    );
+  });
+
+  it("shows a team owner their team's budget instead of gateway status", async () => {
+    renderOrganization();
+    const card = (await screen.findByText("Team budget")).parentElement!;
+    expect(card).toHaveTextContent("$1,000");
+    expect(card).toHaveTextContent("$50 per person");
+    expect(screen.queryByText("LiteLLM gateway")).not.toBeInTheDocument();
+  });
+
+  it("closes the usage report from its button or its close control", async () => {
+    renderOrganization();
+    const open = await screen.findByRole("button", {
+      name: "Usage report, Engineering, 5 users",
+    });
+    fireEvent.click(open);
+    expect(
+      await screen.findByRole("region", { name: "Usage report" }),
+    ).toBeVisible();
+    // The same button hides it again.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Hide report, Engineering, 5 users" }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Usage report" }),
+    ).not.toBeInTheDocument();
+    // Or the report's own close control, which returns focus to the button.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Usage report, Engineering, 5 users",
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Close usage report" }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Usage report" }),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: "Usage report, Engineering, 5 users",
+        }),
+      ).toHaveFocus(),
+    );
+    // A selected group's report closes with the group.
+    fireEvent.click(
+      await within(await groupList()).findByRole("button", {
+        name: "Infrastructure, 4 users",
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Close usage report" }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Usage report" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("combines several departments in the cards, table and report", async () => {
+    // A third department, so two selected ones are not "all groups".
+    const overview = organizationOverview();
+    const sales = {
+      ...overview.groups.find((group) => group.id === "marketing")!,
+      id: "sales",
+      name: "Sales",
+      path: ["Sales"],
+      team_id: "demo-sales",
+      members: 0,
+    };
+    vi.mocked(api.organization).mockResolvedValue({
+      ...overview,
+      groups: [...overview.groups, sales],
+    });
+    vi.mocked(api.organizationChildren).mockImplementation(async (parent) => {
+      const children = organizationChildren(parent);
+      return parent
+        ? children
+        : {
+            ...children,
+            groups: [
+              ...children.groups,
+              {
+                ...sales,
+                has_children: false,
+              } as (typeof children.groups)[number],
+            ],
+          };
+    });
+    renderOrganization();
+    const engineering = await screen.findByRole("button", {
+      name: "Engineering",
+      pressed: true,
+    });
+    // The last selected department cannot be switched off.
+    fireEvent.click(engineering);
+    expect(engineering).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(
       screen.getByRole("button", { name: "Marketing", pressed: false }),
     );
+    expect(
+      screen.getByRole("button", { name: "Marketing", pressed: true }),
+    ).toBeVisible();
+    expect(
+      await screen.findByRole("heading", {
+        name: "Groups in Engineering + Marketing",
+      }),
+    ).toBeVisible();
+    const rows = await groupList();
+    expect(
+      within(rows).getByRole("button", { name: "Engineering, 5 users" }),
+    ).toBeVisible();
+    expect(
+      within(rows).getByRole("button", { name: "Marketing, 1 user" }),
+    ).toBeVisible();
+    expect(
+      await screen.findByRole("img", {
+        name: "Spend split across 2 departments",
+      }),
+    ).toBeVisible();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Marketing, 1 user" }),
+      screen.getByRole("button", {
+        name: "Usage report, Engineering + Marketing, 6 users",
+      }),
     );
     await waitFor(() =>
-      expect(api.organizationUsers).toHaveBeenLastCalledWith("marketing", 1),
+      expect(api.organizationUsage).toHaveBeenLastCalledWith(
+        ["engineering", "marketing"],
+        expect.any(String),
+        expect.any(String),
+      ),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "Usage in Engineering + Marketing",
+      }),
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(api.organizationUsers).toHaveBeenLastCalledWith(
+        ["engineering", "marketing"],
+        1,
+      ),
     );
   });
 });

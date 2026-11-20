@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { openGroup } from "./organizationPanel";
 
 // Real Keycloak, real LiteLLM and the real backend with enforced budgets:
 // administrators set per-user limits on both pages, and many members replace
@@ -60,7 +61,7 @@ async function keyInfo(page: Page, secret: string) {
   return response.ok() ? (await response.json()).info : null;
 }
 
-test("a global administrator sets per-user limits on Budget planning and the Teams page", async ({
+test("a global administrator sets per-user limits on Organization and the Teams page", async ({
   browser,
 }) => {
   test.setTimeout(240_000);
@@ -75,16 +76,15 @@ test("a global administrator sets per-user limits on Budget planning and the Tea
       (g) => g.name === "Engineering",
     )!.id;
 
-    // Budget planning: override the configured limit (none) with $25.
+    // Organization: override the configured limit (none) with $25.
     await admin.page.goto("/organization");
-    const input = admin.page.getByLabel("Engineering per-user limit");
+    const panel = await openGroup(admin.page, "Engineering");
+    const input = panel.getByLabel("Engineering per-person limit");
     await input.fill("25");
     const saved = admin.page.waitForResponse(
       (r) => r.request().method() === "PATCH" && r.url().endsWith("/per-user"),
     );
-    await admin.page
-      .getByRole("button", { name: "Save Engineering per-user limit" })
-      .click();
+    await panel.getByRole("button", { name: "Save changes" }).click();
     expect((await saved).status()).toBe(200);
     const after = await groups(admin.page);
     expect(after.find((g) => g.name === "Engineering")?.per_user).toBe(25);
@@ -93,11 +93,10 @@ test("a global administrator sets per-user limits on Budget planning and the Tea
 
     // A team administrator sees the limit but cannot change it.
     await teamAdmin.page.goto("/organization");
+    const teamPanel = await openGroup(teamAdmin.page, "Engineering");
+    await expect(teamPanel.getByText("Per-person limit")).toContainText("$25");
     await expect(
-      teamAdmin.page.getByText(/Per-user limit: \$25\.00 \(set here/).first(),
-    ).toBeVisible();
-    await expect(
-      teamAdmin.page.getByLabel("Engineering per-user limit"),
+      teamAdmin.page.getByLabel("Engineering per-person limit"),
     ).toHaveCount(0);
     const denied = await teamAdmin.page.request.patch(
       `/api/v1/organization/groups/${engineering}/per-user`,

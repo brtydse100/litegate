@@ -80,9 +80,10 @@ authoritative protection.
 | `user` | Sign in, create or regenerate a personal key, and view its access snapshot, including the accessible model list |
 | `admin` | Everything a user can do, plus manage local users, LiteLLM teams, installation keys, and bulk key policy |
 
-Administrators work from a sidebar grouped into **Workspace** (My key, and
-Analytics when enabled), **Manage** (Organization, Teams, Keys, People) and **System**
-(Audit log, Status). On phones the sidebar becomes a scrolling row at the top.
+Administrators, including organization administrators, always work from a
+sidebar grouped into **Workspace** (My key, and Analytics when enabled),
+**Manage** (Organization, Teams, Keys, People) and **System** (Audit log,
+Status); ordinary users get a top bar. On phones the sidebar becomes a scrolling row at the top.
 **Audit log** opens the audit table on the Status page. The sign-in page shows
 the logo and custom login text in a navy panel beside the sign-in form; on
 phones the panel sits above the form.
@@ -267,6 +268,16 @@ Continue with the [deployment guide](../DEPLOYMENT.md) or
 All portal users can open personal hourly analytics. System administrators can
 search the read-only registered People directory, including SSO/no-key accounts.
 Delegated Organization access requires both designation and group administration;
-LiteGate-managed scoped roles work without an Enterprise license. Full email
+LiteGate-managed scoped roles work without an Enterprise license. A team owner
+sees only their own team, with the same sidebar and Organization page as an
+administrator. A **Team budget** card replaces gateway status, and the usage
+report opens only on request. A team of people opens on its **People** list;
+choosing any team shows everyone in it, including sub-teams. With budget
+planning enabled, owners split their team's budget among its teams (in the edit
+panel) and members (in the People list), but cannot raise their own team's
+total, their own allowance or per-person limits. The sidebar has a theme
+switch. The live demo's **Owner** role
+shows a team of people and a team of teams (**People** and **Teams**), with
+synthetic budget planning. Full email
 addresses wrap and have explicit copy actions. See [configuration and current
 enforcement limits](governance-and-analytics.md).

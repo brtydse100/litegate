@@ -37,7 +37,7 @@ async def organization_group(node_id: str, actor: ApiActor = Depends(get_api_act
 
 @router.get("/users")
 async def organization_users(
-    node: str | None = Query(default=None, max_length=24),
+    node: list[str] | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
     actor: ApiActor = Depends(get_api_actor),
@@ -47,7 +47,7 @@ async def organization_users(
 
 @router.get("/usage")
 async def organization_usage(
-    node: str | None = Query(default=None, max_length=24),
+    node: list[str] | None = Query(default=None),
     start_date: date | None = None,
     end_date: date | None = None,
     actor: ApiActor = Depends(get_api_actor),

@@ -125,7 +125,8 @@ async def test_leaf_selection_counts_only_members_in_that_group(monkeypatch, set
     teams = sorted({item.team_id for item in setup.nodes.values()})
     fetch.assert_awaited_once_with(teams, day.isoformat(), day.isoformat())
     assert result["totals"] == {"spend": 10, "tokens": 100, "requests": 2}
-    assert result["by_group"] == [{"id": None, "name": "Direct members", "spend": 10, "tokens": 100, "requests": 2}]
+    day_usage = {"date": day.isoformat(), "spend": 10, "tokens": 100, "requests": 2}
+    assert result["by_group"] == [{"id": None, "name": "Direct members", "spend": 10, "tokens": 100, "requests": 2, "daily": [day_usage]}]
     assert result["by_user"] == [{"id": "alice", "name": "alice@example.com", "spend": 10, "tokens": 100, "requests": 2}]
 
 
@@ -380,3 +381,62 @@ async def test_direct_members_and_a_child_with_that_name_have_distinct_group_ids
     detail = await reports.usage(child.id, day, day)
     assert detail["users"] == 1
     assert detail["totals"]["spend"] == 5
+
+
+def squads(tree):
+    return [next(node for node in tree.nodes.values() if node.path[-1] == name) for name in ("squad1", "squad2")]
+
+
+@pytest.mark.asyncio
+async def test_several_groups_combine_members_and_compare_side_by_side(monkeypatch, setup):
+    squad1, squad2 = squads(setup)
+    marketing = next(node for node in setup.roots if node.path == ("Marketing",))
+    monkeypatch.setattr(litellm, "list_user_keys", AsyncMock(return_value=[]))
+    combined = await reports.users([squad1.id, squad2.id], 1, 25)
+    assert {user["user_id"] for user in combined["users"]} == {"alice", "bob"}
+    only_alice = await reports.users([squad1.id, marketing.id], 1, 25)
+    assert [user["user_id"] for user in only_alice["users"]] == ["alice"]
+
+    day = datetime.now(timezone.utc).date()
+    monkeypatch.setattr(upstream, "team_daily_usage", AsyncMock(return_value=[row(day, {"alice": 3, "bob": 5})]))
+    result = await reports.usage([squad1.id, squad2.id], day, day)
+    # Several selected groups break down by those groups, not their children.
+    assert {group["name"]: group["spend"] for group in result["by_group"]} == {"squad1": 3, "squad2": 5}
+    # Each group also reports its own days, for the team-by-day grid.
+    assert {group["name"]: group["daily"][0]["spend"] for group in result["by_group"]} == {"squad1": 3, "squad2": 5}
+    assert result["totals"]["spend"] == 8
+    assert result["users"] == 2
+
+
+@pytest.mark.asyncio
+async def test_selected_groups_are_validated_one_by_one(setup):
+    squad1, _ = squads(setup)
+    with pytest.raises(HTTPException) as missing:
+        await reports.users([squad1.id, "missing"], 1, 25)
+    assert missing.value.status_code == 404
+    with pytest.raises(HTTPException) as too_many:
+        await reports.users([f"group-{index}" for index in range(reports.MAX_SELECTED_GROUPS + 1)], 1, 25)
+    assert too_many.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_usage_endpoint_accepts_repeated_node_parameters(monkeypatch, setup):
+    import httpx
+
+    from app.main import app
+    from app.models import CurrentUser
+    from app.routers.api_actor import ApiActor, get_api_actor
+
+    squad1, squad2 = squads(setup)
+    received = AsyncMock(return_value={"users": []})
+    monkeypatch.setattr(reports, "users", received)
+    app.dependency_overrides[get_api_actor] = lambda: ApiActor(
+        CurrentUser(user_id="root", email="root@example.invalid", role="admin", auth_source="sso")
+    )
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as http:
+            response = await http.get(f"/api/v1/organization/users?node={squad1.id}&node={squad2.id}")
+    finally:
+        app.dependency_overrides.pop(get_api_actor, None)
+    assert response.status_code == 200
+    assert received.await_args.args[0] == [squad1.id, squad2.id]

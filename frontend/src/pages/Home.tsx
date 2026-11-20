@@ -18,12 +18,12 @@ import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
 import AdminTeams from "../components/AdminTeams";
 import PersonalAnalytics from "../components/PersonalAnalytics";
-import BudgetManager from "../components/BudgetManager";
 import AdminOrganization from "../components/AdminOrganization";
 import {
   AdminSidebar,
   BrandMark,
   DemoRoleSwitch,
+  type DemoRole,
   UserMenu,
   type NavGroup,
 } from "../components/AppChrome";
@@ -63,6 +63,10 @@ async function fetchPortalConfig(): Promise<PortalConfig> {
   return response.json();
 }
 
+// The demo's team-owner choice outlives Home re-mounting after a sign-in
+// refresh; a full reload resets the demo account and this together.
+let rememberedDemoOwner: DemoRole | null = null;
+
 export default function Home() {
   const { user, login, logout } = useAuth();
   const queryClient = useQueryClient();
@@ -71,6 +75,9 @@ export default function Home() {
   const [previousKeyIds, setPreviousKeyIds] = useState<string[]>([]);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [demoRolePending, setDemoRolePending] = useState(false);
+  const [demoOwner, setDemoOwner] = useState<DemoRole | null>(
+    () => rememberedDemoOwner,
+  );
 
   function showKey(secret: string) {
     setPreviousKeyIds(keyList.map(keyToken));
@@ -113,9 +120,8 @@ export default function Home() {
   });
   const mutationError = create.error ?? regenerate.error ?? keys.error;
 
-  async function switchDemoRole(role: "admin" | "user") {
-    if (import.meta.env.VITE_DEMO_MODE !== "true" || user?.role === role)
-      return;
+  async function switchDemoRole(role: DemoRole) {
+    if (import.meta.env.VITE_DEMO_MODE !== "true") return;
     setDemoRolePending(true);
     try {
       const response = await fetch("/api/demo/role", {
@@ -124,6 +130,13 @@ export default function Home() {
         body: JSON.stringify({ role }),
       });
       if (!response.ok) throw new Error("Could not switch the demo role");
+      rememberedDemoOwner = role.endsWith("-owner") ? role : null;
+      setDemoOwner(rememberedDemoOwner);
+      // Organization data depends on who is looking; fetch it again.
+      queryClient.removeQueries({
+        predicate: (query) =>
+          String(query.queryKey[0]).startsWith("organization"),
+      });
       await login();
     } finally {
       setDemoRolePending(false);
@@ -162,6 +175,14 @@ export default function Home() {
     organizationAccess.isPending
   )
     return <p role="status">Checking organization access…</p>;
+  // Team owners get the sidebar layout; wait for their access instead of
+  // flashing the ordinary top bar first.
+  if (
+    !isAdmin &&
+    config?.organization_delegation_enabled &&
+    organizationAccess.isPending
+  )
+    return <p role="status">Loading access…</p>;
   const adminSections = new Set([
     "/keys",
     "/users",
@@ -184,13 +205,18 @@ export default function Home() {
   const signOut = () => void logout();
   const demoSwitch = (
     <DemoRoleSwitch
-      role={user?.role}
+      role={demoOwner ?? (user?.role === "admin" ? "admin" : "user")}
       pending={demoRolePending}
       onSwitch={(role) => void switchDemoRole(role)}
     />
   );
-  const adminLayout = section !== "/my-key" && section !== "/analytics";
   const adminHome = isAdmin || canViewOrganization ? "/organization" : null;
+  // Delegated organization access is shown as its own role.
+  const roleLabel = !isAdmin && canViewOrganization ? "Team owner" : user?.role;
+  // Anyone with admin access keeps the sidebar, including on My key and
+  // Analytics (listed under Workspace); ordinary users get the top bar.
+  const adminLayout =
+    !!adminHome || (section !== "/my-key" && section !== "/analytics");
 
   const notices = (
     <>
@@ -412,18 +438,13 @@ export default function Home() {
                   Setup guide
                 </a>
               )}
-              {adminHome && (
-                <Link to={adminHome} className={topLink}>
-                  Admin
-                </Link>
-              )}
               <span
                 aria-hidden="true"
                 className="hidden h-5 w-px bg-navy-3 sm:block"
               />
               <UserMenu
                 email={user?.email}
-                role={user?.role}
+                role={roleLabel}
                 onSignOut={signOut}
                 apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
               />
@@ -488,7 +509,7 @@ export default function Home() {
         groups={navGroups}
         logoUrl={config?.logo_url}
         email={user?.email}
-        role={user?.role}
+        role={roleLabel}
         onSignOut={signOut}
         apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
         extra={demoSwitch}
@@ -496,18 +517,15 @@ export default function Home() {
       <div className="min-w-0 flex-1 md:flex md:flex-col">
         <main className="min-w-0 flex-1 md:overflow-y-auto">
           {section === "/organization" && canViewOrganization ? (
-            <>
-              <AdminOrganization
-                budgetsEnabled={!!config?.hierarchical_budgets_enabled}
-                email={user?.email}
-                isAdmin={isAdmin}
-              />
-              {config?.hierarchical_budgets_enabled && (
-                <div className="px-4 pb-8 sm:px-8">
-                  <BudgetManager />
-                </div>
-              )}
-            </>
+            <AdminOrganization
+              budgetsEnabled={!!config?.hierarchical_budgets_enabled}
+              email={user?.email}
+              isAdmin={isAdmin}
+            />
+          ) : section === "/my-key" || section === "/analytics" ? (
+            <div className="mx-auto max-w-[1080px] px-4 pb-14 pt-9 sm:px-8">
+              {section === "/analytics" ? <PersonalAnalytics /> : myKey}
+            </div>
           ) : (
             <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-8">
               {section === "/users" && isAdmin ? (

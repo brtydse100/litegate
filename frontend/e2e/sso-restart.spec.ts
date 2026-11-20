@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openGroup } from "./organizationPanel";
 import { access, writeFile } from "node:fs/promises";
 
 // Real Keycloak, real LiteLLM 1.109.1 and the real backend with enforced
@@ -41,17 +42,17 @@ async function restartBackend(mode: "wipe" | "restart") {
 
 async function saveRootBudget(page: Page, team: string, amount: string) {
   await page.goto("/organization");
-  const input = page.getByLabel(`${team} assigned budget`);
+  const panel = await openGroup(page, team);
+  const input = panel.getByLabel(`${team} group budget`);
   await input.fill(amount);
   // The input shows the draft at once; wait for the saved response itself.
   const saved = page.waitForResponse(
     (r) => r.request().method() === "PATCH" && r.url().includes("/budgets/"),
   );
-  await page.getByRole("button", { name: `Save ${team} budget` }).click();
+  await panel.getByRole("button", { name: "Save changes" }).click();
   expect((await saved).status()).toBe(200);
   await expect(input).toHaveValue(amount);
-  const editor = page.locator("article", { has: input });
-  await expect(editor.getByRole("alert")).toHaveCount(0);
+  await expect(panel.getByRole("alert")).toHaveCount(0);
 }
 
 test("two team budgets saved across restarts without persistence never break the key page", async ({
@@ -193,12 +194,16 @@ test("with persistent storage a restart keeps team budgets and shows no messages
     await restartBackend("restart");
 
     await admin.goto("/organization");
-    await expect(admin.getByLabel("Engineering assigned budget")).toHaveValue(
-      "70",
-    );
-    await expect(admin.getByLabel("Marketing assigned budget")).toHaveValue(
-      "50",
-    );
+    await expect(
+      (await openGroup(admin, "Engineering")).getByLabel(
+        "Engineering group budget",
+      ),
+    ).toHaveValue("70");
+    await expect(
+      (await openGroup(admin, "Marketing")).getByLabel(
+        "Marketing group budget",
+      ),
+    ).toHaveValue("50");
     await user.goto("/my-key");
     await expect(user.getByText(/Assigned through/)).toBeVisible();
     await expect(user.getByRole("alert")).toHaveCount(0);
