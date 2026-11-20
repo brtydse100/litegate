@@ -45,6 +45,22 @@ def within(node, ancestor) -> bool:
     return ancestor is None or node.path[: len(ancestor.path)] == ancestor.path
 
 
+MAX_SELECTED_GROUPS = 50
+
+
+def selected_ancestors(node_ids: str | list[str] | None, scope: OrganizationScope = GLOBAL_SCOPE) -> list:
+    """Groups a report covers (none means every visible group); each is scope-checked."""
+    ids = [node_ids] if node_ids is None or isinstance(node_ids, str) else node_ids
+    ids = list(dict.fromkeys(node_id for node_id in ids if node_id))
+    if len(ids) > MAX_SELECTED_GROUPS or any(len(node_id) > 24 for node_id in ids):
+        raise HTTPException(status_code=422, detail=f"Select at most {MAX_SELECTED_GROUPS} groups")
+    return [selected_nodes(node_id, scope) for node_id in ids]
+
+
+def within_any(node, ancestors: list) -> bool:
+    return not ancestors or any(within(node, ancestor) for ancestor in ancestors)
+
+
 def node_metadata(node, records, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     return {
         "id": node.id,
@@ -169,10 +185,10 @@ async def overview(scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     }
 
 
-async def users(node_id: str | None, page: int, size: int, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
-    ancestor = selected_nodes(node_id, scope)
+async def users(node_id: str | list[str] | None, page: int, size: int, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
+    ancestors = selected_ancestors(node_id, scope)
     records, _ = await identities(scope)
-    selected = [(identity, node) for identity, node in records if within(node, ancestor)]
+    selected = [(identity, node) for identity, node in records if within_any(node, ancestors)]
     batch = selected[(page - 1) * size : page * size]
     semaphore = asyncio.Semaphore(5)
     # Spend for the page comes from one shared key listing when available.
@@ -293,7 +309,7 @@ def add_metrics(target: dict, source: dict) -> None:
         target[key] = upstream.finite_number(target[key] + value, integer=key != "spend")
 
 
-async def usage(node_id: str | None, start: date, end: date, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
+async def usage(node_id: str | list[str] | None, start: date, end: date, scope: OrganizationScope = GLOBAL_SCOPE) -> dict:
     """Usage of the selected members across every managed team.
 
     LiteLLM aggregates per team, one request for up to 50 teams, and attributes
@@ -303,9 +319,10 @@ async def usage(node_id: str | None, start: date, end: date, scope: Organization
     """
     if end < start or (end - start).days > 90 or end > datetime.now(timezone.utc).date():
         raise HTTPException(status_code=422, detail="Select a past or current date range of at most 90 days")
-    ancestor = selected_nodes(node_id, scope)
+    ancestors = selected_ancestors(node_id, scope)
+    ancestor = ancestors[0] if len(ancestors) == 1 else None
     records, issues = await identities(scope)
-    selected = [(identity, node) for identity, node in records if within(node, ancestor)]
+    selected = [(identity, node) for identity, node in records if within_any(node, ancestors)]
     if len(selected) > 5000:
         raise HTTPException(status_code=422, detail="Select a smaller group; one report supports at most 5000 users")
     teams = sorted({node.team_id for node in settings.organization_hierarchy.nodes.values()})
@@ -331,7 +348,16 @@ async def usage(node_id: str | None, start: date, end: date, scope: Organization
         member = {"id": identity["user_id"], "name": identity.get("email") or identity["user_id"], **zero_metrics()}
         by_user.append(member)
         root = scope.root_for(node)
-        depth = ancestor.level + 1 if ancestor else root.level if root is not None and not scope.global_admin else 0
+        # One group breaks down by its children; several compare side by side.
+        depth = (
+            ancestor.level + 1
+            if ancestor
+            else min(item.level for item in ancestors)
+            if ancestors
+            else root.level
+            if root is not None and not scope.global_admin
+            else 0
+        )
         child = node
         while child.level > depth:
             child = settings.organization_hierarchy.nodes[child.parent_id]

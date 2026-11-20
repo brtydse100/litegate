@@ -4,7 +4,7 @@ test("organization demo filters usage and protects the admin view", async ({
   page,
 }) => {
   await page.goto("./");
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   await expect(page).toHaveURL(/\/organization$/);
   const groups = page.getByRole("list", { name: "Organization groups" });
   await expect(groups.getByRole("button", { name: /^Platform,/ })).toHaveCount(
@@ -23,7 +23,7 @@ test("organization demo filters usage and protects the admin view", async ({
   await expect(page.getByText("sam@example.com", { exact: true })).toHaveCount(
     0,
   );
-  await page.getByLabel("Chart metric").selectOption("tokens");
+  // Spend, requests and tokens each have their own small trend.
   await expect(
     page.getByRole("img", { name: "Tokens over time" }),
   ).toBeVisible();
@@ -47,7 +47,6 @@ test("organization demo filters usage and protects the admin view", async ({
   const cloud = page.getByRole("complementary", { name: "Edit Cloud" });
   await expect(cloud.getByText(/Inherited from Engineering/)).toBeVisible();
   await expect(cloud.getByText("$50", { exact: true })).toBeVisible();
-  await page.getByLabel("Chart metric").selectOption("spend");
   const memberChart = page
     .getByRole("heading", { name: "Usage by member" })
     .locator("..");
@@ -57,7 +56,7 @@ test("organization demo filters usage and protects the admin view", async ({
   await page.getByRole("button", { name: "View demo as user" }).click();
   await expect(page).toHaveURL(/\/my-key$/);
   await expect(
-    page.getByRole("link", { name: "Admin", exact: true }),
+    page.getByRole("navigation", { name: "Admin navigation" }),
   ).toHaveCount(0);
   const status = await page.evaluate(
     async () => (await fetch("/api/v1/organization")).status,
@@ -84,7 +83,7 @@ test("interactive demo keeps its key views consistent and supports local sign-in
   await expect(page.getByText("sk-litegate-demo-rotated-4d8e")).toBeVisible();
   await page.getByRole("button", { name: "Hide API key" }).click();
 
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   await page.getByRole("link", { name: "Keys", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Key policies" }),
@@ -104,9 +103,12 @@ test("interactive demo keeps its key views consistent and supports local sign-in
 
   await page.getByRole("button", { name: "View demo as user" }).click();
   await expect(page).toHaveURL(/\/litegate\/my-key$/);
-  await expect(page.getByRole("link", { name: "Admin" })).toHaveCount(0);
+  await expect(
+    page.getByRole("navigation", { name: "Admin navigation" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "View demo as admin" }).click();
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  // The admin sidebar appears at once, without leaving My key.
+  await expect(page).toHaveURL(/\/litegate\/my-key$/);
   await expect(
     page.getByRole("link", { name: "Keys", exact: true }),
   ).toBeVisible();
@@ -138,7 +140,7 @@ for (const width of [390, 1280]) {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.setViewportSize({ width, height: 900 });
     await page.goto("./");
-    await page.getByRole("link", { name: "Admin", exact: true }).click();
+    await page.getByRole("link", { name: "Organization", exact: true }).click();
     await page.getByRole("link", { name: "People", exact: true }).click();
     const directory = page.getByRole("region", { name: "People directory" });
     await directory.getByLabel("Search people by email").fill("no-key");
@@ -244,7 +246,7 @@ for (const width of [390, 768, 1024, 1100, 1280]) {
 test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("./");
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   const nav = page.getByRole("navigation", { name: "Admin navigation" });
   await nav.getByRole("button", { name: "Account menu" }).last().click();
   await expect(nav.getByRole("menu")).toBeVisible();
@@ -255,7 +257,7 @@ test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
 test("the current sidebar link is visible on phones", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./");
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   for (const [route, label] of [
     ["teams", "Teams"],
     ["keys", "Keys"],
@@ -278,7 +280,7 @@ test("pages fit a phone screen without sideways scrolling", async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./");
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   const admin = ["organization", "teams", "keys", "users", "status"];
   for (const route of [...admin, "analytics", "my-key"]) {
     await page.goto(`./${route}`);

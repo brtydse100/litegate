@@ -153,7 +153,9 @@ export const shortMoney = (value: number | null | undefined): string =>
 export function pluralWord(word: string) {
   const lower = word.toLowerCase();
   if (lower === "person") return "people";
-  return lower.endsWith("s") ? lower : `${lower}s`;
+  if (lower.endsWith("s")) return lower;
+  // "branch" → "branches", "box" → "boxes".
+  return /(ch|sh|x|z)$/.test(lower) ? `${lower}es` : `${lower}s`;
 }
 
 export function plural(count: number, word: string) {

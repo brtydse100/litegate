@@ -189,8 +189,11 @@ export default function Home() {
       onSwitch={(role) => void switchDemoRole(role)}
     />
   );
-  const adminLayout = section !== "/my-key" && section !== "/analytics";
   const adminHome = isAdmin || canViewOrganization ? "/organization" : null;
+  // Anyone with admin access keeps the sidebar, including on My key and
+  // Analytics (listed under Workspace); ordinary users get the top bar.
+  const adminLayout =
+    !!adminHome || (section !== "/my-key" && section !== "/analytics");
 
   const notices = (
     <>
@@ -412,11 +415,6 @@ export default function Home() {
                   Setup guide
                 </a>
               )}
-              {adminHome && (
-                <Link to={adminHome} className={topLink}>
-                  Admin
-                </Link>
-              )}
               <span
                 aria-hidden="true"
                 className="hidden h-5 w-px bg-navy-3 sm:block"
@@ -508,6 +506,10 @@ export default function Home() {
                 </div>
               )}
             </>
+          ) : section === "/my-key" || section === "/analytics" ? (
+            <div className="mx-auto max-w-[1080px] px-4 pb-14 pt-9 sm:px-8">
+              {section === "/analytics" ? <PersonalAnalytics /> : myKey}
+            </div>
           ) : (
             <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-8">
               {section === "/users" && isAdmin ? (

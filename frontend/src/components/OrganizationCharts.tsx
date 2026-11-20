@@ -15,107 +15,102 @@ export function metricValue(value: number, metric: UsageMetric): string {
   return formatUsd(value);
 }
 
-export function SpendTrend({
+const trendColor: Record<UsageMetric, string> = {
+  spend: "text-teal",
+  requests: "text-blue",
+  tokens: "text-periwinkle",
+};
+
+const shortDay = (date: string) =>
+  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+
+/** A compact card: the period total, a small daily trend and its peak day. */
+export function TrendCard({
   daily,
   metric,
+  total,
 }: {
   daily: OrganizationUsage["daily"];
   metric: UsageMetric;
+  total: number;
 }) {
-  const max = Math.max(...daily.map((day) => day[metric]), 0);
+  const label = metricLabels[metric];
+  const values = daily.map((day) => day[metric]);
+  const max = Math.max(0, ...values);
   const scale = max || 1;
-  const x = (index: number) =>
-    88 + (index / Math.max(1, daily.length - 1)) * 544;
-  const y = (value: number) => 176 - (value / scale) * 144;
-  const points = daily
-    .map((day, index) => `${x(index)},${y(day[metric])}`)
-    .join(" ");
+  const x = (index: number) => (index / Math.max(1, daily.length - 1)) * 240;
+  const y = (value: number) => 52 - (value / scale) * 46;
+  const line = daily.map((day, index) => `${x(index)},${y(day[metric])}`);
+  const peak = daily.reduce<(typeof daily)[number] | undefined>(
+    (best, day) => (!best || day[metric] > best[metric] ? day : best),
+    undefined,
+  );
+  const average = daily.length ? total / daily.length : 0;
   return (
-    <section className="rounded-lg border border-line bg-card p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-ink">
-        {metricLabels[metric]} over time
-      </h2>
+    <section
+      aria-label={`${label} summary`}
+      className="flex min-w-0 flex-col rounded-[10px] border border-line bg-card p-4"
+    >
+      <p className="text-xs text-ink-4">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-ink">
+        {metricValue(total, metric)}
+      </p>
       <svg
         role="img"
-        aria-label={`${metricLabels[metric]} over time`}
-        viewBox="0 0 656 216"
-        className="mt-3 w-full text-blue-ink"
+        aria-label={`${label} over time`}
+        viewBox="0 0 240 56"
+        preserveAspectRatio="none"
+        className={`mt-3 h-14 w-full ${trendColor[metric]}`}
       >
-        <title>{metricLabels[metric]} by day</title>
-        {[0, 0.5, 1].map((ratio) => (
-          <g key={ratio}>
-            <line
-              x1="88"
-              x2="632"
-              y1={y(scale * ratio)}
-              y2={y(scale * ratio)}
-              stroke="currentColor"
-              className="text-line"
-            />
-            <text
-              x="82"
-              y={y(scale * ratio) + 4}
-              textAnchor="end"
-              fontSize="10"
-              fill="currentColor"
-              className="text-ink-4"
-            >
-              {max * ratio >= 1000
-                ? `${metric === "spend" ? "$" : ""}${(max * ratio).toLocaleString(undefined, { notation: "compact", minimumFractionDigits: metric === "spend" ? 2 : 0, maximumFractionDigits: metric === "spend" ? 2 : 6 })}`
-                : metricValue(max * ratio, metric)}
-            </text>
-          </g>
-        ))}
-        <polyline
-          fill="none"
+        <title>{label} by day</title>
+        <line
+          x1="0"
+          x2="240"
+          y1="52"
+          y2="52"
           stroke="currentColor"
-          strokeWidth="2.5"
-          points={points}
+          className="text-line"
         />
-        {daily.map((day, index) => (
-          <circle
-            key={day.date}
-            cx={x(index)}
-            cy={y(day[metric])}
-            r="3"
-            fill="currentColor"
-          >
-            <title>
-              {day.date}: {metricValue(day[metric], metric)}
-            </title>
-          </circle>
-        ))}
-        <text
-          x="88"
-          y="203"
-          fontSize="11"
-          fill="currentColor"
-          className="text-ink-4"
-        >
-          {daily[0]?.date}
-        </text>
-        <text
-          x="632"
-          y="203"
-          textAnchor="end"
-          fontSize="11"
-          fill="currentColor"
-          className="text-ink-4"
-        >
-          {daily[daily.length - 1]?.date}
-        </text>
+        {line.length > 1 && (
+          <>
+            <polygon
+              points={`0,52 ${line.join(" ")} 240,52`}
+              fill="currentColor"
+              opacity="0.12"
+            />
+            <polyline
+              points={line.join(" ")}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              vectorEffect="non-scaling-stroke"
+            />
+          </>
+        )}
       </svg>
-      {max === 0 && (
-        <p className="text-xs text-ink-4">No recorded usage in this period.</p>
+      {daily.length > 0 && (
+        <p className="mt-1 flex justify-between text-[11px] text-ink-4">
+          <span>{shortDay(daily[0].date)}</span>
+          <span>{shortDay(daily[daily.length - 1].date)}</span>
+        </p>
       )}
-      <details className="mt-2 text-xs text-ink-4">
-        <summary className="cursor-pointer">View daily values</summary>
+      <p className="mt-2 text-xs text-ink-3">
+        {max === 0 || !peak
+          ? "No recorded usage in this period."
+          : `Avg ${metricValue(average, metric)} a day · peak ${metricValue(peak[metric], metric)} on ${shortDay(peak.date)}`}
+      </p>
+      <details className="mt-1.5 text-xs text-ink-4">
+        <summary className="cursor-pointer">Daily values</summary>
         <div className="mt-2 max-h-52 overflow-auto">
           <table className="w-full text-left">
             <thead>
               <tr>
                 <th>Date</th>
-                <th className="text-right">{metricLabels[metric]}</th>
+                <th className="text-right">{label}</th>
               </tr>
             </thead>
             <tbody>

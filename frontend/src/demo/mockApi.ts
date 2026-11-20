@@ -294,7 +294,7 @@ async function mockResponse(request: Request): Promise<Response> {
     if (path.endsWith("/users"))
       return json(
         organizationUsers(
-          url.searchParams.get("node"),
+          url.searchParams.getAll("node"),
           Number(url.searchParams.get("page") ?? 1),
         ),
       );
@@ -311,7 +311,9 @@ async function mockResponse(request: Request): Promise<Response> {
           { detail: "Select a valid date range of at most 90 days" },
           422,
         );
-      return json(organizationUsage(url.searchParams.get("node"), start, end));
+      return json(
+        organizationUsage(url.searchParams.getAll("node"), start, end),
+      );
     }
     return json({ detail: "Not found" }, 404);
   }

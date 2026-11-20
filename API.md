@@ -119,8 +119,12 @@ cannot use these capabilities. See [configuration](docs/governance-and-analytics
   returns `enabled: false`.
 - `GET /api/v1/organization/users?node=<id>&page=1&page_size=25`: paginated users,
   current paths, per-key allowances, and key spend. Page size is at most 100.
+  Repeat `node` (up to 50 groups) to combine several groups; omit it for every
+  group the caller may see. Each group is checked against the caller's scope.
 - `GET /api/v1/organization/usage?node=<id>&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD`:
-  daily/group/model spend, tokens, and logged requests. Defaults to 30 days through
+  daily/group/model spend, tokens, and logged requests. `node` repeats like the
+  users endpoint; one group breaks down by its children, several by the selected
+  groups themselves. Defaults to 30 days through
   today. Supports up to 90 days between UTC dates and 5000 users per report.
   LiteGate reads LiteLLM's per-team daily activity for every managed team (one
   request per 50 teams, cached for a minute) and counts each key's usage for its

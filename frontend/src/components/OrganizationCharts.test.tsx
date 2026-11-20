@@ -1,22 +1,27 @@
 import { render, cleanup, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
-import { SpendTrend, UsageBars, metricValue } from "./OrganizationCharts";
+import { TrendCard, UsageBars, metricValue } from "./OrganizationCharts";
 afterEach(cleanup);
-it.each([0.02, 0.04, 0.99, 1, 1234, 123456789])(
-  "distinguishes ticks at scale %s",
+it.each([0.000001, 0.02, 1, 1234, 123456789])(
+  "summarises spend of %s with a finite trend and its peak day",
   (spend) => {
+    const daily = [
+      { date: "2026-01-01", spend: spend / 2, tokens: 0, requests: 0 },
+      { date: "2026-01-02", spend, tokens: 0, requests: 0 },
+    ];
     const { container } = render(
-      <SpendTrend
-        metric="spend"
-        daily={[{ date: "2026-01-01", spend, tokens: 0, requests: 0 }]}
-      />,
+      <TrendCard metric="spend" daily={daily} total={spend * 1.5} />,
     );
-    const labels = [...container.querySelectorAll("g text")].map(
-      (el) => el.textContent,
+    expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
+    expect(
+      screen.getByRole("img", { name: "Spend (USD) over time" }),
+    ).toBeVisible();
+    expect(container.textContent).toContain(metricValue(spend * 1.5, "spend"));
+    // The peak sits at the top of the small chart, whatever the scale.
+    expect(container.querySelector("polyline")?.getAttribute("points")).toBe(
+      "0,29 240,6",
     );
-    expect(new Set(labels).size).toBe(3);
-    expect(labels[1]).not.toMatch(/^\$0(?:\.0+)?$/);
-    expect(labels[2]).not.toMatch(/^\$0(?:\.0+)?$/);
+    expect(container.textContent).toMatch(/peak .+ on /);
   },
 );
 it("rounds sub-cent spend to two decimals for display", () => {
@@ -69,7 +74,7 @@ it.each([
 ])("renders zero and empty usage finitely", ({ daily }) => {
   const { container } = render(
     <>
-      <SpendTrend metric="spend" daily={daily} />
+      <TrendCard metric="spend" daily={daily} total={0} />
       <UsageBars
         title="Usage"
         metric="spend"

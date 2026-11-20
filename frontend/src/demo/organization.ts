@@ -227,19 +227,29 @@ export function organizationTeams(): TeamInfo[] {
   }));
 }
 
-function selectedMembers(nodeId: string | null) {
-  const ancestor = groups.find((group) => group.id === nodeId);
+/** Selected groups: one id, several ids (combined) or none for every group. */
+type Selection = string | string[] | null;
+
+function selectedGroups(nodeIds: Selection) {
+  const ids = [nodeIds ?? []].flat().filter(Boolean);
+  return groups.filter((group) => ids.includes(group.id));
+}
+
+function selectedMembers(nodeIds: Selection) {
+  const ancestors = selectedGroups(nodeIds);
   return members.filter((member) => {
     const group = groups.find((value) => value.id === member.node)!;
     return (
-      !ancestor ||
-      ancestor.path.every((name, index) => group.path[index] === name)
+      !ancestors.length ||
+      ancestors.some((ancestor) =>
+        ancestor.path.every((name, index) => group.path[index] === name),
+      )
     );
   });
 }
 
 export function organizationUsers(
-  nodeId: string | null,
+  nodeId: Selection,
   page: number,
 ): OrganizationUserPage {
   const selected = selectedMembers(nodeId);
@@ -282,11 +292,18 @@ function memberDailyUsage(
 }
 
 export function organizationUsage(
-  nodeId: string | null,
+  nodeId: Selection,
   start: string,
   end: string,
 ): OrganizationUsage {
-  const ancestor = groups.find((group) => group.id === nodeId);
+  const ancestors = selectedGroups(nodeId);
+  // One group breaks down by its children; several by the groups themselves.
+  const breakdownLevel =
+    ancestors.length === 1
+      ? ancestors[0].level + 1
+      : ancestors.length
+        ? Math.min(...ancestors.map((group) => group.level))
+        : 0;
   const selected = selectedMembers(nodeId);
   const totals = zero();
   const byGroup = new Map<
@@ -311,7 +328,7 @@ export function organizationUsage(
     const metrics = zero();
     selected.forEach((member, memberIndex) => {
       const group = groups.find((value) => value.id === member.node)!;
-      const depth = (ancestor?.level ?? -1) + 1;
+      const depth = breakdownLevel;
       const child = groups.find(
         (candidate) =>
           candidate.level === depth &&

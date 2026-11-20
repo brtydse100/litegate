@@ -6,7 +6,7 @@ import {
   organizationUsage,
 } from "../src/demo/organization";
 
-test("@smoke microspend axis labels fit inside the chart", async ({ page }) => {
+test("@smoke microspend trend cards stay readable", async ({ page }) => {
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const url = new URL(route.request().url());
     let body: unknown = {};
@@ -33,19 +33,18 @@ test("@smoke microspend axis labels fit inside the chart", async ({ page }) => {
   });
   await page.goto("/organization");
   await page
-    .getByRole("button", { name: "Usage report, all groups, 4 users" })
+    .getByRole("button", { name: "Usage report, Engineering, 3 users" })
     .click();
-  const chart = page.getByRole("img", { name: "Spend (USD) over time" });
-  await expect(chart).toBeVisible();
-  const bounds = await chart.locator("g text").evaluateAll((labels) =>
-    labels.map((label) => {
-      const box = (label as SVGGraphicsElement).getBBox();
-      return { text: label.textContent, left: box.x };
-    }),
-  );
-  expect(bounds).toHaveLength(3);
-  expect(bounds.map((label) => label.text)).toContain("$0.00");
-  for (const label of bounds) expect(label.left).toBeGreaterThanOrEqual(0);
+  await expect(
+    page.getByRole("img", { name: "Spend (USD) over time" }),
+  ).toBeVisible();
+  const card = page.getByRole("region", { name: "Spend (USD) summary" });
+  await expect(card).toContainText("$0.00");
+  expect(await card.innerHTML()).not.toMatch(/NaN|Infinity/);
+  // Sub-cent amounts round for display without overflowing the small card.
+  expect(
+    await card.evaluate((element) => element.scrollWidth - element.clientWidth),
+  ).toBeLessThanOrEqual(0);
 });
 
 test("organization fetches direct children and selected data progressively", async ({
@@ -87,7 +86,7 @@ test("organization fetches direct children and selected data progressively", asy
   });
   await page.goto("/organization");
   await expect(
-    page.getByRole("button", { name: "Engineering, 3 users" }),
+    page.getByRole("button", { name: "Engineering, 3 users", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Marketing", pressed: false }),

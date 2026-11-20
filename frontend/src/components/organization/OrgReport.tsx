@@ -4,13 +4,7 @@ import { Users } from "lucide-react";
 import { api } from "../../api/client";
 import EmailAddress from "../EmailAddress";
 import DismissibleMessage from "../DismissibleMessage";
-import {
-  metricLabels,
-  metricValue,
-  SpendTrend,
-  UsageBars,
-  type UsageMetric,
-} from "../OrganizationCharts";
+import { metricValue, TrendCard, UsageBars } from "../OrganizationCharts";
 import type { Group } from "./orgModel";
 
 const inputClass =
@@ -18,15 +12,17 @@ const inputClass =
 const money = (value: number | null) =>
   value === null ? "No cap" : metricValue(value, "spend");
 
-/** Usage charts and member list for one group, or all groups when `nodeId` is "". */
+/** Usage charts and member list for some groups, or all groups when empty. */
 export default function OrgReport({
-  nodeId,
+  nodeIds,
+  title,
   selected,
   nextLevel,
   totalUsers,
   onSelectChild,
 }: {
-  nodeId: string;
+  nodeIds: string[];
+  title: string;
   selected?: Group;
   nextLevel?: string;
   totalUsers?: number;
@@ -34,24 +30,24 @@ export default function OrgReport({
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [page, setPage] = useState(1);
-  const [pageNode, setPageNode] = useState(nodeId);
-  if (pageNode !== nodeId) {
-    setPageNode(nodeId);
+  const nodeKey = nodeIds.join(",");
+  const [pageNode, setPageNode] = useState(nodeKey);
+  if (pageNode !== nodeKey) {
+    setPageNode(nodeKey);
     setPage(1);
   }
-  const [metric, setMetric] = useState<UsageMetric>("spend");
   const [startDate, setStartDate] = useState(() =>
     new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10),
   );
   const [endDate, setEndDate] = useState(today);
   const usage = useQuery({
-    queryKey: ["organization-usage", nodeId, startDate, endDate],
-    queryFn: () => api.organizationUsage(nodeId, startDate, endDate),
+    queryKey: ["organization-usage", nodeKey, startDate, endDate],
+    queryFn: () => api.organizationUsage(nodeIds, startDate, endDate),
     staleTime: 60000,
   });
   const users = useQuery({
-    queryKey: ["organization-users", nodeId, page],
-    queryFn: () => api.organizationUsers(nodeId, page),
+    queryKey: ["organization-users", nodeKey, page],
+    queryFn: () => api.organizationUsers(nodeIds, page),
     staleTime: 60000,
     refetchInterval: 60000,
   });
@@ -64,9 +60,7 @@ export default function OrgReport({
       className="flex flex-col gap-5 rounded-xl border border-line bg-card p-5"
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 className="text-base font-bold text-ink">
-          Usage in {selected?.name ?? "all groups"}
-        </h2>
+        <h2 className="text-base font-bold text-ink">Usage in {title}</h2>
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs text-ink-4">
             From (UTC)
@@ -90,21 +84,6 @@ export default function OrgReport({
               max={today}
               onChange={(event) => setEndDate(event.target.value)}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-ink-4">
-            Chart metric
-            <select
-              aria-label="Chart metric"
-              className={inputClass}
-              value={metric}
-              onChange={(event) => setMetric(event.target.value as UsageMetric)}
-            >
-              {Object.entries(metricLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
           </label>
         </div>
       </div>
@@ -135,18 +114,14 @@ export default function OrgReport({
         <>
           <div className="grid gap-3 sm:grid-cols-3">
             {(["spend", "requests", "tokens"] as const).map((item) => (
-              <div
+              <TrendCard
                 key={item}
-                className="rounded-[10px] border border-line bg-card p-4"
-              >
-                <p className="text-xs text-ink-4">{metricLabels[item]}</p>
-                <p className="mt-1 text-xl font-semibold text-ink">
-                  {metricValue(usage.data.totals[item], item)}
-                </p>
-              </div>
+                metric={item}
+                daily={usage.data.daily}
+                total={usage.data.totals[item]}
+              />
             ))}
           </div>
-          <SpendTrend daily={usage.data.daily} metric={metric} />
           {showMembers && !hasMemberUsage && (
             <p className="text-sm text-ink-4">
               Per-member usage is unavailable in this report. Showing group
@@ -167,14 +142,14 @@ export default function OrgReport({
                   ? usage.data.by_user
                   : usage.data.by_group
               }
-              metric={metric}
+              metric="spend"
               emailLabels={showMembers && hasMemberUsage}
               onSelect={!showMembers && nextLevel ? onSelectChild : undefined}
             />
             <UsageBars
               title="Usage by model"
               values={usage.data.by_model}
-              metric={metric}
+              metric="spend"
             />
           </div>
         </>
