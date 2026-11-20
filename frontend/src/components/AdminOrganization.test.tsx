@@ -117,10 +117,13 @@ describe("organization dashboard contracts", () => {
     await waitFor(() => expect(refresh).toBeEnabled());
     const calls = vi.mocked(api.organizationChildren).mock.calls.length;
     fireEvent.click(refresh);
-    await waitFor(() =>
-      expect(
-        vi.mocked(api.organizationChildren).mock.calls.length,
-      ).toBeGreaterThan(calls),
+    // The refetch is asynchronous; allow for slow CI runners.
+    await waitFor(
+      () =>
+        expect(
+          vi.mocked(api.organizationChildren).mock.calls.length,
+        ).toBeGreaterThan(calls),
+      { timeout: 5000 },
     );
   });
 

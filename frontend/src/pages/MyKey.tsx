@@ -379,7 +379,6 @@ export function StatusCard({
   const tone = statusTone[status] ?? { label: status, dot: "bg-sand" };
   const path = keyInfo?.organization_path?.filter(Boolean) ?? [];
   const team = path.length ? path[path.length - 1] : keyInfo?.team_id;
-  const parents = path.slice(0, -1);
   const summary = keyInfo ? budgetSummary(keyInfo) : null;
   const used =
     summary?.available && summary.budget
@@ -394,17 +393,22 @@ export function StatusCard({
           {tone.label}
         </span>
       </span>
+      {/* "Needs attention" and "Updating" have their own messages, so they
+          never show a second one; "Ready" and "No key" need none. */}
+      {!["Ready", "No key", "Needs attention", "Updating"].includes(status) && (
+        <p className="-mt-2 text-[13px] text-navy-text">
+          Key status: {tone.label}. Contact an administrator if you need help.
+        </p>
+      )}
       {team && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.05em] text-navy-muted">
             Team
           </p>
           <p className="mt-1 break-words text-[22px] font-semibold">{team}</p>
-          {parents.length > 0 && (
-            <p className="mt-0.5 text-[13px] text-navy-text">
-              {parents.join(" › ")}
-            </p>
-          )}
+          <p className="mt-0.5 break-words text-[13px] text-navy-text">
+            Assigned through {path.length ? path.join(" › ") : team}
+          </p>
         </div>
       )}
       {used != null && (

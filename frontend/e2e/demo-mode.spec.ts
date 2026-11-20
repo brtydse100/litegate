@@ -195,6 +195,13 @@ test("the signed-in email is visible and copyable on My key", async ({
     .toBe(email);
 });
 
+test("My key says which team the key is assigned through", async ({ page }) => {
+  await page.goto("./my-key");
+  await page.getByRole("button", { name: "View demo as user" }).click();
+  await expect(page.getByText(/^Assigned through /)).toBeVisible();
+  await expect(page.getByText(/Key status:/)).toHaveCount(0);
+});
+
 test("the top-bar account menu stays on a phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./my-key");
