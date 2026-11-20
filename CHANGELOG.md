@@ -7,8 +7,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.21.0] - 2026-11-20
+
 ### Changed
 
+- My key, Organization, Teams, Keys, People, Status, Analytics and Sign in are
+  redesigned with one calm design in light and dark themes. My key leads with
+  what is left to spend, the refill date and whether spend is on track; the
+  Organization page adds a spend split, a "Needs attention" list and an edit
+  panel for each group. Layouts work from phones to wide screens, with keyboard
+  and screen-reader improvements.
+- The Organization page reads team status and member spend from two shared
+  LiteLLM listings, each reused for a minute, instead of one request per group
+  or member. Failed listings fall back to per-item reads.
+- The organization sweep runs every `ORGANIZATION_SYNC_INTERVAL_SECONDS`
+  (default 900, range 60 to 86400) instead of every minute. Budget and per-user
+  limit edits wake it within about a minute, and failed passes retry from a
+  minute with backoff.
+- The README and demo media show the redesigned interface; the walkthrough
+  video and drawings of the previous interface are removed.
 - Large organizations with enforced budgets: a budget update now locks and
   re-reads only the groups it affects, so sign-ins and key replacements in
   different groups no longer wait for each other or for the background
@@ -22,6 +39,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- `SETUP_GUIDE_URL` adds a **Setup guide** link to My key for your own key
+  usage instructions; blank hides it. The link no longer opens the API
+  reference, which administrators find in their account menu.
 - System administrators can set a group's per-user limit on Budget planning or
   in a configuration-managed team's Teams dialog, overriding the configured
   `perUser`; clearing it restores the configured value.
@@ -630,7 +650,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.20.3...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.21.0...HEAD
+[2.21.0]: https://github.com/brtydse100/litegate/compare/v2.20.3...v2.21.0
 [2.20.3]: https://github.com/brtydse100/litegate/compare/v2.20.2...v2.20.3
 [2.20.2]: https://github.com/brtydse100/litegate/compare/v2.20.1...v2.20.2
 [2.20.1]: https://github.com/brtydse100/litegate/compare/v2.20.0...v2.20.1
