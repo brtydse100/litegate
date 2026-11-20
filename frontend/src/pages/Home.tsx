@@ -18,7 +18,6 @@ import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
 import AdminTeams from "../components/AdminTeams";
 import PersonalAnalytics from "../components/PersonalAnalytics";
-import BudgetManager from "../components/BudgetManager";
 import AdminOrganization from "../components/AdminOrganization";
 import {
   AdminSidebar,
@@ -518,18 +517,11 @@ export default function Home() {
       <div className="min-w-0 flex-1 md:flex md:flex-col">
         <main className="min-w-0 flex-1 md:overflow-y-auto">
           {section === "/organization" && canViewOrganization ? (
-            <>
-              <AdminOrganization
-                budgetsEnabled={!!config?.hierarchical_budgets_enabled}
-                email={user?.email}
-                isAdmin={isAdmin}
-              />
-              {config?.hierarchical_budgets_enabled && (
-                <div className="px-4 pb-8 sm:px-8">
-                  <BudgetManager />
-                </div>
-              )}
-            </>
+            <AdminOrganization
+              budgetsEnabled={!!config?.hierarchical_budgets_enabled}
+              email={user?.email}
+              isAdmin={isAdmin}
+            />
           ) : section === "/my-key" || section === "/analytics" ? (
             <div className="mx-auto max-w-[1080px] px-4 pb-14 pt-9 sm:px-8">
               {section === "/analytics" ? <PersonalAnalytics /> : myKey}

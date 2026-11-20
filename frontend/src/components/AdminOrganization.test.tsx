@@ -340,7 +340,7 @@ describe("organization dashboard contracts", () => {
     );
     expect(
       await within(
-        screen.getByRole("heading", { name: /^Users/ }).closest("section")!,
+        screen.getByRole("region", { name: "People in Platform" }),
       ).findByText("alex@example.com"),
     ).toBeVisible();
     await waitFor(() =>
@@ -510,7 +510,7 @@ describe("organization dashboard contracts", () => {
       ).getByText(metricValue(report.totals.requests, "requests")),
     ).toBeVisible();
     expect(
-      screen.getByText("Budget-period spend / per-key allowance"),
+      screen.getByRole("columnheader", { name: "Per-key allowance" }),
     ).toBeVisible();
   });
 

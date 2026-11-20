@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import DismissibleMessage from "./DismissibleMessage";
 import GroupPanel from "./organization/GroupPanel";
 import OrgReport from "./organization/OrgReport";
+import PeopleTable from "./organization/PeopleTable";
 import {
   groupInitials,
   hueFor,
@@ -215,11 +216,8 @@ export default function AdminOrganization({
     if (!group?.has_children) return false;
     return expanded.has(id) || (expandAll && depth(group) < MAX_DEPTH - 1);
   };
-  // A single team without sub-teams lists itself, like the admin view's rows.
   const rows = tableRoot
-    ? tableRoot.has_children
-      ? treeOrder(groups, isExpanded, tableRoot.id)
-      : [tableRoot]
+    ? treeOrder(groups, isExpanded, tableRoot.id)
     : activeRoots.flatMap((item) => [
         item,
         ...(isExpanded(item.id) ? treeOrder(groups, isExpanded, item.id) : []),
@@ -537,6 +535,18 @@ export default function AdminOrganization({
   const reportUsers = allActive
     ? (rootsQuery.data?.total_users ?? 0)
     : combinedMembers;
+  const reportToggle = (
+    <button
+      type="button"
+      ref={reportButton}
+      onClick={() => setAllGroupsReport((open) => !open)}
+      aria-label={`${allGroupsReport ? "Hide report" : "Usage report"}, ${reportScope}, ${plural(reportUsers, "user")}`}
+      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-90"
+    >
+      <BarChart3 size={15} aria-hidden="true" />
+      {allGroupsReport ? "Hide report" : "Usage report"}
+    </button>
+  );
 
   return (
     <div className="flex flex-wrap content-start min-[1140px]:flex-nowrap">
@@ -892,7 +902,31 @@ export default function AdminOrganization({
           </DismissibleMessage>
         )}
 
-        {activeRoots.length > 0 && (
+        {leafScope && (
+          // A team of people starts on its people, for quick budget edits.
+          <PeopleTable
+            standalone
+            nodeIds={[root.id]}
+            title={`People in ${root.name}`}
+            totalUsers={root.members}
+            budgets={budgets.data}
+            actions={
+              <>
+                <button
+                  type="button"
+                  aria-pressed={nodeId === root.id}
+                  onClick={() => select(root.id)}
+                  className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas"
+                >
+                  Team details
+                </button>
+                {!selected && reportToggle}
+              </>
+            }
+          />
+        )}
+
+        {activeRoots.length > 0 && !leafScope && (
           <section
             aria-label="Groups"
             className="overflow-hidden rounded-xl border border-line bg-card"
@@ -900,11 +934,9 @@ export default function AdminOrganization({
             <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line px-5 py-3.5">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-base font-bold text-ink">
-                  {leafScope
-                    ? root.name
-                    : `Groups in ${tableRoot ? tableRoot.name : scopeName}`}
+                  Groups in {tableRoot ? tableRoot.name : scopeName}
                 </h2>
-                {tableRoot && !leafScope && (
+                {tableRoot && (
                   <button
                     type="button"
                     aria-pressed={nodeId === tableRoot.id}
@@ -956,30 +988,17 @@ export default function AdminOrganization({
                 </nav>
               </div>
               <div className="flex gap-2">
-                {!leafScope && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (expandAll) setExpanded(new Set());
-                      setExpandAll((value) => !value);
-                    }}
-                    className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas"
-                  >
-                    {expandAll ? "Collapse all" : "Expand all"}
-                  </button>
-                )}
-                {!selected && (
-                  <button
-                    type="button"
-                    ref={reportButton}
-                    onClick={() => setAllGroupsReport((open) => !open)}
-                    aria-label={`${allGroupsReport ? "Hide report" : "Usage report"}, ${reportScope}, ${plural(reportUsers, "user")}`}
-                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-90"
-                  >
-                    <BarChart3 size={15} aria-hidden="true" />
-                    {allGroupsReport ? "Hide report" : "Usage report"}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (expandAll) setExpanded(new Set());
+                    setExpandAll((value) => !value);
+                  }}
+                  className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas"
+                >
+                  {expandAll ? "Collapse all" : "Expand all"}
+                </button>
+                {!selected && reportToggle}
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -1148,16 +1167,27 @@ export default function AdminOrganization({
                   Spend totals are unavailable: {totals.error.message}
                 </p>
               )}
-              {!leafScope && (
-                <p className="px-5 pb-3 pt-2.5 text-[13px] text-ink-4">
-                  Sub-groups load when you open them
-                  {levels.length - baseLevel - 2 > MAX_DEPTH
-                    ? " · deeper levels open in their own view"
-                    : ""}
-                </p>
-              )}
+              <p className="px-5 pb-3 pt-2.5 text-[13px] text-ink-4">
+                Sub-groups load when you open them
+                {levels.length - baseLevel - 2 > MAX_DEPTH
+                  ? " · deeper levels open in their own view"
+                  : ""}
+              </p>
             </div>
           </section>
+        )}
+
+        {selected && !leafScope && (
+          // A chosen team shows everyone in it, sub-teams included.
+          <PeopleTable
+            standalone
+            // Distinct from the report's key, which can be the same group id.
+            key={`people-${selected.id}`}
+            nodeIds={[selected.id]}
+            title={`People in ${selected.name}`}
+            totalUsers={selected.members}
+            budgets={budgets.data}
+          />
         )}
 
         {reportNodes !== null && (
@@ -1175,7 +1205,7 @@ export default function AdminOrganization({
             }
             totalUsers={reportUsers}
             onSelectChild={select}
-            // A childless team's report is the whole view, so it stays open.
+            hidePeople={!!selected || leafScope}
             onClose={
               selected
                 ? closeGroup

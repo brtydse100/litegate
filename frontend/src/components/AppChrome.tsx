@@ -281,6 +281,9 @@ const navLink = (isActive: boolean) =>
       : "text-navy-text hover:bg-navy-2/60 hover:text-paper"
   }`;
 
+const sidebarThemeButton =
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-navy-muted transition-colors hover:bg-navy-2 hover:text-paper";
+
 /** Navy admin sidebar; becomes a scrolling top row on narrow screens. */
 export function AdminSidebar({
   groups,
@@ -333,7 +336,8 @@ export function AdminSidebar({
     >
       <div className="flex items-center justify-between gap-3 px-2 pb-2 md:pb-4">
         <BrandMark logoUrl={logoUrl} />
-        <div className="md:hidden">
+        <div className="flex items-center gap-1 md:hidden">
+          <ThemeToggle className={sidebarThemeButton} />
           <UserMenu
             email={email}
             role={role}
@@ -378,7 +382,12 @@ export function AdminSidebar({
           </div>
         ))}
       </div>
-      <div className="mt-auto hidden items-center gap-1 border-t border-navy-3 pt-3.5 md:flex">
+      {/* Its own row, so long email addresses keep their full width. */}
+      <ThemeToggle
+        showLabel
+        className={`${navLink(false)} mt-auto hidden w-full md:flex`}
+      />
+      <div className="mt-2 hidden items-center gap-1 border-t border-navy-3 pt-3.5 md:flex">
         <UserMenu
           email={email}
           role={role}
@@ -387,7 +396,7 @@ export function AdminSidebar({
           compact
           up
         />
-        <span className="min-w-0 text-[13px] leading-tight">
+        <span className="min-w-0 flex-1 text-[13px] leading-tight">
           {email && <EmailAddress email={email} className="block" />}
           <span className="block capitalize text-navy-muted">{role}</span>
         </span>

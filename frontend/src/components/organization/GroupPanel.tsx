@@ -228,7 +228,8 @@ export default function GroupPanel({
       {editEnvelope ? (
         <label className={label}>
           Group budget
-          <span className="flex min-h-11 items-center rounded-lg border border-line-input px-3">
+          {/* The ring goes round the whole field so it never crosses the "$". */}
+          <span className="flex min-h-11 items-center rounded-lg border border-line-input px-3 focus-within:outline focus-within:outline-2 focus-within:outline-blue">
             <span className="text-ink-4">$</span>
             <input
               type="number"
@@ -237,7 +238,7 @@ export default function GroupPanel({
               aria-label={`${group.name} group budget`}
               value={envelope ?? String(budgetGroup!.assigned)}
               onChange={(event) => setEnvelope(event.target.value)}
-              className="flex-1 border-0 bg-transparent px-1.5 py-2.5 text-sm font-normal text-ink outline-none"
+              className="min-w-0 flex-1 border-0 bg-transparent px-1.5 py-2.5 text-sm font-normal text-ink focus:outline-none"
             />
           </span>
         </label>
@@ -251,6 +252,12 @@ export default function GroupPanel({
                 ? "No target"
                 : shortMoney(total)}
           </span>
+          {budgetGroup && (
+            <span className="text-xs font-normal text-ink-4">
+              Set by a parent team or a system administrator. Split it among
+              people and teams below it.
+            </span>
+          )}
         </div>
       )}
 
@@ -288,7 +295,9 @@ export default function GroupPanel({
           <div className={label}>
             Per-person limit
             <span className="text-sm font-normal text-ink-3">
-              {group.per_user == null ? "No limit" : shortMoney(group.per_user)}
+              {(budgetGroup?.per_user ?? group.per_user) == null
+                ? "No limit"
+                : shortMoney(budgetGroup?.per_user ?? group.per_user)}
             </span>
           </div>
         )}

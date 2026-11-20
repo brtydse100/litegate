@@ -344,38 +344,60 @@ test("team owners see only their own team", async ({ page }) => {
   await expect(panel.getByRole("alert")).toHaveCount(0);
   await expect(envelope).toHaveValue("270");
 
-  // A People owner sees the same page as an admin: cards, the team's row and
-  // a report only on request, and splits the team's budget among members.
+  // Opening a team shows everyone in it, with allowances to split, so a
+  // Teams owner never needs another view for people.
+  const teamPeople = page.getByRole("region", { name: "People in Platform" });
+  await expect(teamPeople.getByText("noa@example.com")).toBeVisible();
+  await expect(
+    teamPeople.getByLabel("Budget override for lee@example.com"),
+  ).toBeVisible();
+
+  // A People owner starts on their people, with the team's details and
+  // usage report on request.
   await page
     .getByRole("button", { name: "Own Platform, a team of people" })
     .click();
   await page.getByRole("link", { name: "Organization", exact: true }).click();
-  await expect(
-    page
-      .getByRole("region", { name: "Groups" })
-      .getByRole("heading", { name: "Platform" }),
-  ).toBeVisible();
+  const people = page.getByRole("region", { name: "People in Platform" });
+  await expect(people).toBeVisible();
+  await expect(page.getByRole("region", { name: "Groups" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Usage report" })).toHaveCount(
     0,
   );
   await expect(page.getByText("Team budget")).toBeVisible();
   await expect(page.getByText("Team owner")).toBeVisible();
   await expect(page.getByText("Cloud")).toHaveCount(0);
-  const budgets = page.getByRole("region", { name: "Budget management" });
   // Their own allowance is not theirs to change.
   await expect(
-    budgets.getByLabel("Budget override for alex@example.com"),
+    people.getByLabel("Budget override for alex@example.com"),
   ).toHaveCount(0);
-  const noa = budgets
-    .getByRole("listitem")
-    .filter({ hasText: "noa@example.com" });
+  const noa = people.getByRole("row").filter({ hasText: "noa@example.com" });
   await noa.getByLabel("Budget override for noa@example.com").fill("90");
-  await noa.getByRole("button", { name: "Save user budget" }).click();
+  await noa
+    .getByRole("button", { name: "Save allowance for noa@example.com" })
+    .click();
   await expect(noa).toContainText("Manual override: $90.00");
+  await people.getByRole("button", { name: "Team details" }).click();
+  await expect(
+    page.getByRole("complementary", { name: "Edit Platform" }),
+  ).toContainText("Set by a parent team");
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: /^Usage report, Platform,/ }).click();
   await expect(
     page.getByRole("heading", { name: "Usage by member" }),
   ).toBeVisible();
+});
+
+test("the sidebar switches the theme", async ({ page }) => {
+  await page.goto("./organization");
+  const sidebar = page.getByRole("navigation", { name: "Admin navigation" });
+  const html = page.locator("html");
+  const dark = (await html.getAttribute("class"))?.includes("dark");
+  await sidebar
+    .getByRole("button", { name: dark ? "Use light theme" : "Use dark theme" })
+    .last()
+    .click();
+  await expect(html).toHaveClass(dark ? /^(?!.*dark)/ : /dark/);
 });
 
 test("the usage report ranks groups by tokens", async ({ page }) => {

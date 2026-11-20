@@ -271,9 +271,12 @@ Delegated Organization access requires both designation and group administration
 LiteGate-managed scoped roles work without an Enterprise license. A team owner
 sees only their own team, with the same sidebar and Organization page as an
 administrator. A **Team budget** card replaces gateway status, and the usage
-report opens only on request. With budget planning enabled, owners split their
-team's budget among its teams and members, but cannot raise their own team's
-total, their own allowance or per-person limits. The live demo's **Owner** role
+report opens only on request. A team of people opens on its **People** list;
+choosing any team shows everyone in it, including sub-teams. With budget
+planning enabled, owners split their team's budget among its teams (in the edit
+panel) and members (in the People list), but cannot raise their own team's
+total, their own allowance or per-person limits. The sidebar has a theme
+switch. The live demo's **Owner** role
 shows a team of people and a team of teams (**People** and **Teams**), with
 synthetic budget planning. Full email
 addresses wrap and have explicit copy actions. See [configuration and current

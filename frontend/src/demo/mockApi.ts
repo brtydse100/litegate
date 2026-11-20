@@ -416,10 +416,20 @@ async function mockResponse(request: Request): Promise<Response> {
     if (owned && nodes.some((id) => !inOwnedScope(groupById(id))))
       return notFound();
     const selection = owned && !nodes.length ? [owned.id] : nodes;
-    if (path.endsWith("/users"))
-      return json(
-        organizationUsers(selection, Number(url.searchParams.get("page") ?? 1)),
+    if (path.endsWith("/users")) {
+      const page = organizationUsers(
+        selection,
+        Number(url.searchParams.get("page") ?? 1),
       );
+      // Owners see paths from their own team, like every organization view.
+      return json({
+        ...page,
+        users: page.users.map((user) => ({
+          ...user,
+          path: owned ? user.path.slice(owned.level) : user.path,
+        })),
+      });
+    }
     if (path.endsWith("/usage")) {
       const start = url.searchParams.get("start_date") ?? "";
       const end = url.searchParams.get("end_date") ?? "";

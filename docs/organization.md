@@ -321,7 +321,7 @@ per-user default. In the example Engineering defaults to $200, Digital overrides
 that to $50, squad1 overrides it to $100, and squads 2–4 inherit $50.
 
 System administrators can change a group's per-user limit without editing the
-configuration: on **Organization → Budget planning**, or in the **Teams** edit
+configuration: in a group's **Organization** edit panel, or in the **Teams** edit
 dialog of a configuration-managed team. The portal value replaces that group's
 configured `perUser` and is inherited the same way; clearing it restores the
 configured value. It is stored in LiteGate's database, so keep persistent
