@@ -49,7 +49,14 @@ export interface OrganizationUsage {
   end_date: string;
   totals: UsageMetrics;
   daily: Array<UsageMetrics & { date: string }>;
-  by_group: Array<UsageMetrics & { id: string | null; name: string }>;
+  by_group: Array<
+    UsageMetrics & {
+      id: string | null;
+      name: string;
+      /** Per-day usage of this group; absent from older backends. */
+      daily?: Array<UsageMetrics & { date: string }>;
+    }
+  >;
   by_user: Array<UsageMetrics & { id: string; name: string }>;
   by_model: Array<UsageMetrics & { name: string }>;
   users: number;

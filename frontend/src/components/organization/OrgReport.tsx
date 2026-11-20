@@ -4,7 +4,12 @@ import { Users } from "lucide-react";
 import { api } from "../../api/client";
 import EmailAddress from "../EmailAddress";
 import DismissibleMessage from "../DismissibleMessage";
-import { metricValue, TrendCard, UsageBars } from "../OrganizationCharts";
+import {
+  metricValue,
+  TokenGrid,
+  TrendCard,
+  UsageBars,
+} from "../OrganizationCharts";
 import type { Group } from "./orgModel";
 
 const inputClass =
@@ -122,6 +127,12 @@ export default function OrgReport({
               />
             ))}
           </div>
+          {!showMembers && (
+            <TokenGrid
+              title={`Tokens by ${nextLevel?.toLowerCase() ?? "group"}`}
+              groups={usage.data.by_group}
+            />
+          )}
           {showMembers && !hasMemberUsage && (
             <p className="text-sm text-ink-4">
               Per-member usage is unavailable in this report. Showing group

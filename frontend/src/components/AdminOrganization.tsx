@@ -490,14 +490,20 @@ export default function AdminOrganization({
     tableChain.unshift(item);
   const childCount = (group: Group) =>
     groups.filter((item) => item.parent_id === group.id).length;
+  // A single team without sub-teams has nothing to drill into: its report
+  // and member list show straight away.
+  const leafScope = !multi && !!root && !root.has_children;
   // Every department selected reports on all groups; otherwise the selection.
   const reportNodes = selected
     ? [selected.id]
-    : allGroupsReport
+    : allGroupsReport || leafScope
       ? allActive
         ? []
         : activeIds
       : null;
+  // "All groups" only when several departments are combined; a single one
+  // (for example a team owner's own team) is named.
+  const reportScope = allActive && roots.length > 1 ? "all groups" : scopeName;
   const reportUsers = allActive
     ? (rootsQuery.data?.total_users ?? 0)
     : combinedMembers;
@@ -633,7 +639,7 @@ export default function AdminOrganization({
             <Metric
               accent="border-t-teal"
               caption="Spend this period"
-              sub={`of ${combinedTarget == null ? "no target" : shortMoney(combinedTarget)} · ${scopeName} + all sub-groups`}
+              sub={`of ${combinedTarget == null ? "no target" : shortMoney(combinedTarget)} · ${scopeName}${leafScope ? "" : " + all sub-groups"}`}
               bar={percent(combinedSpend, combinedTarget)}
             >
               {totals.isPending ? (
@@ -645,7 +651,11 @@ export default function AdminOrganization({
             <Metric
               accent="border-t-blue"
               caption="People"
-              sub={`across ${plural(subtree.length || activeRoots.reduce((sum, item) => sum + childCount(item), 0), "group")}`}
+              sub={
+                leafScope
+                  ? `in ${scopeName}`
+                  : `across ${plural(subtree.length || activeRoots.reduce((sum, item) => sum + childCount(item), 0), "group")}`
+              }
             >
               {combinedMembers.toLocaleString()}
             </Metric>
@@ -825,7 +835,7 @@ export default function AdminOrganization({
           </DismissibleMessage>
         )}
 
-        {activeRoots.length > 0 && (
+        {activeRoots.length > 0 && !leafScope && (
           <section
             aria-label="Groups"
             className="overflow-hidden rounded-xl border border-line bg-card"
@@ -901,7 +911,7 @@ export default function AdminOrganization({
                   <button
                     type="button"
                     onClick={() => setAllGroupsReport(true)}
-                    aria-label={`Usage report, ${allActive ? "all groups" : scopeName}, ${plural(reportUsers, "user")}`}
+                    aria-label={`Usage report, ${reportScope}, ${plural(reportUsers, "user")}`}
                     aria-pressed={allGroupsReport}
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-90"
                   >
@@ -1091,8 +1101,8 @@ export default function AdminOrganization({
           <OrgReport
             key={reportNodes.join(",") || "all"}
             nodeIds={reportNodes}
-            title={selected?.name ?? (allActive ? "all groups" : scopeName)}
-            selected={selected}
+            title={selected?.name ?? reportScope}
+            selected={selected ?? (leafScope ? root : undefined)}
             nextLevel={
               selected
                 ? childLevel(selected)

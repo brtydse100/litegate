@@ -42,7 +42,8 @@ The edit panel splits a group's spend into its own team spend and each
 sub-group's total. Select one or more top-level groups (or **All**); the cards,
 **Needs attention**, spend split, group table and usage report combine the
 selection. Usage charts aggregate the explicitly selected groups over the
-selected date range as small spend, request and token trends. **Usage report**
+selected date range as small spend, request and token trends, plus a
+contribution-style grid that ranks groups by tokens, one square per day. **Usage report**
 with no group open reports on the selected top-level groups; with **All** it is
 an organization-wide request, which can be more expensive. Existing hierarchy
 policy and membership protections still apply. The legacy full-overview API remains available for existing clients;

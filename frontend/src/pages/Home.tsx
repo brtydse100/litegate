@@ -24,6 +24,7 @@ import {
   AdminSidebar,
   BrandMark,
   DemoRoleSwitch,
+  type DemoRole,
   UserMenu,
   type NavGroup,
 } from "../components/AppChrome";
@@ -63,6 +64,10 @@ async function fetchPortalConfig(): Promise<PortalConfig> {
   return response.json();
 }
 
+// The demo's team-owner choice outlives Home re-mounting after a sign-in
+// refresh; a full reload resets the demo account and this together.
+let rememberedDemoOwner: DemoRole | null = null;
+
 export default function Home() {
   const { user, login, logout } = useAuth();
   const queryClient = useQueryClient();
@@ -71,6 +76,9 @@ export default function Home() {
   const [previousKeyIds, setPreviousKeyIds] = useState<string[]>([]);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [demoRolePending, setDemoRolePending] = useState(false);
+  const [demoOwner, setDemoOwner] = useState<DemoRole | null>(
+    () => rememberedDemoOwner,
+  );
 
   function showKey(secret: string) {
     setPreviousKeyIds(keyList.map(keyToken));
@@ -113,9 +121,8 @@ export default function Home() {
   });
   const mutationError = create.error ?? regenerate.error ?? keys.error;
 
-  async function switchDemoRole(role: "admin" | "user") {
-    if (import.meta.env.VITE_DEMO_MODE !== "true" || user?.role === role)
-      return;
+  async function switchDemoRole(role: DemoRole) {
+    if (import.meta.env.VITE_DEMO_MODE !== "true") return;
     setDemoRolePending(true);
     try {
       const response = await fetch("/api/demo/role", {
@@ -124,6 +131,13 @@ export default function Home() {
         body: JSON.stringify({ role }),
       });
       if (!response.ok) throw new Error("Could not switch the demo role");
+      rememberedDemoOwner = role.endsWith("-owner") ? role : null;
+      setDemoOwner(rememberedDemoOwner);
+      // Organization data depends on who is looking; fetch it again.
+      queryClient.removeQueries({
+        predicate: (query) =>
+          String(query.queryKey[0]).startsWith("organization"),
+      });
       await login();
     } finally {
       setDemoRolePending(false);
@@ -184,7 +198,7 @@ export default function Home() {
   const signOut = () => void logout();
   const demoSwitch = (
     <DemoRoleSwitch
-      role={user?.role}
+      role={demoOwner ?? (user?.role === "admin" ? "admin" : "user")}
       pending={demoRolePending}
       onSwitch={(role) => void switchDemoRole(role)}
     />

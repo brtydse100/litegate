@@ -353,8 +353,17 @@ export function organizationUsage(
         id,
         name: child?.name ?? "Direct members",
         ...zero(),
+        daily: [],
       };
       add(bucket, value);
+      // Each group keeps its own days, like the real report.
+      const date = new Date(time).toISOString().slice(0, 10);
+      let day = bucket.daily!.find((entry) => entry.date === date);
+      if (!day) {
+        day = { date, ...zero() };
+        bucket.daily!.push(day);
+      }
+      add(day, value);
       byGroup.set(id, bucket);
     });
     add(totals, metrics);

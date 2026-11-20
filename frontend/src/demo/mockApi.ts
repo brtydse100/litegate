@@ -84,6 +84,44 @@ for (const key of installationKeys)
   Object.assign(key, organizationKeyPolicy(key.user_id ?? ""));
 demoUser.team_ids = [organizationKeyPolicy(demoUser.user_id)!.team_id];
 
+// Demo team owners: one owns a team of people, one a team of teams.
+const demoOwners: Record<string, string> = {
+  "platform-owner": "platform",
+  "infrastructure-owner": "infrastructure",
+};
+let demoOwnerOf: string | null = null;
+
+type ScopedGroup = {
+  id: string;
+  path: string[];
+  level: number;
+  parent_id: string | null;
+  budget_source?: string | null;
+};
+const groupById = (id: string | null) =>
+  organizationOverview().groups.find((group) => group.id === id);
+const ownedGroup = () => (demoOwnerOf ? groupById(demoOwnerOf) : undefined);
+function inOwnedScope(group?: Pick<ScopedGroup, "path">) {
+  const owned = ownedGroup();
+  if (!group) return false;
+  return (
+    !owned || owned.path.every((name, index) => group.path[index] === name)
+  );
+}
+/** What a delegated owner sees: paths and levels start at their own team. */
+function scoped<T extends ScopedGroup>(group: T): T {
+  const owned = ownedGroup();
+  if (!owned) return group;
+  const source = group.budget_source ? groupById(group.budget_source) : null;
+  return {
+    ...group,
+    path: group.path.slice(owned.level),
+    level: group.level - owned.level,
+    parent_id: group.id === owned.id ? null : group.parent_id,
+    budget_source: source && inOwnedScope(source) ? source.id : null,
+  };
+}
+
 let users: LocalUser[] = [
   {
     username: "contractor",
@@ -262,9 +300,9 @@ async function mockResponse(request: Request): Promise<Response> {
   if (path === "/api/v1/organization/access") {
     if (!signedIn) return json({ detail: "Not signed in" }, 401);
     return json({
-      organization: demoUser.role === "admin",
+      organization: demoUser.role === "admin" || !!demoOwnerOf,
       global_admin: demoUser.role === "admin",
-      roots: [],
+      roots: demoOwnerOf ? [demoOwnerOf] : [],
     });
   }
   if (path === "/api/v1/policy-schemas") {
@@ -277,26 +315,54 @@ async function mockResponse(request: Request): Promise<Response> {
   }
   if (path.startsWith("/api/v1/organization")) {
     if (!signedIn) return json({ detail: "Not signed in" }, 401);
-    if (demoUser.role !== "admin")
+    if (demoUser.role !== "admin" && !demoOwnerOf)
       return json({ detail: "Administrator access required" }, 403);
     if (method !== "GET") return json({ detail: "Method not allowed" }, 405);
-    if (path === "/api/v1/organization") return json(organizationOverview());
-    if (path === "/api/v1/organization/children")
-      return json(organizationChildren(url.searchParams.get("parent")));
+    const owned = ownedGroup();
+    const notFound = () =>
+      json({ detail: "Organization group not found" }, 404);
+    if (path === "/api/v1/organization") {
+      const overview = organizationOverview();
+      return json(
+        owned
+          ? {
+              ...overview,
+              levels: overview.levels.slice(owned.level),
+              groups: overview.groups.filter(inOwnedScope).map(scoped),
+              total_users: organizationUsers([owned.id], 1).total,
+            }
+          : overview,
+      );
+    }
+    if (path === "/api/v1/organization/children") {
+      const parent = url.searchParams.get("parent");
+      if (!owned) return json(organizationChildren(parent));
+      if (parent && !inOwnedScope(groupById(parent))) return notFound();
+      // An owner's top level is the team they own.
+      const children = organizationChildren(parent ?? owned.parent_id);
+      return json({
+        ...children,
+        levels: children.levels.slice(owned.level),
+        groups: children.groups
+          .filter((group) => (parent ? true : group.id === owned.id))
+          .map(scoped),
+        total_users: organizationUsers([owned.id], 1).total,
+      });
+    }
     if (path.startsWith("/api/v1/organization/groups/")) {
       const group = organizationGroup(
         decodeURIComponent(path.split("/").pop() ?? ""),
       );
-      return group
-        ? json(group)
-        : json({ detail: "Organization group not found" }, 404);
+      return group && inOwnedScope(group) ? json(scoped(group)) : notFound();
     }
+    // Owners report on their own team unless they pick groups inside it.
+    const nodes = url.searchParams.getAll("node");
+    if (owned && nodes.some((id) => !inOwnedScope(groupById(id))))
+      return notFound();
+    const selection = owned && !nodes.length ? [owned.id] : nodes;
     if (path.endsWith("/users"))
       return json(
-        organizationUsers(
-          url.searchParams.getAll("node"),
-          Number(url.searchParams.get("page") ?? 1),
-        ),
+        organizationUsers(selection, Number(url.searchParams.get("page") ?? 1)),
       );
     if (path.endsWith("/usage")) {
       const start = url.searchParams.get("start_date") ?? "";
@@ -311,9 +377,7 @@ async function mockResponse(request: Request): Promise<Response> {
           { detail: "Select a valid date range of at most 90 days" },
           422,
         );
-      return json(
-        organizationUsage(url.searchParams.getAll("node"), start, end),
-      );
+      return json(organizationUsage(selection, start, end));
     }
     return json({ detail: "Not found" }, 404);
   }
@@ -327,9 +391,15 @@ async function mockResponse(request: Request): Promise<Response> {
     });
   if (path === "/api/demo/role" && method === "POST") {
     const payload = await body(request);
-    if (payload.role !== "admin" && payload.role !== "user")
-      return json({ detail: "Role must be admin or user" }, 400);
-    demoUser = { ...demoUser, role: payload.role };
+    const owned = demoOwners[payload.role as string];
+    if (payload.role !== "admin" && payload.role !== "user" && !owned)
+      return json({ detail: "Unknown demo role" }, 400);
+    // Team owners are ordinary users with delegated organization access.
+    demoUser = {
+      ...demoUser,
+      role: payload.role === "admin" ? "admin" : "user",
+    };
+    demoOwnerOf = owned ?? null;
     return json(demoUser);
   }
   if (path === "/api/auth/local" && method === "POST") {
@@ -353,7 +423,7 @@ async function mockResponse(request: Request): Promise<Response> {
         "https://github.com/brtydse100/litegate/blob/main/docs/features.md",
       local_users_enabled: true,
       analytics_enabled: true,
-      organization_delegation_enabled: false,
+      organization_delegation_enabled: true,
       // Synthetic budgets only; demo mode never connects to a LiteLLM proxy.
       litellm_enterprise_enabled: true,
     });

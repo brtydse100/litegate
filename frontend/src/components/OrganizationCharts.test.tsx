@@ -1,6 +1,11 @@
 import { render, cleanup, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
-import { TrendCard, UsageBars, metricValue } from "./OrganizationCharts";
+import {
+  TokenGrid,
+  TrendCard,
+  UsageBars,
+  metricValue,
+} from "./OrganizationCharts";
 afterEach(cleanup);
 it.each([0.000001, 0.02, 1, 1234, 123456789])(
   "summarises spend of %s with a finite trend and its peak day",
@@ -100,4 +105,53 @@ it("offers full email copy access in per-user usage labels", () => {
   expect(
     screen.getByRole("button", { name: "Copy email long.person@example.com" }),
   ).toBeVisible();
+});
+
+it("ranks groups by tokens and shades each day relative to the busiest day", () => {
+  const day = (date: string, tokens: number) => ({
+    date,
+    tokens,
+    spend: 0,
+    requests: 0,
+  });
+  const { container } = render(
+    <TokenGrid
+      title="Tokens by team"
+      groups={[
+        {
+          id: "small",
+          name: "Small",
+          tokens: 10,
+          spend: 0,
+          requests: 0,
+          daily: [day("2026-01-01", 10), day("2026-01-02", 0)],
+        },
+        {
+          id: "big",
+          name: "Big",
+          tokens: 500,
+          spend: 0,
+          requests: 0,
+          daily: [day("2026-01-01", 100), day("2026-01-02", 400)],
+        },
+      ]}
+    />,
+  );
+  const rows = screen.getAllByRole("img");
+  expect(rows[0]).toHaveAccessibleName(
+    "Big: 500 tokens, peak 400 on 2026-01-02",
+  );
+  expect(rows[1]).toHaveAccessibleName(
+    "Small: 10 tokens, peak 10 on 2026-01-01",
+  );
+  const squares = [...container.querySelectorAll("li [title]")];
+  expect(squares.map((square) => square.getAttribute("title"))).toEqual([
+    "2026-01-01: 100 tokens",
+    "2026-01-02: 400 tokens",
+    "2026-01-01: 10 tokens",
+    "2026-01-02: 0 tokens",
+  ]);
+  // 400 is the busiest day; empty days use the lightest shade.
+  expect(squares[1].className.split(" ")).toContain("bg-periwinkle");
+  expect(squares[3].className).toContain("bg-well");
 });

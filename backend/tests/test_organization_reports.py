@@ -125,7 +125,8 @@ async def test_leaf_selection_counts_only_members_in_that_group(monkeypatch, set
     teams = sorted({item.team_id for item in setup.nodes.values()})
     fetch.assert_awaited_once_with(teams, day.isoformat(), day.isoformat())
     assert result["totals"] == {"spend": 10, "tokens": 100, "requests": 2}
-    assert result["by_group"] == [{"id": None, "name": "Direct members", "spend": 10, "tokens": 100, "requests": 2}]
+    day_usage = {"date": day.isoformat(), "spend": 10, "tokens": 100, "requests": 2}
+    assert result["by_group"] == [{"id": None, "name": "Direct members", "spend": 10, "tokens": 100, "requests": 2, "daily": [day_usage]}]
     assert result["by_user"] == [{"id": "alice", "name": "alice@example.com", "spend": 10, "tokens": 100, "requests": 2}]
 
 
@@ -401,6 +402,8 @@ async def test_several_groups_combine_members_and_compare_side_by_side(monkeypat
     result = await reports.usage([squad1.id, squad2.id], day, day)
     # Several selected groups break down by those groups, not their children.
     assert {group["name"]: group["spend"] for group in result["by_group"]} == {"squad1": 3, "squad2": 5}
+    # Each group also reports its own days, for the team-by-day grid.
+    assert {group["name"]: group["daily"][0]["spend"] for group in result["by_group"]} == {"squad1": 3, "squad2": 5}
     assert result["totals"]["spend"] == 8
     assert result["users"] == 2
 

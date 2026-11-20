@@ -298,3 +298,52 @@ test("pages fit a phone screen without sideways scrolling", async ({
     expect(overflow, `${route} scrolls sideways`).toBeLessThanOrEqual(0);
   }
 });
+
+test("team owners see only their own team", async ({ page }) => {
+  await page.goto("./my-key");
+  await page.getByRole("button", { name: "View demo as team owner" }).click();
+
+  // An owner of a team of teams works inside that team.
+  await page
+    .getByRole("button", { name: "Own Infrastructure, a team of teams" })
+    .click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Groups in Infrastructure" }),
+  ).toBeVisible();
+  const groups = page.getByRole("list", { name: "Organization groups" });
+  await expect(
+    groups.getByRole("button", { name: /^Platform,/ }),
+  ).toBeVisible();
+  await expect(groups.getByRole("button", { name: /^Cloud,/ })).toBeVisible();
+  await expect(page.getByText("Marketing")).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Keys", exact: true }),
+  ).toHaveCount(0);
+
+  // An owner of a team of people sees its report and members at once.
+  await page
+    .getByRole("button", { name: "Own Platform, a team of people" })
+    .click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Usage in Platform" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Usage by member" }),
+  ).toBeVisible();
+  await expect(page.getByText("Cloud")).toHaveCount(0);
+});
+
+test("the usage report ranks groups by tokens", async ({ page }) => {
+  await page.goto("./organization");
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Usage report, all groups, 4 users" })
+    .click();
+  const grid = page.getByRole("region", { name: "Tokens by department" });
+  await expect(grid).toBeVisible();
+  const rows = grid.getByRole("img");
+  await expect(rows.first()).toHaveAccessibleName(/^Engineering: /);
+  await expect(rows.nth(1)).toHaveAccessibleName(/^Marketing: /);
+});

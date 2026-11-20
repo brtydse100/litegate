@@ -268,6 +268,9 @@ Continue with the [deployment guide](../DEPLOYMENT.md) or
 All portal users can open personal hourly analytics. System administrators can
 search the read-only registered People directory, including SSO/no-key accounts.
 Delegated Organization access requires both designation and group administration;
-LiteGate-managed scoped roles work without an Enterprise license. Full email
+LiteGate-managed scoped roles work without an Enterprise license. A team owner
+sees only their own team: a team with sub-teams opens on its group table, and a
+team of people opens straight on its usage report and members. The live demo's
+**Owner** role shows both (**People** and **Teams**). Full email
 addresses wrap and have explicit copy actions. See [configuration and current
 enforcement limits](governance-and-analytics.md).

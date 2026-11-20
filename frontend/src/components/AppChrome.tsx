@@ -184,37 +184,80 @@ export function UserMenu({
   );
 }
 
+/** Demo-only roles; team owners see just their part of the organization. */
+export type DemoRole =
+  "user" | "admin" | "platform-owner" | "infrastructure-owner";
+
+const ownerTeams: Array<{ role: DemoRole; label: string; name: string }> = [
+  {
+    role: "platform-owner",
+    label: "People",
+    name: "Own Platform, a team of people",
+  },
+  {
+    role: "infrastructure-owner",
+    label: "Teams",
+    name: "Own Infrastructure, a team of teams",
+  },
+];
+
 export function DemoRoleSwitch({
   role,
   pending,
   onSwitch,
 }: {
-  role?: string;
+  role?: DemoRole;
   pending: boolean;
-  onSwitch: (role: "admin" | "user") => void;
+  onSwitch: (role: DemoRole) => void;
 }) {
   if (import.meta.env.VITE_DEMO_MODE !== "true") return null;
+  const owner = role === "platform-owner" || role === "infrastructure-owner";
+  const segment = (active: boolean) =>
+    `whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${
+      active ? "bg-card text-ink" : "text-navy-text hover:text-paper"
+    }`;
   return (
-    <div
-      className="flex items-center rounded-lg bg-navy-2 p-0.5"
-      aria-label="Demo role"
-    >
-      {(["user", "admin"] as const).map((value) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => onSwitch(value)}
-          disabled={pending}
-          aria-label={`View demo as ${value}`}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize disabled:opacity-50 ${
-            role === value
-              ? "bg-card text-ink"
-              : "text-navy-text hover:text-paper"
-          }`}
-        >
-          {value}
-        </button>
-      ))}
+    <div className="flex flex-col gap-1" aria-label="Demo role">
+      <div className="flex items-center rounded-lg bg-navy-2 p-0.5">
+        {[
+          { value: "user" as const, label: "User", active: role === "user" },
+          {
+            value: "platform-owner" as const,
+            label: "Owner",
+            active: owner,
+          },
+          { value: "admin" as const, label: "Admin", active: role === "admin" },
+        ].map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => !item.active && onSwitch(item.value)}
+            disabled={pending}
+            aria-pressed={item.active}
+            aria-label={`View demo as ${item.value === "platform-owner" ? "team owner" : item.label.toLowerCase()}`}
+            className={segment(item.active)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {owner && (
+        <div className="flex items-center rounded-lg bg-navy-2 p-0.5">
+          {ownerTeams.map((item) => (
+            <button
+              key={item.role}
+              type="button"
+              onClick={() => role !== item.role && onSwitch(item.role)}
+              disabled={pending}
+              aria-pressed={role === item.role}
+              aria-label={item.name}
+              className={segment(role === item.role)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

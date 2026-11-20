@@ -364,7 +364,8 @@ async def usage(node_id: str | list[str] | None, start: date, end: date, scope: 
         group_id = child.id if child.level == depth else None
         group_name = child.member.name if group_id is not None else "Direct members"
         members[identity["user_id"]] = member
-        groups[identity["user_id"]] = by_group.setdefault(group_id, {"id": group_id, "name": group_name, **zero_metrics()})
+        days = {day: zero_metrics() for day in daily}
+        groups[identity["user_id"]] = by_group.setdefault(group_id, {"id": group_id, "name": group_name, **zero_metrics(), "daily": days})
     for rows in results:
         for row in rows:
             day = row.get("date")
@@ -373,7 +374,7 @@ async def usage(node_id: str | list[str] | None, start: date, end: date, scope: 
                 raise HTTPException(status_code=502, detail="LiteLLM returned an invalid daily usage aggregate")
             for owner, metrics in key_entries(breakdown):
                 if owner in members:
-                    for target in (daily[day], total, groups[owner], members[owner]):
+                    for target in (daily[day], total, groups[owner], groups[owner]["daily"][day], members[owner]):
                         add_metrics(target, metrics)
             for model in breakdown.get("models") or {}:
                 for owner, metrics in key_entries(breakdown, model=model):
@@ -384,7 +385,7 @@ async def usage(node_id: str | list[str] | None, start: date, end: date, scope: 
         "end_date": end.isoformat(),
         "totals": total,
         "daily": [{"date": day, **values} for day, values in daily.items()],
-        "by_group": list(by_group.values()),
+        "by_group": [{**group, "daily": [{"date": day, **values} for day, values in group["daily"].items()]} for group in by_group.values()],
         "by_user": by_user,
         "by_model": [{"name": name, **values} for name, values in by_model.items()],
         "users": len(selected),

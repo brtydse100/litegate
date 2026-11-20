@@ -130,6 +130,8 @@ cannot use these capabilities. See [configuration](docs/governance-and-analytics
   request per 50 teams, cached for a minute) and counts each key's usage for its
   owner, wherever that key was. Usage of keys outside managed teams is not part
   of the organization report.
+  Each `by_group` entry also carries an additive `daily` array (`date`, `spend`,
+  `tokens`, `requests`) for that group over the same range.
   The additive `by_user` array contains each selected member's `id` (user ID),
   `name` (email, or user ID when unavailable), `spend`, `tokens`, and `requests`
   for the same date range. Inactive members remain included with zero metrics.

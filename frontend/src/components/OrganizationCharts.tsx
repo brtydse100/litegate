@@ -106,6 +106,94 @@ export function TrendCard({
   );
 }
 
+const shades = [
+  "bg-well",
+  "bg-periwinkle/25",
+  "bg-periwinkle/50",
+  "bg-periwinkle/75",
+  "bg-periwinkle",
+];
+
+/**
+ * Contribution-style grid: one row per group (most tokens first), one square
+ * per day, darker for more tokens.
+ */
+export function TokenGrid({
+  title,
+  groups,
+}: {
+  title: string;
+  groups: OrganizationUsage["by_group"];
+}) {
+  const rows = groups
+    .filter((group) => group.daily?.length)
+    .sort((left, right) => right.tokens - left.tokens);
+  if (!rows.length) return null;
+  const max = Math.max(
+    0,
+    ...rows.flatMap((group) => group.daily!.map((day) => day.tokens)),
+  );
+  const shade = (tokens: number) =>
+    tokens <= 0 || !max ? 0 : Math.max(1, Math.ceil((tokens / max) * 4));
+  return (
+    <section
+      aria-label={title}
+      className="rounded-lg border border-line bg-card p-5 shadow-sm"
+    >
+      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      <p className="mt-0.5 text-xs text-ink-4">
+        One square per day; darker means more tokens. Most tokens first.
+      </p>
+      <div className="relative mt-3 overflow-x-auto">
+        <ul className="flex min-w-max flex-col gap-1.5">
+          {rows.map((group) => {
+            const peak = group.daily!.reduce((best, day) =>
+              day.tokens > best.tokens ? day : best,
+            );
+            const summary = `${group.name}: ${metricValue(group.tokens, "tokens")} tokens, peak ${metricValue(peak.tokens, "tokens")} on ${peak.date}`;
+            return (
+              <li
+                key={group.id ?? "direct"}
+                className="flex items-center gap-3"
+              >
+                <span className="w-36 shrink-0 truncate text-[13px] text-ink-2">
+                  {group.name}
+                </span>
+                <span
+                  role="img"
+                  aria-label={summary}
+                  className="flex gap-[3px]"
+                >
+                  {group.daily!.map((day) => (
+                    <span
+                      key={day.date}
+                      title={`${day.date}: ${metricValue(day.tokens, "tokens")} tokens`}
+                      className={`h-3 w-3 shrink-0 rounded-[3px] ${shades[shade(day.tokens)]}`}
+                    />
+                  ))}
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-ink-2">
+                  {metricValue(group.tokens, "tokens")}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <p
+        aria-hidden="true"
+        className="mt-3 flex items-center justify-end gap-1 text-[11px] text-ink-4"
+      >
+        Less
+        {shades.map((tone) => (
+          <span key={tone} className={`h-3 w-3 rounded-[3px] ${tone}`} />
+        ))}
+        More
+      </p>
+    </section>
+  );
+}
+
 export function UsageBars({
   title,
   values,
