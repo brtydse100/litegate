@@ -42,9 +42,10 @@ export function TrendCard({
   const values = daily.map((day) => day[metric]);
   const max = Math.max(0, ...values);
   const scale = max || 1;
-  const x = (index: number) => (index / Math.max(1, daily.length - 1)) * 240;
-  const y = (value: number) => 52 - (value / scale) * 46;
-  const line = daily.map((day, index) => `${x(index)},${y(day[metric])}`);
+  // One bar per day: equal slots across the chart, bars 70% of a slot wide.
+  const slot = 240 / Math.max(1, daily.length);
+  const barWidth = Math.max(1, slot * 0.7);
+  const height = (value: number) => (value / scale) * 46;
   const peak = daily.reduce<(typeof daily)[number] | undefined>(
     (best, day) => (!best || day[metric] > best[metric] ? day : best),
     undefined,
@@ -75,22 +76,20 @@ export function TrendCard({
           stroke="currentColor"
           className="text-line"
         />
-        {line.length > 1 && (
-          <>
-            <polygon
-              points={`0,52 ${line.join(" ")} 240,52`}
-              fill="currentColor"
-              opacity="0.12"
-            />
-            <polyline
-              points={line.join(" ")}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              vectorEffect="non-scaling-stroke"
-            />
-          </>
-        )}
+        {daily.map((day, index) => (
+          <rect
+            key={day.date}
+            x={index * slot + (slot - barWidth) / 2}
+            y={52 - height(day[metric])}
+            width={barWidth}
+            height={height(day[metric])}
+            fill="currentColor"
+          >
+            <title>
+              {day.date}: {metricValue(day[metric], metric)}
+            </title>
+          </rect>
+        ))}
       </svg>
       {daily.length > 0 && (
         <p className="mt-1 flex justify-between text-[11px] text-ink-4">
@@ -103,29 +102,6 @@ export function TrendCard({
           ? "No recorded usage in this period."
           : `Avg ${metricValue(average, metric)} a day · peak ${metricValue(peak[metric], metric)} on ${shortDay(peak.date)}`}
       </p>
-      <details className="mt-1.5 text-xs text-ink-4">
-        <summary className="cursor-pointer">Daily values</summary>
-        <div className="mt-2 max-h-52 overflow-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th className="text-right">{label}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {daily.map((day) => (
-                <tr key={day.date}>
-                  <td>{day.date}</td>
-                  <td className="text-right">
-                    {metricValue(day[metric], metric)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
     </section>
   );
 }

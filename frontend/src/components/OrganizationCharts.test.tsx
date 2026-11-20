@@ -17,10 +17,10 @@ it.each([0.000001, 0.02, 1, 1234, 123456789])(
       screen.getByRole("img", { name: "Spend (USD) over time" }),
     ).toBeVisible();
     expect(container.textContent).toContain(metricValue(spend * 1.5, "spend"));
-    // The peak sits at the top of the small chart, whatever the scale.
-    expect(container.querySelector("polyline")?.getAttribute("points")).toBe(
-      "0,29 240,6",
-    );
+    // One bar per day; the peak day is full height, whatever the scale.
+    const bars = [...container.querySelectorAll("rect")];
+    expect(bars.map((bar) => bar.getAttribute("height"))).toEqual(["23", "46"]);
+    expect(bars[1].textContent).toContain("2026-01-02");
     expect(container.textContent).toMatch(/peak .+ on /);
   },
 );
