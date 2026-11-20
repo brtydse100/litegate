@@ -823,7 +823,7 @@ export default function AdminOrganization({
                     onClick={() => setAllGroupsReport(true)}
                     aria-label={`Usage report, all groups, ${plural(rootsQuery.data?.total_users ?? 0, "user")}`}
                     aria-pressed={allGroupsReport}
-                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-110"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-90"
                   >
                     <BarChart3 size={15} aria-hidden="true" />
                     Usage report

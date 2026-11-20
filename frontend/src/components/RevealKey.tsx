@@ -59,7 +59,7 @@ export default function RevealKey({
         disabled={pending}
         className={
           buttonClassName ??
-          "inline-flex items-center gap-2 rounded-md border border-indigo-200 px-3 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+          "inline-flex items-center gap-2 rounded-md border border-blue/30 px-3 py-2 text-xs font-medium text-blue-ink hover:bg-blue-tint disabled:opacity-50"
         }
       >
         {secret ? (
@@ -73,25 +73,25 @@ export default function RevealKey({
         <DismissibleMessage
           role="alert"
           messageKey={error}
-          className={`${compact ? "col-span-2 pb-2 " : ""}text-sm text-red-600`}
+          className={`${compact ? "col-span-2 pb-2 " : ""}text-sm text-danger`}
         >
           {error}
         </DismissibleMessage>
       )}
       {secret && (
         <div
-          className={`${compact ? "col-span-2 mb-2 " : ""}rounded-lg border border-emerald-200 bg-emerald-50 p-4`}
+          className={`${compact ? "col-span-2 mb-2 " : ""}rounded-lg border border-mint/40 bg-mint-tint p-4`}
         >
-          <p className="text-sm font-medium text-emerald-900">API key</p>
+          <p className="text-sm font-medium text-mint-ink">API key</p>
           <div className="mt-3 flex gap-2">
-            <code className="min-w-0 flex-1 break-all text-sm text-emerald-800">
+            <code className="min-w-0 flex-1 break-all text-sm text-mint-ink">
               {secret}
             </code>
             <button
               type="button"
               onClick={() => void copy()}
               aria-label="Copy API key"
-              className="text-emerald-700"
+              className="text-mint-ink"
             >
               {copied ? <Check size={15} /> : <Copy size={15} />}
             </button>

@@ -164,3 +164,15 @@ describe("personal analytics", () => {
     ).toBeInTheDocument();
   });
 });
+
+it("shows an empty chart for a user with no usage days", async () => {
+  vi.mocked(api.personalAnalytics).mockResolvedValue({
+    ...snapshot(),
+    daily: [],
+    models: [],
+  });
+  setup();
+  expect(
+    await screen.findByText("No usage recorded in this period."),
+  ).toBeVisible();
+});

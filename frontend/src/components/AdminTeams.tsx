@@ -24,7 +24,24 @@ import type {
 } from "../types";
 import TeamMembersDialog from "./TeamMembersDialog";
 import DismissibleMessage from "./DismissibleMessage";
+import { Callout, PageHeader, Pill, UsageBar } from "./Page";
+import {
+  buttonCreate,
+  buttonSecondary,
+  buttonSmall,
+  buttonSmallDanger,
+  card,
+  cardHeader,
+  cardTitle,
+  fieldInput,
+  tableHead,
+} from "./ui";
+
+/** Team list columns, shared by the caption row and each team. */
+const teamColumns =
+  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] items-center gap-4";
 import { metricValue } from "./OrganizationCharts";
+import { durationLabel } from "../keyBudget";
 import {
   CurrentPolicySettings,
   DurationChoices,
@@ -33,7 +50,7 @@ import {
 } from "./PolicySettings";
 
 const inputClass =
-  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
+  "w-full rounded-md border border-line-input bg-card px-3 py-2 text-sm text-ink shadow-sm placeholder:text-ink-4 focus:border-blue focus:outline-none focus:ring-2 focus:ring-blue/20";
 
 type EditorState = { mode: "create" } | { mode: "edit"; team: TeamInfo };
 
@@ -173,7 +190,7 @@ function TeamEditor({
 
   return (
     <div
-      className="!m-0 fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
       role="dialog"
       ref={dialogRef}
       aria-modal="true"
@@ -184,17 +201,17 @@ function TeamEditor({
     >
       <form
         onSubmit={(event) => void submit(event)}
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#2A2E42] bg-[#1A1D27] p-5 shadow-2xl"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-card p-5 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3
               id="team-editor-title"
-              className="text-lg font-semibold text-white"
+              className="text-lg font-semibold text-ink"
             >
               {state.mode === "create" ? "Create team" : "Edit team"}
             </h3>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-ink-4">
               Choose allowed models below. Blank numeric limits remove the limit
               when editing.
             </p>
@@ -203,7 +220,7 @@ function TeamEditor({
             type="button"
             onClick={onClose}
             aria-label="Close team editor"
-            className="rounded p-1 text-gray-500 hover:bg-[#22263A] hover:text-white"
+            className="rounded p-1 text-ink-4 hover:bg-canvas hover:text-ink"
           >
             <X size={18} />
           </button>
@@ -211,9 +228,9 @@ function TeamEditor({
         {existing && (
           <section
             aria-label="Current team settings"
-            className="mt-4 space-y-2 rounded-lg border border-[#2A2E42] p-3"
+            className="mt-4 space-y-2 rounded-lg border border-line p-3"
           >
-            <h4 className="text-sm font-semibold text-gray-200">
+            <h4 className="text-sm font-semibold text-ink">
               Current team settings
             </h4>
             <CurrentPolicySettings settings={existing} />
@@ -221,7 +238,7 @@ function TeamEditor({
         )}
         <DurationChoices id="team-budget-durations" />
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <label className="space-y-1 text-xs text-gray-400">
+          <label className="space-y-1 text-xs text-ink-3">
             <span>Team name</span>
             <input
               data-dialog-autofocus
@@ -233,7 +250,7 @@ function TeamEditor({
               required
             />
           </label>
-          <label className="space-y-1 text-xs text-gray-400">
+          <label className="space-y-1 text-xs text-ink-3">
             <span>Team ID {state.mode === "create" && "(optional)"}</span>
             <input
               className={`${inputClass} font-mono`}
@@ -268,7 +285,7 @@ function TeamEditor({
               }
             />
           )}
-          <label className="space-y-1 text-xs text-gray-400">
+          <label className="space-y-1 text-xs text-ink-3">
             <span>Budget reset</span>
             <input
               disabled={existing?.organization_managed}
@@ -287,7 +304,7 @@ function TeamEditor({
             />
           </label>
           {perUserNode && (
-            <p className="text-xs text-gray-500 sm:col-span-2">
+            <p className="text-xs text-ink-4 sm:col-span-2">
               The per-user limit caps each member's key in this organization
               group. Clear it to use the organization configuration again.
             </p>
@@ -317,7 +334,7 @@ function TeamEditor({
             onChange={setModels}
             knownModels={existing?.models ?? []}
           />
-          <label className="flex items-center gap-2 text-sm text-gray-300 sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm text-ink-2 sm:col-span-2">
             <input
               type="checkbox"
               checked={blocked}
@@ -346,7 +363,7 @@ function TeamEditor({
           />
         </div>
         {(modelError || error) && (
-          <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          <p className="mt-4 rounded-lg border border-danger-line bg-danger-tint px-3 py-2 text-xs text-danger">
             {modelError || error?.message}
           </p>
         )}
@@ -354,7 +371,7 @@ function TeamEditor({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 hover:bg-[#22263A]"
+            className="rounded-lg border border-line px-4 py-2 text-sm text-ink-2 hover:bg-canvas"
           >
             Cancel
           </button>
@@ -362,7 +379,7 @@ function TeamEditor({
             disabled={
               pending || savingPerUser || operationsBlocked || !alias.trim()
             }
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-blue px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {pending
               ? "Saving..."
@@ -406,16 +423,16 @@ function DeleteTeamDialog({
         if (event.target === event.currentTarget && !pending) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-[#1A1D27] p-5 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-danger-line bg-card p-5 shadow-2xl">
         <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-red-500/10 p-2 text-red-400">
+          <div className="rounded-lg bg-danger-tint p-2 text-danger">
             <ShieldAlert size={20} />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 id="delete-team-title" className="font-semibold text-white">
+            <h3 id="delete-team-title" className="font-semibold text-ink">
               Delete {team.team_alias || team.team_id}?
             </h3>
-            <p className="mt-1 text-xs leading-5 text-gray-400">
+            <p className="mt-1 text-xs leading-5 text-ink-3">
               LiteLLM deletes this team and its team-scoped API keys. This
               cannot be undone by LiteGate.
             </p>
@@ -423,14 +440,14 @@ function DeleteTeamDialog({
           <button
             onClick={onClose}
             aria-label="Close delete dialog"
-            className="text-gray-500 hover:text-white"
+            className="text-ink-4 hover:text-ink"
           >
             <X size={18} />
           </button>
         </div>
-        <label className="mt-4 block space-y-1 text-xs text-gray-400">
+        <label className="mt-4 block space-y-1 text-xs text-ink-3">
           <span>
-            Type <code className="text-red-300">{team.team_id}</code> to confirm
+            Type <code className="text-danger">{team.team_id}</code> to confirm
           </span>
           <input
             data-dialog-autofocus
@@ -439,11 +456,11 @@ function DeleteTeamDialog({
             onChange={(event) => setConfirmation(event.target.value)}
           />
         </label>
-        {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
+        {error && <p className="mt-3 text-xs text-danger">{error}</p>}
         <div className="mt-5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300"
+            className="rounded-lg border border-line px-4 py-2 text-sm text-ink-2"
           >
             Cancel
           </button>
@@ -452,7 +469,7 @@ function DeleteTeamDialog({
             disabled={
               pending || operationsBlocked || confirmation !== team.team_id
             }
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-danger-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending
               ? "Deleting..."
@@ -563,191 +580,210 @@ export default function AdminTeams() {
   ) as Error | null;
 
   return (
-    <section className="w-full space-y-5">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs font-medium text-indigo-600">Teams</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-            LiteLLM team policy
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage team budgets, model access, rate limits, and availability
-            without opening the LiteLLM admin UI.
-          </p>
-        </div>
-        <button
-          onClick={openCreate}
-          disabled={operationsBlocked}
-          className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Plus size={16} />{" "}
-          {operationsBlocked ? "Team actions paused" : "Create team"}
-        </button>
-      </div>
+    <section className="flex w-full flex-col gap-6">
+      <PageHeader
+        eyebrow="Manage"
+        title="LiteLLM team policy"
+        description="Manage team budgets, model access, rate limits, and availability without opening the LiteLLM admin UI."
+        actions={
+          <button
+            type="button"
+            onClick={openCreate}
+            disabled={operationsBlocked}
+            className={buttonCreate}
+          >
+            <Plus size={16} aria-hidden="true" />
+            {operationsBlocked ? "Team actions paused" : "Create team"}
+          </button>
+        }
+      />
 
-      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs leading-5 text-amber-100/70">
-        <span className="font-medium text-amber-200">
-          Deletion is intentionally guarded.
-        </span>{" "}
+      <Callout tone="warn" title="Deletion is intentionally guarded.">
         Deleting a LiteLLM team also deletes its team-scoped keys. Teams
         referenced by SSO mapping or <code>KEY_TEAM_ID</code> cannot be deleted
         until that configuration is changed.
-      </div>
+      </Callout>
       {operationsBlocked && (
         <DismissibleMessage
           messageKey="team-actions-paused"
-          className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200"
+          className="rounded-xl border border-sand/40 bg-sand-tint px-4 py-3 text-sm text-sand-ink"
         >
           Team actions are paused. Try again in {retryAfter || 1} seconds.
         </DismissibleMessage>
       )}
-
-      <form onSubmit={applySearch} className="flex gap-2">
-        <div className="relative min-w-0 flex-1">
-          <Search
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600"
-          />
-          <input
-            aria-label="Search teams"
-            className={`${inputClass} pl-9`}
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search team name or ID"
-            maxLength={128}
-          />
-        </div>
-        <button className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 hover:bg-[#1A1D27]">
-          Search
-        </button>
-      </form>
-
       {pageError && (
         <DismissibleMessage
           role="alert"
           messageKey={pageError.message}
-          className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+          className="rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger"
         >
           {pageError.message}
         </DismissibleMessage>
       )}
-      <div className="overflow-hidden rounded-xl border border-[#2A2E42] bg-[#1A1D27]">
-        <div className="flex items-center justify-between border-b border-[#2A2E42] px-4 py-3">
-          <span className="text-sm font-medium text-gray-200">
-            {teams.data?.total ?? 0} teams
-          </span>
-          {teams.isFetching && (
-            <span className="text-xs text-gray-600">Refreshing...</span>
-          )}
+
+      <div className={`overflow-hidden ${card}`}>
+        <div className={cardHeader}>
+          <div className="flex items-center gap-3">
+            <h2 className={cardTitle}>{teams.data?.total ?? 0} teams</h2>
+            {teams.isFetching && (
+              <span className="text-xs text-ink-4">Refreshing...</span>
+            )}
+          </div>
+          <form
+            onSubmit={applySearch}
+            className="flex w-full gap-2 sm:w-auto sm:min-w-[360px]"
+          >
+            <div className="relative min-w-0 flex-1">
+              <Search
+                size={15}
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-4"
+              />
+              <input
+                aria-label="Search teams"
+                className={`${fieldInput} pl-9`}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Search team name or ID"
+                maxLength={128}
+              />
+            </div>
+            <button className={buttonSecondary}>Search</button>
+          </form>
         </div>
         {teams.isLoading ? (
-          <div className="h-48 animate-pulse bg-[#22263A]" />
+          <div className="h-48 animate-pulse bg-canvas" />
         ) : teams.data?.teams.length ? (
-          <div className="divide-y divide-[#2A2E42]">
-            {teams.data.teams.map((team) => {
-              const protectedTeam =
-                team.organization_managed ||
-                team.mapped_groups.length > 0 ||
-                team.default_key_team;
-              return (
-                <article key={team.team_id} className="p-4">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Building2 size={16} className="text-cyan-400" />
-                        <h3 className="truncate text-sm font-semibold text-white">
+          <div className="relative overflow-x-auto">
+            <div
+              className={`${teamColumns} px-5 py-2.5 ${tableHead}`}
+              aria-hidden="true"
+            >
+              <span>Team</span>
+              <span>Spend / budget</span>
+              <span>Models</span>
+              <span>RPM / TPM</span>
+              <span>Members / keys</span>
+              <span className="text-right">Actions</span>
+            </div>
+            <div className="divide-y divide-line-soft">
+              {teams.data.teams.map((team) => {
+                const protectedTeam =
+                  team.organization_managed ||
+                  team.mapped_groups.length > 0 ||
+                  team.default_key_team;
+                const used =
+                  team.max_budget && team.spend != null
+                    ? (team.spend / team.max_budget) * 100
+                    : null;
+                return (
+                  <article
+                    key={team.team_id}
+                    className={`${teamColumns} px-5 py-3.5 text-sm`}
+                  >
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-tint text-cyan-ink"
+                      >
+                        <Building2 size={16} />
+                      </span>
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold text-ink">
                           {team.team_alias || "Unnamed team"}
                         </h3>
-                        {team.blocked && (
-                          <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">
-                            Blocked
-                          </span>
-                        )}
-                        {team.organization_managed && (
-                          <span
-                            title="Managed by the organization hierarchy configuration, including Helm values"
-                            className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300"
-                          >
-                            Config managed
-                          </span>
-                        )}
-                        {team.default_key_team && (
-                          <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300">
-                            Default key team
-                          </span>
-                        )}
-                        {team.mapped_groups.map((group) => (
-                          <span
-                            key={group}
-                            className="rounded bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-300"
-                          >
-                            SSO: {group}
-                          </span>
-                        ))}
-                      </div>
-                      <p
-                        className="mt-1 truncate font-mono text-[11px] text-gray-600"
-                        title={team.team_id}
-                      >
-                        {team.team_id}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 text-xs lg:min-w-80">
-                      <div>
-                        <p className="text-gray-600">Budget</p>
-                        <p className="mt-0.5 text-gray-300">
-                          {team.max_budget != null
-                            ? `$${team.max_budget}`
-                            : "Unlimited"}
+                        <p
+                          className="truncate font-mono text-xs text-ink-4"
+                          title={team.team_id}
+                        >
+                          {team.team_id}
                         </p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {team.blocked && <Pill tone="bad">Blocked</Pill>}
+                          {team.organization_managed && (
+                            <span
+                              title="Managed by the organization hierarchy configuration, including Helm values"
+                              className="rounded-md bg-blue-tint px-2 py-0.5 text-[11px] font-semibold text-blue-ink"
+                            >
+                              Config managed
+                            </span>
+                          )}
+                          {team.default_key_team && (
+                            <span className="rounded-md bg-blue-tint px-2 py-0.5 text-[11px] font-semibold text-blue-ink">
+                              Default key team
+                            </span>
+                          )}
+                          {team.mapped_groups.map((group) => (
+                            <span
+                              key={group}
+                              className="rounded-md bg-cyan-tint px-2 py-0.5 text-[11px] font-semibold text-cyan-ink"
+                            >
+                              SSO: {group}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-gray-600">Usage</p>
-                        <p className="mt-0.5 text-gray-300">
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-[13px]">
+                        <span className="sr-only">Spend: </span>
+                        <span className="font-semibold text-ink">
                           {metricValue(team.spend ?? 0, "spend")}
+                        </span>{" "}
+                        <span className="text-ink-4">
+                          {team.max_budget != null
+                            ? `of ${metricValue(team.max_budget, "spend")}`
+                            : "· Unlimited"}
+                        </span>
+                      </p>
+                      {used != null && <UsageBar percent={used} />}
+                      {team.budget_duration && (
+                        <p className="text-xs text-ink-4">
+                          resets every{" "}
+                          {durationLabel(team.budget_duration)?.replace(
+                            /^1 /,
+                            "",
+                          )}
                         </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Members / keys</p>
-                        <p className="mt-0.5 text-gray-300">
-                          {team.members_count ?? 0} / {team.keys_count ?? 0}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Models</p>
-                        <p className="mt-0.5 text-gray-300">
-                          {team.models?.length ? team.models.length : "All"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">TPM</p>
-                        <p className="mt-0.5 text-gray-300">
-                          {team.tpm_limit?.toLocaleString() ?? "Default"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">RPM</p>
-                        <p className="mt-0.5 text-gray-300">
-                          {team.rpm_limit?.toLocaleString() ?? "Default"}
-                        </p>
-                      </div>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <p className="text-[13px] text-ink-2">
+                      <span className="sr-only">Models: </span>
+                      {team.models?.length
+                        ? `${team.models.length} ${team.models.length === 1 ? "model" : "models"}`
+                        : "All"}
+                    </p>
+                    <p className="text-[13px] text-ink-2">
+                      <span className="sr-only">
+                        Requests per minute / tokens per minute:{" "}
+                      </span>
+                      {team.rpm_limit?.toLocaleString() ?? "Default"}
+                      <span className="text-ink-4"> / </span>
+                      {team.tpm_limit?.toLocaleString() ?? "Default"}
+                    </p>
+                    <p className="text-[13px] text-ink-2">
+                      <span className="sr-only">Members / keys: </span>
+                      {team.members_count ?? 0} / {team.keys_count ?? 0}
+                    </p>
+                    <div className="flex flex-wrap justify-end gap-1.5">
                       <button
+                        type="button"
                         onClick={() => openMembers(team)}
                         disabled={operationsBlocked}
-                        className="flex items-center gap-1.5 rounded-lg border border-cyan-500/20 px-3 py-2 text-xs text-cyan-300 hover:bg-cyan-500/10 disabled:cursor-not-allowed disabled:opacity-35"
+                        className={buttonSmall}
                       >
-                        <Users size={13} /> Members
+                        <Users size={13} aria-hidden="true" /> Members
                       </button>
                       <button
+                        type="button"
                         onClick={() => openEdit(team)}
                         disabled={operationsBlocked}
-                        className="flex items-center gap-1.5 rounded-lg border border-[#2A2E42] px-3 py-2 text-xs text-gray-300 hover:bg-[#22263A] disabled:cursor-not-allowed disabled:opacity-35"
+                        className={buttonSmall}
                       >
-                        <Edit3 size={13} /> Edit
+                        <Edit3 size={13} aria-hidden="true" /> Edit
                       </button>
                       <button
+                        type="button"
                         onClick={() => openDelete(team)}
                         disabled={protectedTeam || operationsBlocked}
                         title={
@@ -757,38 +793,40 @@ export default function AdminTeams() {
                               ? "Wait for the operation cooldown"
                               : "Delete team"
                         }
-                        className="flex items-center gap-1.5 rounded-lg border border-red-500/20 px-3 py-2 text-xs text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-35"
+                        className={buttonSmallDanger}
                       >
-                        <Trash2 size={13} /> Delete
+                        <Trash2 size={13} aria-hidden="true" /> Delete
                       </button>
                     </div>
-                  </div>
-                </article>
-              );
-            })}
+                  </article>
+                );
+              })}
+            </div>
           </div>
         ) : (
-          <p className="p-10 text-center text-sm text-gray-500">
+          <p className="p-10 text-center text-sm text-ink-4">
             {search
               ? "No teams match this search."
               : "No LiteLLM teams yet. Create the first team to define a shared budget and model policy."}
           </p>
         )}
-        <div className="flex items-center justify-between border-t border-[#2A2E42] px-4 py-3 text-xs">
+        <div className="flex items-center justify-between border-t border-line-soft px-5 py-3 text-[13px]">
           <button
+            type="button"
             onClick={() => setPage((value) => Math.max(1, value - 1))}
             disabled={page <= 1}
-            className="text-gray-400 disabled:opacity-30"
+            className={buttonSmall}
           >
             Previous
           </button>
-          <span className="text-gray-600">
+          <span className="text-ink-4">
             Page {page} of {pageCount}
           </span>
           <button
+            type="button"
             onClick={() => setPage((value) => Math.min(pageCount, value + 1))}
             disabled={page >= pageCount}
-            className="text-gray-400 disabled:opacity-30"
+            className={buttonSmall}
           >
             Next
           </button>

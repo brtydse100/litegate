@@ -45,7 +45,7 @@ export function parseModelBudgets(
 }
 
 const inputClass =
-  "min-w-0 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900";
+  "min-w-0 w-full rounded-md border border-line-input bg-card px-3 py-2 text-sm text-ink";
 
 export default function ModelBudgetEditor({
   rows,
@@ -67,7 +67,7 @@ export default function ModelBudgetEditor({
     );
   }
   return (
-    <fieldset className="min-w-0 space-y-3 rounded-xl border border-slate-200 p-3 text-xs text-slate-700 sm:col-span-2">
+    <fieldset className="min-w-0 space-y-3 rounded-xl border border-line p-3 text-xs text-ink-2 sm:col-span-2">
       <legend className="px-1 font-semibold">Per-model budgets</legend>
       <p>
         Model spending also counts toward the overall key budget. Each model has
@@ -99,7 +99,7 @@ export default function ModelBudgetEditor({
       </label>
       {rows !== undefined && (
         <>
-          <p className="text-amber-700">
+          <p className="text-sand-ink">
             This replaces all per-model budgets on every selected key. Models
             omitted here lose their separate limit. Overall key budgets stay
             unchanged.
@@ -167,7 +167,7 @@ export default function ModelBudgetEditor({
               <button
                 type="button"
                 aria-label={`Remove model budget ${index + 1}`}
-                className="self-end rounded border border-slate-300 px-3 py-2"
+                className="self-end rounded border border-line-input px-3 py-2"
                 onClick={() => onChange(rows.filter((_, i) => i !== index))}
               >
                 Remove
@@ -177,14 +177,14 @@ export default function ModelBudgetEditor({
           <button
             type="button"
             disabled={rows.length >= 100}
-            className="rounded border border-slate-300 px-3 py-2 disabled:opacity-50"
+            className="rounded border border-line-input px-3 py-2 disabled:opacity-50"
             onClick={() =>
               onChange([...rows, { model: "", amount: "", period: "" }])
             }
           >
             Add model budget
           </button>
-          <p className="text-slate-500">
+          <p className="text-ink-4">
             Periods: seconds (s), minutes (m), hours (h), or days (d). Requires
             a valid LiteLLM Enterprise license. Amounts must be greater than $0;
             LiteLLM treats a zero limit as unlimited.

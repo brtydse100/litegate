@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { Activity, Clock3 } from "lucide-react";
 import { AdminSidebar, UserMenu } from "./AppChrome";
 
 describe("UserMenu", () => {
@@ -20,6 +21,63 @@ describe("UserMenu", () => {
     fireEvent.keyDown(items[1], { key: "Escape" });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+});
+
+describe("API reference", () => {
+  it("appears in the account menu only when given", () => {
+    const { unmount } = render(
+      <UserMenu email="ann@example.test" onSignOut={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(
+      screen.queryByRole("menuitem", { name: "API reference" }),
+    ).not.toBeInTheDocument();
+    unmount();
+    render(
+      <UserMenu
+        email="ann@example.test"
+        onSignOut={vi.fn()}
+        apiDocsUrl="/api/docs"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(
+      screen.getByRole("menuitem", { name: "API reference" }),
+    ).toHaveAttribute("href", "/api/docs");
+  });
+});
+
+describe("AdminSidebar", () => {
+  const groups = [
+    {
+      label: "System",
+      items: [
+        { to: "/status#audit", label: "Audit log", icon: Clock3 },
+        { to: "/status", label: "Status", icon: Activity },
+      ],
+    },
+  ];
+
+  function activeAt(entry: string) {
+    render(
+      <MemoryRouter initialEntries={[entry]}>
+        <AdminSidebar groups={groups} onSignOut={vi.fn()} />
+      </MemoryRouter>,
+    );
+    return screen
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("aria-current") === "page")
+      .map((link) => link.textContent);
+  }
+
+  it.each([
+    ["/status", ["Status"]],
+    ["/status/", ["Status"]],
+    ["/status#audit", ["Audit log"]],
+    ["/keys", []],
+  ])("marks only the matching link active at %s", (entry, expected) => {
+    expect(activeAt(entry)).toEqual(expected);
   });
 });
 

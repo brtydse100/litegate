@@ -1,4 +1,5 @@
 import {
+  cleanup,
   act,
   fireEvent,
   render,
@@ -125,6 +126,7 @@ describe("personal key storage", () => {
     configState?: "pending" | "error",
     keyPending = false,
     myKeyText?: string,
+    extraConfig: Record<string, unknown> = {},
   ) {
     vi.stubGlobal(
       "fetch",
@@ -133,6 +135,7 @@ describe("personal key storage", () => {
         json: async () => ({
           save_api_keys_in_db: enabled,
           my_key_text: myKeyText,
+          ...extraConfig,
         }),
       }),
     );
@@ -553,6 +556,33 @@ describe("personal key storage", () => {
     expect(
       screen.queryByText(/You were moved to Engineering/),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows Setup guide only when a guide URL is configured", async () => {
+    renderHome(false, false);
+    expect(await screen.findByText("Your API key")).toBeVisible();
+    expect(
+      screen.queryByRole("link", { name: "Setup guide" }),
+    ).not.toBeInTheDocument();
+    cleanup();
+    renderHome(
+      false,
+      false,
+      {},
+      undefined,
+      false,
+      false,
+      undefined,
+      false,
+      undefined,
+      {
+        setup_guide_url: "https://guide.example.test/litegate",
+        api_docs_url: "/api/docs",
+      },
+    );
+    expect(
+      await screen.findByRole("link", { name: "Setup guide" }),
+    ).toHaveAttribute("href", "https://guide.example.test/litegate");
   });
 
   it("shows one warning, not two, when a key needs attention", async () => {

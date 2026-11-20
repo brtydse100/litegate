@@ -115,6 +115,7 @@ async def portal_config():
         "logo_url": settings.logo_url,
         "my_key_text": settings.my_key_text,
         "litellm_ui_url": settings.litellm_ui_url,
+        "setup_guide_url": settings.setup_guide_url.strip(),
         "api_docs_url": "/api/docs",
         "local_users_enabled": settings.local_users_enabled,
         "save_api_keys_in_db": settings.save_api_keys_in_db,

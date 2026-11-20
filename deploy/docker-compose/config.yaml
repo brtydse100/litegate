@@ -94,6 +94,9 @@ login_text: ""
 # Independent plain text beneath the My key actions, before and after creation.
 # Blank hides the message; multiline YAML is supported and HTML is not rendered.
 my_key_text: ""
+# Your own guide for using a LiteGate key; adds "Setup guide" to the My key top
+# bar. Used exactly as configured; blank hides the link.
+setup_guide_url: ""
 
 # Full browser-facing destination for the "Open LiteLLM Hub" button.
 # Used exactly as configured; blank hides the button.

@@ -183,7 +183,7 @@ export function BudgetCard({ keyInfo }: { keyInfo: KeyInfo }) {
 }
 
 const bigButton =
-  "flex min-h-[58px] w-full items-center justify-center gap-3 rounded-xl bg-blue px-6 py-4 text-[17px] font-semibold text-paper shadow-[0_1px_2px_rgba(22,27,34,0.12)] hover:brightness-110 disabled:opacity-50";
+  "flex min-h-[58px] w-full items-center justify-center gap-3 rounded-xl bg-blue px-6 py-4 text-[17px] font-semibold text-paper shadow-[0_1px_2px_rgba(22,27,34,0.12)] hover:brightness-90 disabled:opacity-50";
 
 export function KeyCard({
   keyInfo,
@@ -290,7 +290,7 @@ export function RegenerateConfirm({
           type="button"
           onClick={onConfirm}
           disabled={pending || paused}
-          className="min-h-11 rounded-lg bg-blue px-4 text-sm font-semibold text-paper hover:brightness-110 disabled:opacity-50"
+          className="min-h-11 rounded-lg bg-blue px-4 text-sm font-semibold text-paper hover:brightness-90 disabled:opacity-50"
         >
           {pending
             ? "Replacing..."
@@ -343,7 +343,7 @@ export function CreateKeyCard({
         type="button"
         onClick={onCreate}
         disabled={pending || paused}
-        className="mt-2 inline-flex min-h-[58px] items-center gap-2.5 rounded-xl bg-blue px-9 py-4 text-lg font-semibold text-paper shadow-[0_1px_2px_rgba(22,27,34,0.12)] hover:brightness-110 disabled:opacity-50"
+        className="mt-2 inline-flex min-h-[58px] items-center gap-2.5 rounded-xl bg-blue px-9 py-4 text-lg font-semibold text-paper shadow-[0_1px_2px_rgba(22,27,34,0.12)] hover:brightness-90 disabled:opacity-50"
       >
         <Plus size={20} strokeWidth={2.4} aria-hidden="true" />
         {pending

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import {
   Activity,
+  Clock3,
   KeyRound,
   LayoutGrid,
   List,
@@ -47,6 +48,7 @@ interface PortalConfig {
   my_key_text?: string;
   litellm_ui_url: string;
   api_docs_url: string;
+  setup_guide_url?: string;
   local_users_enabled: boolean;
   save_api_keys_in_db: boolean;
   analytics_enabled?: boolean;
@@ -380,7 +382,7 @@ export default function Home() {
       "rounded-md px-1 py-2 text-navy-text no-underline hover:text-paper";
     return (
       <div className="min-h-screen bg-canvas text-ink">
-        <header className="bg-navy text-[#E6ECF3]">
+        <header className="bg-navy text-navy-ink">
           <div className="mx-auto flex max-w-[1040px] flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-8">
             <Link to="/my-key" className="no-underline">
               <BrandMark logoUrl={config?.logo_url} />
@@ -400,9 +402,9 @@ export default function Home() {
                     Analytics
                   </Link>
                 ))}
-              {config?.api_docs_url && (
+              {config?.setup_guide_url && (
                 <a
-                  href={config.api_docs_url}
+                  href={config.setup_guide_url}
                   target="_blank"
                   rel="noreferrer"
                   className={topLink}
@@ -423,6 +425,7 @@ export default function Home() {
                 email={user?.email}
                 role={user?.role}
                 onSignOut={signOut}
+                apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
               />
             </nav>
           </div>
@@ -462,6 +465,7 @@ export default function Home() {
           {
             label: "System",
             items: [
+              { to: "/status#audit", label: "Audit log", icon: Clock3 },
               {
                 to: "/status",
                 label: "Status",
@@ -486,6 +490,7 @@ export default function Home() {
         email={user?.email}
         role={user?.role}
         onSignOut={signOut}
+        apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
         extra={demoSwitch}
       />
       <div className="min-w-0 flex-1 md:flex md:flex-col">

@@ -1,5 +1,5 @@
-import { KeyRound } from "lucide-react";
 import BulkKeyEditor from "./BulkKeyEditor";
+import { PageHeader } from "./Page";
 
 export default function AdminKeys({
   saveApiKeysInDb = false,
@@ -9,20 +9,20 @@ export default function AdminKeys({
   enterpriseEnabled?: boolean;
 }) {
   return (
-    <section className="w-full space-y-5">
-      <div>
-        <p className="text-xs font-medium text-indigo-600">Virtual keys</p>
-        <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-slate-950">
-          <KeyRound size={21} /> Key policies
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
-          Search the entire installation, select individual results or every
-          matching key, and apply one policy change safely.{" "}
-          {saveApiKeysInDb
-            ? "Stored key secrets can be revealed by administrators."
-            : "This page never reveals key secrets."}
-        </p>
-      </div>
+    <section className="flex w-full flex-col gap-6">
+      <PageHeader
+        eyebrow="Manage"
+        title="Key policies"
+        description={
+          <>
+            Search the entire installation, select individual results or every
+            matching key, and apply one policy change safely.{" "}
+            {saveApiKeysInDb
+              ? "Stored key secrets can be revealed by administrators."
+              : "This page never reveals key secrets."}
+          </>
+        }
+      />
       <BulkKeyEditor
         expanded
         saveApiKeysInDb={saveApiKeysInDb}

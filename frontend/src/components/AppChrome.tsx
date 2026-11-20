@@ -1,7 +1,13 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type React from "react";
-import { NavLink } from "react-router-dom";
-import { LogOut, Zap, type LucideIcon } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { BookOpen, LogOut, Zap, type LucideIcon } from "lucide-react";
 import EmailAddress from "./EmailAddress";
 import ThemeToggle from "./ThemeToggle";
 
@@ -10,11 +16,13 @@ export function BrandMark({ logoUrl }: { logoUrl?: string }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-2.5 text-[17px] font-bold text-paper">
       {logoUrl ? (
-        <img
-          src={logoUrl}
-          alt=""
-          className="h-7 max-w-[120px] object-contain"
-        />
+        <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-paper px-1.5">
+          <img
+            src={logoUrl}
+            alt=""
+            className="h-6 max-w-[120px] object-contain"
+          />
+        </span>
       ) : (
         <span
           aria-hidden="true"
@@ -46,7 +54,7 @@ export function Avatar({
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex ${size} shrink-0 items-center justify-center rounded-full bg-[#E5F0F4] text-[11px] font-bold text-[#3F6878]`}
+      className={`inline-flex ${size} shrink-0 items-center justify-center rounded-full bg-cyan-tint text-[11px] font-bold text-cyan-ink`}
     >
       {initials(email)}
     </span>
@@ -60,10 +68,13 @@ export function UserMenu({
   onSignOut,
   compact = false,
   up = false,
+  apiDocsUrl,
 }: {
   email?: string;
   role?: string;
   onSignOut: () => void;
+  /** Administrators get the built-in API reference here. */
+  apiDocsUrl?: string;
   compact?: boolean;
   /** Open above the button, for the sidebar footer. */
   up?: boolean;
@@ -120,7 +131,7 @@ export function UserMenu({
             setOpen(true);
           }
         }}
-        className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 text-sm text-[#E6ECF3] hover:bg-navy-2"
+        className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 text-sm text-navy-ink hover:bg-navy-2"
       >
         <Avatar email={email} />
       </button>
@@ -147,6 +158,17 @@ export function UserMenu({
           </div>
           <div className="pt-1.5">
             <ThemeToggle className={item} showLabel role="menuitem" />
+            {apiDocsUrl && (
+              <a
+                role="menuitem"
+                href={apiDocsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={`${item} no-underline`}
+              >
+                <BookOpen size={16} aria-hidden="true" /> API reference
+              </a>
+            )}
             <button
               type="button"
               role="menuitem"
@@ -209,7 +231,7 @@ export interface NavGroup {
   items: NavItem[];
 }
 
-const navLink = ({ isActive }: { isActive: boolean }) =>
+const navLink = (isActive: boolean) =>
   `flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm no-underline ${
     isActive
       ? "bg-navy-2 font-semibold text-paper shadow-[inset_3px_0_0_rgb(var(--ice))]"
@@ -223,35 +245,78 @@ export function AdminSidebar({
   email,
   role,
   onSignOut,
+  apiDocsUrl,
   extra,
 }: {
   extra?: ReactNode;
+  apiDocsUrl?: string;
   groups: NavGroup[];
   logoUrl?: string;
   email?: string;
   role?: string;
   onSignOut: () => void;
 }) {
+  const location = useLocation();
+  const row = useRef<HTMLDivElement>(null);
+  const items = groups.flatMap((group) => group.items);
+  const links = items.map((item) => `${item.to}:${item.dot ?? ""}`).join("|");
+  // On phones the links form a scrolling row; keep the current one visible,
+  // including after late links or status dots shift the row.
+  useLayoutEffect(() => {
+    const box = row.current;
+    const current = box?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!box || !current || box.scrollWidth <= box.clientWidth) return;
+    const link = current.getBoundingClientRect();
+    const edges = box.getBoundingClientRect();
+    if (link.left < edges.left) box.scrollLeft -= edges.left - link.left + 8;
+    else if (link.right > edges.right)
+      box.scrollLeft += link.right - edges.right + 8;
+  }, [location.pathname, location.hash, links]);
+  // A link with a #section is active only on that section, and the plain
+  // link to the same page steps aside while the section is shown.
+  const pathname = location.pathname.replace(/(.)\/+$/, "$1");
+  const isActive = (to: string) => {
+    const [path, hash = ""] = to.split("#");
+    if (pathname !== path) return false;
+    if (hash) return location.hash === `#${hash}`;
+    return !items.some(
+      (item) => item.to === `${path}${location.hash}` && location.hash,
+    );
+  };
   return (
     <nav
       aria-label="Admin navigation"
-      className="flex shrink-0 flex-col gap-0.5 bg-navy px-3.5 py-3 text-sm text-[#E6ECF3] md:h-screen md:w-[236px] md:overflow-y-auto md:py-5"
+      className="flex shrink-0 flex-col gap-0.5 bg-navy px-3.5 py-3 text-sm text-navy-ink md:h-screen md:w-[236px] md:overflow-y-auto md:py-5"
     >
       <div className="flex items-center justify-between gap-3 px-2 pb-2 md:pb-4">
         <BrandMark logoUrl={logoUrl} />
         <div className="md:hidden">
-          <UserMenu email={email} role={role} onSignOut={onSignOut} compact />
+          <UserMenu
+            email={email}
+            role={role}
+            onSignOut={onSignOut}
+            apiDocsUrl={apiDocsUrl}
+            compact
+          />
         </div>
       </div>
       {extra && <div className="px-2 pb-2">{extra}</div>}
-      <div className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:gap-0.5 md:overflow-visible md:pb-0">
+      <div
+        ref={row}
+        className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:gap-0.5 md:overflow-visible md:pb-0"
+      >
         {groups.map((group) => (
           <div key={group.label} className="contents md:block">
             <p className="mx-2.5 mb-1.5 mt-4 hidden text-[11px] font-semibold uppercase tracking-[0.06em] text-navy-muted md:block">
               {group.label}
             </p>
             {group.items.map((item) => (
-              <NavLink key={item.to} to={item.to} className={navLink} end>
+              <Link
+                key={item.to}
+                to={item.to}
+                aria-current={isActive(item.to) ? "page" : undefined}
+                className={navLink(isActive(item.to))}
+              >
                 <item.icon size={16} aria-hidden />
                 <span className="flex-1">{item.label}</span>
                 {item.dot && (
@@ -265,13 +330,20 @@ export function AdminSidebar({
                     </span>
                   </span>
                 )}
-              </NavLink>
+              </Link>
             ))}
           </div>
         ))}
       </div>
       <div className="mt-auto hidden items-center gap-1 border-t border-navy-3 pt-3.5 md:flex">
-        <UserMenu email={email} role={role} onSignOut={onSignOut} compact up />
+        <UserMenu
+          email={email}
+          role={role}
+          onSignOut={onSignOut}
+          apiDocsUrl={apiDocsUrl}
+          compact
+          up
+        />
         <span className="min-w-0 text-[13px] leading-tight">
           {email && <EmailAddress email={email} className="block" />}
           <span className="block capitalize text-navy-muted">{role}</span>

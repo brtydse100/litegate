@@ -3,6 +3,8 @@ import AdvancedPolicySettings, {
   type AdvancedPolicyHandle,
 } from "./AdvancedPolicySettings";
 import EmailAddress from "./EmailAddress";
+import { Pill, UsageBar } from "./Page";
+import { isKeyExpired } from "../keyBudget";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Check,
@@ -40,8 +42,8 @@ import type {
 } from "../types";
 
 const inputClass =
-  "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100";
-const fieldClass = "space-y-1 text-xs text-gray-400";
+  "rounded-md border border-line-input bg-card px-3 py-2 text-sm text-ink shadow-sm placeholder:text-ink-4 focus:border-blue focus:outline-none focus:ring-2 focus:ring-blue/20";
+const fieldClass = "space-y-1 text-xs text-ink-3";
 const emptyKeys: KeyInfo[] = [];
 const emptyTokens: string[] = [];
 
@@ -363,48 +365,48 @@ export default function BulkKeyEditor({
     <details
       open={expanded ? true : undefined}
       onToggle={(event) => setEditorOpen(event.currentTarget.open)}
-      className="w-full rounded-lg border border-slate-200 bg-white shadow-sm"
+      className="w-full rounded-xl border border-line bg-card"
     >
-      <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-medium text-gray-200">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-base font-bold text-ink">
         <SlidersHorizontal size={16} /> Bulk edit key settings
         {targetCount > 0 && (
-          <span className="ml-auto rounded-full bg-indigo-500/15 px-2.5 py-1 text-[10px] font-semibold text-indigo-300">
+          <span className="ml-auto rounded-full bg-blue-tint px-2.5 py-1 text-[10px] font-semibold text-blue-ink">
             {targetCount} selected
           </span>
         )}
       </summary>
       <form
         onSubmit={submit}
-        className="grid gap-4 border-t border-[#2A2E42] p-4 sm:grid-cols-2"
+        className="grid gap-4 border-t border-line p-4 sm:grid-cols-2"
       >
         <DurationChoices id="key-budget-durations" />
         <DurationChoices id="key-lifetime-durations" />
         <div className="space-y-3 sm:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-gray-200">
+              <p className="text-xs font-semibold text-ink">
                 Find and choose keys
               </p>
-              <p className="mt-0.5 text-[11px] text-gray-600">
+              <p className="mt-0.5 text-[11px] text-ink-4">
                 Search runs across the installation. Selections persist across
                 pages.
               </p>
             </div>
             {adminKeys.data && (
-              <span className="shrink-0 text-[10px] text-gray-500">
+              <span className="shrink-0 text-[10px] text-ink-4">
                 {adminKeys.data.total} results
               </span>
             )}
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-[#2A2E42] bg-[#0F1117]">
-            <div className="space-y-3 border-b border-[#2A2E42] bg-[#151822] p-3">
+          <div className="overflow-hidden rounded-xl border border-line bg-card">
+            <div className="space-y-3 border-b border-line bg-canvas p-3">
               <div className="grid gap-2 sm:grid-cols-[1fr_12rem_9rem_auto]">
                 <label className="relative">
                   <span className="sr-only">Search all keys</span>
                   <Search
                     size={14}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-600"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-4"
                   />
                   <input
                     aria-label="Search all keys"
@@ -448,7 +450,7 @@ export default function BulkKeyEditor({
                 <button
                   type="button"
                   onClick={applySearch}
-                  className="rounded-lg bg-[#2A2E42] px-3 py-2 text-xs font-medium text-gray-200 hover:bg-[#353A52]"
+                  className="rounded-lg bg-line px-3 py-2 text-xs font-medium text-ink hover:bg-line-input"
                 >
                   Search
                 </button>
@@ -456,7 +458,7 @@ export default function BulkKeyEditor({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${selected.length ? "bg-indigo-500/15 text-indigo-300" : "bg-[#22263A] text-gray-500"}`}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${selected.length ? "bg-blue-tint text-blue-ink" : "bg-canvas text-ink-4"}`}
                   >
                     {selected.length} selected
                   </span>
@@ -464,7 +466,7 @@ export default function BulkKeyEditor({
                     <button
                       type="button"
                       onClick={clearFilters}
-                      className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-500 hover:bg-[#22263A] hover:text-white"
+                      className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-ink-4 hover:bg-canvas hover:text-ink"
                     >
                       <X size={11} /> Clear filters
                     </button>
@@ -475,7 +477,7 @@ export default function BulkKeyEditor({
                     <button
                       type="button"
                       onClick={() => setSelected([])}
-                      className="rounded-lg px-2.5 py-1.5 text-[11px] text-gray-400 hover:bg-[#22263A] hover:text-white"
+                      className="rounded-lg px-2.5 py-1.5 text-[11px] text-ink-3 hover:bg-canvas hover:text-ink"
                     >
                       Clear selection
                     </button>
@@ -484,7 +486,7 @@ export default function BulkKeyEditor({
                     type="button"
                     onClick={toggleAllKeys}
                     disabled={!adminKeys.data?.total || selectAll.isPending}
-                    className="rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1.5 text-[11px] font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-35"
+                    className="rounded-lg border border-cyan/40 bg-cyan-tint px-2.5 py-1.5 text-[11px] font-medium text-cyan-ink hover:border-cyan disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     {selectAll.isPending
                       ? "Selecting..."
@@ -496,7 +498,7 @@ export default function BulkKeyEditor({
                     type="button"
                     onClick={toggleVisible}
                     disabled={!visibleTokens.length}
-                    className="rounded-lg border border-indigo-500/25 bg-indigo-500/10 px-2.5 py-1.5 text-[11px] font-medium text-indigo-300 hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-35"
+                    className="rounded-lg border border-blue/30 bg-blue-tint px-2.5 py-1.5 text-[11px] font-medium text-blue-ink hover:border-blue disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     {allVisibleSelected
                       ? "Deselect page"
@@ -507,56 +509,69 @@ export default function BulkKeyEditor({
             </div>
 
             {adminKeys.isLoading ? (
-              <div className="h-44 animate-pulse bg-[#22263A]" />
+              <div className="h-44 animate-pulse bg-canvas" />
             ) : adminKeys.error ? (
-              <p className="p-4 text-xs text-red-400">
+              <p className="p-4 text-xs text-danger">
                 {(adminKeys.error as Error).message}
               </p>
             ) : visibleKeys.length ? (
               <>
-                <div className="space-y-2 p-2">
-                  {visibleKeys.map((key, index) => {
-                    const token = keyToken(key);
-                    const isSelected = Boolean(token && selectedSet.has(token));
-                    const label =
-                      key.key_alias ||
-                      `Key ${(adminKeys.data?.page ?? page) * 25 - 24 + index}`;
-                    return (
-                      <div
-                        key={token || index}
-                        className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border px-2 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-indigo-500/50 ${!token ? "opacity-40" : isSelected ? "border-indigo-500/55 bg-indigo-500/10" : "border-transparent bg-[#151822] hover:border-[#353A52] hover:bg-[#1A1D27]"}`}
-                      >
-                        <label
-                          className={`group flex min-w-0 items-center gap-2 py-2 transition ${!token ? "cursor-not-allowed" : "cursor-pointer"}`}
+                <div className="relative overflow-x-auto">
+                  <div className="space-y-1 p-2 md:min-w-[860px]">
+                    {visibleKeys.map((key, index) => {
+                      const token = keyToken(key);
+                      const isSelected = Boolean(
+                        token && selectedSet.has(token),
+                      );
+                      const label =
+                        key.key_alias ||
+                        `Key ${(adminKeys.data?.page ?? page) * 25 - 24 + index}`;
+                      return (
+                        <div
+                          key={token || index}
+                          className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border px-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue/50 ${!token ? "opacity-40" : isSelected ? "border-blue/60 bg-blue-tint/60" : "border-transparent hover:border-line hover:bg-canvas"}`}
                         >
-                          <input
-                            className="sr-only"
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleKey(token)}
-                            disabled={!token}
-                            aria-label={`${isSelected ? "Deselect" : "Select"} ${label}`}
-                          />
-                          <span
-                            aria-hidden="true"
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${isSelected ? "border-indigo-400 bg-indigo-500 text-white" : "border-gray-600 bg-[#0F1117] group-hover:border-indigo-400"}`}
+                          <label
+                            className={`group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 transition md:grid-cols-[auto_minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] md:gap-3 ${!token ? "cursor-not-allowed" : "cursor-pointer"}`}
                           >
-                            {isSelected && <Check size={13} strokeWidth={3} />}
-                          </span>
-                          <span
-                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isSelected ? "bg-indigo-500/20 text-indigo-300" : "bg-[#22263A] text-gray-500"}`}
-                          >
-                            <KeyRound size={16} />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-medium text-gray-200">
-                              {label}
+                            <input
+                              className="sr-only"
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleKey(token)}
+                              disabled={!token}
+                              aria-label={`${isSelected ? "Deselect" : "Select"} ${label}`}
+                            />
+                            <span
+                              aria-hidden="true"
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${isSelected ? "border-blue bg-blue text-paper" : "border-line-input bg-card group-hover:border-blue/60"}`}
+                            >
+                              {isSelected && (
+                                <Check size={13} strokeWidth={3} />
+                              )}
                             </span>
-                            <span className="mt-0.5 block truncate font-mono text-[10px] text-gray-600">
-                              {maskedToken(token)}
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              <span
+                                aria-hidden="true"
+                                className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:flex ${isSelected ? "bg-blue text-paper" : "bg-blue-tint text-blue-ink"}`}
+                              >
+                                <KeyRound size={15} />
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-semibold text-ink">
+                                  {label}
+                                </span>
+                                <span className="block truncate font-mono text-xs text-ink-4">
+                                  {maskedToken(token)}
+                                </span>
+                              </span>
                             </span>
-                            <span className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-gray-500">
-                              <UserRound size={10} className="shrink-0" />
+                            <span className="col-span-2 col-start-2 flex min-w-0 items-center gap-1.5 text-[13px] text-ink-3 md:col-span-1 md:col-start-auto">
+                              <UserRound
+                                size={13}
+                                aria-hidden="true"
+                                className="shrink-0 text-ink-4"
+                              />
                               {key.user_email ? (
                                 <EmailAddress email={key.user_email} />
                               ) : (
@@ -565,42 +580,72 @@ export default function BulkKeyEditor({
                                 </span>
                               )}
                             </span>
-                          </span>
-                          <span className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
-                            <span className="rounded bg-[#22263A] px-2 py-0.5 text-[10px] text-gray-400">
-                              {metricValue(key.spend ?? 0, "spend")} spent
+                            <span className="col-span-2 col-start-2 min-w-0 md:col-span-1 md:col-start-auto">
+                              {key.team_id ? (
+                                <span
+                                  className="inline-block max-w-full truncate rounded-md bg-cyan-tint px-2 py-0.5 text-xs font-medium text-cyan-ink"
+                                  title={key.team_id}
+                                >
+                                  {key.team_id}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-ink-4">
+                                  No team
+                                </span>
+                              )}
                             </span>
-                            {key.team_id && (
-                              <span
-                                className="max-w-32 truncate rounded bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-300"
-                                title={key.team_id}
-                              >
-                                {key.team_id}
+                            <span className="col-span-2 col-start-2 flex min-w-0 flex-col gap-1.5 md:col-span-1 md:col-start-auto">
+                              <span className="text-[13px] text-ink-2">
+                                <span>
+                                  {metricValue(key.spend ?? 0, "spend")} spent
+                                </span>
+                                {key.max_budget != null && (
+                                  <span className="text-ink-4">
+                                    {" "}
+                                    of {metricValue(key.max_budget, "spend")}
+                                  </span>
+                                )}
                               </span>
-                            )}
-                          </span>
-                        </label>
-                        {saveApiKeysInDb && key.secret_available && (
-                          <RevealKey
-                            identifier={token}
-                            compact
-                            buttonClassName="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
+                              {key.max_budget ? (
+                                <UsageBar
+                                  percent={
+                                    ((key.spend ?? 0) / key.max_budget) * 100
+                                  }
+                                />
+                              ) : null}
+                            </span>
+                            <span className="col-start-3 row-start-1 justify-self-end md:col-start-auto md:row-start-auto">
+                              {key.blocked ? (
+                                <Pill tone="bad">Blocked</Pill>
+                              ) : isKeyExpired(key.expires) ? (
+                                <Pill tone="bad">Expired</Pill>
+                              ) : (
+                                <Pill tone="ok">Active</Pill>
+                              )}
+                            </span>
+                          </label>
+                          {saveApiKeysInDb && key.secret_available && (
+                            <RevealKey
+                              identifier={token}
+                              compact
+                              buttonClassName="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-blue-ink hover:bg-blue-tint disabled:opacity-50"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between border-t border-[#2A2E42] bg-[#151822] px-3 py-2.5 text-xs">
+                <div className="flex items-center justify-between border-t border-line bg-canvas px-3 py-2.5 text-xs">
                   <button
                     type="button"
                     onClick={() => setPage((value) => Math.max(1, value - 1))}
                     disabled={page <= 1 || adminKeys.isFetching}
-                    className="rounded px-2 py-1 text-gray-400 hover:bg-[#22263A] hover:text-white disabled:opacity-30"
+                    className="rounded px-2 py-1 text-ink-3 hover:bg-well hover:text-ink disabled:opacity-30"
                   >
                     Previous
                   </button>
-                  <span className="text-gray-600">
+                  <span className="text-ink-4">
                     Page {adminKeys.data?.page} of {adminKeys.data?.total_pages}
                     {adminKeys.isFetching ? " · refreshing" : ""}
                   </span>
@@ -611,14 +656,14 @@ export default function BulkKeyEditor({
                       page >= (adminKeys.data?.total_pages ?? 1) ||
                       adminKeys.isFetching
                     }
-                    className="rounded px-2 py-1 text-gray-400 hover:bg-[#22263A] hover:text-white disabled:opacity-30"
+                    className="rounded px-2 py-1 text-ink-3 hover:bg-well hover:text-ink disabled:opacity-30"
                   >
                     Next
                   </button>
                 </div>
               </>
             ) : (
-              <p className="p-8 text-center text-xs text-gray-500">
+              <p className="p-8 text-center text-xs text-ink-4">
                 {hasFilters
                   ? "No keys match these installation-wide filters."
                   : "No keys found."}
@@ -626,12 +671,12 @@ export default function BulkKeyEditor({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sand/40 bg-sand-tint p-3">
             <div>
-              <p className="text-xs font-medium text-amber-200">
+              <p className="text-xs font-medium text-sand-ink">
                 Reset accumulated spend
               </p>
-              <p className="mt-0.5 text-[11px] text-gray-500">
+              <p className="mt-0.5 text-[11px] text-ink-3">
                 Select one or more keys. Their budgets, limits, and spend
                 histories are kept.
               </p>
@@ -640,7 +685,7 @@ export default function BulkKeyEditor({
               type="button"
               onClick={openResetDialog}
               disabled={!targetCount || operationsBlocked}
-              className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 px-3 py-2 text-xs font-medium text-amber-200 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-lg border border-sand/40 px-3 py-2 text-xs font-medium text-sand-ink hover:bg-sand-tint disabled:cursor-not-allowed disabled:opacity-40"
             >
               <RotateCcw size={13} />
               {targetCount
@@ -650,7 +695,7 @@ export default function BulkKeyEditor({
           </div>
           {resetSpend.data && (
             <div
-              className={`rounded-lg border p-3 text-xs ${resetSpend.data.failed ? "border-amber-500/25 bg-amber-500/5 text-amber-200" : "border-green-500/25 bg-green-500/5 text-green-300"}`}
+              className={`rounded-lg border p-3 text-xs ${resetSpend.data.failed ? "border-sand/40 bg-sand-tint text-sand-ink" : "border-mint/40 bg-mint-tint text-mint-ink"}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
@@ -663,14 +708,14 @@ export default function BulkKeyEditor({
                       type="button"
                       onClick={retryResetFailures}
                       disabled={resetSpend.isPending || operationsBlocked}
-                      className="rounded border border-amber-500/30 px-2 py-1 hover:bg-amber-500/10 disabled:opacity-40"
+                      className="rounded border border-sand/40 px-2 py-1 hover:bg-sand-tint disabled:opacity-40"
                     >
                       Retry failed
                     </button>
                     <button
                       type="button"
                       onClick={() => downloadResetFailures(resetSpend.data!)}
-                      className="flex items-center gap-1 rounded border border-amber-500/30 px-2 py-1 hover:bg-amber-500/10"
+                      className="flex items-center gap-1 rounded border border-sand/40 px-2 py-1 hover:bg-sand-tint"
                     >
                       <Download size={11} /> Download failures
                     </button>
@@ -678,7 +723,7 @@ export default function BulkKeyEditor({
                 )}
               </div>
               {failedResetResults.length > 0 && (
-                <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] text-amber-100/70">
+                <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] text-sand-ink">
                   {failedResetResults.map((result) => (
                     <li
                       key={result.key}
@@ -698,9 +743,9 @@ export default function BulkKeyEditor({
         {targetCount > 0 && (
           <section
             aria-label="Current key settings"
-            className="space-y-3 rounded-lg border border-[#2A2E42] p-3 sm:col-span-2"
+            className="space-y-3 rounded-lg border border-line p-3 sm:col-span-2"
           >
-            <h3 className="text-sm font-semibold text-gray-200">
+            <h3 className="text-sm font-semibold text-ink">
               Current key settings
             </h3>
             {visibleKeys
@@ -708,9 +753,9 @@ export default function BulkKeyEditor({
               .map((key) => (
                 <div
                   key={keyToken(key)}
-                  className="space-y-2 border-t border-[#2A2E42] pt-2"
+                  className="space-y-2 border-t border-line pt-2"
                 >
-                  <p className="text-xs font-medium text-gray-300">
+                  <p className="text-xs font-medium text-ink-2">
                     {key.key_alias || maskedToken(keyToken(key))}
                   </p>
                   <CurrentPolicySettings settings={key} />
@@ -719,7 +764,7 @@ export default function BulkKeyEditor({
             {targetCount >
               visibleTokens.filter((token) => selectedSet.has(token))
                 .length && (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-sand-ink">
                 {targetCount -
                   visibleTokens.filter((token) => selectedSet.has(token))
                     .length}{" "}
@@ -740,9 +785,9 @@ export default function BulkKeyEditor({
           <details
             key={selectionId}
             open={targetCount > 0}
-            className="group rounded-lg border border-slate-200 sm:col-span-2"
+            className="group rounded-lg border border-line sm:col-span-2"
           >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-xs font-semibold text-slate-700">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3 text-xs font-semibold text-ink-2">
               <span>Choose settings to change</span>
               <ChevronDown
                 size={16}
@@ -750,8 +795,8 @@ export default function BulkKeyEditor({
                 className="transition-transform group-open:rotate-180"
               />
             </summary>
-            <div className="grid gap-4 border-t border-slate-200 p-3 sm:grid-cols-2">
-              <p className="text-[11px] text-slate-500 sm:col-span-2">
+            <div className="grid gap-4 border-t border-line p-3 sm:grid-cols-2">
+              <p className="text-[11px] text-ink-4 sm:col-span-2">
                 Saved values are filled in below. Only edited, filled fields are
                 changed. Mixed values differ between selected keys. Changing the
                 selection resets edits.
@@ -844,7 +889,7 @@ export default function BulkKeyEditor({
               </label>
 
               <div className="space-y-1 sm:col-span-2">
-                <label className="flex items-center gap-2 text-xs text-gray-400">
+                <label className="flex items-center gap-2 text-xs text-ink-3">
                   <input
                     type="checkbox"
                     checked={useKeyBudgetOnly}
@@ -854,7 +899,7 @@ export default function BulkKeyEditor({
                   />
                   Use key budget as the individual allowance
                 </label>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-ink-4">
                   Requires one key per owner with a finite budget. Removes the
                   owner's separate personal budget and member budget in this
                   key's team. Shared team budgets remain in force. Key settings
@@ -890,7 +935,7 @@ export default function BulkKeyEditor({
                 disabled={
                   update.isPending || operationsBlocked || targetCount === 0
                 }
-                className="rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-950/30 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+                className="rounded-lg bg-blue px-4 py-3 text-sm font-semibold text-paper shadow-lg hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
               >
                 {update.isPending
                   ? "Updating..."
@@ -903,15 +948,15 @@ export default function BulkKeyEditor({
             </div>
           </details>
         )}
-        {error && <p className="text-xs text-red-400 sm:col-span-2">{error}</p>}
+        {error && <p className="text-xs text-danger sm:col-span-2">{error}</p>}
         {operationsBlocked && (
-          <p className="text-xs text-amber-300 sm:col-span-2">
+          <p className="text-xs text-sand-ink sm:col-span-2">
             Bulk updates are paused. Try again in {retryAfter || 1} seconds.
           </p>
         )}
         {update.data && (
           <div
-            className={`rounded-lg border p-3 text-xs sm:col-span-2 ${update.data.failed ? "border-amber-500/25 bg-amber-500/5 text-amber-200" : "border-green-500/25 bg-green-500/5 text-green-300"}`}
+            className={`rounded-lg border p-3 text-xs sm:col-span-2 ${update.data.failed ? "border-sand/40 bg-sand-tint text-sand-ink" : "border-mint/40 bg-mint-tint text-mint-ink"}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>
@@ -923,14 +968,14 @@ export default function BulkKeyEditor({
                     type="button"
                     onClick={retryFailures}
                     disabled={update.isPending || operationsBlocked}
-                    className="rounded border border-amber-500/30 px-2 py-1 hover:bg-amber-500/10 disabled:opacity-40"
+                    className="rounded border border-sand/40 px-2 py-1 hover:bg-sand-tint disabled:opacity-40"
                   >
                     Retry failed
                   </button>
                   <button
                     type="button"
                     onClick={() => downloadFailures(update.data!)}
-                    className="flex items-center gap-1 rounded border border-amber-500/30 px-2 py-1 hover:bg-amber-500/10"
+                    className="flex items-center gap-1 rounded border border-sand/40 px-2 py-1 hover:bg-sand-tint"
                   >
                     <Download size={11} /> Download failures
                   </button>
@@ -938,7 +983,7 @@ export default function BulkKeyEditor({
               )}
             </div>
             {failedResults.length > 0 && (
-              <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] text-amber-100/70">
+              <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] text-sand-ink">
                 {failedResults.map((result) => (
                   <li
                     key={result.key}
@@ -1000,17 +1045,17 @@ function ResetSpendDialog({
         if (event.target === event.currentTarget && !pending) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-2xl border border-amber-500/30 bg-[#1A1D27] p-5 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-sand/40 bg-card p-5 shadow-2xl">
         <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-amber-500/10 p-2 text-amber-300">
+          <div className="rounded-lg bg-sand-tint p-2 text-sand-ink">
             <RotateCcw size={20} />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 id="reset-spend-title" className="font-semibold text-white">
+            <h3 id="reset-spend-title" className="font-semibold text-ink">
               Reset spend for {target.keys.length}{" "}
               {target.keys.length === 1 ? "key" : "keys"}?
             </h3>
-            <p className="mt-1 text-xs leading-5 text-gray-400">
+            <p className="mt-1 text-xs leading-5 text-ink-3">
               Accumulated spend will be reset to $0.00. LiteLLM keeps each key's
               spend logs, budget, and limits.
             </p>
@@ -1020,18 +1065,18 @@ function ResetSpendDialog({
             onClick={onClose}
             disabled={pending}
             aria-label="Close reset spend dialog"
-            className="text-gray-500 hover:text-white disabled:opacity-40"
+            className="text-ink-4 hover:text-ink disabled:opacity-40"
           >
             <X size={18} />
           </button>
         </div>
-        {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
+        {error && <p className="mt-3 text-xs text-danger">{error}</p>}
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
             disabled={pending}
-            className="rounded-lg border border-[#2A2E42] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
+            className="rounded-lg border border-line px-4 py-2 text-sm text-ink-2 disabled:opacity-40"
           >
             Cancel
           </button>
@@ -1039,7 +1084,7 @@ function ResetSpendDialog({
             type="button"
             onClick={onReset}
             disabled={pending || operationsBlocked}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-sand-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending
               ? "Resetting..."

@@ -13,7 +13,7 @@ export function applyStoredTheme() {
 }
 
 export default function ThemeToggle({
-  className = "flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900",
+  className = "flex h-8 w-8 items-center justify-center rounded-md text-ink-4 transition-colors hover:bg-well hover:text-ink",
   showLabel = false,
   role,
 }: {

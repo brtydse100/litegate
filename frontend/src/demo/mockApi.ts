@@ -347,6 +347,8 @@ async function mockResponse(request: Request): Promise<Response> {
       logo_url: "",
       litellm_ui_url: "",
       api_docs_url: "https://github.com/brtydse100/litegate/blob/main/API.md",
+      setup_guide_url:
+        "https://github.com/brtydse100/litegate/blob/main/docs/features.md",
       local_users_enabled: true,
       analytics_enabled: true,
       organization_delegation_enabled: false,

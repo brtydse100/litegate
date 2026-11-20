@@ -252,17 +252,44 @@ test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
   expect(overflow).toBeLessThanOrEqual(0);
 });
 
+test("the current sidebar link is visible on phones", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("./");
+  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  for (const [route, label] of [
+    ["teams", "Teams"],
+    ["keys", "Keys"],
+    ["users", "People"],
+    ["status", "Status"],
+  ]) {
+    await page.goto(`./${route}`);
+    const nav = page.getByRole("navigation", { name: "Admin navigation" });
+    await expect(nav.getByText(/^(Ready|Not ready)$/).first()).toBeAttached();
+    await page.waitForLoadState("networkidle");
+    await expect(
+      // The Status link's name also carries its hidden Ready text.
+      nav.getByRole("link", { name: new RegExp(`^${label}`) }),
+    ).toBeInViewport({ ratio: 0.95 });
+  }
+});
+
 test("pages fit a phone screen without sideways scrolling", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./");
   await page.getByRole("link", { name: "Admin", exact: true }).click();
-  for (const route of ["organization", "teams", "keys", "users", "status"]) {
+  const admin = ["organization", "teams", "keys", "users", "status"];
+  for (const route of [...admin, "analytics", "my-key"]) {
     await page.goto(`./${route}`);
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
-    // The status dot and its hidden text render once system status loads.
-    await expect(page.getByText(/^(Ready|Not ready)$/).first()).toBeAttached();
+    // Admin pages show a status dot once system status loads; wait for it,
+    // and for page data, so late content is measured too.
+    if (admin.includes(route))
+      await expect(
+        page.getByText(/^(Ready|Not ready)$/).first(),
+      ).toBeAttached();
+    await page.waitForLoadState("networkidle");
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
     );

@@ -27,7 +27,7 @@ export default function PerUserLimitEditor({ group }: { group: BudgetGroup }) {
     : "from configuration";
   if (!group.can_edit_per_user)
     return (
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-4">
         Per-user limit: {describe(group.per_user)} ({source})
       </p>
     );
@@ -41,11 +41,11 @@ export default function PerUserLimitEditor({ group }: { group: BudgetGroup }) {
       }}
       className="flex flex-wrap items-end gap-2"
     >
-      <label className="text-xs text-slate-600">
+      <label className="text-xs text-ink-3">
         Per-user limit
         <input
           aria-label={`${group.name} per-user limit`}
-          className="ml-2 w-32 rounded border border-slate-300 bg-white p-2 text-sm text-slate-900"
+          className="ml-2 w-32 rounded border border-line-input bg-card p-2 text-sm text-ink"
           value={value}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="No limit"
@@ -56,7 +56,7 @@ export default function PerUserLimitEditor({ group }: { group: BudgetGroup }) {
       </label>
       <button
         disabled={mutation.isPending}
-        className="rounded border border-slate-300 px-3 py-2 text-sm"
+        className="rounded border border-line-input px-3 py-2 text-sm"
       >
         Save {group.name} per-user limit
       </button>
@@ -65,17 +65,17 @@ export default function PerUserLimitEditor({ group }: { group: BudgetGroup }) {
           type="button"
           disabled={mutation.isPending}
           onClick={() => mutation.mutate(null)}
-          className="rounded px-3 py-2 text-sm text-indigo-600 underline"
+          className="rounded px-3 py-2 text-sm text-blue-ink underline"
         >
           Use configured value
         </button>
       )}
-      <span className="text-xs text-slate-500">{source}</span>
+      <span className="text-xs text-ink-4">{source}</span>
       {mutation.error && (
         <DismissibleMessage
           role="alert"
           messageKey={mutation.error.message}
-          className="w-full text-sm text-red-600"
+          className="w-full text-sm text-danger"
         >
           {mutation.error.message}
         </DismissibleMessage>

@@ -9,8 +9,8 @@ export default function AuthCallback() {
     void login().then(() => navigate("/", { replace: true }));
   }, [login, navigate]);
   return (
-    <div className="flex h-screen items-center justify-center bg-[#0F1117]">
-      <p className="text-gray-400">Completing sign in…</p>
+    <div className="flex h-screen items-center justify-center bg-canvas">
+      <p className="text-ink-3">Completing sign in…</p>
     </div>
   );
 }

@@ -372,6 +372,7 @@ as an additional shared ceiling when a person may own keys outside LiteGate.
 | `login_text` | empty | Plain text below the login title; empty keeps the default subtitle |
 | `my_key_text` | empty | Independent plain text below My key actions; empty hides it |
 | `litellm_ui_url` | empty | Full browser-accessible LiteLLM model-hub URL; used as configured |
+| `setup_guide_url` | empty | Your own guide for using a key; adds **Setup guide** to the My key top bar; empty hides it |
 | `support_ticket_url` | empty | Support button destination |
 
 Set `litellm_ui_url` to the complete destination, for example
@@ -388,6 +389,8 @@ portal. Both settings are optional: an empty or whitespace-only `login_text`
 keeps **Sign in to your LiteLLM access portal**, and an empty `logo_url` keeps the
 default lightning icon. The page title, sign-in methods, and access rules stay
 the same.
+The logo sits on a small white tile over the navy sign-in panel and sidebar,
+so dark artwork stays visible; a transparent PNG or SVG fits best.
 
 Use these backend settings in `config.yaml` (for Docker Compose, edit
 `deploy/docker-compose/config.yaml`):

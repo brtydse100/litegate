@@ -134,6 +134,7 @@ class Settings(BaseSettings):
     login_text: str = ""
     my_key_text: str = ""
     litellm_ui_url: str = ""
+    setup_guide_url: str = ""
 
     @model_validator(mode="before")
     @classmethod

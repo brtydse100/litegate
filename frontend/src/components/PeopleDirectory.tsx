@@ -1,7 +1,18 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 import { api } from "../api/client";
 import EmailAddress from "./EmailAddress";
+import { Pill } from "./Page";
+import {
+  buttonSecondary,
+  buttonSmall,
+  card,
+  cardHeader,
+  cardTitle,
+  fieldInput,
+  tableHead,
+} from "./ui";
 
 export default function PeopleDirectory() {
   const [draft, setDraft] = useState("");
@@ -15,90 +26,120 @@ export default function PeopleDirectory() {
   return (
     <section
       aria-label="People directory"
-      className="space-y-3 rounded-xl border border-slate-200 bg-white p-4"
+      className={`overflow-hidden ${card}`}
     >
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900">
-          People directory
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Registered LiteLLM people, including SSO accounts and people without
-          keys. This directory is read-only.
-        </p>
+      <div className={cardHeader}>
+        <div>
+          <h2 className={cardTitle}>People directory</h2>
+          <p className="mt-0.5 text-[13px] text-ink-4">
+            Registered LiteLLM people, including SSO accounts and people without
+            keys. This directory is read-only.
+          </p>
+        </div>
+        {people.data && (
+          <span className="text-[13px] text-ink-4">
+            {people.data.total} people{search ? " matching email" : ""}
+          </span>
+        )}
       </div>
       <form
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap items-end gap-2 border-b border-line-soft px-5 py-3.5"
         onSubmit={(event) => {
           event.preventDefault();
           setSearch(draft.trim());
           setPage(1);
         }}
       >
-        <label className="min-w-0 flex-1 space-y-1 text-xs text-slate-600">
+        <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-[13px] font-semibold text-ink-2">
           <span>Search people by email</span>
-          <input
-            type="search"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            maxLength={200}
-            placeholder="Email contains..."
-            className="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-900"
-          />
+          <span className="relative">
+            <Search
+              size={15}
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-4"
+            />
+            <input
+              type="search"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              maxLength={200}
+              placeholder="Email contains..."
+              className={`${fieldInput} pl-9 font-normal`}
+            />
+          </span>
         </label>
-        <button
-          type="submit"
-          className="self-end rounded border border-slate-300 px-3 py-2 text-sm text-slate-700"
-        >
+        <button type="submit" className={buttonSecondary}>
           Search people
         </button>
       </form>
       {people.isPending && (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="px-5 py-4 text-sm text-ink-4">
           Loading people...
         </p>
       )}
       {people.error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="px-5 py-4 text-sm text-danger">
           {people.error.message}
         </p>
       )}
       {people.data && (
         <>
-          <p className="text-xs text-slate-500">
-            {people.data.total} people{search ? " matching email" : ""}
-          </p>
-          <ul className="divide-y divide-slate-200">
-            {people.data.users.map((person) => (
-              <li
-                key={person.user_id}
-                className="space-y-1 py-3 text-sm text-slate-800"
-              >
-                {person.email ? (
-                  <EmailAddress email={person.email} />
-                ) : (
-                  <p>No email registered</p>
-                )}
-                <p className="break-all text-xs text-slate-500">
-                  {person.user_id}
-                </p>
-                {person.upstream_role && (
-                  <p className="text-xs text-slate-500">
-                    LiteLLM role: {person.upstream_role}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-          {!people.data.users.length && (
-            <p className="text-sm text-slate-500">No people found.</p>
+          {people.data.users.length ? (
+            <div className="relative overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead className={tableHead}>
+                  <tr>
+                    <th className="px-5 py-2.5 font-semibold">Person</th>
+                    <th className="px-3 py-2.5 font-semibold">User ID</th>
+                    <th className="px-5 py-2.5 font-semibold">LiteLLM role</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line-soft">
+                  {people.data.users.map((person) => (
+                    <tr key={person.user_id}>
+                      <td className="px-5 py-3 text-ink">
+                        {person.email ? (
+                          <EmailAddress email={person.email} />
+                        ) : (
+                          <p className="text-ink-4">No email registered</p>
+                        )}
+                      </td>
+                      <td className="break-all px-3 py-3 font-mono text-[13px] text-ink-3">
+                        {person.user_id}
+                      </td>
+                      <td className="px-5 py-3">
+                        {person.upstream_role ? (
+                          <Pill
+                            tone={
+                              person.upstream_role.includes("admin")
+                                ? "info"
+                                : "neutral"
+                            }
+                          >
+                            <span className="sr-only">LiteLLM role: </span>
+                            {person.upstream_role}
+                          </Pill>
+                        ) : (
+                          <span className="text-ink-4">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="px-5 py-6 text-center text-sm text-ink-4">
+              No people found.
+            </p>
           )}
-          <div className="flex items-center gap-3 text-xs text-slate-600">
+          <div className="flex items-center justify-between gap-3 border-t border-line-soft px-5 py-3 text-[13px] text-ink-4">
             <button
               type="button"
               aria-label="Previous people page"
               disabled={page <= 1 || people.isFetching}
               onClick={() => setPage(page - 1)}
-              className="rounded border px-3 py-2 disabled:opacity-40"
+              className={buttonSmall}
             >
               Previous
             </button>
@@ -110,7 +151,7 @@ export default function PeopleDirectory() {
               aria-label="Next people page"
               disabled={page >= people.data.total_pages || people.isFetching}
               onClick={() => setPage(page + 1)}
-              className="rounded border px-3 py-2 disabled:opacity-40"
+              className={buttonSmall}
             >
               Next
             </button>
