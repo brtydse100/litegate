@@ -42,9 +42,10 @@ The edit panel splits a group's spend into its own team spend and each
 sub-group's total. Select one or more top-level groups (or **All**); the cards,
 **Needs attention**, spend split, group table and usage report combine the
 selection. Usage charts aggregate the explicitly selected groups over the
-selected date range as a GitHub-style contribution history: one square per
-day, with spend, request and token totals as tabs. Groups are ranked by the
-chosen metric (tokens first), and choosing one shows its own history. **Usage report**
+selected date range as small cards: weekly spend and request bars, the groups
+or members using the most tokens, and a donut of spend by model, each with two
+summary figures. A list below ranks groups or members by spend, requests or
+tokens. **Usage report**
 with no group open reports on the selected top-level groups; with **All** it is
 an organization-wide request, which can be more expensive. Existing hierarchy
 policy and membership protections still apply. The legacy full-overview API remains available for existing clients;

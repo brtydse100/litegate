@@ -1,42 +1,69 @@
-import { render, cleanup, fireEvent, screen } from "@testing-library/react";
+import { render, cleanup, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import {
-  ContributionHistory,
+  BarCard,
+  DonutCard,
   UsageBars,
   metricValue,
+  weekly,
 } from "./OrganizationCharts";
 afterEach(cleanup);
-const day = (date: string, values: Partial<Record<string, number>> = {}) => ({
-  date,
-  spend: 0,
-  tokens: 0,
-  requests: 0,
-  ...values,
-});
-
 it.each([0.000001, 0.02, 1, 1234, 123456789])(
-  "shows spend of %s as a finite contribution history",
+  "draws spend of %s as finite bars, the largest solid",
   (spend) => {
-    const daily = [
-      day("2026-01-01", { spend: spend / 2 }),
-      day("2026-01-02", { spend }),
-    ];
     const { container } = render(
-      <ContributionHistory
-        daily={daily}
-        totals={{ spend: spend * 1.5, tokens: 0, requests: 0 }}
+      <BarCard
+        title="Spend history"
+        subtitle="By week"
+        metric="spend"
+        bars={[
+          { label: "Week 1", value: spend / 2 },
+          { label: "Week 2", value: spend },
+        ]}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /^Spend/ }));
     expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
+    const bars = [...container.querySelectorAll("[title]")];
+    expect(bars.map((bar) => bar.getAttribute("style"))).toEqual([
+      "height: 50%;",
+      "height: 100%;",
+    ]);
+    expect(bars[0].className).toContain("opacity-50");
+    expect(bars[1].className).not.toContain("opacity-50");
     expect(
-      screen.getByRole("img", { name: /busiest day 2026-01-02/ }),
+      screen.getByRole("img", { name: /^Spend history: Week 1 / }),
     ).toBeVisible();
-    // The busiest day takes the darkest shade, whatever the scale.
-    const busiest = container.querySelector('[title^="2026-01-02"]')!;
-    expect(busiest.className.split(" ")).toContain("bg-teal");
   },
 );
+
+it("sums days into labelled weeks", () => {
+  const daily = Array.from({ length: 9 }, (_, index) => ({
+    date: `2026-01-${String(index + 1).padStart(2, "0")}`,
+    spend: 0,
+    tokens: 10,
+    requests: 1,
+  }));
+  expect(weekly(daily, "tokens").map((week) => week.value)).toEqual([70, 20]);
+});
+
+it("shows each model's share of spend in a donut", () => {
+  render(
+    <DonutCard
+      title="Spend by model"
+      subtitle="Share"
+      metric="spend"
+      slices={[
+        { label: "small", value: 25 },
+        { label: "large", value: 75 },
+        { label: "unused", value: 0 },
+      ]}
+    />,
+  );
+  expect(
+    screen.getByRole("img", { name: "Spend by model: large 75%, small 25%" }),
+  ).toBeVisible();
+  expect(screen.queryByText("unused")).not.toBeInTheDocument();
+});
 it("rounds sub-cent spend to two decimals for display", () => {
   expect(metricValue(0.000001, "spend")).toBe("$0.00");
   expect(metricValue(0.0000000123, "spend")).toBe("$0.00");
@@ -87,9 +114,17 @@ it.each([
 ])("renders zero and empty usage finitely", ({ daily }) => {
   const { container } = render(
     <>
-      <ContributionHistory
-        daily={daily}
-        totals={{ spend: 0, tokens: 0, requests: 0 }}
+      <BarCard
+        title="Spend history"
+        subtitle="By week"
+        metric="spend"
+        bars={weekly(daily, "spend")}
+      />
+      <DonutCard
+        title="Spend by model"
+        subtitle="Share"
+        metric="spend"
+        slices={[]}
       />
       <UsageBars
         title="Usage"
@@ -99,7 +134,7 @@ it.each([
     </>,
   );
   expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
-  expect(container.textContent).toContain("$0.00");
+  expect(container.textContent).toContain("No recorded usage in this period.");
 });
 
 it("offers full email copy access in per-user usage labels", () => {
@@ -116,54 +151,4 @@ it("offers full email copy access in per-user usage labels", () => {
   expect(
     screen.getByRole("button", { name: "Copy email long.person@example.com" }),
   ).toBeVisible();
-});
-
-it("ranks groups by tokens and shows a chosen group's own history", () => {
-  const { container } = render(
-    <ContributionHistory
-      daily={[
-        day("2026-01-01", { tokens: 110 }),
-        day("2026-01-02", { tokens: 400 }),
-      ]}
-      totals={{ spend: 0, tokens: 510, requests: 0 }}
-      groupLabel="team"
-      groups={[
-        {
-          id: "small",
-          name: "Small",
-          tokens: 10,
-          spend: 0,
-          requests: 0,
-          daily: [day("2026-01-01", { tokens: 10 }), day("2026-01-02")],
-        },
-        {
-          id: "big",
-          name: "Big",
-          tokens: 500,
-          spend: 0,
-          requests: 0,
-          daily: [
-            day("2026-01-01", { tokens: 100 }),
-            day("2026-01-02", { tokens: 400 }),
-          ],
-        },
-      ]}
-    />,
-  );
-  const chips = screen
-    .getByRole("group", { name: "Rank by team" })
-    .querySelectorAll("button");
-  // Tokens are shown first; the biggest token user comes right after All.
-  expect([...chips].map((chip) => chip.textContent)).toEqual([
-    "All",
-    "Big500",
-    "Small10",
-  ]);
-  fireEvent.click(screen.getByRole("button", { name: /^Small/ }));
-  expect(
-    screen.getByRole("img", { name: /10 tokens for Small/ }),
-  ).toBeVisible();
-  expect(
-    container.querySelector('[title="2026-01-02: 0"]')!.className,
-  ).toContain("bg-well");
 });

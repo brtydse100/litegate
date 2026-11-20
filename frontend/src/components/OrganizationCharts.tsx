@@ -1,4 +1,4 @@
-import { useState } from "react";
+import type React from "react";
 import type { OrganizationUsage, UsageMetrics } from "../types/organization";
 import EmailAddress from "./EmailAddress";
 import { formatUsd } from "../formatUsd";
@@ -16,199 +16,248 @@ export function metricValue(value: number, metric: UsageMetric): string {
   return formatUsd(value);
 }
 
-const levels = ["bg-well", "bg-teal/25", "bg-teal/50", "bg-teal/75", "bg-teal"];
-const weekdays = ["Mon", "", "Wed", "", "Fri", "", ""];
-const tabLabels: Record<UsageMetric, string> = {
-  spend: "Spend",
-  requests: "Requests",
-  tokens: "Tokens",
-};
-const units: Record<UsageMetric, string> = {
-  spend: "spent",
-  requests: "requests",
-  tokens: "tokens",
-};
-
 type Day = OrganizationUsage["daily"][number];
-const utc = (date: string) => new Date(`${date}T00:00:00Z`);
-const monthName = (date: string) =>
-  utc(date).toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
 
-/** Days as weekly columns (Monday first), padded so each column is a week. */
-function weeks(days: Day[]): Array<Array<Day | null>> {
-  if (!days.length) return [];
-  const lead = (utc(days[0].date).getUTCDay() + 6) % 7;
-  const cells: Array<Day | null> = [...Array(lead).fill(null), ...days];
-  const columns: Array<Array<Day | null>> = [];
-  for (let index = 0; index < cells.length; index += 7)
-    columns.push(cells.slice(index, index + 7));
-  return columns;
+const shortDate = (date: string) =>
+  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+
+/** Daily usage summed into weeks, labelled by each week's first day. */
+export function weekly(daily: Day[], metric: UsageMetric) {
+  const weeks: Array<{ label: string; value: number; title: string }> = [];
+  for (let index = 0; index < daily.length; index += 7) {
+    const days = daily.slice(index, index + 7);
+    const value = days.reduce((sum, day) => sum + day[metric], 0);
+    const first = days[0].date;
+    const last = days[days.length - 1].date;
+    weeks.push({
+      label: shortDate(first),
+      value,
+      title: `${shortDate(first)} – ${shortDate(last)}: ${metricValue(value, metric)}`,
+    });
+  }
+  return weeks;
 }
 
-/**
- * GitHub-style contribution history: one square per day, darker for more.
- * Metric tabs show each total; group chips rank groups by the chosen metric.
- */
-export function ContributionHistory({
-  daily,
-  totals,
-  groups = [],
-  groupLabel = "group",
+export interface StatTile {
+  caption: string;
+  value: string;
+  sub: string;
+}
+
+function Card({
+  title,
+  subtitle,
+  tiles,
+  children,
 }: {
-  daily: Day[];
-  totals: UsageMetrics;
-  groups?: OrganizationUsage["by_group"];
-  groupLabel?: string;
+  title: string;
+  subtitle: string;
+  tiles?: StatTile[];
+  children: React.ReactNode;
 }) {
-  const [metric, setMetric] = useState<UsageMetric>("tokens");
-  const [team, setTeam] = useState<string | null>(null);
-  const ranked = groups
-    .filter((group) => group.daily?.length)
-    .sort((left, right) => right[metric] - left[metric]);
-  const chosen = ranked.find((group) => (group.id ?? "direct") === team);
-  const series = chosen?.daily ?? daily;
-  const total = chosen ? chosen[metric] : totals[metric];
-  const max = Math.max(0, ...series.map((day) => day[metric]));
-  const level = (value: number) =>
-    value <= 0 || !max ? 0 : Math.max(1, Math.ceil((value / max) * 4));
-  const peak = series.reduce<Day | undefined>(
-    (best, day) => (!best || day[metric] > best[metric] ? day : best),
-    undefined,
-  );
-  const columns = weeks(series);
-  let lastMonth = "";
-  const monthLabels = columns.map((column) => {
-    const first = column.find((day): day is Day => !!day);
-    const name = first ? monthName(first.date) : "";
-    if (!name || name === lastMonth) return "";
-    lastMonth = name;
-    return name;
-  });
-  const scope = chosen ? ` for ${chosen.name}` : "";
-  const summary =
-    max === 0 || !peak
-      ? `No recorded ${units[metric]}${scope} in this period`
-      : `${metricValue(total, metric)} ${units[metric]}${scope}; busiest day ${peak.date} with ${metricValue(peak[metric], metric)}`;
-  const chip = (active: boolean) =>
-    `inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] ${
-      active
-        ? "border-teal bg-teal-tint font-semibold text-teal-ink"
-        : "border-line-input bg-card text-ink-3 hover:text-ink"
-    }`;
   return (
     <section
-      aria-label="Contribution history"
-      className="flex flex-col gap-4 rounded-lg border border-line bg-card p-5"
+      aria-label={title}
+      className="flex min-w-0 flex-col gap-4 rounded-2xl border border-line bg-card p-5"
     >
-      <div
-        role="group"
-        aria-label="Metric"
-        className="grid grid-cols-3 overflow-hidden rounded-lg border border-line"
-      >
-        {(["spend", "requests", "tokens"] as const).map((item) => (
-          <button
-            key={item}
-            type="button"
-            aria-pressed={metric === item}
-            onClick={() => setMetric(item)}
-            className={`flex flex-col items-start gap-0.5 border-r border-line px-4 py-3 text-left last:border-r-0 ${
-              metric === item ? "bg-canvas" : "hover:bg-canvas/60"
-            }`}
-          >
-            <span className="text-xs text-ink-4">{tabLabels[item]}</span>
-            <span className="text-lg font-semibold text-ink">
-              {metricValue(totals[item], item)}
-            </span>
-          </button>
-        ))}
+      <div>
+        <h3 className="text-base font-semibold text-ink">{title}</h3>
+        <p className="mt-0.5 text-[13px] text-ink-4">{subtitle}</p>
       </div>
-      {ranked.length > 1 && (
-        <div
-          role="group"
-          aria-label={`Rank by ${groupLabel}`}
-          className="flex flex-wrap gap-1.5"
-        >
-          <button
-            type="button"
-            aria-pressed={!chosen}
-            onClick={() => setTeam(null)}
-            className={chip(!chosen)}
-          >
-            All
-          </button>
-          {ranked.map((group) => (
-            <button
-              key={group.id ?? "direct"}
-              type="button"
-              aria-pressed={chosen === group}
-              onClick={() => setTeam(group.id ?? "direct")}
-              className={chip(chosen === group)}
-            >
-              {group.name}
-              <span className="text-ink-4">
-                {metricValue(group[metric], metric)}
-              </span>
-            </button>
+      {children}
+      {tiles && tiles.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          {tiles.map((tile) => (
+            <div key={tile.caption} className="rounded-xl bg-canvas px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-4">
+                {tile.caption}
+              </p>
+              <p className="mt-1 truncate text-[15px] font-bold text-ink">
+                {tile.value}
+              </p>
+              <p className="truncate text-xs text-ink-4">{tile.sub}</p>
+            </div>
           ))}
         </div>
       )}
-      <div>
-        <p className="text-sm font-semibold text-ink">
-          {metricValue(total, metric)} {units[metric]}
-          {scope} in this period
+    </section>
+  );
+}
+
+const barTone: Record<UsageMetric, string> = {
+  spend: "bg-teal",
+  requests: "bg-blue",
+  tokens: "bg-periwinkle",
+};
+
+/** A few thick rounded bars with a label under each; the largest is solid. */
+export function BarCard({
+  title,
+  subtitle,
+  bars,
+  metric,
+  tiles,
+}: {
+  title: string;
+  subtitle: string;
+  bars: Array<{ label: string; value: number; title?: string }>;
+  metric: UsageMetric;
+  tiles?: StatTile[];
+}) {
+  const max = Math.max(0, ...bars.map((bar) => bar.value));
+  const summary = bars
+    .map((bar) => `${bar.label} ${metricValue(bar.value, metric)}`)
+    .join(", ");
+  return (
+    <Card title={title} subtitle={subtitle} tiles={tiles}>
+      {max === 0 ? (
+        <p className="flex h-40 items-center justify-center text-sm text-ink-4">
+          No recorded usage in this period.
         </p>
-        <div className="relative mt-3 overflow-x-auto">
-          <div role="img" aria-label={summary} className="inline-flex gap-2">
-            <div
-              aria-hidden="true"
-              className="grid grid-rows-[16px_repeat(7,18px)] gap-1 text-[10px] text-ink-4"
-            >
-              <span />
-              {weekdays.map((name, index) => (
-                <span key={index} className="leading-[18px]">
-                  {name}
-                </span>
-              ))}
-            </div>
-            {columns.map((column, index) => (
-              <div
-                key={index}
-                className="grid grid-rows-[16px_repeat(7,18px)] gap-1"
+      ) : (
+        <div role="img" aria-label={`${title}: ${summary}`}>
+          <div aria-hidden="true" className="flex h-40 items-end gap-2.5">
+            {bars.map((bar, index) => (
+              <span
+                key={`${bar.label}-${index}`}
+                title={
+                  bar.title ?? `${bar.label}: ${metricValue(bar.value, metric)}`
+                }
+                className={`min-w-0 flex-1 rounded-xl ${barTone[metric]} ${
+                  bar.value === max ? "" : "opacity-50"
+                }`}
+                style={{ height: `${Math.max(4, (bar.value / max) * 100)}%` }}
+              />
+            ))}
+          </div>
+          <div aria-hidden="true" className="mt-2 flex gap-2.5">
+            {bars.map((bar, index) => (
+              <span
+                key={`${bar.label}-${index}`}
+                className="min-w-0 flex-1 truncate text-center text-[11px] text-ink-4"
               >
-                <span
-                  aria-hidden="true"
-                  className="whitespace-nowrap text-[10px] leading-4 text-ink-4"
-                >
-                  {monthLabels[index]}
-                </span>
-                {Array.from({ length: 7 }, (_, row) => {
-                  const day = column[row];
-                  return day ? (
-                    <span
-                      key={day.date}
-                      title={`${day.date}: ${metricValue(day[metric], metric)}`}
-                      className={`h-[18px] w-[18px] rounded-[3px] ${levels[level(day[metric])]}`}
-                    />
-                  ) : (
-                    <span key={row} />
-                  );
-                })}
-              </div>
+                {bar.label}
+              </span>
             ))}
           </div>
         </div>
-        <p
-          aria-hidden="true"
-          className="mt-3 flex items-center justify-end gap-1 text-[11px] text-ink-4"
-        >
-          Less
-          {levels.map((tone) => (
-            <span key={tone} className={`h-3 w-3 rounded-[3px] ${tone}`} />
-          ))}
-          More
+      )}
+    </Card>
+  );
+}
+
+const sliceColors = [
+  "rgb(var(--teal))",
+  "rgb(var(--blue))",
+  "rgb(var(--periwinkle))",
+  "rgb(var(--cyan))",
+  "rgb(var(--mint))",
+  "rgb(var(--sand))",
+];
+
+/** A donut of shares, largest first, with a legend of percentages. */
+export function DonutCard({
+  title,
+  subtitle,
+  slices,
+  metric,
+  tiles,
+}: {
+  title: string;
+  subtitle: string;
+  slices: Array<{ label: string; value: number }>;
+  metric: UsageMetric;
+  tiles?: StatTile[];
+}) {
+  const sorted = [...slices]
+    .filter((slice) => slice.value > 0)
+    .sort((left, right) => right.value - left.value);
+  // More than six shares fold into "Other" so colours stay distinct.
+  const shown = sorted.length > 6 ? sorted.slice(0, 5) : sorted;
+  if (sorted.length > 6)
+    shown.push({
+      label: "Other",
+      value: sorted.slice(5).reduce((sum, slice) => sum + slice.value, 0),
+    });
+  const total = shown.reduce((sum, slice) => sum + slice.value, 0);
+  const circumference = 2 * Math.PI * 40;
+  let offset = 0;
+  return (
+    <Card title={title} subtitle={subtitle} tiles={tiles}>
+      {total === 0 ? (
+        <p className="flex h-40 items-center justify-center text-sm text-ink-4">
+          No recorded usage in this period.
         </p>
-      </div>
-    </section>
+      ) : (
+        <div className="flex flex-wrap items-center gap-5">
+          <svg
+            role="img"
+            aria-label={`${title}: ${shown
+              .map(
+                (slice) =>
+                  `${slice.label} ${Math.round((slice.value / total) * 100)}%`,
+              )
+              .join(", ")}`}
+            viewBox="0 0 100 100"
+            className="h-36 w-36 shrink-0 -rotate-90"
+          >
+            <circle
+              cx="50"
+              cy="50"
+              r="40"
+              fill="none"
+              stroke="rgb(var(--well))"
+              strokeWidth="14"
+            />
+            {shown.map((slice, index) => {
+              const length = (slice.value / total) * circumference;
+              const dash = (
+                <circle
+                  key={slice.label}
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="none"
+                  stroke={sliceColors[index % sliceColors.length]}
+                  strokeWidth="14"
+                  strokeDasharray={`${length} ${circumference - length}`}
+                  strokeDashoffset={-offset}
+                >
+                  <title>
+                    {slice.label}: {metricValue(slice.value, metric)}
+                  </title>
+                </circle>
+              );
+              offset += length;
+              return dash;
+            })}
+          </svg>
+          <ul className="flex min-w-0 flex-1 flex-col gap-2 text-[13px]">
+            {shown.map((slice, index) => (
+              <li key={slice.label} className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{
+                    background: sliceColors[index % sliceColors.length],
+                  }}
+                />
+                <span className="min-w-0 flex-1 truncate text-ink-2">
+                  {slice.label}
+                </span>
+                <span className="text-ink-4">
+                  {Math.round((slice.value / total) * 100)}%
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
   );
 }
 

@@ -6,9 +6,7 @@ import {
   organizationUsage,
 } from "../src/demo/organization";
 
-test("@smoke microspend contribution history stays readable", async ({
-  page,
-}) => {
+test("@smoke microspend usage cards stay readable", async ({ page }) => {
   await page.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const url = new URL(route.request().url());
     let body: unknown = {};
@@ -37,9 +35,8 @@ test("@smoke microspend contribution history stays readable", async ({
   await page
     .getByRole("button", { name: "Usage report, Engineering, 3 users" })
     .click();
-  const card = page.getByRole("region", { name: "Contribution history" });
-  await card.getByRole("button", { name: /^Spend/ }).click();
-  await expect(card).toContainText("$0.00 spent in this period");
+  const card = page.getByRole("region", { name: "Spend history" });
+  await expect(card).toContainText("$0.00");
   expect(await card.innerHTML()).not.toMatch(/NaN|Infinity/);
   // Sub-cent amounts round for display without overflowing the small card.
   expect(

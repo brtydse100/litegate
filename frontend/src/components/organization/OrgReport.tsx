@@ -5,10 +5,13 @@ import { api } from "../../api/client";
 import EmailAddress from "../EmailAddress";
 import DismissibleMessage from "../DismissibleMessage";
 import {
-  ContributionHistory,
+  BarCard,
+  DonutCard,
   metricValue,
   UsageBars,
+  weekly,
 } from "../OrganizationCharts";
+import type { OrganizationUsage, UsageMetrics } from "../../types/organization";
 import type { Group } from "./orgModel";
 
 const inputClass =
@@ -116,11 +119,18 @@ export default function OrgReport({
       {usage.isPending && <p className="text-sm text-ink-4">Loading usage…</p>}
       {usage.data && (
         <>
-          <ContributionHistory
-            daily={usage.data.daily}
-            totals={usage.data.totals}
-            groups={showMembers ? [] : usage.data.by_group}
-            groupLabel={nextLevel?.toLowerCase() ?? "group"}
+          <UsageCards
+            usage={usage.data}
+            ranked={
+              showMembers && hasMemberUsage
+                ? usage.data.by_user
+                : usage.data.by_group
+            }
+            rankedLabel={
+              showMembers && hasMemberUsage
+                ? "member"
+                : (nextLevel?.toLowerCase() ?? "group")
+            }
           />
           {showMembers && !hasMemberUsage && (
             <p className="text-sm text-ink-4">
@@ -128,7 +138,7 @@ export default function OrgReport({
               totals.
             </p>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div>
             <UsageBars
               title={
                 showMembers && hasMemberUsage
@@ -145,11 +155,6 @@ export default function OrgReport({
               metric="spend"
               emailLabels={showMembers && hasMemberUsage}
               onSelect={!showMembers && nextLevel ? onSelectChild : undefined}
-            />
-            <UsageBars
-              title="Usage by model"
-              values={usage.data.by_model}
-              metric="spend"
             />
           </div>
         </>
@@ -251,5 +256,124 @@ export default function OrgReport({
         </div>
       </section>
     </section>
+  );
+}
+
+/** Small report cards: weekly spend and requests, top token users, models. */
+function UsageCards({
+  usage,
+  ranked,
+  rankedLabel,
+}: {
+  usage: OrganizationUsage;
+  ranked: Array<UsageMetrics & { name: string }>;
+  rankedLabel: string;
+}) {
+  const days = usage.daily.length || 1;
+  const spendWeeks = weekly(usage.daily, "spend");
+  const requestWeeks = weekly(usage.daily, "requests");
+  const busiest = (weeks: typeof spendWeeks) =>
+    weeks.reduce<(typeof weeks)[number] | undefined>(
+      (best, week) => (!best || week.value > best.value ? week : best),
+      undefined,
+    );
+  const topSpend = busiest(spendWeeks);
+  const topRequests = busiest(requestWeeks);
+  const byTokens = [...ranked]
+    .filter((item) => item.tokens > 0)
+    .sort((left, right) => right.tokens - left.tokens);
+  const range = `${usage.start_date} – ${usage.end_date}`;
+  const usedModels = usage.by_model.filter((model) => model.spend > 0);
+  const topModel = usedModels.reduce<(typeof usedModels)[number] | undefined>(
+    (best, model) => (!best || model.spend > best.spend ? model : best),
+    undefined,
+  );
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <BarCard
+        title="Spend history"
+        subtitle={`By week · ${range}`}
+        metric="spend"
+        bars={spendWeeks}
+        tiles={[
+          {
+            caption: "Busiest week",
+            value: topSpend ? metricValue(topSpend.value, "spend") : "—",
+            sub: topSpend ? `Week of ${topSpend.label}` : "No spend",
+          },
+          {
+            caption: "Daily average",
+            value: metricValue(usage.totals.spend / days, "spend"),
+            sub: `${metricValue(usage.totals.spend, "spend")} in total`,
+          },
+        ]}
+      />
+      <BarCard
+        title={`Tokens by ${rankedLabel}`}
+        subtitle="Most tokens first"
+        metric="tokens"
+        bars={byTokens.slice(0, 6).map((item) => ({
+          label: item.name,
+          value: item.tokens,
+        }))}
+        tiles={[
+          {
+            caption: `Top ${rankedLabel}`,
+            value: byTokens[0]?.name ?? "—",
+            sub: byTokens[0]
+              ? `${metricValue(byTokens[0].tokens, "tokens")} tokens`
+              : "No tokens",
+          },
+          {
+            caption: "Total tokens",
+            value: metricValue(usage.totals.tokens, "tokens"),
+            sub: `across ${byTokens.length} ${byTokens.length === 1 ? rankedLabel : `${rankedLabel}s`}`,
+          },
+        ]}
+      />
+      <DonutCard
+        title="Spend by model"
+        subtitle="Share of spend in this period"
+        metric="spend"
+        slices={usage.by_model.map((model) => ({
+          label: model.name,
+          value: model.spend,
+        }))}
+        tiles={[
+          {
+            caption: "Top model",
+            value: topModel?.name ?? "—",
+            sub: topModel
+              ? `${metricValue(topModel.spend, "spend")} spent`
+              : "No spend",
+          },
+          {
+            caption: "Models used",
+            value: metricValue(usedModels.length, "requests"),
+            sub: `${metricValue(usage.totals.spend, "spend")} in total`,
+          },
+        ]}
+      />
+      <BarCard
+        title="Requests history"
+        subtitle={`By week · ${range}`}
+        metric="requests"
+        bars={requestWeeks}
+        tiles={[
+          {
+            caption: "Total requests",
+            value: metricValue(usage.totals.requests, "requests"),
+            sub: `${metricValue(Math.round(usage.totals.requests / days), "requests")} a day`,
+          },
+          {
+            caption: "Busiest week",
+            value: topRequests
+              ? metricValue(topRequests.value, "requests")
+              : "—",
+            sub: topRequests ? `Week of ${topRequests.label}` : "No requests",
+          },
+        ]}
+      />
+    </div>
   );
 }

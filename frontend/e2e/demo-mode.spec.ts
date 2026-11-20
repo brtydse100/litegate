@@ -25,7 +25,7 @@ test("organization demo filters usage and protects the admin view", async ({
   );
   // Spend, requests and tokens each have their own small trend.
   await expect(
-    page.getByRole("region", { name: "Contribution history" }),
+    page.getByRole("region", { name: "Spend history" }),
   ).toBeVisible();
   await groups
     .getByRole("button", {
@@ -341,11 +341,10 @@ test("the usage report ranks groups by tokens", async ({ page }) => {
   await page
     .getByRole("button", { name: "Usage report, all groups, 4 users" })
     .click();
-  const ranking = page
-    .getByRole("region", { name: "Contribution history" })
-    .getByRole("group", { name: "Rank by department" })
-    .getByRole("button");
-  // Tokens are shown first; the biggest token user follows All.
-  await expect(ranking.nth(1)).toHaveText(/^Engineering/);
-  await expect(ranking.nth(2)).toHaveText(/^Marketing/);
+  const tokens = page.getByRole("region", { name: "Tokens by department" });
+  // Most tokens first: the top department leads and is named in the card.
+  await expect(tokens.getByRole("img")).toHaveAccessibleName(
+    /^Tokens by department: Engineering .*, Marketing /,
+  );
+  await expect(tokens).toContainText("Top department");
 });
