@@ -7,7 +7,7 @@ import {
 } from "react";
 import type React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LogOut, Zap, type LucideIcon } from "lucide-react";
+import { BookOpen, LogOut, Zap, type LucideIcon } from "lucide-react";
 import EmailAddress from "./EmailAddress";
 import ThemeToggle from "./ThemeToggle";
 
@@ -68,10 +68,13 @@ export function UserMenu({
   onSignOut,
   compact = false,
   up = false,
+  apiDocsUrl,
 }: {
   email?: string;
   role?: string;
   onSignOut: () => void;
+  /** Administrators get the built-in API reference here. */
+  apiDocsUrl?: string;
   compact?: boolean;
   /** Open above the button, for the sidebar footer. */
   up?: boolean;
@@ -155,6 +158,17 @@ export function UserMenu({
           </div>
           <div className="pt-1.5">
             <ThemeToggle className={item} showLabel role="menuitem" />
+            {apiDocsUrl && (
+              <a
+                role="menuitem"
+                href={apiDocsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className={`${item} no-underline`}
+              >
+                <BookOpen size={16} aria-hidden="true" /> API reference
+              </a>
+            )}
             <button
               type="button"
               role="menuitem"
@@ -231,9 +245,11 @@ export function AdminSidebar({
   email,
   role,
   onSignOut,
+  apiDocsUrl,
   extra,
 }: {
   extra?: ReactNode;
+  apiDocsUrl?: string;
   groups: NavGroup[];
   logoUrl?: string;
   email?: string;
@@ -275,7 +291,13 @@ export function AdminSidebar({
       <div className="flex items-center justify-between gap-3 px-2 pb-2 md:pb-4">
         <BrandMark logoUrl={logoUrl} />
         <div className="md:hidden">
-          <UserMenu email={email} role={role} onSignOut={onSignOut} compact />
+          <UserMenu
+            email={email}
+            role={role}
+            onSignOut={onSignOut}
+            apiDocsUrl={apiDocsUrl}
+            compact
+          />
         </div>
       </div>
       {extra && <div className="px-2 pb-2">{extra}</div>}
@@ -314,7 +336,14 @@ export function AdminSidebar({
         ))}
       </div>
       <div className="mt-auto hidden items-center gap-1 border-t border-navy-3 pt-3.5 md:flex">
-        <UserMenu email={email} role={role} onSignOut={onSignOut} compact up />
+        <UserMenu
+          email={email}
+          role={role}
+          onSignOut={onSignOut}
+          apiDocsUrl={apiDocsUrl}
+          compact
+          up
+        />
         <span className="min-w-0 text-[13px] leading-tight">
           {email && <EmailAddress email={email} className="block" />}
           <span className="block capitalize text-navy-muted">{role}</span>

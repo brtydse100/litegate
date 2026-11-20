@@ -5,6 +5,9 @@
 `GET /api/portal-config` requires no authentication. Its `litellm_ui_url` field
 returns the configured full destination unchanged, or an empty string when the
 Model Hub button is disabled. LiteGate does not append a Model Hub path.
+`setup_guide_url` (default `""`) is the operator's own key usage guide; My key
+shows a **Setup guide** link only when it is set. `api_docs_url` remains the
+built-in API reference, which the portal offers to administrators only.
 
 The response also includes `my_key_text` (default `""`), independent of
 `login_text`. My key displays this plain text beneath the key action area,

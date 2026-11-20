@@ -90,6 +90,8 @@ config:
   loginText: ""
   # Plain text beneath the My key actions. Blank hides the message.
   myKeyText: ""
+  # Your own key usage guide; adds "Setup guide" to My key. Blank hides it.
+  setupGuideUrl: ""
   supportTicketUrl: ""
 
   # -- SSO: simple discovery mode --------------------------------------------

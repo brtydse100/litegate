@@ -658,6 +658,7 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `local_auth_password` | `LOCAL_AUTH_PASSWORD` | `""` | Admin password |
 | `logo_url` | `LOGO_URL` | `""` | Logo image URL or path |
 | `litellm_ui_url` | `LITELLM_UI_URL` | `""` | LiteLLM web UI URL (adds hub button) |
+| `setup_guide_url` | `SETUP_GUIDE_URL` | `""` | Key usage guide URL (adds **Setup guide** to My key; blank hides it) |
 | `support_ticket_url` | `SUPPORT_TICKET_URL` | `""` | Support ticket URL |
 | `key_max_budget` | `KEY_MAX_BUDGET` | `null` | Budget per key (USD) |
 | `key_budget_duration` | `KEY_BUDGET_DURATION` | `null` | Budget reset period |

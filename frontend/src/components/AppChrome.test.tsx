@@ -24,6 +24,30 @@ describe("UserMenu", () => {
   });
 });
 
+describe("API reference", () => {
+  it("appears in the account menu only when given", () => {
+    const { unmount } = render(
+      <UserMenu email="ann@example.test" onSignOut={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(
+      screen.queryByRole("menuitem", { name: "API reference" }),
+    ).not.toBeInTheDocument();
+    unmount();
+    render(
+      <UserMenu
+        email="ann@example.test"
+        onSignOut={vi.fn()}
+        apiDocsUrl="/api/docs"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(
+      screen.getByRole("menuitem", { name: "API reference" }),
+    ).toHaveAttribute("href", "/api/docs");
+  });
+});
+
 describe("AdminSidebar", () => {
   const groups = [
     {

@@ -48,6 +48,7 @@ interface PortalConfig {
   my_key_text?: string;
   litellm_ui_url: string;
   api_docs_url: string;
+  setup_guide_url?: string;
   local_users_enabled: boolean;
   save_api_keys_in_db: boolean;
   analytics_enabled?: boolean;
@@ -401,9 +402,9 @@ export default function Home() {
                     Analytics
                   </Link>
                 ))}
-              {config?.api_docs_url && (
+              {config?.setup_guide_url && (
                 <a
-                  href={config.api_docs_url}
+                  href={config.setup_guide_url}
                   target="_blank"
                   rel="noreferrer"
                   className={topLink}
@@ -424,6 +425,7 @@ export default function Home() {
                 email={user?.email}
                 role={user?.role}
                 onSignOut={signOut}
+                apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
               />
             </nav>
           </div>
@@ -488,6 +490,7 @@ export default function Home() {
         email={user?.email}
         role={user?.role}
         onSignOut={signOut}
+        apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
         extra={demoSwitch}
       />
       <div className="min-w-0 flex-1 md:flex md:flex-col">

@@ -52,6 +52,18 @@ async def test_portal_config_exposes_local_users_setting(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(("configured", "served"), [("", ""), ("  https://guide.example.test/  ", "https://guide.example.test/")])
+async def test_portal_config_exposes_the_optional_setup_guide(monkeypatch, configured, served):
+    monkeypatch.setattr(main_module.settings, "setup_guide_url", configured)
+
+    async with _client() as client:
+        response = await client.get("/api/portal-config")
+
+    assert response.json()["setup_guide_url"] == served
+    assert response.json()["api_docs_url"] == "/api/docs"
+
+
+@pytest.mark.asyncio
 async def test_password_session_contract_is_httponly_usable_and_revocable(monkeypatch):
     monkeypatch.setattr(auth.settings, "local_auth_username", "admin")
     monkeypatch.setattr(auth.settings, "local_auth_password", "strong-test-password")

@@ -42,6 +42,7 @@ data:
   LOGO_URL: {{ .Values.config.logoUrl | quote }}
   LOGIN_TEXT: {{ .Values.config.loginText | quote }}
   MY_KEY_TEXT: {{ .Values.config.myKeyText | quote }}
+  SETUP_GUIDE_URL: {{ .Values.config.setupGuideUrl | quote }}
   SUPPORT_TICKET_URL: {{ .Values.config.supportTicketUrl | quote }}
   LOCAL_USERS_ENABLED: {{ .Values.config.localUsersEnabled | quote }}
   LOCAL_USERS_DB_PATH: {{ .Values.config.localUsersDbPath | quote }}
