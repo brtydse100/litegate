@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
-import { Check, Copy, Eye, EyeOff } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { api } from "../api/client";
-import { primaryKeyActionClassName } from "./keyActionStyles";
 import DismissibleMessage from "./DismissibleMessage";
 
 interface Props {
@@ -10,7 +8,8 @@ interface Props {
   canReveal: boolean;
   initialSecret?: string | null;
   onHide?: () => void;
-  children?: (action: ReactNode) => ReactNode;
+  /** Masked preview shown while the secret is hidden. */
+  preview?: string;
 }
 
 export default function PersonalKeySecret(props: Props) {
@@ -24,7 +23,7 @@ function SecretContent({
   canReveal,
   initialSecret,
   onHide,
-  children,
+  preview = "sk-••••••••••••••••",
 }: Props) {
   const [secret, setSecret] = useState<string | null>(initialSecret ?? null);
   const [pending, setPending] = useState(false);
@@ -82,60 +81,68 @@ function SecretContent({
     onHide?.();
   }
 
-  const action =
-    secret || canReveal ? (
-      <button
-        type="button"
-        onClick={() => (secret ? hide() : void reveal())}
-        disabled={pending}
-        aria-expanded={!!secret}
-        className={primaryKeyActionClassName}
-      >
-        {secret ? <EyeOff size={21} /> : <Eye size={21} />}
-        {pending
-          ? "Loading API key..."
-          : secret
-            ? "Hide API key"
-            : "Show API key"}
-      </button>
-    ) : null;
-
   return (
     <div
-      className="w-full min-w-0 space-y-6"
+      className="flex w-full min-w-0 flex-col gap-2"
       role="group"
       aria-label="API key secret"
     >
-      {secret ? (
-        <div className="flex min-w-0 items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <code className="min-w-0 flex-1 break-all font-mono text-sm leading-relaxed text-emerald-900">
-            {secret}
-          </code>
+      <div
+        className={`flex flex-wrap items-center gap-2 rounded-[10px] py-1.5 pl-4 pr-1.5 ${
+          secret ? "bg-mint-tint" : "bg-canvas"
+        }`}
+      >
+        <code
+          className={`min-w-0 flex-[1_1_240px] break-all py-2 font-mono text-[15px] ${
+            secret ? "text-mint-ink" : "text-ink"
+          }`}
+        >
+          {secret ?? preview}
+        </code>
+        {(secret || canReveal) && (
+          <button
+            type="button"
+            onClick={() => (secret ? hide() : void reveal())}
+            disabled={pending}
+            aria-expanded={!!secret}
+            aria-label={
+              pending
+                ? "Loading API key"
+                : secret
+                  ? "Hide API key"
+                  : "Show API key"
+            }
+            className="min-h-11 rounded-lg px-3.5 py-2 text-sm text-ink-2 hover:bg-well disabled:opacity-50"
+          >
+            {pending ? "Loading…" : secret ? "Hide" : "Show"}
+          </button>
+        )}
+        {secret && (
           <button
             type="button"
             onClick={() => void copy()}
             aria-label="Copy API key"
-            title={copied ? "Copied" : "Copy API key"}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-emerald-900 hover:bg-emerald-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 [html.dark_&]:hover:bg-emerald-900"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line-input bg-card px-4 py-2 text-sm font-semibold text-ink hover:bg-canvas"
           >
-            {copied ? <Check size={17} /> : <Copy size={17} />}
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+            {copied ? "Copied" : "Copy"}
             <span className="sr-only" role="status">
               {copied ? "Copied" : ""}
             </span>
           </button>
-        </div>
-      ) : !canReveal ? (
-        <span className="text-xs text-slate-500">
+        )}
+      </div>
+      {!secret && !canReveal && (
+        <p className="text-xs text-ink-4">
           LiteGate has no saved copy of this key to show. The key itself still
           works.
-        </span>
-      ) : null}
-      {children ? children(action) : action}
+        </p>
+      )}
       {error && (
         <DismissibleMessage
           role="alert"
           messageKey={error}
-          className="mt-1 text-xs text-red-600"
+          className="text-xs text-danger"
         >
           {error}
         </DismissibleMessage>

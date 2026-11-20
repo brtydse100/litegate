@@ -7,10 +7,15 @@ The open Organization page refreshes hierarchy and membership status every
 navigation and the selected report immediately. Usage reports remain lazy and
 are refreshed on demand rather than polled in the background.
 
-The Organization page initially loads only root-group metadata from LiteGate's
-configured hierarchy and local identity records. It does not wait for live
-LiteLLM data for every internal team, and it does not request installation-wide
-usage or users before a selection.
+The Organization page renders from root-group metadata from LiteGate's
+configured hierarchy and local identity records, then fills in spend. Root
+groups appear as tabs; the selected root's direct children load immediately and
+deeper groups load as you open them. The group table, budget split, metric cards
+and **Needs attention** list take descendant spend totals from one request to
+the organization overview, made once when the page opens, again on
+**Refresh organization** and after a save in the edit panel; it reads the shared team listing described below.
+Until it arrives, spend cells show placeholders and navigation stays usable.
+The page does not request installation-wide usage or users before a selection.
 
 Organization spend totals and the member table's budget-period spend come from
 two shared bulk listings (all teams and all keys). Each listing is reused for a
@@ -23,18 +28,23 @@ period, LiteGate reads that team individually. When the key listing is unavailab
 member's keys individually; a member absent from a successful listing has no keys
 and shows no spend. Key changes and budget enforcement always read live data.
 
-Select or expand a group to fetch its direct children and that team's current
-details. Deeper groups load the same way as you open them. Child lists, team
+Select a group row to open its edit panel and usage report, or expand it to
+fetch its direct children. When a branch would show more than three nested
+levels, the table re-roots at the opened group and a breadcrumb leads back up.
+The edit panel saves the group budget and per-person limit through the budget
+endpoints when hierarchical budgets are enabled; otherwise it is read-only.
+Deeper groups load the same way as you open them. Child lists, team
 details, users and usage have separate loading/error states and retry controls;
 navigation remains usable while a slow branch or chart request completes.
 Fetched branches and selected data are cached for 60 seconds for quick revisits.
 
-The current team's spend is labelled as **team spend**, not a descendant total.
-Usage charts aggregate the explicitly selected subtree over the selected date
-range. **All groups** is an explicit request for organization-wide reporting,
-which can be more expensive. Existing hierarchy policy and membership protections
+The edit panel splits a group's spend into its own team spend and each
+sub-group's total. Usage charts aggregate the explicitly selected subtree over
+the selected date range. **Usage report** with no group selected is an explicit
+request for organization-wide reporting, which can be more expensive. Existing hierarchy policy and membership protections
 still apply. The legacy full-overview API remains available for existing clients;
-the page uses the lightweight children/detail endpoints described in [API.md](../API.md).
+the page uses it for spend totals alongside the children/detail endpoints
+described in [API.md](../API.md).
 
 LiteGate organizes users under configurable level labels and provides inherited
 per-key allowances, aggregate budget tracking, and administrative usage graphs.

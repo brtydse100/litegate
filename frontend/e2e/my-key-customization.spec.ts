@@ -46,7 +46,7 @@ test("@smoke My key guidance remains below actions after creation", async ({
   });
   await page.goto("/my-key");
   const guidance = page.getByLabel("My key guidance");
-  const create = page.getByRole("button", { name: "Create API key" });
+  const create = page.getByRole("button", { name: "Create my API key" });
   await expect(guidance).toHaveText(message);
   await expect(guidance.locator("img")).toHaveCount(0);
   expect((await guidance.boundingBox())!.y).toBeGreaterThan(

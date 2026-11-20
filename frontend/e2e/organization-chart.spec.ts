@@ -32,7 +32,9 @@ test("@smoke microspend axis labels fit inside the chart", async ({ page }) => {
     await route.fulfill({ json: body });
   });
   await page.goto("/organization");
-  await page.getByRole("button", { name: "All groups, 4 users" }).click();
+  await page
+    .getByRole("button", { name: "Usage report, all groups, 4 users" })
+    .click();
   const chart = page.getByRole("img", { name: "Spend (USD) over time" });
   await expect(chart).toBeVisible();
   const bounds = await chart.locator("g text").evaluateAll((labels) =>
@@ -87,16 +89,17 @@ test("organization fetches direct children and selected data progressively", asy
   await expect(
     page.getByRole("button", { name: "Engineering, 3 users" }),
   ).toBeVisible();
-  expect(requests.filter((path) => path.includes("organization"))).toEqual([
-    "/api/v1/organization/children",
-  ]);
-  await page.getByRole("button", { name: "Engineering, 3 users" }).click();
   await expect(
-    page.getByRole("button", { name: "Marketing, 1 user" }),
+    page.getByRole("button", { name: "Marketing", pressed: false }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Infrastructure, 2 users" }),
   ).toHaveCount(0);
+  expect(
+    requests.filter((path) =>
+      /organization\/(users|usage|groups\/)/.test(path),
+    ),
+  ).toEqual([]);
   releaseChildren();
   await expect(
     page.getByRole("button", { name: "Infrastructure, 2 users" }),
@@ -104,23 +107,36 @@ test("organization fetches direct children and selected data progressively", asy
   await expect(
     page.getByRole("button", { name: "Platform, 1 user" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Collapse Engineering" }).click();
-  await page.getByRole("button", { name: "Expand Engineering" }).click();
+  await page
+    .getByRole("button", { name: "Expand Engineering → Infrastructure" })
+    .click();
   await expect(
-    page.getByRole("button", { name: "Infrastructure, 2 users" }),
+    page.getByRole("button", { name: "Cloud, 1 user" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Collapse Engineering → Infrastructure" })
+    .click();
+  await page
+    .getByRole("button", { name: "Expand Engineering → Infrastructure" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Cloud, 1 user" }),
   ).toBeVisible();
   expect(
     requests.filter(
       (path) => path === "/api/v1/organization/children?parent=engineering",
     ),
   ).toHaveLength(1);
-  await page.getByRole("button", { name: "Infrastructure, 2 users" }).click();
-  await expect(
-    page.getByRole("button", { name: "Cloud, 1 user" }),
-  ).toBeVisible();
   expect(
-    requests.some(
+    requests.filter(
       (path) => path === "/api/v1/organization/children?parent=infrastructure",
     ),
+  ).toHaveLength(1);
+  await page.getByRole("button", { name: "Infrastructure, 2 users" }).click();
+  await expect(
+    page.getByRole("complementary", { name: "Edit Infrastructure" }),
+  ).toBeVisible();
+  expect(
+    requests.some((path) => path.startsWith("/api/v1/organization/usage")),
   ).toBe(true);
 });

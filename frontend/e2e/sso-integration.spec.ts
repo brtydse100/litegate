@@ -69,7 +69,7 @@ for (const [username, role, organization] of personas) {
       const keys = await (await page.request.get("/api/keys")).json();
       expect(keys.keys).toEqual([]);
       await expect(
-        page.getByRole("button", { name: "Create API key" }),
+        page.getByRole("button", { name: "Create my API key" }),
       ).toBeVisible();
     }
   });

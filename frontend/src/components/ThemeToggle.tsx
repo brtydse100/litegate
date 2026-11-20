@@ -12,7 +12,16 @@ export function applyStoredTheme() {
   document.documentElement.style.colorScheme = theme;
 }
 
-export default function ThemeToggle() {
+export default function ThemeToggle({
+  className = "flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900",
+  showLabel = false,
+  role,
+}: {
+  className?: string;
+  showLabel?: boolean;
+  /** Set to `menuitem` when the toggle sits inside a menu. */
+  role?: "menuitem";
+}) {
   const [theme, setTheme] = useState<Theme>(() =>
     document.documentElement.classList.contains("dark") ? "dark" : "light",
   );
@@ -26,15 +35,18 @@ export default function ThemeToggle() {
   }
 
   const dark = theme === "dark";
+  const label = dark ? "Use light theme" : "Use dark theme";
   return (
     <button
       type="button"
+      role={role}
       onClick={toggleTheme}
-      aria-label={dark ? "Use light theme" : "Use dark theme"}
-      title={dark ? "Use light theme" : "Use dark theme"}
-      className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+      aria-label={label}
+      title={label}
+      className={className}
     >
       {dark ? <Sun size={16} /> : <Moon size={16} />}
+      {showLabel && <span>{dark ? "Light theme" : "Dark theme"}</span>}
     </button>
   );
 }
