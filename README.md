@@ -20,6 +20,12 @@ master key.
 SSO groups can map users to existing LiteLLM teams automatically, so the key
 inherits the intended team budget and model policy.
 
+| Sign in | Replace a key safely |
+| --- | --- |
+| ![Sign-in page](docs/media/litegate-login-hd.png) | ![Confirmation before replacing a key](docs/media/litegate-regenerate-confirmation-hd.png) |
+| **Organization (administrators)** | **Dark theme** |
+| ![Organization page with a group open](docs/media/litegate-organization-hd.png) | ![My key page in the dark theme](docs/media/litegate-my-key-dark-hd.png) |
+
 <details>
 <summary><strong>Optional administrator and operations tools</strong></summary>
 
