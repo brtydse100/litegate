@@ -5,9 +5,8 @@ import { api } from "../../api/client";
 import EmailAddress from "../EmailAddress";
 import DismissibleMessage from "../DismissibleMessage";
 import {
+  ContributionHistory,
   metricValue,
-  TokenGrid,
-  TrendCard,
   UsageBars,
 } from "../OrganizationCharts";
 import type { Group } from "./orgModel";
@@ -117,22 +116,12 @@ export default function OrgReport({
       {usage.isPending && <p className="text-sm text-ink-4">Loading usage…</p>}
       {usage.data && (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(["spend", "requests", "tokens"] as const).map((item) => (
-              <TrendCard
-                key={item}
-                metric={item}
-                daily={usage.data.daily}
-                total={usage.data.totals[item]}
-              />
-            ))}
-          </div>
-          {!showMembers && (
-            <TokenGrid
-              title={`Tokens by ${nextLevel?.toLowerCase() ?? "group"}`}
-              groups={usage.data.by_group}
-            />
-          )}
+          <ContributionHistory
+            daily={usage.data.daily}
+            totals={usage.data.totals}
+            groups={showMembers ? [] : usage.data.by_group}
+            groupLabel={nextLevel?.toLowerCase() ?? "group"}
+          />
           {showMembers && !hasMemberUsage && (
             <p className="text-sm text-ink-4">
               Per-member usage is unavailable in this report. Showing group

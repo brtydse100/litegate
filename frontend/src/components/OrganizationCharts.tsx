@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { OrganizationUsage, UsageMetrics } from "../types/organization";
 import EmailAddress from "./EmailAddress";
 import { formatUsd } from "../formatUsd";
@@ -15,181 +16,198 @@ export function metricValue(value: number, metric: UsageMetric): string {
   return formatUsd(value);
 }
 
-const trendColor: Record<UsageMetric, string> = {
-  spend: "text-teal",
-  requests: "text-blue",
-  tokens: "text-periwinkle",
+const levels = ["bg-well", "bg-teal/25", "bg-teal/50", "bg-teal/75", "bg-teal"];
+const weekdays = ["Mon", "", "Wed", "", "Fri", "", ""];
+const tabLabels: Record<UsageMetric, string> = {
+  spend: "Spend",
+  requests: "Requests",
+  tokens: "Tokens",
+};
+const units: Record<UsageMetric, string> = {
+  spend: "spent",
+  requests: "requests",
+  tokens: "tokens",
 };
 
-const shortDay = (date: string) =>
-  new Date(`${date}T00:00:00Z`).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
+type Day = OrganizationUsage["daily"][number];
+const utc = (date: string) => new Date(`${date}T00:00:00Z`);
+const monthName = (date: string) =>
+  utc(date).toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
 
-/** A compact card: the period total, a small daily trend and its peak day. */
-export function TrendCard({
+/** Days as weekly columns (Monday first), padded so each column is a week. */
+function weeks(days: Day[]): Array<Array<Day | null>> {
+  if (!days.length) return [];
+  const lead = (utc(days[0].date).getUTCDay() + 6) % 7;
+  const cells: Array<Day | null> = [...Array(lead).fill(null), ...days];
+  const columns: Array<Array<Day | null>> = [];
+  for (let index = 0; index < cells.length; index += 7)
+    columns.push(cells.slice(index, index + 7));
+  return columns;
+}
+
+/**
+ * GitHub-style contribution history: one square per day, darker for more.
+ * Metric tabs show each total; group chips rank groups by the chosen metric.
+ */
+export function ContributionHistory({
   daily,
-  metric,
-  total,
+  totals,
+  groups = [],
+  groupLabel = "group",
 }: {
-  daily: OrganizationUsage["daily"];
-  metric: UsageMetric;
-  total: number;
+  daily: Day[];
+  totals: UsageMetrics;
+  groups?: OrganizationUsage["by_group"];
+  groupLabel?: string;
 }) {
-  const label = metricLabels[metric];
-  const values = daily.map((day) => day[metric]);
-  const max = Math.max(0, ...values);
-  const scale = max || 1;
-  // One bar per day: equal slots across the chart, bars 70% of a slot wide.
-  const slot = 240 / Math.max(1, daily.length);
-  const barWidth = Math.max(1, slot * 0.7);
-  const height = (value: number) => (value / scale) * 46;
-  const peak = daily.reduce<(typeof daily)[number] | undefined>(
+  const [metric, setMetric] = useState<UsageMetric>("tokens");
+  const [team, setTeam] = useState<string | null>(null);
+  const ranked = groups
+    .filter((group) => group.daily?.length)
+    .sort((left, right) => right[metric] - left[metric]);
+  const chosen = ranked.find((group) => (group.id ?? "direct") === team);
+  const series = chosen?.daily ?? daily;
+  const total = chosen ? chosen[metric] : totals[metric];
+  const max = Math.max(0, ...series.map((day) => day[metric]));
+  const level = (value: number) =>
+    value <= 0 || !max ? 0 : Math.max(1, Math.ceil((value / max) * 4));
+  const peak = series.reduce<Day | undefined>(
     (best, day) => (!best || day[metric] > best[metric] ? day : best),
     undefined,
   );
-  const average = daily.length ? total / daily.length : 0;
+  const columns = weeks(series);
+  let lastMonth = "";
+  const monthLabels = columns.map((column) => {
+    const first = column.find((day): day is Day => !!day);
+    const name = first ? monthName(first.date) : "";
+    if (!name || name === lastMonth) return "";
+    lastMonth = name;
+    return name;
+  });
+  const scope = chosen ? ` for ${chosen.name}` : "";
+  const summary =
+    max === 0 || !peak
+      ? `No recorded ${units[metric]}${scope} in this period`
+      : `${metricValue(total, metric)} ${units[metric]}${scope}; busiest day ${peak.date} with ${metricValue(peak[metric], metric)}`;
+  const chip = (active: boolean) =>
+    `inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] ${
+      active
+        ? "border-teal bg-teal-tint font-semibold text-teal-ink"
+        : "border-line-input bg-card text-ink-3 hover:text-ink"
+    }`;
   return (
     <section
-      aria-label={`${label} summary`}
-      className="flex min-w-0 flex-col rounded-[10px] border border-line bg-card p-4"
+      aria-label="Contribution history"
+      className="flex flex-col gap-4 rounded-lg border border-line bg-card p-5"
     >
-      <p className="text-xs text-ink-4">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-ink">
-        {metricValue(total, metric)}
-      </p>
-      <svg
-        role="img"
-        aria-label={`${label} over time`}
-        viewBox="0 0 240 56"
-        preserveAspectRatio="none"
-        className={`mt-3 h-14 w-full ${trendColor[metric]}`}
+      <div
+        role="group"
+        aria-label="Metric"
+        className="grid grid-cols-3 overflow-hidden rounded-lg border border-line"
       >
-        <title>{label} by day</title>
-        <line
-          x1="0"
-          x2="240"
-          y1="52"
-          y2="52"
-          stroke="currentColor"
-          className="text-line"
-        />
-        {daily.map((day, index) => (
-          <rect
-            key={day.date}
-            x={index * slot + (slot - barWidth) / 2}
-            y={52 - height(day[metric])}
-            width={barWidth}
-            height={height(day[metric])}
-            fill="currentColor"
+        {(["spend", "requests", "tokens"] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            aria-pressed={metric === item}
+            onClick={() => setMetric(item)}
+            className={`flex flex-col items-start gap-0.5 border-r border-line px-4 py-3 text-left last:border-r-0 ${
+              metric === item ? "bg-canvas" : "hover:bg-canvas/60"
+            }`}
           >
-            <title>
-              {day.date}: {metricValue(day[metric], metric)}
-            </title>
-          </rect>
+            <span className="text-xs text-ink-4">{tabLabels[item]}</span>
+            <span className="text-lg font-semibold text-ink">
+              {metricValue(totals[item], item)}
+            </span>
+          </button>
         ))}
-      </svg>
-      {daily.length > 0 && (
-        <p className="mt-1 flex justify-between text-[11px] text-ink-4">
-          <span>{shortDay(daily[0].date)}</span>
-          <span>{shortDay(daily[daily.length - 1].date)}</span>
-        </p>
+      </div>
+      {ranked.length > 1 && (
+        <div
+          role="group"
+          aria-label={`Rank by ${groupLabel}`}
+          className="flex flex-wrap gap-1.5"
+        >
+          <button
+            type="button"
+            aria-pressed={!chosen}
+            onClick={() => setTeam(null)}
+            className={chip(!chosen)}
+          >
+            All
+          </button>
+          {ranked.map((group) => (
+            <button
+              key={group.id ?? "direct"}
+              type="button"
+              aria-pressed={chosen === group}
+              onClick={() => setTeam(group.id ?? "direct")}
+              className={chip(chosen === group)}
+            >
+              {group.name}
+              <span className="text-ink-4">
+                {metricValue(group[metric], metric)}
+              </span>
+            </button>
+          ))}
+        </div>
       )}
-      <p className="mt-2 text-xs text-ink-3">
-        {max === 0 || !peak
-          ? "No recorded usage in this period."
-          : `Avg ${metricValue(average, metric)} a day · peak ${metricValue(peak[metric], metric)} on ${shortDay(peak.date)}`}
-      </p>
-    </section>
-  );
-}
-
-const shades = [
-  "bg-well",
-  "bg-periwinkle/25",
-  "bg-periwinkle/50",
-  "bg-periwinkle/75",
-  "bg-periwinkle",
-];
-
-/**
- * Contribution-style grid: one row per group (most tokens first), one square
- * per day, darker for more tokens.
- */
-export function TokenGrid({
-  title,
-  groups,
-}: {
-  title: string;
-  groups: OrganizationUsage["by_group"];
-}) {
-  const rows = groups
-    .filter((group) => group.daily?.length)
-    .sort((left, right) => right.tokens - left.tokens);
-  if (!rows.length) return null;
-  const max = Math.max(
-    0,
-    ...rows.flatMap((group) => group.daily!.map((day) => day.tokens)),
-  );
-  const shade = (tokens: number) =>
-    tokens <= 0 || !max ? 0 : Math.max(1, Math.ceil((tokens / max) * 4));
-  return (
-    <section
-      aria-label={title}
-      className="rounded-lg border border-line bg-card p-5 shadow-sm"
-    >
-      <h2 className="text-sm font-semibold text-ink">{title}</h2>
-      <p className="mt-0.5 text-xs text-ink-4">
-        One square per day; darker means more tokens. Most tokens first.
-      </p>
-      <div className="relative mt-3 overflow-x-auto">
-        <ul className="flex min-w-max flex-col gap-1.5">
-          {rows.map((group) => {
-            const peak = group.daily!.reduce((best, day) =>
-              day.tokens > best.tokens ? day : best,
-            );
-            const summary = `${group.name}: ${metricValue(group.tokens, "tokens")} tokens, peak ${metricValue(peak.tokens, "tokens")} on ${peak.date}`;
-            return (
-              <li
-                key={group.id ?? "direct"}
-                className="flex items-center gap-3"
-              >
-                <span className="w-36 shrink-0 truncate text-[13px] text-ink-2">
-                  {group.name}
+      <div>
+        <p className="text-sm font-semibold text-ink">
+          {metricValue(total, metric)} {units[metric]}
+          {scope} in this period
+        </p>
+        <div className="relative mt-3 overflow-x-auto">
+          <div role="img" aria-label={summary} className="inline-flex gap-2">
+            <div
+              aria-hidden="true"
+              className="grid grid-rows-[16px_repeat(7,18px)] gap-1 text-[10px] text-ink-4"
+            >
+              <span />
+              {weekdays.map((name, index) => (
+                <span key={index} className="leading-[18px]">
+                  {name}
                 </span>
+              ))}
+            </div>
+            {columns.map((column, index) => (
+              <div
+                key={index}
+                className="grid grid-rows-[16px_repeat(7,18px)] gap-1"
+              >
                 <span
-                  role="img"
-                  aria-label={summary}
-                  className="flex gap-[3px]"
+                  aria-hidden="true"
+                  className="whitespace-nowrap text-[10px] leading-4 text-ink-4"
                 >
-                  {group.daily!.map((day) => (
+                  {monthLabels[index]}
+                </span>
+                {Array.from({ length: 7 }, (_, row) => {
+                  const day = column[row];
+                  return day ? (
                     <span
                       key={day.date}
-                      title={`${day.date}: ${metricValue(day.tokens, "tokens")} tokens`}
-                      className={`h-3 w-3 shrink-0 rounded-[3px] ${shades[shade(day.tokens)]}`}
+                      title={`${day.date}: ${metricValue(day[metric], metric)}`}
+                      className={`h-[18px] w-[18px] rounded-[3px] ${levels[level(day[metric])]}`}
                     />
-                  ))}
-                </span>
-                <span className="shrink-0 text-xs font-semibold text-ink-2">
-                  {metricValue(group.tokens, "tokens")}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+                  ) : (
+                    <span key={row} />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+        <p
+          aria-hidden="true"
+          className="mt-3 flex items-center justify-end gap-1 text-[11px] text-ink-4"
+        >
+          Less
+          {levels.map((tone) => (
+            <span key={tone} className={`h-3 w-3 rounded-[3px] ${tone}`} />
+          ))}
+          More
+        </p>
       </div>
-      <p
-        aria-hidden="true"
-        className="mt-3 flex items-center justify-end gap-1 text-[11px] text-ink-4"
-      >
-        Less
-        {shades.map((tone) => (
-          <span key={tone} className={`h-3 w-3 rounded-[3px] ${tone}`} />
-        ))}
-        More
-      </p>
     </section>
   );
 }

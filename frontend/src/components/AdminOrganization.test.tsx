@@ -297,7 +297,7 @@ describe("organization dashboard contracts", () => {
         name: "Usage report, all groups, 4 users",
       }),
     );
-    await screen.findByRole("img", { name: "Spend (USD) over time" });
+    await screen.findByRole("region", { name: "Contribution history" });
     const refresh = screen.getByRole("button", {
       name: "Refresh organization",
     });
@@ -358,7 +358,7 @@ describe("organization dashboard contracts", () => {
     expect(api.organizationUsers).toHaveBeenLastCalledWith(["platform"], 1);
   });
 
-  it("shows inherited allowance and all three usage trends", async () => {
+  it("shows inherited allowance and the usage contribution history", async () => {
     renderOrganization();
     const rows = await groupList();
     fireEvent.click(
@@ -379,12 +379,15 @@ describe("organization dashboard contracts", () => {
         name: "Collapse Engineering → Infrastructure",
       }),
     ).toHaveAttribute("aria-expanded", "true");
-    for (const name of [
-      "Spend (USD) over time",
-      "Logged requests over time",
-      "Tokens over time",
-    ])
-      expect(await screen.findByRole("img", { name })).toBeVisible();
+    const history = await screen.findByRole("region", {
+      name: "Contribution history",
+    });
+    // One metric at a time, with each total on its tab; tokens come first.
+    for (const name of [/^Spend/, /^Requests/, /^Tokens/])
+      expect(within(history).getByRole("button", { name })).toBeVisible();
+    expect(
+      within(history).getByRole("button", { name: /^Tokens/ }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(
       screen.queryByRole("combobox", { name: "Chart metric" }),
     ).not.toBeInTheDocument();
@@ -397,7 +400,7 @@ describe("organization dashboard contracts", () => {
         name: "Usage report, Engineering, 3 users",
       }),
     );
-    await screen.findByRole("img", { name: "Spend (USD) over time" });
+    await screen.findByRole("region", { name: "Contribution history" });
     const start = await screen.findByLabelText("Usage start date");
     vi.mocked(api.organizationUsage).mockRejectedValue(
       new Error("Aggregate unavailable"),
@@ -407,7 +410,7 @@ describe("organization dashboard contracts", () => {
       "Aggregate unavailable",
     );
     expect(
-      screen.queryByRole("img", { name: "Spend (USD) over time" }),
+      screen.queryByRole("region", { name: "Contribution history" }),
     ).not.toBeInTheDocument();
   });
 
@@ -503,9 +506,9 @@ describe("organization dashboard contracts", () => {
     const [node, start, end] = calls[calls.length - 1];
     const report = organizationUsage(node, start, end);
     expect(
-      within(
-        screen.getByRole("region", { name: "Logged requests summary" }),
-      ).getByText(metricValue(report.totals.requests, "requests")),
+      within(screen.getByRole("button", { name: /^Requests/ })).getByText(
+        metricValue(report.totals.requests, "requests"),
+      ),
     ).toBeVisible();
     expect(
       screen.getByText("Budget-period spend / per-key allowance"),
@@ -669,7 +672,7 @@ describe("organization dashboard contracts", () => {
       await screen.findByRole("button", { name: "Engineering, 3 users" }),
     );
     expect(
-      await screen.findByRole("img", { name: "Spend (USD) over time" }),
+      await screen.findByRole("region", { name: "Contribution history" }),
     ).toBeVisible();
     vi.mocked(api.organizationUsage).mockImplementation(
       () => new Promise(() => {}),
@@ -687,7 +690,7 @@ describe("organization dashboard contracts", () => {
       await screen.findByRole("button", { name: "Marketing, 1 user" }),
     );
     expect(
-      screen.queryByRole("img", { name: "Spend (USD) over time" }),
+      screen.queryByRole("region", { name: "Contribution history" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("alex@example.com")).not.toBeInTheDocument();
     expect(screen.getByText("Loading team details...")).toBeVisible();

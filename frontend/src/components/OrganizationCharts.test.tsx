@@ -1,32 +1,40 @@
-import { render, cleanup, screen } from "@testing-library/react";
+import { render, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import {
-  TokenGrid,
-  TrendCard,
+  ContributionHistory,
   UsageBars,
   metricValue,
 } from "./OrganizationCharts";
 afterEach(cleanup);
+const day = (date: string, values: Partial<Record<string, number>> = {}) => ({
+  date,
+  spend: 0,
+  tokens: 0,
+  requests: 0,
+  ...values,
+});
+
 it.each([0.000001, 0.02, 1, 1234, 123456789])(
-  "summarises spend of %s with a finite trend and its peak day",
+  "shows spend of %s as a finite contribution history",
   (spend) => {
     const daily = [
-      { date: "2026-01-01", spend: spend / 2, tokens: 0, requests: 0 },
-      { date: "2026-01-02", spend, tokens: 0, requests: 0 },
+      day("2026-01-01", { spend: spend / 2 }),
+      day("2026-01-02", { spend }),
     ];
     const { container } = render(
-      <TrendCard metric="spend" daily={daily} total={spend * 1.5} />,
+      <ContributionHistory
+        daily={daily}
+        totals={{ spend: spend * 1.5, tokens: 0, requests: 0 }}
+      />,
     );
+    fireEvent.click(screen.getByRole("button", { name: /^Spend/ }));
     expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
     expect(
-      screen.getByRole("img", { name: "Spend (USD) over time" }),
+      screen.getByRole("img", { name: /busiest day 2026-01-02/ }),
     ).toBeVisible();
-    expect(container.textContent).toContain(metricValue(spend * 1.5, "spend"));
-    // One bar per day; the peak day is full height, whatever the scale.
-    const bars = [...container.querySelectorAll("rect")];
-    expect(bars.map((bar) => bar.getAttribute("height"))).toEqual(["23", "46"]);
-    expect(bars[1].textContent).toContain("2026-01-02");
-    expect(container.textContent).toMatch(/peak .+ on /);
+    // The busiest day takes the darkest shade, whatever the scale.
+    const busiest = container.querySelector('[title^="2026-01-02"]')!;
+    expect(busiest.className.split(" ")).toContain("bg-teal");
   },
 );
 it("rounds sub-cent spend to two decimals for display", () => {
@@ -79,7 +87,10 @@ it.each([
 ])("renders zero and empty usage finitely", ({ daily }) => {
   const { container } = render(
     <>
-      <TrendCard metric="spend" daily={daily} total={0} />
+      <ContributionHistory
+        daily={daily}
+        totals={{ spend: 0, tokens: 0, requests: 0 }}
+      />
       <UsageBars
         title="Usage"
         metric="spend"
@@ -107,16 +118,15 @@ it("offers full email copy access in per-user usage labels", () => {
   ).toBeVisible();
 });
 
-it("ranks groups by tokens and shades each day relative to the busiest day", () => {
-  const day = (date: string, tokens: number) => ({
-    date,
-    tokens,
-    spend: 0,
-    requests: 0,
-  });
+it("ranks groups by tokens and shows a chosen group's own history", () => {
   const { container } = render(
-    <TokenGrid
-      title="Tokens by team"
+    <ContributionHistory
+      daily={[
+        day("2026-01-01", { tokens: 110 }),
+        day("2026-01-02", { tokens: 400 }),
+      ]}
+      totals={{ spend: 0, tokens: 510, requests: 0 }}
+      groupLabel="team"
       groups={[
         {
           id: "small",
@@ -124,7 +134,7 @@ it("ranks groups by tokens and shades each day relative to the busiest day", () 
           tokens: 10,
           spend: 0,
           requests: 0,
-          daily: [day("2026-01-01", 10), day("2026-01-02", 0)],
+          daily: [day("2026-01-01", { tokens: 10 }), day("2026-01-02")],
         },
         {
           id: "big",
@@ -132,26 +142,28 @@ it("ranks groups by tokens and shades each day relative to the busiest day", () 
           tokens: 500,
           spend: 0,
           requests: 0,
-          daily: [day("2026-01-01", 100), day("2026-01-02", 400)],
+          daily: [
+            day("2026-01-01", { tokens: 100 }),
+            day("2026-01-02", { tokens: 400 }),
+          ],
         },
       ]}
     />,
   );
-  const rows = screen.getAllByRole("img");
-  expect(rows[0]).toHaveAccessibleName(
-    "Big: 500 tokens, peak 400 on 2026-01-02",
-  );
-  expect(rows[1]).toHaveAccessibleName(
-    "Small: 10 tokens, peak 10 on 2026-01-01",
-  );
-  const squares = [...container.querySelectorAll("li [title]")];
-  expect(squares.map((square) => square.getAttribute("title"))).toEqual([
-    "2026-01-01: 100 tokens",
-    "2026-01-02: 400 tokens",
-    "2026-01-01: 10 tokens",
-    "2026-01-02: 0 tokens",
+  const chips = screen
+    .getByRole("group", { name: "Rank by team" })
+    .querySelectorAll("button");
+  // Tokens are shown first; the biggest token user comes right after All.
+  expect([...chips].map((chip) => chip.textContent)).toEqual([
+    "All",
+    "Big500",
+    "Small10",
   ]);
-  // 400 is the busiest day; empty days use the lightest shade.
-  expect(squares[1].className.split(" ")).toContain("bg-periwinkle");
-  expect(squares[3].className).toContain("bg-well");
+  fireEvent.click(screen.getByRole("button", { name: /^Small/ }));
+  expect(
+    screen.getByRole("img", { name: /10 tokens for Small/ }),
+  ).toBeVisible();
+  expect(
+    container.querySelector('[title="2026-01-02: 0"]')!.className,
+  ).toContain("bg-well");
 });
