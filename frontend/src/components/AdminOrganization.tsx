@@ -112,6 +112,7 @@ export default function AdminOrganization({
   const [showIssues, setShowIssues] = useState(false);
   const [showAllAttention, setShowAllAttention] = useState(false);
   const opener = useRef<HTMLElement | null>(null);
+  const reportButton = useRef<HTMLButtonElement | null>(null);
 
   const rootsQuery = useQuery({
     queryKey: ["organization-children", ""],
@@ -251,6 +252,18 @@ export default function AdminOrganization({
   function request(id: string) {
     if (byId.get(id)?.has_children)
       setRequestedParents((current) => new Set(current).add(id));
+  }
+  function closeGroup() {
+    setNodeId(null);
+    // The panel unmounts; put focus back where the user started.
+    requestAnimationFrame(() => {
+      if (opener.current?.isConnected) opener.current.focus();
+      opener.current = null;
+    });
+  }
+  function closeAllGroupsReport() {
+    setAllGroupsReport(false);
+    requestAnimationFrame(() => reportButton.current?.focus());
   }
   function select(id: string) {
     const group = byId.get(id);
@@ -542,14 +555,7 @@ export default function AdminOrganization({
             (group) => group.id === selected.id,
           )}
           revision={budgets.data?.revision}
-          onClose={() => {
-            setNodeId(null);
-            // The panel unmounts; put focus back where the user started.
-            requestAnimationFrame(() => {
-              if (opener.current?.isConnected) opener.current.focus();
-              opener.current = null;
-            });
-          }}
+          onClose={closeGroup}
           onSelect={select}
         />
       )}
@@ -910,13 +916,13 @@ export default function AdminOrganization({
                 {!selected && (
                   <button
                     type="button"
-                    onClick={() => setAllGroupsReport(true)}
-                    aria-label={`Usage report, ${reportScope}, ${plural(reportUsers, "user")}`}
-                    aria-pressed={allGroupsReport}
+                    ref={reportButton}
+                    onClick={() => setAllGroupsReport((open) => !open)}
+                    aria-label={`${allGroupsReport ? "Hide report" : "Usage report"}, ${reportScope}, ${plural(reportUsers, "user")}`}
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-90"
                   >
                     <BarChart3 size={15} aria-hidden="true" />
-                    Usage report
+                    {allGroupsReport ? "Hide report" : "Usage report"}
                   </button>
                 )}
               </div>
@@ -1112,6 +1118,14 @@ export default function AdminOrganization({
             }
             totalUsers={reportUsers}
             onSelectChild={select}
+            // A childless team's report is the whole view, so it stays open.
+            onClose={
+              selected
+                ? closeGroup
+                : allGroupsReport
+                  ? closeAllGroupsReport
+                  : undefined
+            }
           />
         )}
       </div>

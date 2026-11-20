@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Users } from "lucide-react";
+import { Users, X } from "lucide-react";
 import { api } from "../../api/client";
 import EmailAddress from "../EmailAddress";
 import DismissibleMessage from "../DismissibleMessage";
@@ -27,6 +27,7 @@ export default function OrgReport({
   nextLevel,
   totalUsers,
   onSelectChild,
+  onClose,
 }: {
   nodeIds: string[];
   title: string;
@@ -34,6 +35,8 @@ export default function OrgReport({
   nextLevel?: string;
   totalUsers?: number;
   onSelectChild: (id: string) => void;
+  /** Hides the report; absent when the report is the whole view. */
+  onClose?: () => void;
 }) {
   const today = new Date().toISOString().slice(0, 10);
   const [page, setPage] = useState(1);
@@ -92,6 +95,17 @@ export default function OrgReport({
               onChange={(event) => setEndDate(event.target.value)}
             />
           </label>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close usage report"
+              title="Close usage report"
+              className="grid h-10 w-10 place-items-center rounded-lg border border-line-input bg-card text-ink-3 hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
       <p className="text-xs text-ink-4">

@@ -729,6 +729,55 @@ describe("organization dashboard contracts", () => {
     );
   });
 
+  it("closes the usage report from its button or its close control", async () => {
+    renderOrganization();
+    const open = await screen.findByRole("button", {
+      name: "Usage report, Engineering, 3 users",
+    });
+    fireEvent.click(open);
+    expect(
+      await screen.findByRole("region", { name: "Usage report" }),
+    ).toBeVisible();
+    // The same button hides it again.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Hide report, Engineering, 3 users" }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Usage report" }),
+    ).not.toBeInTheDocument();
+    // Or the report's own close control, which returns focus to the button.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Usage report, Engineering, 3 users",
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Close usage report" }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Usage report" }),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: "Usage report, Engineering, 3 users",
+        }),
+      ).toHaveFocus(),
+    );
+    // A selected group's report closes with the group.
+    fireEvent.click(
+      await within(await groupList()).findByRole("button", {
+        name: "Infrastructure, 2 users",
+      }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Close usage report" }),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Usage report" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("combines several departments in the cards, table and report", async () => {
     // A third department, so two selected ones are not "all groups".
     const overview = organizationOverview();
