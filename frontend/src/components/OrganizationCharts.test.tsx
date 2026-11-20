@@ -1,4 +1,4 @@
-import { render, cleanup, screen } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import {
   BarCard,
@@ -23,7 +23,7 @@ it.each([0.000001, 0.02, 1, 1234, 123456789])(
       />,
     );
     expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
-    const bars = [...container.querySelectorAll("[title]")];
+    const bars = [...container.querySelectorAll("[data-bar]")];
     expect(bars.map((bar) => bar.getAttribute("style"))).toEqual([
       "height: 50%;",
       "height: 100%;",
@@ -151,4 +151,53 @@ it("offers full email copy access in per-user usage labels", () => {
   expect(
     screen.getByRole("button", { name: "Copy email long.person@example.com" }),
   ).toBeVisible();
+});
+
+it("reads a bar on hover, tap and arrow keys", () => {
+  const { container } = render(
+    <BarCard
+      title="Tokens"
+      subtitle="Most first"
+      metric="tokens"
+      bars={[
+        { label: "Engineering", value: 3000 },
+        { label: "Marketing", value: 1000, detail: "Marketing team" },
+      ]}
+    />,
+  );
+  const [first, second] = container.querySelectorAll("[data-bar]");
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.pointerEnter(second);
+  expect(screen.getByRole("tooltip")).toHaveTextContent(
+    "Marketing team1,000 tokens",
+  );
+  // The read bar is solid and the rest fade.
+  expect(second.className).not.toContain("opacity-30");
+  expect(first.className).toContain("opacity-30");
+  fireEvent.pointerLeave(screen.getByRole("img"), { pointerType: "mouse" });
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.click(first);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("3,000 tokens");
+  fireEvent.keyDown(screen.getByRole("img"), { key: "ArrowRight" });
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Marketing team");
+  fireEvent.keyDown(screen.getByRole("img"), { key: "Escape" });
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+});
+
+it("reads a donut slice in its centre on hover", () => {
+  const { container } = render(
+    <DonutCard
+      title="Spend by model"
+      subtitle="Share"
+      metric="spend"
+      slices={[
+        { label: "small", value: 25 },
+        { label: "large", value: 75 },
+      ]}
+    />,
+  );
+  const chart = screen.getByRole("img");
+  expect(chart).toHaveTextContent("Total$100.00");
+  fireEvent.pointerEnter(container.querySelectorAll("[data-slice]")[1]);
+  expect(chart).toHaveTextContent("small$25.0025%");
 });
