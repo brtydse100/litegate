@@ -176,6 +176,14 @@ export default function Home() {
     organizationAccess.isPending
   )
     return <p role="status">Checking organization access…</p>;
+  // Team owners get the sidebar layout; wait for their access instead of
+  // flashing the ordinary top bar first.
+  if (
+    !isAdmin &&
+    config?.organization_delegation_enabled &&
+    organizationAccess.isPending
+  )
+    return <p role="status">Loading access…</p>;
   const adminSections = new Set([
     "/keys",
     "/users",
@@ -204,6 +212,8 @@ export default function Home() {
     />
   );
   const adminHome = isAdmin || canViewOrganization ? "/organization" : null;
+  // Delegated organization access is shown as its own role.
+  const roleLabel = !isAdmin && canViewOrganization ? "Team owner" : user?.role;
   // Anyone with admin access keeps the sidebar, including on My key and
   // Analytics (listed under Workspace); ordinary users get the top bar.
   const adminLayout =
@@ -435,7 +445,7 @@ export default function Home() {
               />
               <UserMenu
                 email={user?.email}
-                role={user?.role}
+                role={roleLabel}
                 onSignOut={signOut}
                 apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
               />
@@ -500,7 +510,7 @@ export default function Home() {
         groups={navGroups}
         logoUrl={config?.logo_url}
         email={user?.email}
-        role={user?.role}
+        role={roleLabel}
         onSignOut={signOut}
         apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
         extra={demoSwitch}

@@ -9,6 +9,13 @@ import {
   organizationKeyPolicy,
   organizationTeams,
 } from "./organization";
+import {
+  budgetView,
+  setEnvelope,
+  setOverride,
+  setPerUser,
+  type BudgetActor,
+} from "./budgets";
 
 let demoUser: User = {
   user_id: "demo-admin",
@@ -270,6 +277,53 @@ function matchesKey(key: KeyInfo, search: string, teamId: string) {
   );
 }
 
+async function bodyIfPatch(request: Request) {
+  return request.method === "PATCH" ? body(request) : {};
+}
+
+/** Budget planning, scoped like the rest of the organization API. */
+function budgetRoute(
+  path: string,
+  method: string,
+  payload: Record<string, unknown>,
+): Response | null {
+  const actor: BudgetActor = {
+    admin: demoUser.role === "admin",
+    userId: demoUser.user_id,
+    allows: (id) => inOwnedScope(groupById(id)),
+  };
+  const view = (data: ReturnType<typeof budgetView>) => ({
+    ...data,
+    // Owners see paths from their own team, like every organization view.
+    groups: data.groups.map((group) => {
+      const shown = scoped({ ...group, level: groupById(group.id)!.level });
+      return { ...group, path: shown.path, parent_id: shown.parent_id };
+    }),
+  });
+  const reply = ({ status, body }: { status: number; body: unknown }) =>
+    json(
+      status === 200 && body && typeof body === "object" && "groups" in body
+        ? view(body as ReturnType<typeof budgetView>)
+        : body,
+      status,
+    );
+  const parts = path.split("/").map(decodeURIComponent);
+  // /api/v1/organization/budgets[/groups/{id}[/users/{user}]]
+  if (parts[4] === "budgets") {
+    if (parts.length === 5 && method === "GET")
+      return json(view(budgetView(actor)));
+    if (method !== "PATCH") return json({ detail: "Method not allowed" }, 405);
+    if (parts.length === 7) return reply(setEnvelope(actor, parts[6], payload));
+    if (parts.length === 9)
+      return reply(setOverride(actor, parts[6], parts[8], payload));
+    return json({ detail: "Not found" }, 404);
+  }
+  // /api/v1/organization/groups/{id}/per-user
+  if (parts[4] === "groups" && parts[6] === "per-user" && method === "PATCH")
+    return reply(setPerUser(actor, parts[5], payload));
+  return null;
+}
+
 async function mockResponse(request: Request): Promise<Response> {
   await new Promise((resolve) => window.setTimeout(resolve, 120));
   const url = new URL(request.url);
@@ -317,6 +371,8 @@ async function mockResponse(request: Request): Promise<Response> {
     if (!signedIn) return json({ detail: "Not signed in" }, 401);
     if (demoUser.role !== "admin" && !demoOwnerOf)
       return json({ detail: "Administrator access required" }, 403);
+    const budgets = budgetRoute(path, method, await bodyIfPatch(request));
+    if (budgets) return budgets;
     if (method !== "GET") return json({ detail: "Method not allowed" }, 405);
     const owned = ownedGroup();
     const notFound = () =>
@@ -424,6 +480,7 @@ async function mockResponse(request: Request): Promise<Response> {
       local_users_enabled: true,
       analytics_enabled: true,
       organization_delegation_enabled: true,
+      hierarchical_budgets_enabled: true,
       // Synthetic budgets only; demo mode never connects to a LiteLLM proxy.
       litellm_enterprise_enabled: true,
     });

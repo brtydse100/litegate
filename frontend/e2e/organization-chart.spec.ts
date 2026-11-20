@@ -33,7 +33,7 @@ test("@smoke microspend usage cards stay readable", async ({ page }) => {
   });
   await page.goto("/organization");
   await page
-    .getByRole("button", { name: "Usage report, Engineering, 3 users" })
+    .getByRole("button", { name: "Usage report, Engineering, 5 users" })
     .click();
   const card = page.getByRole("region", { name: "Spend history" });
   await expect(card).toContainText("$0.00");
@@ -83,13 +83,13 @@ test("organization fetches direct children and selected data progressively", asy
   });
   await page.goto("/organization");
   await expect(
-    page.getByRole("button", { name: "Engineering, 3 users", exact: true }),
+    page.getByRole("button", { name: "Engineering, 5 users", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Marketing", pressed: false }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Infrastructure, 2 users" }),
+    page.getByRole("button", { name: "Infrastructure, 4 users" }),
   ).toHaveCount(0);
   expect(
     requests.filter((path) =>
@@ -98,10 +98,10 @@ test("organization fetches direct children and selected data progressively", asy
   ).toEqual([]);
   releaseChildren();
   await expect(
-    page.getByRole("button", { name: "Infrastructure, 2 users" }),
+    page.getByRole("button", { name: "Infrastructure, 4 users" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Platform, 1 user" }),
+    page.getByRole("button", { name: "Platform, 3 users" }),
   ).toHaveCount(0);
   await page
     .getByRole("button", { name: "Expand Engineering → Infrastructure" })
@@ -128,7 +128,7 @@ test("organization fetches direct children and selected data progressively", asy
       (path) => path === "/api/v1/organization/children?parent=infrastructure",
     ),
   ).toHaveLength(1);
-  await page.getByRole("button", { name: "Infrastructure, 2 users" }).click();
+  await page.getByRole("button", { name: "Infrastructure, 4 users" }).click();
   await expect(
     page.getByRole("complementary", { name: "Edit Infrastructure" }),
   ).toBeVisible();

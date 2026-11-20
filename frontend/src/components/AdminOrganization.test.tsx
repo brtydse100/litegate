@@ -154,7 +154,7 @@ describe("organization dashboard contracts", () => {
     const rows = await groupList();
     expect(
       await within(rows).findByRole("button", {
-        name: "Infrastructure, 2 users",
+        name: "Infrastructure, 4 users",
       }),
     ).toBeVisible();
     expect(
@@ -196,7 +196,7 @@ describe("organization dashboard contracts", () => {
     renderOrganization();
     const rows = await groupList();
     const row = await within(rows).findByRole("button", {
-      name: "Infrastructure, 2 users",
+      name: "Infrastructure, 4 users",
     });
     row.focus();
     fireEvent.click(row);
@@ -209,7 +209,7 @@ describe("organization dashboard contracts", () => {
     renderOrganization();
     const rows = await groupList();
     const first = await within(rows).findByRole("button", {
-      name: "Infrastructure, 2 users",
+      name: "Infrastructure, 4 users",
     });
     first.focus();
     fireEvent.click(first);
@@ -294,7 +294,7 @@ describe("organization dashboard contracts", () => {
     fireEvent.click(await screen.findByRole("button", { name: "All" }));
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Usage report, all groups, 4 users",
+        name: "Usage report, all groups, 6 users",
       }),
     );
     await screen.findByRole("region", { name: "Spend history" });
@@ -312,7 +312,7 @@ describe("organization dashboard contracts", () => {
     renderOrganization();
     const rows = await groupList();
     expect(
-      within(rows).queryByRole("button", { name: "Platform, 1 user" }),
+      within(rows).queryByRole("button", { name: "Platform, 3 users" }),
     ).not.toBeInTheDocument();
     fireEvent.click(
       await within(rows).findByRole("button", {
@@ -320,7 +320,7 @@ describe("organization dashboard contracts", () => {
       }),
     );
     fireEvent.click(
-      await within(rows).findByRole("button", { name: "Platform, 1 user" }),
+      await within(rows).findByRole("button", { name: "Platform, 3 users" }),
     );
     const edit = await panel("Edit Platform");
     expect(
@@ -352,7 +352,7 @@ describe("organization dashboard contracts", () => {
       }),
     );
     expect(
-      within(rows).queryByRole("button", { name: "Platform, 1 user" }),
+      within(rows).queryByRole("button", { name: "Platform, 3 users" }),
     ).not.toBeInTheDocument();
     expect(within(edit).getByText("$100")).toBeVisible();
     expect(api.organizationUsers).toHaveBeenLastCalledWith(["platform"], 1);
@@ -362,7 +362,7 @@ describe("organization dashboard contracts", () => {
     renderOrganization();
     const rows = await groupList();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -396,7 +396,7 @@ describe("organization dashboard contracts", () => {
     renderOrganization();
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Usage report, Engineering, 3 users",
+        name: "Usage report, Engineering, 5 users",
       }),
     );
     await screen.findByRole("region", { name: "Spend history" });
@@ -460,7 +460,7 @@ describe("organization dashboard contracts", () => {
     );
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -479,7 +479,7 @@ describe("organization dashboard contracts", () => {
     );
     expect(
       await within(await groupList()).findByRole("button", {
-        name: "Direct members, 1 user",
+        name: "Direct members, 3 users",
       }),
     ).toHaveAttribute("aria-pressed", "true");
   });
@@ -487,7 +487,7 @@ describe("organization dashboard contracts", () => {
   it("shows each leaf member's selected-period metrics without a Direct members bucket", async () => {
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -524,7 +524,7 @@ describe("organization dashboard contracts", () => {
     );
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Select Infrastructure" }),
@@ -584,7 +584,7 @@ describe("organization dashboard contracts", () => {
     );
     renderOrganization();
     const engineering = await screen.findByRole("button", {
-      name: "Engineering, 3 users",
+      name: "Engineering, 5 users",
     });
     expect(
       screen.getByRole("button", { name: "Marketing", pressed: false }),
@@ -602,11 +602,11 @@ describe("organization dashboard contracts", () => {
     const rows = await groupList();
     expect(
       await within(rows).findByRole("button", {
-        name: "Infrastructure, 2 users",
+        name: "Infrastructure, 4 users",
       }),
     ).toBeVisible();
     expect(
-      within(rows).queryByRole("button", { name: "Platform, 1 user" }),
+      within(rows).queryByRole("button", { name: "Platform, 3 users" }),
     ).not.toBeInTheDocument();
     fireEvent.click(
       within(rows).getByRole("button", {
@@ -618,7 +618,7 @@ describe("organization dashboard contracts", () => {
       pending.get("infrastructure")!(organizationChildren("infrastructure"));
     });
     expect(
-      await within(rows).findByRole("button", { name: "Platform, 1 user" }),
+      await within(rows).findByRole("button", { name: "Platform, 3 users" }),
     ).toBeVisible();
     fireEvent.click(
       within(rows).getByRole("button", {
@@ -626,7 +626,7 @@ describe("organization dashboard contracts", () => {
       }),
     );
     expect(
-      within(rows).queryByRole("button", { name: "Platform, 1 user" }),
+      within(rows).queryByRole("button", { name: "Platform, 3 users" }),
     ).not.toBeInTheDocument();
     fireEvent.click(
       within(rows).getByRole("button", {
@@ -634,7 +634,7 @@ describe("organization dashboard contracts", () => {
       }),
     );
     expect(
-      await within(rows).findByRole("button", { name: "Platform, 1 user" }),
+      await within(rows).findByRole("button", { name: "Platform, 3 users" }),
     ).toBeVisible();
     expect(
       vi
@@ -661,14 +661,14 @@ describe("organization dashboard contracts", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Retry children" }));
     expect(
-      await screen.findByRole("button", { name: "Infrastructure, 2 users" }),
+      await screen.findByRole("button", { name: "Infrastructure, 4 users" }),
     ).toBeVisible();
   });
 
   it("does not flash a previous branch report while the next branch is loading", async () => {
     renderOrganization();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Engineering, 3 users" }),
+      await screen.findByRole("button", { name: "Engineering, 5 users" }),
     );
     expect(
       await screen.findByRole("region", { name: "Spend history" }),
@@ -704,14 +704,14 @@ describe("organization dashboard contracts", () => {
     renderOrganization();
     expect(
       await screen.findByRole("button", {
-        name: "Usage report, Engineering, 3 users",
+        name: "Usage report, Engineering, 5 users",
       }),
     ).toBeVisible();
     expect(api.organizationUsage).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "All" }));
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Usage report, all groups, 4 users",
+        name: "Usage report, all groups, 6 users",
       }),
     );
     expect(await screen.findByText("sam@example.com")).toBeVisible();
@@ -729,10 +729,18 @@ describe("organization dashboard contracts", () => {
     );
   });
 
+  it("shows a team owner their team's budget instead of gateway status", async () => {
+    renderOrganization();
+    const card = (await screen.findByText("Team budget")).parentElement!;
+    expect(card).toHaveTextContent("$1,000");
+    expect(card).toHaveTextContent("$50 per person");
+    expect(screen.queryByText("LiteLLM gateway")).not.toBeInTheDocument();
+  });
+
   it("closes the usage report from its button or its close control", async () => {
     renderOrganization();
     const open = await screen.findByRole("button", {
-      name: "Usage report, Engineering, 3 users",
+      name: "Usage report, Engineering, 5 users",
     });
     fireEvent.click(open);
     expect(
@@ -740,7 +748,7 @@ describe("organization dashboard contracts", () => {
     ).toBeVisible();
     // The same button hides it again.
     fireEvent.click(
-      screen.getByRole("button", { name: "Hide report, Engineering, 3 users" }),
+      screen.getByRole("button", { name: "Hide report, Engineering, 5 users" }),
     );
     expect(
       screen.queryByRole("region", { name: "Usage report" }),
@@ -748,7 +756,7 @@ describe("organization dashboard contracts", () => {
     // Or the report's own close control, which returns focus to the button.
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Usage report, Engineering, 3 users",
+        name: "Usage report, Engineering, 5 users",
       }),
     );
     fireEvent.click(
@@ -760,14 +768,14 @@ describe("organization dashboard contracts", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("button", {
-          name: "Usage report, Engineering, 3 users",
+          name: "Usage report, Engineering, 5 users",
         }),
       ).toHaveFocus(),
     );
     // A selected group's report closes with the group.
     fireEvent.click(
       await within(await groupList()).findByRole("button", {
-        name: "Infrastructure, 2 users",
+        name: "Infrastructure, 4 users",
       }),
     );
     fireEvent.click(
@@ -829,7 +837,7 @@ describe("organization dashboard contracts", () => {
     ).toBeVisible();
     const rows = await groupList();
     expect(
-      within(rows).getByRole("button", { name: "Engineering, 3 users" }),
+      within(rows).getByRole("button", { name: "Engineering, 5 users" }),
     ).toBeVisible();
     expect(
       within(rows).getByRole("button", { name: "Marketing, 1 user" }),
@@ -841,7 +849,7 @@ describe("organization dashboard contracts", () => {
     ).toBeVisible();
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Usage report, Engineering + Marketing, 4 users",
+        name: "Usage report, Engineering + Marketing, 6 users",
       }),
     );
     await waitFor(() =>

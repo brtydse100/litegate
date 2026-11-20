@@ -215,8 +215,11 @@ export default function AdminOrganization({
     if (!group?.has_children) return false;
     return expanded.has(id) || (expandAll && depth(group) < MAX_DEPTH - 1);
   };
+  // A single team without sub-teams lists itself, like the admin view's rows.
   const rows = tableRoot
-    ? treeOrder(groups, isExpanded, tableRoot.id)
+    ? tableRoot.has_children
+      ? treeOrder(groups, isExpanded, tableRoot.id)
+      : [tableRoot]
     : activeRoots.flatMap((item) => [
         item,
         ...(isExpanded(item.id) ? treeOrder(groups, isExpanded, item.id) : []),
@@ -503,13 +506,12 @@ export default function AdminOrganization({
     tableChain.unshift(item);
   const childCount = (group: Group) =>
     groups.filter((item) => item.parent_id === group.id).length;
-  // A single team without sub-teams has nothing to drill into: its report
-  // and member list show straight away.
+  // A single team without sub-teams has nothing to drill into.
   const leafScope = !multi && !!root && !root.has_children;
   // Every department selected reports on all groups; otherwise the selection.
   const reportNodes = selected
     ? [selected.id]
-    : allGroupsReport || leafScope
+    : allGroupsReport
       ? allActive
         ? []
         : activeIds
@@ -517,6 +519,21 @@ export default function AdminOrganization({
   // "All groups" only when several departments are combined; a single one
   // (for example a team owner's own team) is named.
   const reportScope = allActive && roots.length > 1 ? "all groups" : scopeName;
+  // Owners see their team's budget plan in place of the admin-only gateway.
+  const plannedRows =
+    budgets.data?.groups.filter((group) => activeIds.includes(group.id)) ?? [];
+  const planned =
+    plannedRows.length === activeRoots.length && plannedRows.length > 0
+      ? {
+          assigned: plannedRows.reduce((sum, group) => sum + group.assigned, 0),
+          allocated: plannedRows.every((group) => group.allocated != null)
+            ? plannedRows.reduce((sum, group) => sum + group.allocated!, 0)
+            : null,
+        }
+      : null;
+  const splitOut = planned?.allocated ?? null;
+  // A planned budget is the team's effective target.
+  const spendTarget = planned ? planned.assigned : combinedTarget;
   const reportUsers = allActive
     ? (rootsQuery.data?.total_users ?? 0)
     : combinedMembers;
@@ -593,6 +610,19 @@ export default function AdminOrganization({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
+            {roots.length === 1 && rootLevel && (
+              // One team (a team owner's): name it where the picker would be.
+              <>
+                <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-4">
+                  {rootLevel}
+                </span>
+                <span className="flex rounded-[10px] bg-well p-1">
+                  <span className="flex min-h-9 items-center rounded-[7px] bg-card px-3.5 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                    {roots[0].name}
+                  </span>
+                </span>
+              </>
+            )}
             {roots.length > 1 && (
               <>
                 {rootLevel && (
@@ -645,8 +675,8 @@ export default function AdminOrganization({
             <Metric
               accent="border-t-teal"
               caption="Spend this period"
-              sub={`of ${combinedTarget == null ? "no target" : shortMoney(combinedTarget)} · ${scopeName}${leafScope ? "" : " + all sub-groups"}`}
-              bar={percent(combinedSpend, combinedTarget)}
+              sub={`of ${spendTarget == null ? "no target" : shortMoney(spendTarget)} · ${scopeName}${leafScope ? "" : " + all sub-groups"}`}
+              bar={percent(combinedSpend, spendTarget)}
             >
               {totals.isPending ? (
                 <span className="h-8 w-24 animate-pulse rounded bg-line-soft" />
@@ -699,6 +729,27 @@ export default function AdminOrganization({
                     ? "Ready"
                     : "Not ready"
                   : "—"}
+              </Metric>
+            )}
+            {!isAdmin && (
+              <Metric
+                accent="border-t-mint"
+                caption="Team budget"
+                sub={
+                  planned
+                    ? splitOut == null
+                      ? "Allocation needs repair"
+                      : `${shortMoney(splitOut)} split out · ${shortMoney(planned.assigned - splitOut)} left`
+                    : root?.per_user != null
+                      ? `${shortMoney(root.per_user)} per person`
+                      : "No per-person limit"
+                }
+              >
+                {planned
+                  ? shortMoney(planned.assigned)
+                  : combinedTarget == null
+                    ? "No target"
+                    : shortMoney(combinedTarget)}
               </Metric>
             )}
           </div>
@@ -841,7 +892,7 @@ export default function AdminOrganization({
           </DismissibleMessage>
         )}
 
-        {activeRoots.length > 0 && !leafScope && (
+        {activeRoots.length > 0 && (
           <section
             aria-label="Groups"
             className="overflow-hidden rounded-xl border border-line bg-card"
@@ -849,9 +900,11 @@ export default function AdminOrganization({
             <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line px-5 py-3.5">
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-base font-bold text-ink">
-                  Groups in {tableRoot ? tableRoot.name : scopeName}
+                  {leafScope
+                    ? root.name
+                    : `Groups in ${tableRoot ? tableRoot.name : scopeName}`}
                 </h2>
-                {tableRoot && (
+                {tableRoot && !leafScope && (
                   <button
                     type="button"
                     aria-pressed={nodeId === tableRoot.id}
@@ -903,16 +956,18 @@ export default function AdminOrganization({
                 </nav>
               </div>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (expandAll) setExpanded(new Set());
-                    setExpandAll((value) => !value);
-                  }}
-                  className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas"
-                >
-                  {expandAll ? "Collapse all" : "Expand all"}
-                </button>
+                {!leafScope && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (expandAll) setExpanded(new Set());
+                      setExpandAll((value) => !value);
+                    }}
+                    className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas"
+                  >
+                    {expandAll ? "Collapse all" : "Expand all"}
+                  </button>
+                )}
                 {!selected && (
                   <button
                     type="button"
@@ -1093,12 +1148,14 @@ export default function AdminOrganization({
                   Spend totals are unavailable: {totals.error.message}
                 </p>
               )}
-              <p className="px-5 pb-3 pt-2.5 text-[13px] text-ink-4">
-                Sub-groups load when you open them
-                {levels.length - baseLevel - 2 > MAX_DEPTH
-                  ? " · deeper levels open in their own view"
-                  : ""}
-              </p>
+              {!leafScope && (
+                <p className="px-5 pb-3 pt-2.5 text-[13px] text-ink-4">
+                  Sub-groups load when you open them
+                  {levels.length - baseLevel - 2 > MAX_DEPTH
+                    ? " · deeper levels open in their own view"
+                    : ""}
+                </p>
+              )}
             </div>
           </section>
         )}

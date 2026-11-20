@@ -154,6 +154,19 @@ const members = [
     node: "platform",
     budget_spend: 18.42,
   },
+  // Platform's teammates, so its owner has a budget to split.
+  {
+    user_id: "noa",
+    email: "noa@example.com",
+    node: "platform",
+    budget_spend: 12.4,
+  },
+  {
+    user_id: "lee",
+    email: "lee@example.com",
+    node: "platform",
+    budget_spend: 7.85,
+  },
   {
     user_id: "priya",
     email: "priya@example.com",
@@ -174,6 +187,10 @@ const members = [
   },
 ];
 
+/** Read-only demo hierarchy and membership, for the budget emulation. */
+export const demoGroups: readonly (typeof groups)[number][] = groups;
+export const demoMembers: readonly (typeof members)[number][] = members;
+
 export function organizationOverview(): OrganizationOverview {
   return {
     enabled: true,
@@ -182,6 +199,8 @@ export function organizationOverview(): OrganizationOverview {
       ...group,
       team_id: `demo-${group.id}`,
       group_total: group.parent_id ? null : group.group_total,
+      // Everyone in the group and its sub-groups.
+      members: selectedMembers(group.id).length,
       group_spend: selectedMembers(group.id).reduce(
         (total, member) => total + member.budget_spend,
         0,

@@ -245,7 +245,11 @@ export default function GroupPanel({
         <div className={label}>
           Group budget
           <span className="text-sm font-normal text-ink-3">
-            {total == null ? "No target" : shortMoney(total)}
+            {budgetGroup
+              ? shortMoney(budgetGroup.assigned)
+              : total == null
+                ? "No target"
+                : shortMoney(total)}
           </span>
         </div>
       )}

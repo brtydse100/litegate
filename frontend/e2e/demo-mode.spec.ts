@@ -18,11 +18,15 @@ test("organization demo filters usage and protects the admin view", async ({
     .click();
   await groups.getByRole("button", { name: /^Platform,/ }).click();
   const platform = page.getByRole("complementary", { name: "Edit Platform" });
-  await expect(platform.getByText("$100", { exact: true })).toBeVisible();
-  await expect(platform.getByText(/Overrides Infrastructure/)).toBeVisible();
-  await expect(page.getByText("sam@example.com", { exact: true })).toHaveCount(
-    0,
+  await expect(platform.getByLabel("Platform per-person limit")).toHaveValue(
+    "100",
   );
+  await expect(platform.getByText(/Overrides Infrastructure/)).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "Usage report" })
+      .getByText("sam@example.com", { exact: true }),
+  ).toHaveCount(0);
   // Spend, requests and tokens each have their own small trend.
   await expect(
     page.getByRole("region", { name: "Spend history" }),
@@ -36,7 +40,9 @@ test("organization demo filters usage and protects the admin view", async ({
   await expect(groups.getByRole("button", { name: /^Platform,/ })).toHaveCount(
     0,
   );
-  await expect(platform.getByText("$100", { exact: true })).toBeVisible();
+  await expect(platform.getByLabel("Platform per-person limit")).toHaveValue(
+    "100",
+  );
   await groups
     .getByRole("button", {
       name: "Expand Engineering → Infrastructure",
@@ -46,7 +52,7 @@ test("organization demo filters usage and protects the admin view", async ({
   await groups.getByRole("button", { name: /^Cloud,/ }).click();
   const cloud = page.getByRole("complementary", { name: "Edit Cloud" });
   await expect(cloud.getByText(/Inherited from Engineering/)).toBeVisible();
-  await expect(cloud.getByText("$50", { exact: true })).toBeVisible();
+  await expect(cloud.getByLabel("Cloud per-person limit")).toHaveValue("50");
   const memberChart = page
     .getByRole("heading", { name: "Usage by member" })
     .locator("..");
@@ -321,25 +327,62 @@ test("team owners see only their own team", async ({ page }) => {
     page.getByRole("link", { name: "Keys", exact: true }),
   ).toHaveCount(0);
 
-  // An owner of a team of people sees its report and members at once.
+  // A Teams owner splits their team's budget among its teams, but cannot
+  // spend more than their own team was given.
+  await groups.getByRole("button", { name: /^Platform,/ }).click();
+  const panel = page.getByRole("complementary", { name: "Edit Platform" });
+  const envelope = panel.getByLabel("Platform group budget");
+  await expect(envelope).toHaveValue("250");
+  await expect(panel.getByLabel("Platform per-person limit")).toHaveCount(0);
+  await envelope.fill("400");
+  await panel.getByRole("button", { name: "Save changes" }).click();
+  await expect(panel.getByRole("alert")).toContainText(
+    "Assigned envelope cannot cover",
+  );
+  await envelope.fill("270");
+  await panel.getByRole("button", { name: "Save changes" }).click();
+  await expect(panel.getByRole("alert")).toHaveCount(0);
+  await expect(envelope).toHaveValue("270");
+
+  // A People owner sees the same page as an admin: cards, the team's row and
+  // a report only on request, and splits the team's budget among members.
   await page
     .getByRole("button", { name: "Own Platform, a team of people" })
     .click();
   await page.getByRole("link", { name: "Organization", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Usage in Platform" }),
+    page
+      .getByRole("region", { name: "Groups" })
+      .getByRole("heading", { name: "Platform" }),
   ).toBeVisible();
+  await expect(page.getByRole("region", { name: "Usage report" })).toHaveCount(
+    0,
+  );
+  await expect(page.getByText("Team budget")).toBeVisible();
+  await expect(page.getByText("Team owner")).toBeVisible();
+  await expect(page.getByText("Cloud")).toHaveCount(0);
+  const budgets = page.getByRole("region", { name: "Budget management" });
+  // Their own allowance is not theirs to change.
+  await expect(
+    budgets.getByLabel("Budget override for alex@example.com"),
+  ).toHaveCount(0);
+  const noa = budgets
+    .getByRole("listitem")
+    .filter({ hasText: "noa@example.com" });
+  await noa.getByLabel("Budget override for noa@example.com").fill("90");
+  await noa.getByRole("button", { name: "Save user budget" }).click();
+  await expect(noa).toContainText("Manual override: $90.00");
+  await page.getByRole("button", { name: /^Usage report, Platform,/ }).click();
   await expect(
     page.getByRole("heading", { name: "Usage by member" }),
   ).toBeVisible();
-  await expect(page.getByText("Cloud")).toHaveCount(0);
 });
 
 test("the usage report ranks groups by tokens", async ({ page }) => {
   await page.goto("./organization");
   await page.getByRole("button", { name: "All", exact: true }).click();
   await page
-    .getByRole("button", { name: "Usage report, all groups, 4 users" })
+    .getByRole("button", { name: "Usage report, all groups, 6 users" })
     .click();
   const tokens = page.getByRole("region", { name: "Tokens by department" });
   // Most tokens first: the top department leads and is named in the card.

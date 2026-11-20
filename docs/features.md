@@ -269,8 +269,12 @@ All portal users can open personal hourly analytics. System administrators can
 search the read-only registered People directory, including SSO/no-key accounts.
 Delegated Organization access requires both designation and group administration;
 LiteGate-managed scoped roles work without an Enterprise license. A team owner
-sees only their own team: a team with sub-teams opens on its group table, and a
-team of people opens straight on its usage report and members. The live demo's
-**Owner** role shows both (**People** and **Teams**). Full email
+sees only their own team, with the same sidebar and Organization page as an
+administrator. A **Team budget** card replaces gateway status, and the usage
+report opens only on request. With budget planning enabled, owners split their
+team's budget among its teams and members, but cannot raise their own team's
+total, their own allowance or per-person limits. The live demo's **Owner** role
+shows a team of people and a team of teams (**People** and **Teams**), with
+synthetic budget planning. Full email
 addresses wrap and have explicit copy actions. See [configuration and current
 enforcement limits](governance-and-analytics.md).
