@@ -7,14 +7,6 @@ import { buttonSecondary, card, cardHeader, cardTitle, tableHead } from "./ui";
 const number = (value: number | null) =>
   value == null ? "Unavailable" : value.toLocaleString();
 
-const accents = [
-  "border-t-blue",
-  "border-t-cyan",
-  "border-t-periwinkle",
-  "border-t-teal",
-  "border-t-mint",
-];
-
 export default function PersonalAnalytics() {
   const query = useQuery({
     queryKey: ["personal-analytics"],
@@ -31,7 +23,7 @@ export default function PersonalAnalytics() {
     return (
       <div
         role="alert"
-        className="flex flex-wrap items-center gap-3 rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger"
+        className="flex flex-wrap items-center gap-3 rounded-xl border border-transparent bg-danger-tint px-4 py-3 text-sm text-danger"
       >
         Could not load your analytics.
         <button
@@ -47,7 +39,7 @@ export default function PersonalAnalytics() {
   if (!data.available)
     return (
       <div className="flex flex-col gap-6">
-        <PageHeader eyebrow="Workspace" title="Your analytics" />
+        <PageHeader title="Your analytics" />
         <div className={`${card} p-6`}>
           <p className="text-sm text-ink-3">
             {data.refresh_failed
@@ -75,7 +67,6 @@ export default function PersonalAnalytics() {
     <section className="flex flex-col gap-6" aria-label="Personal analytics">
       <div>
         <PageHeader
-          eyebrow="Workspace"
           title="Your analytics"
           description="Your latest 30 days of usage. Data is aggregated once per hour."
         />
@@ -89,22 +80,22 @@ export default function PersonalAnalytics() {
         {(data.stale || query.isError) && (
           <p
             role="status"
-            className="mt-3 rounded-lg border border-sand/40 bg-sand-tint px-3 py-2 text-sm text-sand-ink"
+            className="mt-3 rounded-lg border border-transparent bg-orange-tint px-3 py-2 text-sm text-orange-ink"
           >
             Showing the previous successful refresh. New data is delayed.
           </p>
         )}
       </div>
       <dl className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-5">
-        {stats.map(([label, value], index) => (
+        {stats.map(([label, value]) => (
           <div
             key={label}
-            className={`rounded-[10px] border border-t-[3px] border-line bg-card px-[18px] pb-4 pt-3.5 ${accents[index]}`}
+            className="rounded-xl border border-line-soft bg-card px-[18px] py-4"
           >
-            <dt className="text-xs font-semibold tracking-[0.04em] text-ink-4">
-              {label}
-            </dt>
-            <dd className="mt-1 text-2xl font-semibold text-ink">{value}</dd>
+            <dt className="text-[13px] font-medium text-ink-4">{label}</dt>
+            <dd className="mt-1 text-2xl font-semibold tabular-nums tracking-[-0.01em] text-ink">
+              {value}
+            </dd>
           </div>
         ))}
       </dl>

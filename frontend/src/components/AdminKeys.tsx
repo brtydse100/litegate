@@ -11,7 +11,6 @@ export default function AdminKeys({
   return (
     <section className="flex w-full flex-col gap-6">
       <PageHeader
-        eyebrow="Manage"
         title="Key policies"
         description={
           <>

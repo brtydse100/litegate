@@ -12,7 +12,7 @@ export interface Hue {
   color: string;
 }
 
-/** Group colours cycle blue → periwinkle → teal → cyan → mint → navy. */
+/** Group colours cycle blue → indigo → teal → cyan → green → orange. */
 export const palette: Hue[] = [
   {
     name: "blue",
@@ -22,11 +22,11 @@ export const palette: Hue[] = [
     color: "rgb(var(--blue))",
   },
   {
-    name: "periwinkle",
-    bar: "bg-periwinkle",
-    tint: "bg-periwinkle-tint",
-    ink: "text-periwinkle-ink",
-    color: "rgb(var(--periwinkle))",
+    name: "indigo",
+    bar: "bg-indigo",
+    tint: "bg-indigo-tint",
+    ink: "text-indigo-ink",
+    color: "rgb(var(--indigo))",
   },
   {
     name: "teal",
@@ -43,18 +43,18 @@ export const palette: Hue[] = [
     color: "rgb(var(--cyan))",
   },
   {
-    name: "mint",
-    bar: "bg-mint",
-    tint: "bg-mint-tint",
-    ink: "text-mint-ink",
-    color: "rgb(var(--mint))",
+    name: "green",
+    bar: "bg-green",
+    tint: "bg-green-tint",
+    ink: "text-green-ink",
+    color: "rgb(var(--green))",
   },
   {
-    name: "navy",
-    bar: "bg-navy",
-    tint: "bg-well",
-    ink: "text-ink-2",
-    color: "rgb(var(--navy))",
+    name: "orange",
+    bar: "bg-orange",
+    tint: "bg-orange-tint",
+    ink: "text-orange-ink",
+    color: "rgb(var(--orange))",
   },
 ];
 
@@ -153,7 +153,9 @@ export const shortMoney = (value: number | null | undefined): string =>
 export function pluralWord(word: string) {
   const lower = word.toLowerCase();
   if (lower === "person") return "people";
-  return lower.endsWith("s") ? lower : `${lower}s`;
+  if (lower.endsWith("s")) return lower;
+  // "branch" → "branches", "box" → "boxes".
+  return /(ch|sh|x|z)$/.test(lower) ? `${lower}es` : `${lower}s`;
 }
 
 export function plural(count: number, word: string) {

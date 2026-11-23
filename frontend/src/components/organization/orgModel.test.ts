@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { limitOrigin, reached, shortMoney } from "./orgModel";
+import { limitOrigin, plural, reached, shortMoney } from "./orgModel";
 
 describe("limitOrigin", () => {
   const parent = { name: "Engineering", per_user: 50 };
@@ -57,5 +57,14 @@ describe("shortMoney", () => {
     expect(shortMoney(-5)).toBe("-$5");
     expect(shortMoney(1200)).toBe("$1,200");
     expect(shortMoney(null)).toBe("—");
+  });
+});
+
+describe("plural", () => {
+  it("pluralises level names", () => {
+    expect(plural(2, "Branch")).toBe("2 branches");
+    expect(plural(1, "Branch")).toBe("1 branch");
+    expect(plural(3, "Team")).toBe("3 teams");
+    expect(plural(2, "Person")).toBe("2 people");
   });
 });

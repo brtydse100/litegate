@@ -13,6 +13,7 @@ import {
   buttonPrimary,
   buttonSecondary,
   buttonSmall,
+  buttonSmallDanger,
   card,
   cardHeader,
   cardTitle,
@@ -110,7 +111,6 @@ export default function AdminUsers({
     return (
       <section className="flex w-full flex-col gap-6">
         <PageHeader
-          eyebrow="Manage"
           title="People"
           description="Everyone registered in LiteLLM, including SSO accounts and people without keys."
         />
@@ -121,7 +121,6 @@ export default function AdminUsers({
   return (
     <section className="flex w-full flex-col gap-6">
       <PageHeader
-        eyebrow="Manage"
         title="People and local access"
         description={
           <>
@@ -133,7 +132,7 @@ export default function AdminUsers({
 
       <PeopleDirectory />
 
-      <div className="grid gap-3.5 md:grid-cols-3">
+      <div className={`${card} divide-y divide-line-soft`}>
         {[
           {
             icon: Info,
@@ -168,14 +167,18 @@ export default function AdminUsers({
             ),
           },
         ].map(({ icon: Icon, title, body }) => (
-          <div key={title} className={`${card} px-4 py-3.5`}>
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <Icon size={15} aria-hidden="true" className="text-blue" />
-              {title}
-            </h2>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
-              {body}
-            </p>
+          <div key={title} className="flex gap-3 px-5 py-3.5">
+            <Icon
+              size={16}
+              aria-hidden="true"
+              className="mt-0.5 shrink-0 text-blue"
+            />
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-ink">{title}</h2>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-ink-3">
+                {body}
+              </p>
+            </div>
           </div>
         ))}
       </div>
@@ -184,7 +187,7 @@ export default function AdminUsers({
         <DismissibleMessage
           role="alert"
           messageKey={(error as Error).message}
-          className="rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger"
+          className="rounded-xl border border-transparent bg-danger-tint px-4 py-3 text-sm text-danger"
         >
           {(error as Error).message}
         </DismissibleMessage>
@@ -192,7 +195,7 @@ export default function AdminUsers({
       {operationsBlocked && (
         <DismissibleMessage
           messageKey="account-actions-paused"
-          className="rounded-xl border border-sand/40 bg-sand-tint px-4 py-3 text-sm text-sand-ink"
+          className="rounded-xl border border-transparent bg-orange-tint px-4 py-3 text-sm text-orange-ink"
         >
           Account actions are paused. Try again in {retryAfter || 1} seconds.
         </DismissibleMessage>
@@ -221,7 +224,7 @@ export default function AdminUsers({
           )}
         </div>
         {users.isLoading ? (
-          <div className="h-32 animate-pulse bg-canvas" />
+          <div className="h-32 animate-pulse bg-well" />
         ) : users.data?.length ? (
           <div className="relative overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
@@ -267,7 +270,7 @@ export default function AdminUsers({
                       )}
                     </td>
                     <td className="px-5 py-3">
-                      <div className="flex flex-wrap justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => {
@@ -305,7 +308,9 @@ export default function AdminUsers({
                             })
                           }
                           disabled={update.isPending || operationsBlocked}
-                          className={buttonSmall}
+                          className={
+                            account.active ? buttonSmallDanger : buttonSmall
+                          }
                         >
                           {account.active ? "Disable" : "Enable"}
                         </button>
@@ -400,7 +405,7 @@ export default function AdminUsers({
 
       {resetUsername && (
         <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !update.isPending)
@@ -413,12 +418,12 @@ export default function AdminUsers({
             role="dialog"
             aria-modal="true"
             aria-labelledby="reset-password-title"
-            className="flex max-h-[90vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl border border-line bg-card p-6 shadow-2xl"
+            className="flex max-h-[90vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl border border-line-soft bg-card p-6 shadow-2xl"
           >
             <div>
               <h3
                 id="reset-password-title"
-                className="text-lg font-bold text-ink"
+                className="text-lg font-semibold text-ink"
               >
                 Reset {resetUsername}&apos;s password
               </h3>
@@ -446,7 +451,7 @@ export default function AdminUsers({
               </p>
             )}
             {operationsBlocked && (
-              <p role="alert" className="text-sm text-sand-ink">
+              <p role="alert" className="text-sm text-orange-ink">
                 Account actions are paused. Try again in {retryAfter || 1}{" "}
                 seconds.
               </p>

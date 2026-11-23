@@ -80,18 +80,18 @@ export default function RevealKey({
       )}
       {secret && (
         <div
-          className={`${compact ? "col-span-2 mb-2 " : ""}rounded-lg border border-mint/40 bg-mint-tint p-4`}
+          className={`${compact ? "col-span-2 mb-2 " : ""}rounded-lg border border-transparent bg-green-tint p-4`}
         >
-          <p className="text-sm font-medium text-mint-ink">API key</p>
+          <p className="text-sm font-medium text-green-ink">API key</p>
           <div className="mt-3 flex gap-2">
-            <code className="min-w-0 flex-1 break-all text-sm text-mint-ink">
+            <code className="min-w-0 flex-1 break-all text-sm text-green-ink">
               {secret}
             </code>
             <button
               type="button"
               onClick={() => void copy()}
               aria-label="Copy API key"
-              className="text-mint-ink"
+              className="text-green-ink"
             >
               {copied ? <Check size={15} /> : <Copy size={15} />}
             </button>

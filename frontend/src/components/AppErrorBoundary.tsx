@@ -23,8 +23,8 @@ export default class AppErrorBoundary extends Component<Props, State> {
     if (!this.state.failed) return this.props.children;
     return (
       <main className="flex min-h-screen items-center justify-center bg-canvas p-6 text-center">
-        <div className="w-full max-w-md rounded-2xl border border-sand/40 bg-card p-6 shadow-2xl">
-          <AlertTriangle size={30} className="mx-auto text-sand-ink" />
+        <div className="w-full max-w-md rounded-2xl border border-orange/40 bg-card p-6 shadow-2xl">
+          <AlertTriangle size={30} className="mx-auto text-orange-ink" />
           <h1 className="mt-4 text-lg font-semibold text-ink">
             This page could not be displayed
           </h1>
@@ -34,7 +34,7 @@ export default class AppErrorBoundary extends Component<Props, State> {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue px-4 py-2.5 text-sm font-semibold text-paper hover:brightness-90"
+            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-solid px-4 py-2.5 text-sm font-semibold text-paper hover:brightness-110"
           >
             <RefreshCw size={15} /> Reload LiteGate
           </button>

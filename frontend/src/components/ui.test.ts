@@ -4,7 +4,7 @@ import * as ui from "./ui";
 // Two colour classes of the same kind on one element resolve by stylesheet
 // order, so a shared class string must never carry competing colours.
 const colour =
-  /^(text|bg|border)-(ink|paper|blue|teal|sand|danger|mint|cyan|card|canvas|well|line|navy|periwinkle)\b/;
+  /^(text|bg|border)-(ink|paper|blue|teal|orange|danger|green|cyan|card|canvas|well|line|indigo|sidebar)\b/;
 
 describe("shared class strings", () => {
   const strings: [string, string][] = [];

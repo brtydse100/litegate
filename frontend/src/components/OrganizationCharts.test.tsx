@@ -1,24 +1,69 @@
-import { render, cleanup, screen } from "@testing-library/react";
+import { render, cleanup, screen, fireEvent } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
-import { SpendTrend, UsageBars, metricValue } from "./OrganizationCharts";
+import {
+  BarCard,
+  DonutCard,
+  UsageBars,
+  metricValue,
+  weekly,
+} from "./OrganizationCharts";
 afterEach(cleanup);
-it.each([0.02, 0.04, 0.99, 1, 1234, 123456789])(
-  "distinguishes ticks at scale %s",
+it.each([0.000001, 0.02, 1, 1234, 123456789])(
+  "draws spend of %s as finite bars, the largest solid",
   (spend) => {
     const { container } = render(
-      <SpendTrend
+      <BarCard
+        title="Spend history"
+        subtitle="By week"
         metric="spend"
-        daily={[{ date: "2026-01-01", spend, tokens: 0, requests: 0 }]}
+        bars={[
+          { label: "Week 1", value: spend / 2 },
+          { label: "Week 2", value: spend },
+        ]}
       />,
     );
-    const labels = [...container.querySelectorAll("g text")].map(
-      (el) => el.textContent,
-    );
-    expect(new Set(labels).size).toBe(3);
-    expect(labels[1]).not.toMatch(/^\$0(?:\.0+)?$/);
-    expect(labels[2]).not.toMatch(/^\$0(?:\.0+)?$/);
+    expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
+    const bars = [...container.querySelectorAll("[data-bar]")];
+    expect(bars.map((bar) => bar.getAttribute("style"))).toEqual([
+      "height: 50%;",
+      "height: 100%;",
+    ]);
+    expect(bars[0].className).toContain("opacity-50");
+    expect(bars[1].className).not.toContain("opacity-50");
+    expect(
+      screen.getByRole("img", { name: /^Spend history: Week 1 / }),
+    ).toBeVisible();
   },
 );
+
+it("sums days into labelled weeks", () => {
+  const daily = Array.from({ length: 9 }, (_, index) => ({
+    date: `2026-01-${String(index + 1).padStart(2, "0")}`,
+    spend: 0,
+    tokens: 10,
+    requests: 1,
+  }));
+  expect(weekly(daily, "tokens").map((week) => week.value)).toEqual([70, 20]);
+});
+
+it("shows each model's share of spend in a donut", () => {
+  render(
+    <DonutCard
+      title="Spend by model"
+      subtitle="Share"
+      metric="spend"
+      slices={[
+        { label: "small", value: 25 },
+        { label: "large", value: 75 },
+        { label: "unused", value: 0 },
+      ]}
+    />,
+  );
+  expect(
+    screen.getByRole("img", { name: "Spend by model: large 75%, small 25%" }),
+  ).toBeVisible();
+  expect(screen.queryByText("unused")).not.toBeInTheDocument();
+});
 it("rounds sub-cent spend to two decimals for display", () => {
   expect(metricValue(0.000001, "spend")).toBe("$0.00");
   expect(metricValue(0.0000000123, "spend")).toBe("$0.00");
@@ -69,7 +114,18 @@ it.each([
 ])("renders zero and empty usage finitely", ({ daily }) => {
   const { container } = render(
     <>
-      <SpendTrend metric="spend" daily={daily} />
+      <BarCard
+        title="Spend history"
+        subtitle="By week"
+        metric="spend"
+        bars={weekly(daily, "spend")}
+      />
+      <DonutCard
+        title="Spend by model"
+        subtitle="Share"
+        metric="spend"
+        slices={[]}
+      />
       <UsageBars
         title="Usage"
         metric="spend"
@@ -78,7 +134,7 @@ it.each([
     </>,
   );
   expect(container.innerHTML).not.toMatch(/NaN|Infinity/);
-  expect(container.textContent).toContain("$0.00");
+  expect(container.textContent).toContain("No recorded usage in this period.");
 });
 
 it("offers full email copy access in per-user usage labels", () => {
@@ -95,4 +151,53 @@ it("offers full email copy access in per-user usage labels", () => {
   expect(
     screen.getByRole("button", { name: "Copy email long.person@example.com" }),
   ).toBeVisible();
+});
+
+it("reads a bar on hover, tap and arrow keys", () => {
+  const { container } = render(
+    <BarCard
+      title="Tokens"
+      subtitle="Most first"
+      metric="tokens"
+      bars={[
+        { label: "Engineering", value: 3000 },
+        { label: "Marketing", value: 1000, detail: "Marketing team" },
+      ]}
+    />,
+  );
+  const [first, second] = container.querySelectorAll("[data-bar]");
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.pointerEnter(second);
+  expect(screen.getByRole("tooltip")).toHaveTextContent(
+    "Marketing team1,000 tokens",
+  );
+  // The read bar is solid and the rest fade.
+  expect(second.className).not.toContain("opacity-30");
+  expect(first.className).toContain("opacity-30");
+  fireEvent.pointerLeave(screen.getByRole("img"), { pointerType: "mouse" });
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  fireEvent.click(first);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("3,000 tokens");
+  fireEvent.keyDown(screen.getByRole("img"), { key: "ArrowRight" });
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Marketing team");
+  fireEvent.keyDown(screen.getByRole("img"), { key: "Escape" });
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+});
+
+it("reads a donut slice in its centre on hover", () => {
+  const { container } = render(
+    <DonutCard
+      title="Spend by model"
+      subtitle="Share"
+      metric="spend"
+      slices={[
+        { label: "small", value: 25 },
+        { label: "large", value: 75 },
+      ]}
+    />,
+  );
+  const chart = screen.getByRole("img");
+  expect(chart).toHaveTextContent("Total$100.00");
+  fireEvent.pointerEnter(container.querySelectorAll("[data-slice]")[1]);
+  expect(chart).toHaveTextContent("small$25.0025%");
 });

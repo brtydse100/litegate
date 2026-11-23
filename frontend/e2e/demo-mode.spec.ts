@@ -4,7 +4,7 @@ test("organization demo filters usage and protects the admin view", async ({
   page,
 }) => {
   await page.goto("./");
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   await expect(page).toHaveURL(/\/organization$/);
   const groups = page.getByRole("list", { name: "Organization groups" });
   await expect(groups.getByRole("button", { name: /^Platform,/ })).toHaveCount(
@@ -18,14 +18,18 @@ test("organization demo filters usage and protects the admin view", async ({
     .click();
   await groups.getByRole("button", { name: /^Platform,/ }).click();
   const platform = page.getByRole("complementary", { name: "Edit Platform" });
-  await expect(platform.getByText("$100", { exact: true })).toBeVisible();
-  await expect(platform.getByText(/Overrides Infrastructure/)).toBeVisible();
-  await expect(page.getByText("sam@example.com", { exact: true })).toHaveCount(
-    0,
+  await expect(platform.getByLabel("Platform per-person limit")).toHaveValue(
+    "100",
   );
-  await page.getByLabel("Chart metric").selectOption("tokens");
+  await expect(platform.getByText(/Overrides Infrastructure/)).toBeVisible();
   await expect(
-    page.getByRole("img", { name: "Tokens over time" }),
+    page
+      .getByRole("region", { name: "Usage report" })
+      .getByText("sam@example.com", { exact: true }),
+  ).toHaveCount(0);
+  // Spend, requests and tokens each have their own small trend.
+  await expect(
+    page.getByRole("region", { name: "Spend history" }),
   ).toBeVisible();
   await groups
     .getByRole("button", {
@@ -36,7 +40,9 @@ test("organization demo filters usage and protects the admin view", async ({
   await expect(groups.getByRole("button", { name: /^Platform,/ })).toHaveCount(
     0,
   );
-  await expect(platform.getByText("$100", { exact: true })).toBeVisible();
+  await expect(platform.getByLabel("Platform per-person limit")).toHaveValue(
+    "100",
+  );
   await groups
     .getByRole("button", {
       name: "Expand Engineering → Infrastructure",
@@ -46,8 +52,7 @@ test("organization demo filters usage and protects the admin view", async ({
   await groups.getByRole("button", { name: /^Cloud,/ }).click();
   const cloud = page.getByRole("complementary", { name: "Edit Cloud" });
   await expect(cloud.getByText(/Inherited from Engineering/)).toBeVisible();
-  await expect(cloud.getByText("$50", { exact: true })).toBeVisible();
-  await page.getByLabel("Chart metric").selectOption("spend");
+  await expect(cloud.getByLabel("Cloud per-person limit")).toHaveValue("50");
   const memberChart = page
     .getByRole("heading", { name: "Usage by member" })
     .locator("..");
@@ -57,7 +62,7 @@ test("organization demo filters usage and protects the admin view", async ({
   await page.getByRole("button", { name: "View demo as user" }).click();
   await expect(page).toHaveURL(/\/my-key$/);
   await expect(
-    page.getByRole("link", { name: "Admin", exact: true }),
+    page.getByRole("navigation", { name: "Admin navigation" }),
   ).toHaveCount(0);
   const status = await page.evaluate(
     async () => (await fetch("/api/v1/organization")).status,
@@ -84,7 +89,7 @@ test("interactive demo keeps its key views consistent and supports local sign-in
   await expect(page.getByText("sk-litegate-demo-rotated-4d8e")).toBeVisible();
   await page.getByRole("button", { name: "Hide API key" }).click();
 
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   await page.getByRole("link", { name: "Keys", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Key policies" }),
@@ -104,9 +109,12 @@ test("interactive demo keeps its key views consistent and supports local sign-in
 
   await page.getByRole("button", { name: "View demo as user" }).click();
   await expect(page).toHaveURL(/\/litegate\/my-key$/);
-  await expect(page.getByRole("link", { name: "Admin" })).toHaveCount(0);
+  await expect(
+    page.getByRole("navigation", { name: "Admin navigation" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "View demo as admin" }).click();
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  // The admin sidebar appears at once, without leaving My key.
+  await expect(page).toHaveURL(/\/litegate\/my-key$/);
   await expect(
     page.getByRole("link", { name: "Keys", exact: true }),
   ).toBeVisible();
@@ -138,7 +146,7 @@ for (const width of [390, 1280]) {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.setViewportSize({ width, height: 900 });
     await page.goto("./");
-    await page.getByRole("link", { name: "Admin", exact: true }).click();
+    await page.getByRole("link", { name: "Organization", exact: true }).click();
     await page.getByRole("link", { name: "People", exact: true }).click();
     const directory = page.getByRole("region", { name: "People directory" });
     await directory.getByLabel("Search people by email").fill("no-key");
@@ -244,7 +252,7 @@ for (const width of [390, 768, 1024, 1100, 1280]) {
 test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("./");
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   const nav = page.getByRole("navigation", { name: "Admin navigation" });
   await nav.getByRole("button", { name: "Account menu" }).last().click();
   await expect(nav.getByRole("menu")).toBeVisible();
@@ -255,7 +263,7 @@ test("the sidebar account menu fits inside the sidebar", async ({ page }) => {
 test("the current sidebar link is visible on phones", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./");
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   for (const [route, label] of [
     ["teams", "Teams"],
     ["keys", "Keys"],
@@ -278,7 +286,7 @@ test("pages fit a phone screen without sideways scrolling", async ({
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("./");
-  await page.getByRole("link", { name: "Admin", exact: true }).click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
   const admin = ["organization", "teams", "keys", "users", "status"];
   for (const route of [...admin, "analytics", "my-key"]) {
     await page.goto(`./${route}`);
@@ -295,4 +303,113 @@ test("pages fit a phone screen without sideways scrolling", async ({
     );
     expect(overflow, `${route} scrolls sideways`).toBeLessThanOrEqual(0);
   }
+});
+
+test("team owners see only their own team", async ({ page }) => {
+  await page.goto("./my-key");
+  await page.getByRole("button", { name: "View demo as team owner" }).click();
+
+  // An owner of a team of teams works inside that team.
+  await page
+    .getByRole("button", { name: "Own Infrastructure, a team of teams" })
+    .click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Groups in Infrastructure" }),
+  ).toBeVisible();
+  const groups = page.getByRole("list", { name: "Organization groups" });
+  await expect(
+    groups.getByRole("button", { name: /^Platform,/ }),
+  ).toBeVisible();
+  await expect(groups.getByRole("button", { name: /^Cloud,/ })).toBeVisible();
+  await expect(page.getByText("Marketing")).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Keys", exact: true }),
+  ).toHaveCount(0);
+
+  // A Teams owner splits their team's budget among its teams, but cannot
+  // spend more than their own team was given.
+  await groups.getByRole("button", { name: /^Platform,/ }).click();
+  const panel = page.getByRole("complementary", { name: "Edit Platform" });
+  const envelope = panel.getByLabel("Platform group budget");
+  await expect(envelope).toHaveValue("250");
+  await expect(panel.getByLabel("Platform per-person limit")).toHaveCount(0);
+  await envelope.fill("400");
+  await panel.getByRole("button", { name: "Save changes" }).click();
+  await expect(panel.getByRole("alert")).toContainText(
+    "Assigned envelope cannot cover",
+  );
+  await envelope.fill("270");
+  await panel.getByRole("button", { name: "Save changes" }).click();
+  await expect(panel.getByRole("alert")).toHaveCount(0);
+  await expect(envelope).toHaveValue("270");
+
+  // Opening a team shows everyone in it, with allowances to split, so a
+  // Teams owner never needs another view for people.
+  const teamPeople = page.getByRole("region", { name: "People in Platform" });
+  await expect(teamPeople.getByText("noa@example.com")).toBeVisible();
+  await expect(
+    teamPeople.getByLabel("Budget override for lee@example.com"),
+  ).toBeVisible();
+
+  // A People owner starts on their people, with the team's details and
+  // usage report on request.
+  await page
+    .getByRole("button", { name: "Own Platform, a team of people" })
+    .click();
+  await page.getByRole("link", { name: "Organization", exact: true }).click();
+  const people = page.getByRole("region", { name: "People in Platform" });
+  await expect(people).toBeVisible();
+  await expect(page.getByRole("region", { name: "Groups" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Usage report" })).toHaveCount(
+    0,
+  );
+  await expect(page.getByText("Team budget")).toBeVisible();
+  await expect(page.getByText("Team owner")).toBeVisible();
+  await expect(page.getByText("Cloud")).toHaveCount(0);
+  // Their own allowance is not theirs to change.
+  await expect(
+    people.getByLabel("Budget override for alex@example.com"),
+  ).toHaveCount(0);
+  const noa = people.getByRole("row").filter({ hasText: "noa@example.com" });
+  await noa.getByLabel("Budget override for noa@example.com").fill("90");
+  await noa
+    .getByRole("button", { name: "Save allowance for noa@example.com" })
+    .click();
+  await expect(noa).toContainText("Manual override: $90.00");
+  await people.getByRole("button", { name: "Team details" }).click();
+  await expect(
+    page.getByRole("complementary", { name: "Edit Platform" }),
+  ).toContainText("Set by a parent team");
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("button", { name: /^Usage report, Platform,/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Usage by member" }),
+  ).toBeVisible();
+});
+
+test("the sidebar switches the theme", async ({ page }) => {
+  await page.goto("./organization");
+  const sidebar = page.getByRole("navigation", { name: "Admin navigation" });
+  const html = page.locator("html");
+  const dark = (await html.getAttribute("class"))?.includes("dark");
+  await sidebar
+    .getByRole("button", { name: dark ? "Use light theme" : "Use dark theme" })
+    .last()
+    .click();
+  await expect(html).toHaveClass(dark ? /^(?!.*dark)/ : /dark/);
+});
+
+test("the usage report ranks groups by tokens", async ({ page }) => {
+  await page.goto("./organization");
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Usage report, all groups, 6 users" })
+    .click();
+  const tokens = page.getByRole("region", { name: "Tokens by department" });
+  // Most tokens first: the top department leads and is named in the card.
+  await expect(tokens.getByRole("img")).toHaveAccessibleName(
+    /^Tokens by department: Engineering .*, Marketing /,
+  );
+  await expect(tokens).toContainText("Top department");
 });

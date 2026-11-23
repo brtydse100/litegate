@@ -18,12 +18,12 @@ import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
 import AdminTeams from "../components/AdminTeams";
 import PersonalAnalytics from "../components/PersonalAnalytics";
-import BudgetManager from "../components/BudgetManager";
 import AdminOrganization from "../components/AdminOrganization";
 import {
   AdminSidebar,
   BrandMark,
   DemoRoleSwitch,
+  type DemoRole,
   UserMenu,
   type NavGroup,
 } from "../components/AppChrome";
@@ -63,6 +63,10 @@ async function fetchPortalConfig(): Promise<PortalConfig> {
   return response.json();
 }
 
+// The demo's team-owner choice outlives Home re-mounting after a sign-in
+// refresh; a full reload resets the demo account and this together.
+let rememberedDemoOwner: DemoRole | null = null;
+
 export default function Home() {
   const { user, login, logout } = useAuth();
   const queryClient = useQueryClient();
@@ -71,6 +75,9 @@ export default function Home() {
   const [previousKeyIds, setPreviousKeyIds] = useState<string[]>([]);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [demoRolePending, setDemoRolePending] = useState(false);
+  const [demoOwner, setDemoOwner] = useState<DemoRole | null>(
+    () => rememberedDemoOwner,
+  );
 
   function showKey(secret: string) {
     setPreviousKeyIds(keyList.map(keyToken));
@@ -113,9 +120,8 @@ export default function Home() {
   });
   const mutationError = create.error ?? regenerate.error ?? keys.error;
 
-  async function switchDemoRole(role: "admin" | "user") {
-    if (import.meta.env.VITE_DEMO_MODE !== "true" || user?.role === role)
-      return;
+  async function switchDemoRole(role: DemoRole) {
+    if (import.meta.env.VITE_DEMO_MODE !== "true") return;
     setDemoRolePending(true);
     try {
       const response = await fetch("/api/demo/role", {
@@ -124,6 +130,13 @@ export default function Home() {
         body: JSON.stringify({ role }),
       });
       if (!response.ok) throw new Error("Could not switch the demo role");
+      rememberedDemoOwner = role.endsWith("-owner") ? role : null;
+      setDemoOwner(rememberedDemoOwner);
+      // Organization data depends on who is looking; fetch it again.
+      queryClient.removeQueries({
+        predicate: (query) =>
+          String(query.queryKey[0]).startsWith("organization"),
+      });
       await login();
     } finally {
       setDemoRolePending(false);
@@ -162,6 +175,14 @@ export default function Home() {
     organizationAccess.isPending
   )
     return <p role="status">Checking organization access…</p>;
+  // Team owners get the sidebar layout; wait for their access instead of
+  // flashing the ordinary top bar first.
+  if (
+    !isAdmin &&
+    config?.organization_delegation_enabled &&
+    organizationAccess.isPending
+  )
+    return <p role="status">Loading access…</p>;
   const adminSections = new Set([
     "/keys",
     "/users",
@@ -184,13 +205,18 @@ export default function Home() {
   const signOut = () => void logout();
   const demoSwitch = (
     <DemoRoleSwitch
-      role={user?.role}
+      role={demoOwner ?? (user?.role === "admin" ? "admin" : "user")}
       pending={demoRolePending}
       onSwitch={(role) => void switchDemoRole(role)}
     />
   );
-  const adminLayout = section !== "/my-key" && section !== "/analytics";
   const adminHome = isAdmin || canViewOrganization ? "/organization" : null;
+  // Delegated organization access is shown as its own role.
+  const roleLabel = !isAdmin && canViewOrganization ? "Team owner" : user?.role;
+  // Anyone with admin access keeps the sidebar, including on My key and
+  // Analytics (listed under Workspace); ordinary users get the top bar.
+  const adminLayout =
+    !!adminHome || (section !== "/my-key" && section !== "/analytics");
 
   const notices = (
     <>
@@ -202,7 +228,7 @@ export default function Home() {
       {portal.isError && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-ink-2"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-transparent bg-danger-tint px-4 py-3 text-sm text-ink-2"
         >
           Portal configuration is unavailable. Retry before creating or
           replacing a key.
@@ -222,7 +248,7 @@ export default function Home() {
         <DismissibleMessage
           role="alert"
           messageKey={(mutationError as Error).message}
-          className="rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger"
+          className="rounded-xl border border-transparent bg-danger-tint px-4 py-3 text-sm text-danger"
         >
           {(mutationError as Error).message}
         </DismissibleMessage>
@@ -242,7 +268,7 @@ export default function Home() {
       {operationsBlocked && (
         <DismissibleMessage
           messageKey="key-actions-paused"
-          className="rounded-xl border border-sand/40 bg-sand-tint px-4 py-3 text-sm text-sand-ink"
+          className="rounded-xl border border-transparent bg-orange-tint px-4 py-3 text-sm text-orange-ink"
         >
           Key actions are paused. Try again in {retryAfter || 1} seconds.
         </DismissibleMessage>
@@ -250,9 +276,9 @@ export default function Home() {
       {newKey && !newKeyIdentifier && (
         <section
           aria-label="New key"
-          className="flex flex-col gap-3 rounded-2xl border border-line bg-card p-6"
+          className="flex flex-col gap-3 rounded-2xl border border-line-soft bg-card p-6"
         >
-          <p className="text-sm font-semibold text-mint-ink">
+          <p className="text-sm font-semibold text-green-ink">
             Your API key is ready. Copy it before leaving this page.
           </p>
           <PersonalKeySecret
@@ -312,7 +338,7 @@ export default function Home() {
         {keys.isLoading ? (
           <div
             role="status"
-            className="h-80 animate-pulse rounded-2xl border border-line bg-card"
+            className="h-80 animate-pulse rounded-2xl border border-line-soft bg-card"
           >
             <span className="sr-only">Loading key information…</span>
           </div>
@@ -379,17 +405,17 @@ export default function Home() {
 
   if (!adminLayout) {
     const topLink =
-      "rounded-md px-1 py-2 text-navy-text no-underline hover:text-paper";
+      "rounded-md px-2 py-1.5 text-ink-3 no-underline transition-colors duration-150 hover:bg-ink/[0.06] hover:text-ink";
     return (
       <div className="min-h-screen bg-canvas text-ink">
-        <header className="bg-navy text-navy-ink">
+        <header className="sticky top-0 z-20 border-b border-line-soft bg-card/80 text-ink backdrop-blur-xl backdrop-saturate-150">
           <div className="mx-auto flex max-w-[1040px] flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-8">
             <Link to="/my-key" className="no-underline">
               <BrandMark logoUrl={config?.logo_url} />
             </Link>
             <nav
               aria-label="Primary navigation"
-              className="ml-auto flex flex-wrap items-center justify-end gap-x-[18px] gap-y-1 text-sm"
+              className="ml-auto flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-sm"
             >
               {demoSwitch}
               {analyticsEnabled &&
@@ -412,18 +438,13 @@ export default function Home() {
                   Setup guide
                 </a>
               )}
-              {adminHome && (
-                <Link to={adminHome} className={topLink}>
-                  Admin
-                </Link>
-              )}
               <span
                 aria-hidden="true"
-                className="hidden h-5 w-px bg-navy-3 sm:block"
+                className="mx-1 hidden h-5 w-px bg-line sm:block"
               />
               <UserMenu
                 email={user?.email}
-                role={user?.role}
+                role={roleLabel}
                 onSignOut={signOut}
                 apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
               />
@@ -488,7 +509,7 @@ export default function Home() {
         groups={navGroups}
         logoUrl={config?.logo_url}
         email={user?.email}
-        role={user?.role}
+        role={roleLabel}
         onSignOut={signOut}
         apiDocsUrl={isAdmin ? config?.api_docs_url : undefined}
         extra={demoSwitch}
@@ -496,18 +517,15 @@ export default function Home() {
       <div className="min-w-0 flex-1 md:flex md:flex-col">
         <main className="min-w-0 flex-1 md:overflow-y-auto">
           {section === "/organization" && canViewOrganization ? (
-            <>
-              <AdminOrganization
-                budgetsEnabled={!!config?.hierarchical_budgets_enabled}
-                email={user?.email}
-                isAdmin={isAdmin}
-              />
-              {config?.hierarchical_budgets_enabled && (
-                <div className="px-4 pb-8 sm:px-8">
-                  <BudgetManager />
-                </div>
-              )}
-            </>
+            <AdminOrganization
+              budgetsEnabled={!!config?.hierarchical_budgets_enabled}
+              email={user?.email}
+              isAdmin={isAdmin}
+            />
+          ) : section === "/my-key" || section === "/analytics" ? (
+            <div className="mx-auto max-w-[1080px] px-4 pb-14 pt-9 sm:px-8">
+              {section === "/analytics" ? <PersonalAnalytics /> : myKey}
+            </div>
           ) : (
             <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-8">
               {section === "/users" && isAdmin ? (

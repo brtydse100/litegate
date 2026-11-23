@@ -7,16 +7,17 @@ import {
 } from "react";
 import type React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { BookOpen, LogOut, Zap, type LucideIcon } from "lucide-react";
+import { BookOpen, LogOut, type LucideIcon } from "lucide-react";
 import EmailAddress from "./EmailAddress";
+import LogoMark from "./LogoMark";
 import ThemeToggle from "./ThemeToggle";
 
 /** Logo tile and product name; a configured logo replaces the default mark. */
 export function BrandMark({ logoUrl }: { logoUrl?: string }) {
   return (
-    <span className="inline-flex min-w-0 items-center gap-2.5 text-[17px] font-bold text-paper">
+    <span className="inline-flex min-w-0 items-center gap-2.5 text-[17px] font-semibold tracking-[-0.01em] text-ink">
       {logoUrl ? (
-        <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-paper px-1.5">
+        <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-paper px-1.5 ring-1 ring-line-soft">
           <img
             src={logoUrl}
             alt=""
@@ -24,12 +25,7 @@ export function BrandMark({ logoUrl }: { logoUrl?: string }) {
           />
         </span>
       ) : (
-        <span
-          aria-hidden="true"
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ice text-navy"
-        >
-          <Zap size={15} strokeWidth={2.4} />
-        </span>
+        <LogoMark size={28} />
       )}
       LiteGate
     </span>
@@ -54,7 +50,7 @@ export function Avatar({
   return (
     <span
       aria-hidden="true"
-      className={`inline-flex ${size} shrink-0 items-center justify-center rounded-full bg-cyan-tint text-[11px] font-bold text-cyan-ink`}
+      className={`inline-flex ${size} shrink-0 items-center justify-center rounded-full bg-ink-5 text-xs font-semibold text-paper`}
     >
       {initials(email)}
     </span>
@@ -115,7 +111,7 @@ export function UserMenu({
     } else if (event.key === "Tab") setOpen(false);
   }
   const item =
-    "flex w-full min-h-11 items-center gap-2.5 rounded-lg px-3 text-left text-sm text-ink-2 hover:bg-canvas";
+    "flex w-full min-h-9 items-center gap-2.5 rounded-md px-2.5 text-left text-sm text-ink hover:bg-blue-solid hover:text-paper focus:bg-blue-solid focus:text-paper focus:outline-none";
   return (
     <div ref={root} className="relative flex items-center gap-1">
       <button
@@ -131,14 +127,14 @@ export function UserMenu({
             setOpen(true);
           }
         }}
-        className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 text-sm text-navy-ink hover:bg-navy-2"
+        className="inline-flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 text-sm text-ink transition-colors duration-150 hover:bg-ink/[0.06]"
       >
         <Avatar email={email} />
       </button>
       {/* Beside the button, not inside it: the address has its own copy
           button, as it did before the redesign. */}
       {!compact && email && (
-        <span className="hidden max-w-[240px] text-sm text-navy-ink sm:inline">
+        <span className="hidden max-w-[240px] text-sm text-ink-2 sm:inline">
           <EmailAddress email={email} />
         </span>
       )}
@@ -148,15 +144,17 @@ export function UserMenu({
           role="menu"
           aria-label="Account"
           onKeyDown={onMenuKey}
-          className={`absolute z-30 rounded-xl ${up ? "bottom-full left-0 mb-2 w-52" : "right-0 mt-2 w-60 max-w-[calc(100vw-2rem)]"} border border-line bg-card p-1.5 shadow-lg`}
+          className={`absolute z-30 rounded-xl ${up ? "bottom-full left-0 mb-2 w-52" : "right-0 mt-2 w-60 max-w-[calc(100vw-2rem)]"} border border-line-soft bg-card/95 p-1.5 shadow-[0_10px_30px_rgb(0_0_0/0.16),0_1px_3px_rgb(0_0_0/0.08)] backdrop-blur-xl`}
         >
-          <div className="border-b border-line-soft px-3 py-2.5 text-sm">
+          <div className="border-b border-line-soft px-2.5 pb-2 pt-1.5 text-sm">
             {email && (
               <EmailAddress email={email} className="font-medium text-ink" />
             )}
-            {role && <p className="capitalize text-ink-4">{role}</p>}
+            {role && (
+              <p className="text-[13px] capitalize text-ink-4">{role}</p>
+            )}
           </div>
-          <div className="pt-1.5">
+          <div className="pt-1">
             <ThemeToggle className={item} showLabel role="menuitem" />
             {apiDocsUrl && (
               <a
@@ -184,37 +182,82 @@ export function UserMenu({
   );
 }
 
+/** Demo-only roles; team owners see just their part of the organization. */
+export type DemoRole =
+  "user" | "admin" | "platform-owner" | "infrastructure-owner";
+
+const ownerTeams: Array<{ role: DemoRole; label: string; name: string }> = [
+  {
+    role: "platform-owner",
+    label: "People",
+    name: "Own Platform, a team of people",
+  },
+  {
+    role: "infrastructure-owner",
+    label: "Teams",
+    name: "Own Infrastructure, a team of teams",
+  },
+];
+
 export function DemoRoleSwitch({
   role,
   pending,
   onSwitch,
 }: {
-  role?: string;
+  role?: DemoRole;
   pending: boolean;
-  onSwitch: (role: "admin" | "user") => void;
+  onSwitch: (role: DemoRole) => void;
 }) {
   if (import.meta.env.VITE_DEMO_MODE !== "true") return null;
+  const owner = role === "platform-owner" || role === "infrastructure-owner";
+  const segment = (active: boolean) =>
+    `flex-1 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 disabled:opacity-50 ${
+      active
+        ? "bg-segment text-ink shadow-[0_1px_2px_rgb(0_0_0/0.12),0_0_0_0.5px_rgb(0_0_0/0.04)]"
+        : "text-ink-3 hover:text-ink"
+    }`;
   return (
-    <div
-      className="flex items-center rounded-lg bg-navy-2 p-0.5"
-      aria-label="Demo role"
-    >
-      {(["user", "admin"] as const).map((value) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => onSwitch(value)}
-          disabled={pending}
-          aria-label={`View demo as ${value}`}
-          className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize disabled:opacity-50 ${
-            role === value
-              ? "bg-card text-ink"
-              : "text-navy-text hover:text-paper"
-          }`}
-        >
-          {value}
-        </button>
-      ))}
+    <div className="flex flex-col gap-1" aria-label="Demo role">
+      <div className="flex items-center rounded-lg bg-ink/[0.06] p-0.5">
+        {[
+          { value: "user" as const, label: "User", active: role === "user" },
+          {
+            value: "platform-owner" as const,
+            label: "Owner",
+            active: owner,
+          },
+          { value: "admin" as const, label: "Admin", active: role === "admin" },
+        ].map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => !item.active && onSwitch(item.value)}
+            disabled={pending}
+            aria-pressed={item.active}
+            aria-label={`View demo as ${item.value === "platform-owner" ? "team owner" : item.label.toLowerCase()}`}
+            className={segment(item.active)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {owner && (
+        <div className="flex items-center rounded-lg bg-ink/[0.06] p-0.5">
+          {ownerTeams.map((item) => (
+            <button
+              key={item.role}
+              type="button"
+              onClick={() => role !== item.role && onSwitch(item.role)}
+              disabled={pending}
+              aria-pressed={role === item.role}
+              aria-label={item.name}
+              className={segment(role === item.role)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -232,13 +275,16 @@ export interface NavGroup {
 }
 
 const navLink = (isActive: boolean) =>
-  `flex shrink-0 items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-sm no-underline ${
+  `flex shrink-0 items-center gap-2.5 rounded-md px-2.5 py-2 text-sm no-underline transition-colors duration-150 ${
     isActive
-      ? "bg-navy-2 font-semibold text-paper shadow-[inset_3px_0_0_rgb(var(--ice))]"
-      : "text-navy-text hover:bg-navy-2/60 hover:text-paper"
+      ? "bg-ink/[0.09] font-medium text-ink [&>svg]:text-blue"
+      : "text-ink hover:bg-ink/[0.05] [&>svg]:text-blue"
   }`;
 
-/** Navy admin sidebar; becomes a scrolling top row on narrow screens. */
+const sidebarThemeButton =
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-4 transition-colors duration-150 hover:bg-ink/[0.06] hover:text-ink";
+
+/** Light sidebar, as in macOS; becomes a scrolling top row on narrow screens. */
 export function AdminSidebar({
   groups,
   logoUrl,
@@ -286,11 +332,12 @@ export function AdminSidebar({
   return (
     <nav
       aria-label="Admin navigation"
-      className="flex shrink-0 flex-col gap-0.5 bg-navy px-3.5 py-3 text-sm text-navy-ink md:h-screen md:w-[236px] md:overflow-y-auto md:py-5"
+      className="flex shrink-0 flex-col gap-0.5 border-b border-line-soft bg-sidebar px-3 py-3 text-sm text-ink md:h-screen md:w-[236px] md:overflow-y-auto md:border-b-0 md:border-r md:py-5"
     >
       <div className="flex items-center justify-between gap-3 px-2 pb-2 md:pb-4">
         <BrandMark logoUrl={logoUrl} />
-        <div className="md:hidden">
+        <div className="flex items-center gap-1 md:hidden">
+          <ThemeToggle className={sidebarThemeButton} />
           <UserMenu
             email={email}
             role={role}
@@ -303,11 +350,11 @@ export function AdminSidebar({
       {extra && <div className="px-2 pb-2">{extra}</div>}
       <div
         ref={row}
-        className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:gap-0.5 md:overflow-visible md:pb-0"
+        className="flex gap-1 overflow-x-auto pb-1 [scrollbar-width:none] md:flex-col md:gap-0.5 md:overflow-visible md:pb-0 [&::-webkit-scrollbar]:hidden"
       >
         {groups.map((group) => (
           <div key={group.label} className="contents md:block">
-            <p className="mx-2.5 mb-1.5 mt-4 hidden text-[11px] font-semibold uppercase tracking-[0.06em] text-navy-muted md:block">
+            <p className="mx-2.5 mb-1 mt-4 hidden text-xs font-semibold text-ink-4 md:block">
               {group.label}
             </p>
             {group.items.map((item) => (
@@ -322,7 +369,7 @@ export function AdminSidebar({
                 {item.dot && (
                   <span
                     className={`relative h-2 w-2 rounded-full ${
-                      item.dot === "ok" ? "bg-ready" : "bg-alert"
+                      item.dot === "ok" ? "bg-green" : "bg-danger"
                     }`}
                   >
                     <span className="sr-only">
@@ -335,7 +382,12 @@ export function AdminSidebar({
           </div>
         ))}
       </div>
-      <div className="mt-auto hidden items-center gap-1 border-t border-navy-3 pt-3.5 md:flex">
+      {/* Its own row, so long email addresses keep their full width. */}
+      <ThemeToggle
+        showLabel
+        className={`${navLink(false)} mt-auto hidden w-full md:flex`}
+      />
+      <div className="mt-2 hidden items-center gap-1 border-t border-line pt-3 md:flex">
         <UserMenu
           email={email}
           role={role}
@@ -344,9 +396,9 @@ export function AdminSidebar({
           compact
           up
         />
-        <span className="min-w-0 text-[13px] leading-tight">
+        <span className="min-w-0 flex-1 text-[13px] leading-tight">
           {email && <EmailAddress email={email} className="block" />}
-          <span className="block capitalize text-navy-muted">{role}</span>
+          <span className="block capitalize text-ink-4">{role}</span>
         </span>
       </div>
     </nav>

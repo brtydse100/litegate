@@ -61,5 +61,8 @@ test("@smoke blank login customization preserves the default page", async ({
   await expect(
     page.getByRole("img", { name: "Organization logo" }),
   ).toHaveCount(0);
-  await expect(page.locator("polygon")).toBeVisible();
+  // The default LiteGate mark replaces the missing custom logo.
+  await expect(
+    page.locator("section[aria-label='LiteGate'] svg"),
+  ).toBeVisible();
 });

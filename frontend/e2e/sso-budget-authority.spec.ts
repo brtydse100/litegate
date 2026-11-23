@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openGroup } from "./organizationPanel";
 
 // Real Keycloak, real LiteLLM and the real backend with enforced budgets:
 // a team administrator redistributes their team's budget but can never change
@@ -77,23 +78,20 @@ test("a team admin redistributes within the team total but cannot change it", as
 
     // UI: the team total is read-only; child allocations are editable.
     await teamAdmin.goto("/organization");
-    const engineeringCard = teamAdmin.locator("article", {
-      has: teamAdmin.getByRole("heading", { name: "Engineering", exact: true }),
-    });
+    const engineeringPanel = await openGroup(teamAdmin, "Engineering");
     await expect(
-      engineeringCard.getByText("This assigned total is read-only"),
+      engineeringPanel.getByText(/Set by a parent team/),
     ).toBeVisible();
-    await expect(
-      teamAdmin.getByLabel("Engineering assigned budget"),
-    ).toHaveCount(0);
-    const childInput = teamAdmin.getByLabel("Platform child allocation");
+    await expect(teamAdmin.getByLabel("Engineering group budget")).toHaveCount(
+      0,
+    );
+    const platformPanel = await openGroup(teamAdmin, "Platform");
+    const childInput = platformPanel.getByLabel("Platform group budget");
     await childInput.fill("40");
     const saved = teamAdmin.waitForResponse(
       (r) => r.request().method() === "PATCH" && r.url().includes("/budgets/"),
     );
-    await teamAdmin
-      .getByRole("button", { name: "Save Platform budget" })
-      .click();
+    await platformPanel.getByRole("button", { name: "Save changes" }).click();
     expect((await saved).status()).toBe(200);
     await expect(childInput).toHaveValue("40");
     await expect
@@ -109,13 +107,10 @@ test("a team admin redistributes within the team total but cannot change it", as
     const rejected = teamAdmin.waitForResponse(
       (r) => r.request().method() === "PATCH" && r.url().includes("/budgets/"),
     );
-    await teamAdmin
-      .getByRole("button", { name: "Save Platform budget" })
-      .click();
+    await platformPanel.getByRole("button", { name: "Save changes" }).click();
     expect((await rejected).status()).toBe(409);
     await expect(
-      teamAdmin
-        .locator("article", { has: childInput })
+      platformPanel
         .getByRole("alert")
         .filter({ hasText: /cannot cover|exceed/i }),
     ).toBeVisible();
@@ -167,12 +162,9 @@ test("a team admin redistributes within the team total but cannot change it", as
     // A child-team admin cannot change their own team's total either, and
     // cannot reach the parent team at all.
     await childAdmin.goto("/organization");
-    await expect(
-      childAdmin.getByText("This assigned total is read-only"),
-    ).toBeVisible();
-    await expect(
-      childAdmin.getByLabel(/Platform .*budget|Platform child allocation/),
-    ).toHaveCount(0);
+    const ownPanel = await openGroup(childAdmin, "Platform");
+    await expect(ownPanel.getByText(/Set by a parent team/)).toBeVisible();
+    await expect(childAdmin.getByLabel("Platform group budget")).toHaveCount(0);
     expect(
       (await patch(childAdmin, `/groups/${platform.id}`, "999")).status(),
     ).toBe(403);

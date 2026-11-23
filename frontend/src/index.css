@@ -2,147 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Apple system palette as RGB channels; see tailwind.config.ts.
+   Text and solid fills keep 4.5:1 contrast in both themes. */
 :root {
-  --bg-0: #f3f5f7;
-  --bg-1: #ffffff;
-  --bg-2: #edf0f3;
-  --border: #e2e6ea;
-  --text-primary: #161b22;
-  --text-secondary: #66707a;
-  --accent: #3f6ab0;
-
-  /* Design tokens as RGB channels; see tailwind.config.ts. */
-  --ink: 22 27 34;
-  --ink-2: 52 60 69;
-  --ink-3: 78 87 97;
-  --ink-4: 102 112 122;
-  --ink-5: 138 147 156;
-  --canvas: 243 245 247;
+  --ink: 29 29 31;
+  --ink-2: 58 58 60;
+  --ink-3: 72 72 74;
+  --ink-4: 106 106 112;
+  --ink-5: 142 142 147;
+  --canvas: 242 242 247;
   --card: 255 255 255;
-  --well: 232 236 240;
-  --line: 226 230 234;
-  --line-soft: 237 240 243;
-  --line-input: 211 217 223;
-  --navy: 34 48 74;
-  --navy-2: 46 63 94;
-  --navy-3: 52 70 106;
-  --navy-text: 197 208 222;
-  --navy-muted: 154 168 188;
-  --ice: 93 194 217;
-  --blue: 63 106 176;
-  --blue-tint: 233 239 249;
-  --blue-ink: 43 78 134;
-  --teal: 47 133 128;
-  --teal-tint: 231 243 242;
-  --teal-ink: 31 97 93;
-  --cyan: 62 154 181;
-  --cyan-tint: 228 243 248;
-  --cyan-ink: 36 106 128;
-  --periwinkle: 100 102 168;
-  --periwinkle-tint: 238 238 248;
-  --periwinkle-ink: 74 76 134;
-  --mint: 78 156 128;
-  --mint-tint: 230 243 238;
-  --mint-ink: 46 107 85;
-  --sand: 176 133 90;
-  --sand-tint: 246 239 230;
-  --sand-ink: 146 88 44;
-  --danger: 160 72 72;
-  --danger-line: 232 207 207;
-  --danger-tint: 250 238 238;
-  /* Solid button fills keep white labels at 4.5:1 or better in both themes,
-     so they are not redefined for dark mode. */
-  --teal-solid: 31 112 107;
-  --sand-solid: 134 92 50;
-  --danger-solid: 160 72 72;
-  /* Status dots on navy surfaces (cards use mint and danger). */
-  --ready: 111 211 168;
-  --alert: 240 138 138;
-  /* Body text on navy surfaces. */
-  --navy-ink: 230 236 243;
+  --well: 236 236 240;
+  --sidebar: 236 236 241;
+  --segment: 255 255 255;
+  --line: 216 216 220;
+  --line-soft: 229 229 234;
+  --line-input: 199 199 204;
+  --blue: 0 122 255;
+  --blue-tint: 230 241 255;
+  --blue-ink: 0 92 196;
+  --blue-solid: 0 113 227;
+  --teal: 48 176 199;
+  --teal-tint: 224 244 248;
+  --teal-ink: 0 110 130;
+  --cyan: 50 173 230;
+  --cyan-tint: 226 243 252;
+  --cyan-ink: 0 105 150;
+  --indigo: 88 86 214;
+  --indigo-tint: 238 238 252;
+  --indigo-ink: 64 62 170;
+  --green: 52 199 89;
+  --green-tint: 230 247 235;
+  --green-ink: 30 121 52;
+  --orange: 255 149 0;
+  --orange-tint: 255 243 224;
+  --orange-ink: 160 78 0;
+  --orange-solid: 178 87 0;
+  --danger: 215 0 21;
+  --danger-line: 255 204 204;
+  --danger-tint: 255 238 237;
+  --danger-solid: 215 0 21;
 }
 
 html.dark {
-  --bg-0: #0f141b;
-  --bg-1: #171d26;
-  --bg-2: #1e2530;
-  --border: #2a323d;
-  --text-primary: #e8edf2;
-  --text-secondary: #8e98a3;
-  --accent: #5b86cc;
-
-  --ink: 232 237 242;
-  --ink-2: 201 209 217;
-  --ink-3: 169 178 188;
-  --ink-4: 150 160 171;
-  --ink-5: 120 130 141;
-  --canvas: 15 20 27;
-  --card: 23 29 38;
-  --well: 30 37 48;
-  --line: 42 50 61;
-  --line-soft: 34 41 50;
-  --line-input: 58 67 80;
-  --navy: 20 29 45;
-  --navy-2: 34 48 74;
-  --navy-3: 46 63 94;
-  --navy-text: 197 208 222;
-  --navy-muted: 154 168 188;
-  --ice: 93 194 217;
-  --blue: 70 112 184;
-  --blue-tint: 28 42 64;
-  --blue-ink: 169 195 236;
-  --teal: 63 163 156;
-  --teal-tint: 20 48 46;
-  --teal-ink: 143 211 204;
-  --cyan: 79 176 203;
-  --cyan-tint: 18 48 58;
-  --cyan-ink: 143 208 226;
-  --periwinkle: 132 134 200;
-  --periwinkle-tint: 35 36 63;
-  --periwinkle-ink: 191 192 234;
-  --mint: 93 184 150;
-  --mint-tint: 21 48 42;
-  --mint-ink: 155 220 194;
-  --sand: 201 154 107;
-  --sand-tint: 51 40 28;
-  --sand-ink: 227 185 142;
-  --danger: 210 114 114;
-  --danger-line: 74 42 42;
-  --danger-tint: 52 28 28;
+  --ink: 245 245 247;
+  --ink-2: 222 222 227;
+  --ink-3: 199 199 204;
+  --ink-4: 152 152 157;
+  --ink-5: 110 110 115;
+  --canvas: 0 0 0;
+  --card: 28 28 30;
+  --well: 44 44 46;
+  --sidebar: 28 28 30;
+  --segment: 99 99 102;
+  --line: 56 56 58;
+  --line-soft: 44 44 46;
+  --line-input: 72 72 74;
+  --blue: 10 132 255;
+  --blue-tint: 16 42 74;
+  --blue-ink: 110 175 255;
+  --teal: 64 200 224;
+  --teal-tint: 14 48 56;
+  --teal-ink: 120 215 235;
+  --cyan: 100 210 255;
+  --cyan-tint: 15 45 60;
+  --cyan-ink: 130 205 245;
+  --indigo: 112 110 240;
+  --indigo-tint: 34 34 70;
+  --indigo-ink: 175 173 250;
+  --green: 48 209 88;
+  --green-tint: 18 50 28;
+  --green-ink: 110 220 140;
+  --orange: 255 159 10;
+  --orange-tint: 58 38 10;
+  --orange-ink: 255 185 90;
+  --danger: 255 69 58;
+  --danger-line: 96 38 38;
+  --danger-tint: 60 22 22;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  background: var(--bg-0);
-  color: var(--text-primary);
+  background: rgb(var(--canvas));
+  color: rgb(var(--ink));
   font-family:
-    "IBM Plex Sans",
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   margin: 0;
 }
 
+::selection {
+  background: rgb(var(--blue) / 25%);
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--line-input));
-  border-radius: 3px;
+  background: rgb(var(--ink-5) / 45%);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--ink-5));
+  background: rgb(var(--ink-5) / 70%);
 }
 
 input,
@@ -163,8 +137,8 @@ input[type="checkbox"]:not(.sr-only) {
   width: 1rem;
   height: 1rem;
   flex-shrink: 0;
-  border: 1px solid rgb(var(--ink-5));
-  border-radius: 0.25rem;
+  border: 1px solid rgb(var(--line-input));
+  border-radius: 0.3rem;
   background-color: rgb(var(--card));
   background-position: center;
   background-repeat: no-repeat;
@@ -174,13 +148,13 @@ input[type="checkbox"]:not(.sr-only) {
 }
 
 input[type="checkbox"]:not(.sr-only):checked {
-  border-color: var(--accent);
-  background-color: var(--accent);
+  border-color: rgb(var(--blue-solid));
+  background-color: rgb(var(--blue-solid));
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m3 8 3 3 7-7' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 input[type="checkbox"]:not(.sr-only):focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid rgb(var(--blue-solid));
   outline-offset: 2px;
 }
 
@@ -199,7 +173,7 @@ input[type="checkbox"]:not(.sr-only):disabled {
 }
 
 .policy-model-option[data-selected="true"] {
-  border-color: rgb(var(--blue) / 40%);
+  border-color: rgb(var(--blue) / 45%);
   background-color: rgb(var(--blue-tint));
   color: rgb(var(--blue-ink));
 }
@@ -216,5 +190,14 @@ input[type="checkbox"]:not(.sr-only):disabled {
 }
 
 :focus-visible {
-  outline-color: rgb(var(--blue));
+  outline-color: rgb(var(--blue) / 60%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

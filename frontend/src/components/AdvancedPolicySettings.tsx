@@ -136,7 +136,7 @@ const AdvancedPolicySettings = forwardRef<
             <p className="text-xs text-ink-4">Loading available settings...</p>
           )}
           {!discovery.isFetching && (!schema || discovery.isError) && (
-            <div className="space-y-2 text-xs text-sand-ink">
+            <div className="space-y-2 text-xs text-orange-ink">
               <p>
                 Advanced settings are unavailable. Familiar controls remain
                 available.

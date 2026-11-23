@@ -3,8 +3,10 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { BarChart3, Network } from "lucide-react";
 import { api } from "../api/client";
 import DismissibleMessage from "./DismissibleMessage";
+import Breadcrumb from "./organization/Breadcrumb";
 import GroupPanel from "./organization/GroupPanel";
 import OrgReport from "./organization/OrgReport";
+import PeopleTable from "./organization/PeopleTable";
 import {
   groupInitials,
   hueFor,
@@ -54,33 +56,32 @@ function treeOrder(
 }
 
 function Metric({
-  accent,
   caption,
   children,
   sub,
   bar,
 }: {
-  accent: string;
   caption: string;
   children: React.ReactNode;
   sub: string;
   bar?: number | null;
 }) {
   return (
-    <div
-      className={`flex flex-col gap-1 rounded-[10px] border border-t-[3px] border-line bg-card px-[18px] pb-[18px] pt-4 ${accent}`}
-    >
-      <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-4">
+    // Phones: one grouped list, label left and figure right. Wider: tiles.
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-3 sm:flex sm:flex-col sm:items-stretch sm:gap-1 sm:rounded-xl sm:border sm:border-line-soft sm:bg-card sm:px-[18px] sm:py-4">
+      <span className="col-start-1 row-start-1 text-sm font-medium text-ink sm:text-[13px] sm:text-ink-4">
         {caption}
       </span>
-      <span className="inline-flex items-center gap-2.5 text-[28px] font-semibold text-ink">
+      <span className="col-start-2 row-span-2 row-start-1 inline-flex items-center gap-2 text-[17px] font-semibold tabular-nums text-ink sm:gap-2.5 sm:text-[26px] sm:tracking-[-0.01em]">
         {children}
       </span>
-      <span className="text-[13px] text-ink-3">{sub}</span>
+      <span className="col-start-1 row-start-2 text-[13px] text-ink-4">
+        {sub}
+      </span>
       {bar != null && (
-        <span className="mt-2 block h-1 rounded-sm bg-line-soft">
+        <span className="col-span-2 mt-2 block h-1.5 rounded-full bg-well">
           <span
-            className="block h-1 rounded-sm bg-teal"
+            className="block h-1.5 rounded-full bg-blue"
             style={{ width: `${Math.min(100, bar)}%` }}
           />
         </span>
@@ -99,7 +100,8 @@ export default function AdminOrganization({
   /** Global administrators also see gateway readiness. */
   isAdmin?: boolean;
 }) {
-  const [rootChoice, setRootChoice] = useState<string | null>(null);
+  // Selected top-level departments; empty means the first one.
+  const [rootChoices, setRootChoices] = useState<string[]>([]);
   const [tableChoice, setTableChoice] = useState<string | null>(null);
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [allGroupsReport, setAllGroupsReport] = useState(false);
@@ -111,6 +113,7 @@ export default function AdminOrganization({
   const [showIssues, setShowIssues] = useState(false);
   const [showAllAttention, setShowAllAttention] = useState(false);
   const opener = useRef<HTMLElement | null>(null);
+  const reportButton = useRef<HTMLButtonElement | null>(null);
 
   const rootsQuery = useQuery({
     queryKey: ["organization-children", ""],
@@ -178,16 +181,28 @@ export default function AdminOrganization({
   const groups = [...loaded.values()].map(withSpend);
   const byId = new Map(groups.map((group) => [group.id, group]));
 
-  const root = byId.get(rootChoice ?? "") ?? roots[0];
-  const tableRoot =
-    byId.get(tableChoice ?? "") && root && within(byId.get(tableChoice!)!, root)
-      ? byId.get(tableChoice!)!
-      : root;
+  const chosen = roots.filter((item) => rootChoices.includes(item.id));
+  const activeRoots = (chosen.length ? chosen : roots.slice(0, 1)).map(
+    (item): Group => byId.get(item.id) ?? item,
+  );
+  const activeIds = activeRoots.map((item) => item.id);
+  const multi = activeRoots.length > 1;
+  const allActive = activeRoots.length === roots.length;
+  // With one department the page works inside it; with several it combines them.
+  const root = multi ? undefined : activeRoots[0];
+  const ownerOf = (group: Group) =>
+    activeRoots.find((item) => item.id === group.id || within(group, item));
+  const drilled = byId.get(tableChoice ?? "");
+  const tableRoot = drilled && ownerOf(drilled) ? drilled : root;
+  // Rows indent from the table base; several departments start one level up.
+  const baseLevel = tableRoot
+    ? tableRoot.level
+    : (activeRoots[0]?.level ?? 0) - 1;
   const rootChildren = groups
     .filter((group) => group.parent_id === root?.id)
     .map((group) => group.id);
   const hue = (group: Group) =>
-    group.id === root?.id
+    multi || group.id === root?.id
       ? hueFor(
           group,
           null,
@@ -195,13 +210,18 @@ export default function AdminOrganization({
           roots.map((item) => item.id),
         )
       : hueFor(group, root?.id ?? null, byId, rootChildren);
-  const depth = (group: Group) => group.level - (tableRoot?.level ?? 0) - 1;
+  const depth = (group: Group) => group.level - baseLevel - 1;
   const isExpanded = (id: string) => {
     const group = byId.get(id);
     if (!group?.has_children) return false;
     return expanded.has(id) || (expandAll && depth(group) < MAX_DEPTH - 1);
   };
-  const rows = tableRoot ? treeOrder(groups, isExpanded, tableRoot.id) : [];
+  const rows = tableRoot
+    ? treeOrder(groups, isExpanded, tableRoot.id)
+    : activeRoots.flatMap((item) => [
+        item,
+        ...(isExpanded(item.id) ? treeOrder(groups, isExpanded, item.id) : []),
+      ]);
 
   // Load the table root's children and, in expand-all mode, every visible branch.
   const wanted = [
@@ -220,6 +240,13 @@ export default function AdminOrganization({
   }, [wanted]);
 
   const selected = nodeId ? byId.get(nodeId) : undefined;
+  const trail: Group[] = [];
+  for (
+    let step = selected;
+    step;
+    step = step.parent_id ? byId.get(step.parent_id) : undefined
+  )
+    trail.unshift(step);
   if (nodeId && rootsQuery.data && !selected && !totals.isPending)
     setNodeId(null);
   const detail = useQuery({
@@ -234,6 +261,18 @@ export default function AdminOrganization({
     if (byId.get(id)?.has_children)
       setRequestedParents((current) => new Set(current).add(id));
   }
+  function closeGroup() {
+    setNodeId(null);
+    // The panel unmounts; put focus back where the user started.
+    requestAnimationFrame(() => {
+      if (opener.current?.isConnected) opener.current.focus();
+      opener.current = null;
+    });
+  }
+  function closeAllGroupsReport() {
+    setAllGroupsReport(false);
+    requestAnimationFrame(() => reportButton.current?.focus());
+  }
   function select(id: string) {
     const group = byId.get(id);
     if (!group) return;
@@ -244,16 +283,19 @@ export default function AdminOrganization({
     setAllGroupsReport(false);
     request(id);
     const owner = roots.find((item) => item.id === id || within(group, item));
-    if (owner && owner.id !== root?.id) setRootChoice(owner.id);
+    const combined = multi && !!owner;
+    if (owner && !activeIds.includes(owner.id))
+      setRootChoices(multi ? [...activeIds, owner.id] : [owner.id]);
     // Reveal the row: expand its ancestors, re-rooting when it sits too deep.
-    const chain: Group[] = [];
+    // In a combined view the department row itself must be open too.
+    const chain: Group[] = combined && owner && owner.id !== id ? [owner] : [];
     let parent = group.parent_id ? byId.get(group.parent_id) : undefined;
     while (parent && parent.id !== (owner?.id ?? null)) {
-      chain.unshift(parent);
+      chain.splice(combined ? 1 : 0, 0, parent);
       parent = parent.parent_id ? byId.get(parent.parent_id) : undefined;
     }
     const base = owner ?? root;
-    const relative = group.level - (base?.level ?? 0) - 1;
+    const relative = group.level - (base?.level ?? 0) - (combined ? 0 : 1);
     const anchor =
       relative >= MAX_DEPTH && group.parent_id
         ? byId.get(group.parent_id)
@@ -286,12 +328,25 @@ export default function AdminOrganization({
     });
     if (!open) request(group.id);
   }
-  function chooseRoot(id: string) {
-    setRootChoice(id);
+  function chooseRoots(ids: string[]) {
+    if (!ids.length) return;
+    // Keep configuration order, and open each department in a combined view.
+    const next = roots.map((item) => item.id).filter((id) => ids.includes(id));
+    setRootChoices(next);
     setTableChoice(null);
     setNodeId(null);
     setShowAllAttention(false);
+    if (next.length > 1) {
+      setExpanded((current) => new Set([...current, ...next]));
+      next.forEach(request);
+    }
   }
+  const toggleRoot = (id: string) =>
+    chooseRoots(
+      activeIds.includes(id)
+        ? activeIds.filter((item) => item !== id)
+        : [...activeIds, id],
+    );
 
   const refreshing =
     rootsQuery.isFetching ||
@@ -309,7 +364,7 @@ export default function AdminOrganization({
         });
         if (selected) void detail.refetch();
       }}
-      className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas disabled:opacity-50"
+      className="min-h-10 rounded-lg bg-ink/[0.06] px-3 text-sm text-ink hover:bg-ink/10 disabled:opacity-50"
     >
       Refresh organization
     </button>
@@ -322,7 +377,7 @@ export default function AdminOrganization({
       <div className="flex flex-col items-start gap-3 p-8">
         <p
           role="alert"
-          className="rounded-lg border border-danger-line bg-danger-tint p-4 text-sm text-danger"
+          className="rounded-lg border border-transparent bg-danger-tint p-4 text-sm text-danger"
         >
           {rootsQuery.error.message}
         </p>
@@ -332,7 +387,7 @@ export default function AdminOrganization({
   if (!enabled)
     return (
       <div className="p-8">
-        <section className="rounded-xl border border-line bg-card p-8">
+        <section className="rounded-xl border border-line-soft bg-card p-8">
           <Network className="text-blue" aria-hidden="true" />
           <h1 className="mt-4 text-lg font-semibold text-ink">Organization</h1>
           <p className="mt-2 text-sm text-ink-4">
@@ -344,13 +399,29 @@ export default function AdminOrganization({
       </div>
     );
 
-  const rootTotals = root ? full.get(root.id) : undefined;
-  const subtree = [...full.values()].filter(
-    (group) => root && within(group, root),
+  const rootTotals = activeRoots
+    .map((item) => full.get(item.id))
+    .filter((item): item is OrganizationGroup => !!item);
+  const subtree = [...full.values()].filter((group) =>
+    activeRoots.some((item) => within(group, item)),
   );
-  // Health checks cover the selected root group itself, not only its
-  // descendants: its own LiteLLM team can fail or near its budget too.
-  const checked = rootTotals ? [rootTotals, ...subtree] : subtree;
+  // Health checks cover the selected departments themselves, not only their
+  // descendants: their own LiteLLM teams can fail or near budget too.
+  const checked = [...rootTotals, ...subtree];
+  const spendKnown =
+    rootTotals.length === activeRoots.length &&
+    rootTotals.every((item) => item.group_spend != null);
+  const combinedSpend = spendKnown
+    ? rootTotals.reduce((sum, item) => sum + (item.group_spend ?? 0), 0)
+    : undefined;
+  const combinedTarget = activeRoots.every((item) => item.group_total != null)
+    ? activeRoots.reduce((sum, item) => sum + (item.group_total ?? 0), 0)
+    : null;
+  const combinedMembers = activeRoots.reduce(
+    (sum, item) => sum + item.members,
+    0,
+  );
+  const scopeName = activeRoots.map((item) => item.name).join(" + ");
   const near = checked.filter((group) =>
     reached(group.group_spend, group.group_total, NEAR),
   );
@@ -380,11 +451,11 @@ export default function AdminOrganization({
       : []),
     ...syncErrors.map((group) => ({
       key: `sync-${group.id}`,
-      tone: "bg-periwinkle",
+      tone: "bg-orange",
       title: `${group.name} policy not synced`,
       sub: group.sync_error ?? "",
       action: "View",
-      button: "bg-periwinkle-tint text-periwinkle-ink",
+      button: "bg-orange-tint text-orange-ink",
       onClick: () => select(group.id),
     })),
     // Budget warnings come last so they never push problems out of view.
@@ -399,11 +470,11 @@ export default function AdminOrganization({
       .sort((left, right) => right.used - left.used)
       .map(({ group, used }) => ({
         key: `budget-${group.id}`,
-        tone: "bg-sand",
+        tone: "bg-orange",
         title: `${group.name} at ${used}%`,
         sub: group.path.join(" › "),
         action: "Review",
-        button: "bg-sand-tint text-sand-ink",
+        button: "bg-orange-tint text-orange-ink",
         onClick: () => select(group.id),
       })),
   ];
@@ -419,23 +490,70 @@ export default function AdminOrganization({
     !totals.isError &&
     !issues.length &&
     !syncErrors.length;
-  const directChildren = groups.filter((group) => group.parent_id === root?.id);
+  // A single department splits by its children; several by department.
+  const directChildren = multi
+    ? activeRoots
+    : groups.filter((group) => group.parent_id === root?.id);
   const splitTotal = directChildren.reduce(
     (sum, group) => sum + (group.group_spend ?? 0),
     0,
   );
-  const rootLevel = root ? levels[root.level] : undefined;
+  const rootLevel = activeRoots[0] ? levels[activeRoots[0].level] : undefined;
   const childLevel = (group: Group) => levels[group.level + 1];
+  const splitLevel = multi ? rootLevel : root && childLevel(root);
+  const chainRoot = tableRoot ? ownerOf(tableRoot) : undefined;
   const tableChain: Group[] = [];
   for (
     let item: Group | undefined = tableRoot;
-    item && root && item.id !== root.id;
+    item && chainRoot && item.id !== chainRoot.id;
     item = item.parent_id ? byId.get(item.parent_id) : undefined
   )
     tableChain.unshift(item);
   const childCount = (group: Group) =>
     groups.filter((item) => item.parent_id === group.id).length;
-  const reportNode = selected ? selected.id : allGroupsReport ? "" : null;
+  // A single team without sub-teams has nothing to drill into.
+  const leafScope = !multi && !!root && !root.has_children;
+  // Every department selected reports on all groups; otherwise the selection.
+  const reportNodes = selected
+    ? [selected.id]
+    : allGroupsReport
+      ? allActive
+        ? []
+        : activeIds
+      : null;
+  // "All groups" only when several departments are combined; a single one
+  // (for example a team owner's own team) is named.
+  const reportScope = allActive && roots.length > 1 ? "all groups" : scopeName;
+  // Owners see their team's budget plan in place of the admin-only gateway.
+  const plannedRows =
+    budgets.data?.groups.filter((group) => activeIds.includes(group.id)) ?? [];
+  const planned =
+    plannedRows.length === activeRoots.length && plannedRows.length > 0
+      ? {
+          assigned: plannedRows.reduce((sum, group) => sum + group.assigned, 0),
+          allocated: plannedRows.every((group) => group.allocated != null)
+            ? plannedRows.reduce((sum, group) => sum + group.allocated!, 0)
+            : null,
+        }
+      : null;
+  const splitOut = planned?.allocated ?? null;
+  // A planned budget is the team's effective target.
+  const spendTarget = planned ? planned.assigned : combinedTarget;
+  const reportUsers = allActive
+    ? (rootsQuery.data?.total_users ?? 0)
+    : combinedMembers;
+  const reportToggle = (
+    <button
+      type="button"
+      ref={reportButton}
+      onClick={() => setAllGroupsReport((open) => !open)}
+      aria-label={`${allGroupsReport ? "Hide report" : "Usage report"}, ${reportScope}, ${plural(reportUsers, "user")}`}
+      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-blue-solid px-3.5 text-sm font-semibold text-paper hover:brightness-110"
+    >
+      <BarChart3 size={15} aria-hidden="true" />
+      {allGroupsReport ? "Hide report" : "Usage report"}
+    </button>
+  );
 
   return (
     <div className="flex flex-wrap content-start min-[1140px]:flex-nowrap">
@@ -471,27 +589,21 @@ export default function AdminOrganization({
             (group) => group.id === selected.id,
           )}
           revision={budgets.data?.revision}
-          onClose={() => {
-            setNodeId(null);
-            // The panel unmounts; put focus back where the user started.
-            requestAnimationFrame(() => {
-              if (opener.current?.isConnected) opener.current.focus();
-              opener.current = null;
-            });
-          }}
+          onClose={closeGroup}
           onSelect={select}
         />
       )}
       <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-[22px] px-4 py-7 sm:px-8">
+        <Breadcrumb trail={trail} onOpen={select} onClose={closeGroup} />
         <div className="flex flex-wrap items-end justify-between gap-3.5">
           <div>
-            <h1 className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-4">
+            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.02em] text-ink">
               Organization
             </h1>
-            <p className="mt-0.5 text-[28px] font-bold tracking-[-0.01em] text-ink">
+            <p className="mt-1 text-[15px] font-medium text-ink-2">
               {greeting(email)}
             </p>
-            <p className="mt-1 text-[15px] text-ink-3">
+            <p className="text-[15px] text-ink-4">
               {status.data && !status.data.ready
                 ? "The gateway is not ready."
                 : healthy
@@ -506,7 +618,7 @@ export default function AdminOrganization({
               {near.length > 0 && (
                 <>
                   {" "}
-                  <span className="font-semibold text-sand-ink">
+                  <span className="font-semibold text-orange-ink">
                     {plural(near.length, "group")}
                   </span>{" "}
                   {near.length === 1 ? "is" : "are"} at {NEAR}% or more of their
@@ -516,10 +628,23 @@ export default function AdminOrganization({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
+            {roots.length === 1 && rootLevel && (
+              // One team (a team owner's): name it where the picker would be.
+              <>
+                <span className="text-xs font-medium text-ink-4">
+                  {rootLevel}
+                </span>
+                <span className="flex rounded-[10px] bg-well p-1">
+                  <span className="flex min-h-9 items-center rounded-[7px] bg-segment px-3.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgb(0_0_0/0.12)]">
+                    {roots[0].name}
+                  </span>
+                </span>
+              </>
+            )}
             {roots.length > 1 && (
               <>
                 {rootLevel && (
-                  <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-4">
+                  <span className="text-xs font-medium text-ink-4">
                     {rootLevel}
                   </span>
                 )}
@@ -528,15 +653,33 @@ export default function AdminOrganization({
                   aria-label={rootLevel ?? "Organization root"}
                   className="flex flex-wrap gap-1 rounded-[10px] bg-well p-1"
                 >
-                  {roots.map((item) => (
+                  {[
+                    {
+                      id: "all",
+                      name: "All",
+                      pressed: allActive,
+                      onClick: () => chooseRoots(roots.map((item) => item.id)),
+                    },
+                    ...roots.map((item) => ({
+                      id: item.id,
+                      name: item.name,
+                      pressed: activeIds.includes(item.id),
+                      // From "All", a click narrows to that one; otherwise
+                      // clicks add or remove teams from the combination.
+                      onClick: () =>
+                        allActive
+                          ? chooseRoots([item.id])
+                          : toggleRoot(item.id),
+                    })),
+                  ].map((item) => (
                     <button
                       key={item.id}
                       type="button"
-                      aria-pressed={item.id === root?.id}
-                      onClick={() => chooseRoot(item.id)}
-                      className={`min-h-9 rounded-[7px] px-3.5 text-sm ${
-                        item.id === root?.id
-                          ? "bg-card font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                      aria-pressed={item.pressed}
+                      onClick={item.onClick}
+                      className={`min-h-9 rounded-[7px] px-3.5 text-sm font-medium transition-colors duration-150 ${
+                        item.pressed
+                          ? "bg-segment text-ink shadow-[0_1px_2px_rgb(0_0_0/0.12)]"
                           : "text-ink-3 hover:text-ink"
                       }`}
                     >
@@ -550,29 +693,30 @@ export default function AdminOrganization({
           </div>
         </div>
 
-        {root && (
-          <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        {activeRoots.length > 0 && (
+          <div className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line-soft bg-card sm:grid sm:grid-cols-2 sm:gap-3.5 sm:divide-y-0 sm:overflow-visible sm:rounded-none sm:border-0 sm:bg-transparent xl:grid-cols-4">
             <Metric
-              accent="border-t-teal"
               caption="Spend this period"
-              sub={`of ${root.group_total == null ? "no target" : shortMoney(root.group_total)} · ${root.name} + all sub-groups`}
-              bar={percent(rootTotals?.group_spend, root.group_total)}
+              sub={`of ${spendTarget == null ? "no target" : shortMoney(spendTarget)} · ${scopeName}${leafScope ? "" : " + all sub-groups"}`}
+              bar={percent(combinedSpend, spendTarget)}
             >
               {totals.isPending ? (
                 <span className="h-8 w-24 animate-pulse rounded bg-line-soft" />
               ) : (
-                shortMoney(rootTotals?.group_spend)
+                shortMoney(combinedSpend)
               )}
             </Metric>
             <Metric
-              accent="border-t-blue"
               caption="People"
-              sub={`across ${plural(subtree.length || childCount(root), "group")}`}
+              sub={
+                leafScope
+                  ? `in ${scopeName}`
+                  : `across ${plural(subtree.length || activeRoots.reduce((sum, item) => sum + childCount(item), 0), "group")}`
+              }
             >
-              {root.members.toLocaleString()}
+              {combinedMembers.toLocaleString()}
             </Metric>
             <Metric
-              accent="border-t-sand"
               caption="Near budget"
               sub={`groups at ${NEAR}% or more used`}
             >
@@ -580,7 +724,6 @@ export default function AdminOrganization({
             </Metric>
             {isAdmin && (
               <Metric
-                accent="border-t-mint"
                 caption="LiteLLM gateway"
                 sub={
                   status.data
@@ -596,7 +739,7 @@ export default function AdminOrganization({
                     !status.data
                       ? "bg-ink-5"
                       : status.data.ready
-                        ? "bg-mint"
+                        ? "bg-green"
                         : "bg-danger"
                   }`}
                 />
@@ -607,27 +750,47 @@ export default function AdminOrganization({
                   : "—"}
               </Metric>
             )}
+            {!isAdmin && (
+              <Metric
+                caption="Team budget"
+                sub={
+                  planned
+                    ? splitOut == null
+                      ? "Allocation needs repair"
+                      : `${shortMoney(splitOut)} split out · ${shortMoney(planned.assigned - splitOut)} left`
+                    : root?.per_user != null
+                      ? `${shortMoney(root.per_user)} per person`
+                      : "No per-person limit"
+                }
+              >
+                {planned
+                  ? shortMoney(planned.assigned)
+                  : combinedTarget == null
+                    ? "No target"
+                    : shortMoney(combinedTarget)}
+              </Metric>
+            )}
           </div>
         )}
 
         <div className="flex flex-wrap gap-4">
-          {root && directChildren.length > 0 && (
+          {activeRoots.length > 0 && directChildren.length > 0 && (
             <section
               aria-label="Spend split"
-              className="flex min-w-0 flex-[999_1_420px] flex-col gap-3.5 rounded-xl border border-line bg-card px-5 py-[18px]"
+              className="flex min-w-0 flex-[999_1_420px] flex-col gap-3.5 rounded-xl border border-line-soft bg-card px-5 py-[18px]"
             >
               <div className="flex flex-wrap justify-between gap-2 text-sm">
                 <span className="font-semibold text-ink">
-                  Where {root.name}’s budget goes{" "}
+                  Where {scopeName}’s budget goes{" "}
                   <span className="font-normal text-ink-4">
-                    · by {childLevel(root)?.toLowerCase() ?? "group"}, incl.
+                    · by {splitLevel?.toLowerCase() ?? "group"}, incl.
                     sub-groups
                   </span>
                 </span>
                 <span className="text-ink-4">
                   {totals.isPending
                     ? "Loading…"
-                    : `${shortMoney(rootTotals?.group_spend)} spent`}
+                    : `${shortMoney(combinedSpend)} spent`}
                 </span>
               </div>
               {totals.isPending ? (
@@ -635,7 +798,7 @@ export default function AdminOrganization({
               ) : splitTotal > 0 ? (
                 <div
                   role="img"
-                  aria-label={`Spend split across ${plural(directChildren.length, childLevel(root) ?? "group")}`}
+                  aria-label={`Spend split across ${plural(directChildren.length, splitLevel ?? "group")}`}
                   className="flex h-3.5 gap-0.5 overflow-hidden rounded-[7px]"
                 >
                   {directChildren
@@ -673,7 +836,7 @@ export default function AdminOrganization({
 
           <section
             aria-label="Needs attention"
-            className="flex flex-[1_1_300px] flex-col rounded-xl border border-line bg-card px-5 py-4"
+            className="flex flex-[1_1_300px] flex-col rounded-xl border border-line-soft bg-card px-5 py-4"
           >
             <h2 className="mb-1.5 text-sm font-semibold text-ink">
               Needs attention
@@ -734,7 +897,7 @@ export default function AdminOrganization({
             messageKey={issues
               .map((issue) => `${issue.user_id}:${issue.error}`)
               .join("|")}
-            className="rounded-xl border border-sand/40 bg-sand-tint p-4 text-sm text-sand-ink"
+            className="rounded-xl border border-transparent bg-orange-tint p-4 text-sm text-orange-ink"
           >
             <p className="font-medium">Some memberships need attention</p>
             <ul className="mt-2 space-y-1">
@@ -747,31 +910,57 @@ export default function AdminOrganization({
           </DismissibleMessage>
         )}
 
-        {tableRoot && (
+        {leafScope && (
+          // A team of people starts on its people, for quick budget edits.
+          <PeopleTable
+            standalone
+            nodeIds={[root.id]}
+            title={`People in ${root.name}`}
+            totalUsers={root.members}
+            budgets={budgets.data}
+            actions={
+              <>
+                <button
+                  type="button"
+                  aria-pressed={nodeId === root.id}
+                  onClick={() => select(root.id)}
+                  className="min-h-10 rounded-lg bg-ink/[0.06] px-3 text-sm text-ink hover:bg-ink/10"
+                >
+                  Team details
+                </button>
+                {!selected && reportToggle}
+              </>
+            }
+          />
+        )}
+
+        {activeRoots.length > 0 && !leafScope && (
           <section
             aria-label="Groups"
-            className="overflow-hidden rounded-xl border border-line bg-card"
+            className="overflow-hidden rounded-xl border border-line-soft bg-card"
           >
             <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line px-5 py-3.5">
               <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-base font-bold text-ink">
-                  Groups in {tableRoot.name}
+                <h2 className="text-base font-semibold text-ink">
+                  Groups in {tableRoot ? tableRoot.name : scopeName}
                 </h2>
-                <button
-                  type="button"
-                  aria-pressed={nodeId === tableRoot.id}
-                  aria-label={`${tableRoot.name}, ${plural(tableRoot.members, "user")}`}
-                  onClick={() => select(tableRoot.id)}
-                  className="min-h-8 rounded-lg px-2 text-[13px] font-semibold text-blue-ink hover:bg-blue-tint"
-                >
-                  Open {tableRoot.name}
-                </button>
+                {tableRoot && (
+                  <button
+                    type="button"
+                    aria-pressed={nodeId === tableRoot.id}
+                    aria-label={`${tableRoot.name}, ${plural(tableRoot.members, "user")}`}
+                    onClick={() => select(tableRoot.id)}
+                    className="min-h-8 rounded-lg px-2 text-[13px] font-semibold text-blue-ink hover:bg-blue-tint"
+                  >
+                    Open {tableRoot.name}
+                  </button>
+                )}
                 <nav
                   aria-label={tableChain.length ? "Table path" : "Levels"}
                   className="inline-flex flex-wrap items-center gap-1.5 text-xs text-ink-3"
                 >
                   {tableChain.length
-                    ? [root!, ...tableChain].map((item, index, all) => (
+                    ? [chainRoot!, ...tableChain].map((item, index, all) => (
                         <span key={item.id} className="inline-flex gap-1.5">
                           {index > 0 && <span aria-hidden="true">›</span>}
                           {index < all.length - 1 ? (
@@ -779,7 +968,7 @@ export default function AdminOrganization({
                               type="button"
                               onClick={() =>
                                 setTableChoice(
-                                  item.id === root!.id ? null : item.id,
+                                  item.id === chainRoot!.id ? null : item.id,
                                 )
                               }
                               className="rounded-md bg-line-soft px-2 py-[3px] text-blue-ink hover:underline"
@@ -796,7 +985,7 @@ export default function AdminOrganization({
                           )}
                         </span>
                       ))
-                    : levels.slice(tableRoot.level).map((level, index) => (
+                    : levels.slice(baseLevel + 1).map((level, index) => (
                         <span key={level} className="inline-flex gap-1.5">
                           {index > 0 && <span aria-hidden="true">›</span>}
                           <span className="rounded-md bg-line-soft px-2 py-[3px]">
@@ -813,27 +1002,16 @@ export default function AdminOrganization({
                     if (expandAll) setExpanded(new Set());
                     setExpandAll((value) => !value);
                   }}
-                  className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas"
+                  className="min-h-10 rounded-lg bg-ink/[0.06] px-3 text-sm text-ink hover:bg-ink/10"
                 >
                   {expandAll ? "Collapse all" : "Expand all"}
                 </button>
-                {!selected && (
-                  <button
-                    type="button"
-                    onClick={() => setAllGroupsReport(true)}
-                    aria-label={`Usage report, all groups, ${plural(rootsQuery.data?.total_users ?? 0, "user")}`}
-                    aria-pressed={allGroupsReport}
-                    className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-90"
-                  >
-                    <BarChart3 size={15} aria-hidden="true" />
-                    Usage report
-                  </button>
-                )}
+                {!selected && reportToggle}
               </div>
             </div>
             <div className="overflow-x-auto">
               <div
-                className={`${columns} border-b border-line-soft bg-canvas px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-ink-4`}
+                className={`${columns} border-b border-line-soft px-5 py-2.5 text-xs font-medium text-ink-4`}
               >
                 <span>Group</span>
                 <span>People</span>
@@ -858,9 +1036,7 @@ export default function AdminOrganization({
                       role="listitem"
                       key={group.id}
                       className={`relative ${columns} border-b border-line-soft px-5 py-[11px] text-sm text-ink ${
-                        active
-                          ? "bg-blue-tint/60 shadow-[inset_3px_0_0_rgb(var(--blue))]"
-                          : "hover:bg-canvas/70"
+                        active ? "bg-blue-tint" : "hover:bg-ink/[0.03]"
                       }`}
                     >
                       <button
@@ -882,7 +1058,7 @@ export default function AdminOrganization({
                             aria-expanded={open}
                             aria-label={`${open ? "Collapse" : "Expand"} ${group.path.join(" → ")}`}
                             onClick={() => toggle(group)}
-                            className="pointer-events-auto relative z-10 -ml-1.5 inline-flex h-7 w-7 items-center justify-center rounded text-sm text-ink-3 hover:bg-well"
+                            className="pointer-events-auto relative z-10 -ml-1.5 inline-flex h-7 w-7 items-center justify-center rounded text-sm text-ink-3 hover:bg-ink/[0.06]"
                           >
                             <span aria-hidden="true">{open ? "▾" : "▸"}</span>
                           </button>
@@ -891,10 +1067,10 @@ export default function AdminOrganization({
                         )}
                         <span
                           aria-hidden="true"
-                          className={`inline-flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] text-[11px] font-bold ${
+                          className={`inline-flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] text-xs font-semibold ${
                             depth(group) === 0
                               ? `${color.tint} ${color.ink}`
-                              : `bg-canvas ${color.ink}`
+                              : `bg-well ${color.ink}`
                           }`}
                         >
                           {groupInitials(group.name)}
@@ -940,7 +1116,7 @@ export default function AdminOrganization({
                               </span>
                               {used != null && (
                                 <span
-                                  className={`font-semibold ${used >= NEAR ? "text-sand-ink" : "text-ink-3"}`}
+                                  className={`font-semibold ${used >= NEAR ? "text-orange-ink" : "text-ink-3"}`}
                                 >
                                   {used}%
                                 </span>
@@ -997,24 +1173,51 @@ export default function AdminOrganization({
                   Spend totals are unavailable: {totals.error.message}
                 </p>
               )}
-              <p className="px-5 pb-3 pt-2.5 text-[13px] text-ink-4">
-                Sub-groups load when you open them
-                {levels.length - tableRoot.level - 1 > MAX_DEPTH
-                  ? " · deeper levels open in their own view"
-                  : ""}
-              </p>
+              {levels.length - baseLevel - 2 > MAX_DEPTH && (
+                <p className="px-5 pb-3 pt-2.5 text-[13px] text-ink-4">
+                  Deeper levels open in their own view
+                </p>
+              )}
             </div>
           </section>
         )}
 
-        {reportNode !== null && (
+        {selected && !leafScope && (
+          // A chosen team shows everyone in it, sub-teams included.
+          <PeopleTable
+            standalone
+            // Distinct from the report's key, which can be the same group id.
+            key={`people-${selected.id}`}
+            nodeIds={[selected.id]}
+            title={`People in ${selected.name}`}
+            totalUsers={selected.members}
+            budgets={budgets.data}
+          />
+        )}
+
+        {reportNodes !== null && (
           <OrgReport
-            key={reportNode}
-            nodeId={reportNode}
-            selected={selected}
-            nextLevel={selected ? childLevel(selected) : levels[0]}
-            totalUsers={rootsQuery.data?.total_users}
+            key={reportNodes.join(",") || "all"}
+            nodeIds={reportNodes}
+            title={selected?.name ?? reportScope}
+            selected={selected ?? (leafScope ? root : undefined)}
+            nextLevel={
+              selected
+                ? childLevel(selected)
+                : multi || allActive
+                  ? rootLevel
+                  : root && childLevel(root)
+            }
+            totalUsers={reportUsers}
             onSelectChild={select}
+            hidePeople={!!selected || leafScope}
+            onClose={
+              selected
+                ? closeGroup
+                : allGroupsReport
+                  ? closeAllGroupsReport
+                  : undefined
+            }
           />
         )}
       </div>

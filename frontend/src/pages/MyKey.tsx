@@ -1,5 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { KeyRound, Plus, RefreshCw, RotateCcw } from "lucide-react";
+import {
+  ArrowUpRight,
+  KeyRound,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+} from "lucide-react";
 import PersonalKeySecret from "../components/PersonalKeySecret";
 import DismissibleMessage from "../components/DismissibleMessage";
 import { keyToken } from "../components/BulkKeyEditor";
@@ -12,6 +18,7 @@ import {
   type BudgetSummary,
 } from "../keyBudget";
 import type { KeyInfo } from "../types";
+import { buttonPrimary, buttonSecondary } from "../components/ui";
 
 export function keyAccessStatus(key: KeyInfo) {
   if (key.blocked) return "Blocked";
@@ -32,7 +39,7 @@ export function keyAccessStatus(key: KeyInfo) {
 const shortDate = (date: Date) =>
   date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
-const card = "rounded-2xl border border-line bg-card";
+const card = "rounded-2xl border border-line-soft bg-card";
 
 /** LiteLLM's masked `key_name` (e.g. `sk-...7f3a`) with a longer mask. */
 export function maskedKey(key: KeyInfo) {
@@ -50,8 +57,8 @@ function BudgetRing({ summary }: { summary: BudgetSummary }) {
     remaining <= 0.1
       ? "rgb(var(--danger))"
       : remaining <= 0.25
-        ? "rgb(var(--sand))"
-        : "rgb(var(--teal))";
+        ? "rgb(var(--orange))"
+        : "rgb(var(--blue))";
   const percent = Math.round(remaining * 100);
   return (
     <div className="relative h-[200px] w-[200px]">
@@ -71,8 +78,8 @@ function BudgetRing({ summary }: { summary: BudgetSummary }) {
           cy="100"
           r={radius}
           fill="none"
-          stroke="rgb(var(--line))"
-          strokeWidth="12"
+          stroke="rgb(var(--well))"
+          strokeWidth="14"
         />
         {summary.available && summary.budget != null && remaining > 0 && (
           <circle
@@ -81,7 +88,7 @@ function BudgetRing({ summary }: { summary: BudgetSummary }) {
             r={radius}
             fill="none"
             stroke={color}
-            strokeWidth="12"
+            strokeWidth="14"
             strokeLinecap="round"
             strokeDasharray={`${remaining * circumference} ${circumference}`}
             transform="rotate(-90 100 100)"
@@ -92,7 +99,7 @@ function BudgetRing({ summary }: { summary: BudgetSummary }) {
         {summary.available ? (
           <>
             <span className="text-[13px] text-ink-4">left to spend</span>
-            <span className="text-[38px] font-semibold tracking-[-0.02em] text-ink">
+            <span className="text-[38px] font-semibold tabular-nums tracking-[-0.02em] text-ink">
               {formatUsd(summary.left ?? 0)}
             </span>
             <span className="text-[13px] text-ink-4">
@@ -113,7 +120,9 @@ function BudgetRing({ summary }: { summary: BudgetSummary }) {
 function Stat({ value, label }: { value: ReactNode; label: string }) {
   return (
     <div>
-      <p className="mb-0.5 text-lg font-semibold text-ink">{value}</p>
+      <p className="mb-0.5 text-lg font-semibold tabular-nums text-ink">
+        {value}
+      </p>
       {label}
     </div>
   );
@@ -138,7 +147,7 @@ export function BudgetCard({ keyInfo }: { keyInfo: KeyInfo }) {
       {unlimited ? (
         <div className="flex flex-col items-center gap-1 py-6 text-center">
           <span className="text-[13px] text-ink-4">spent so far</span>
-          <span className="text-[38px] font-semibold tracking-[-0.02em] text-ink">
+          <span className="text-[38px] font-semibold tabular-nums tracking-[-0.02em] text-ink">
             {formatUsd(summary.spent)}
           </span>
           <span className="text-[13px] text-ink-4">No budget limit</span>
@@ -147,8 +156,8 @@ export function BudgetCard({ keyInfo }: { keyInfo: KeyInfo }) {
         <BudgetRing summary={summary} />
       )}
       {refill && summary.available && (
-        <p className="inline-flex items-center gap-2 rounded-full bg-teal-tint px-4 py-[7px] text-sm font-semibold text-teal-ink">
-          <RotateCcw size={15} aria-hidden="true" />
+        <p className="inline-flex items-center gap-2 rounded-full bg-well px-3.5 py-1.5 text-[13px] font-medium text-ink-3">
+          <RotateCcw size={14} aria-hidden="true" />
           {refill}
         </p>
       )}
@@ -172,7 +181,7 @@ export function BudgetCard({ keyInfo }: { keyInfo: KeyInfo }) {
             ) : summary.onTrack ? (
               "On track"
             ) : (
-              <span className="text-sand-ink">Over pace</span>
+              <span className="text-orange-ink">Over pace</span>
             )
           }
           label="at this pace"
@@ -183,7 +192,7 @@ export function BudgetCard({ keyInfo }: { keyInfo: KeyInfo }) {
 }
 
 const bigButton =
-  "flex min-h-[58px] w-full items-center justify-center gap-3 rounded-xl bg-blue px-6 py-4 text-[17px] font-semibold text-paper shadow-[0_1px_2px_rgba(22,27,34,0.12)] hover:brightness-90 disabled:opacity-50";
+  "flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl bg-blue-solid px-6 py-3.5 text-[17px] font-semibold text-paper transition-[filter] duration-150 hover:brightness-110 active:brightness-95 disabled:opacity-40";
 
 export function KeyCard({
   keyInfo,
@@ -201,10 +210,10 @@ export function KeyCard({
 }) {
   return (
     <section aria-label="Key" className={`${card} flex flex-col gap-4 p-6`}>
-      <h2 className="text-[13px] font-semibold uppercase tracking-[0.05em] text-ink-4">
+      <h2 className="text-[15px] font-semibold text-ink">
         Your API key
         {keyInfo.key_alias && (
-          <span className="ml-2 font-mono font-normal normal-case tracking-normal">
+          <span className="ml-2 font-mono text-[13px] font-normal text-ink-4">
             {keyInfo.key_alias}
           </span>
         )}
@@ -221,7 +230,7 @@ export function KeyCard({
         <DismissibleMessage
           role="alert"
           messageKey={keyInfo.policy_error}
-          className="rounded-lg border border-sand/40 bg-sand-tint px-4 py-3 text-sm text-sand-ink"
+          className="rounded-xl bg-orange-tint px-4 py-3 text-sm text-orange-ink"
         >
           {keyInfo.policy_error}
         </DismissibleMessage>
@@ -229,7 +238,7 @@ export function KeyCard({
       {keyInfo.policy_notice && (
         <DismissibleMessage
           messageKey={keyInfo.policy_notice}
-          className="rounded-lg border border-cyan/30 bg-cyan-tint px-4 py-3 text-sm text-cyan-ink"
+          className="rounded-xl bg-blue-tint px-4 py-3 text-sm text-blue-ink"
         >
           {keyInfo.policy_notice}
         </DismissibleMessage>
@@ -253,7 +262,7 @@ export function RegenerateButton({
         disabled={paused}
         className={bigButton}
       >
-        <RefreshCw size={20} strokeWidth={2.2} aria-hidden="true" />
+        <RefreshCw size={19} strokeWidth={2.2} aria-hidden="true" />
         {paused ? "Regeneration paused" : "Regenerate key"}
       </button>
       <p className="-mt-1 text-center text-[13px] text-ink-4">
@@ -278,7 +287,7 @@ export function RegenerateConfirm({
     <div
       role="group"
       aria-label="Confirm key replacement"
-      className="rounded-xl border border-sand/40 bg-sand-tint p-5"
+      className="rounded-xl bg-orange-tint p-5"
     >
       <p className="text-sm font-semibold text-ink">Replace the current key?</p>
       <p className="mt-1 text-sm text-ink-3">
@@ -290,7 +299,7 @@ export function RegenerateConfirm({
           type="button"
           onClick={onConfirm}
           disabled={pending || paused}
-          className="min-h-11 rounded-lg bg-blue px-4 text-sm font-semibold text-paper hover:brightness-90 disabled:opacity-50"
+          className={buttonPrimary}
         >
           {pending
             ? "Replacing..."
@@ -298,11 +307,7 @@ export function RegenerateConfirm({
               ? "Temporarily paused"
               : "Replace key"}
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="min-h-11 rounded-lg border border-line-input bg-card px-4 text-sm text-ink-2 hover:bg-canvas"
-        >
+        <button type="button" onClick={onCancel} className={buttonSecondary}>
           Cancel
         </button>
       </div>
@@ -325,7 +330,7 @@ export function CreateKeyCard({
   return (
     <section
       aria-label="Create key"
-      className="flex flex-col items-center gap-3.5 rounded-xl border border-blue/25 bg-card px-8 py-11 text-center"
+      className="flex flex-col items-center gap-3 rounded-2xl border border-line-soft bg-card px-8 py-12 text-center"
     >
       <span
         aria-hidden="true"
@@ -333,17 +338,17 @@ export function CreateKeyCard({
       >
         <KeyRound size={28} />
       </span>
-      <h2 className="text-2xl font-bold text-ink">
+      <h2 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">
         You don’t have an API key yet
       </h2>
-      <p className="max-w-[460px] text-[15px] leading-normal text-ink-3">
+      <p className="max-w-[460px] text-[15px] leading-normal text-ink-4">
         Create one to start sending requests through the gateway.
       </p>
       <button
         type="button"
         onClick={onCreate}
         disabled={pending || paused}
-        className="mt-2 inline-flex min-h-[58px] items-center gap-2.5 rounded-xl bg-blue px-9 py-4 text-lg font-semibold text-paper shadow-[0_1px_2px_rgba(22,27,34,0.12)] hover:brightness-90 disabled:opacity-50"
+        className="mt-3 inline-flex min-h-[52px] items-center gap-2.5 rounded-xl bg-blue-solid px-8 py-3.5 text-[17px] font-semibold text-paper transition-[filter] duration-150 hover:brightness-110 active:brightness-95 disabled:opacity-40"
       >
         <Plus size={20} strokeWidth={2.4} aria-hidden="true" />
         {pending
@@ -362,11 +367,11 @@ export function CreateKeyCard({
 }
 
 const statusTone: Record<string, { label: string; dot: string }> = {
-  Ready: { label: "Active", dot: "bg-ready" },
-  "No key": { label: "No key yet", dot: "bg-navy-muted" },
+  Ready: { label: "Active", dot: "bg-green" },
+  "No key": { label: "No key yet", dot: "bg-ink-5" },
   Blocked: { label: "Blocked", dot: "bg-danger" },
   Expired: { label: "Expired", dot: "bg-danger" },
-  "Budget reached": { label: "Budget reached", dot: "bg-sand" },
+  "Budget reached": { label: "Budget reached", dot: "bg-orange" },
 };
 
 export function StatusCard({
@@ -376,7 +381,7 @@ export function StatusCard({
   keyInfo?: KeyInfo;
   status: string;
 }) {
-  const tone = statusTone[status] ?? { label: status, dot: "bg-sand" };
+  const tone = statusTone[status] ?? { label: status, dot: "bg-orange" };
   const path = keyInfo?.organization_path?.filter(Boolean) ?? [];
   const team = path.length ? path[path.length - 1] : keyInfo?.team_id;
   const summary = keyInfo ? budgetSummary(keyInfo) : null;
@@ -385,41 +390,43 @@ export function StatusCard({
       ? Math.min(100, Math.round((summary.spent / summary.budget) * 100))
       : null;
   return (
-    <div className="flex flex-col gap-[18px] rounded-2xl bg-navy p-[22px] text-paper">
-      <span className="flex items-center justify-between text-[13px] text-navy-text">
-        <span>Status</span>
-        <span className="inline-flex items-center gap-[7px] rounded-full bg-navy-2 px-3 py-1 font-semibold text-paper">
+    <div className={`${card} divide-y divide-line-soft px-5 py-1 text-sm`}>
+      <div className="flex items-center justify-between gap-3 py-3">
+        <span className="text-ink-4">Status</span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-well px-2.5 py-1 text-[13px] font-medium text-ink">
           <span className={`h-2 w-2 rounded-full ${tone.dot}`} />
           {tone.label}
         </span>
-      </span>
+      </div>
       {/* "Needs attention" and "Updating" have their own messages, so they
           never show a second one; "Ready" and "No key" need none. */}
       {!["Ready", "No key", "Needs attention", "Updating"].includes(status) && (
-        <p className="-mt-2 text-[13px] text-navy-text">
+        <p className="py-3 text-[13px] text-ink-4">
           Key status: {tone.label}. Contact an administrator if you need help.
         </p>
       )}
       {team && (
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.05em] text-navy-muted">
-            Team
-          </p>
-          <p className="mt-1 break-words text-[22px] font-semibold">{team}</p>
-          <p className="mt-0.5 break-words text-[13px] text-navy-text">
-            Assigned through {path.length ? path.join(" › ") : team}
-          </p>
+        <div className="flex items-baseline gap-3 py-3">
+          <span className="shrink-0 text-ink-4">Team</span>
+          <span className="min-w-0 flex-1 text-right">
+            <span className="block break-words font-medium text-ink">
+              {team}
+            </span>
+            <span className="mt-0.5 block break-words text-[13px] text-ink-4">
+              Assigned through {path.length ? path.join(" › ") : team}
+            </span>
+          </span>
         </div>
       )}
       {used != null && (
-        <div className="flex flex-col gap-2">
-          <span className="block h-1.5 rounded-[3px] bg-navy-3">
+        <div className="flex flex-col gap-2 py-3.5">
+          <span className="block h-1.5 rounded-full bg-well">
             <span
-              className="block h-1.5 rounded-[3px] bg-ice"
+              className="block h-1.5 rounded-full bg-blue"
               style={{ width: `${used}%` }}
             />
           </span>
-          <span className="flex justify-between text-[13px] text-navy-text">
+          <span className="flex justify-between text-[13px] text-ink-4">
             <span>{used}% of budget used</span>
             {summary?.resetAt && <span>{shortDate(summary.resetAt)}</span>}
           </span>
@@ -443,7 +450,12 @@ export function DetailsCard({ keys }: { keys: KeyInfo[] }) {
       models == null ? (
         "All models"
       ) : models.length <= 3 ? (
-        models.join(", ")
+        models.map((model, index) => (
+          <span key={model}>
+            <span className="whitespace-nowrap">{model}</span>
+            {index < models.length - 1 ? ", " : ""}
+          </span>
+        ))
       ) : (
         <button
           type="button"
@@ -470,20 +482,12 @@ export function DetailsCard({ keys }: { keys: KeyInfo[] }) {
   }
   if (!rows.length) return null;
   return (
-    <div className="rounded-2xl border border-line bg-card px-5 py-1.5 text-sm">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3">
-        {rows.map(([label, value], index) => (
-          <div key={label} className="contents">
-            <dt
-              className={`py-3 text-ink-4 ${index < rows.length - 1 ? "border-b border-line-soft" : ""}`}
-            >
-              {label}
-            </dt>
-            <dd
-              className={`py-3 text-right text-ink ${index < rows.length - 1 ? "border-b border-line-soft" : ""}`}
-            >
-              {value}
-            </dd>
+    <div className={`${card} px-5 py-1 text-sm`}>
+      <dl className="divide-y divide-line-soft">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-baseline gap-3 py-3">
+            <dt className="shrink-0 text-ink-4">{label}</dt>
+            <dd className="min-w-0 flex-1 text-right text-ink">{value}</dd>
           </div>
         ))}
       </dl>
@@ -496,7 +500,7 @@ export function DetailsCard({ keys }: { keys: KeyInfo[] }) {
           {models.map((model) => (
             <li
               key={model}
-              className="rounded-md bg-canvas px-2 py-1 font-mono text-xs text-ink-2"
+              className="rounded-md bg-well px-2 py-1 font-mono text-xs text-ink-2"
             >
               {model}
             </li>
@@ -514,18 +518,18 @@ export function LinkCard({
 }) {
   if (!links.length) return null;
   return (
-    <div className="flex flex-col rounded-2xl border border-line bg-card px-5 py-1.5 text-sm">
+    <div className={`${card} flex flex-col px-5 py-1 text-sm`}>
       {links.map((link, index) => (
         <a
           key={link.href}
           href={link.href}
           target="_blank"
           rel="noreferrer"
-          className={`flex min-h-11 items-center justify-between py-2 font-medium text-blue-ink no-underline hover:underline ${
+          className={`flex min-h-11 items-center justify-between py-2 text-blue-ink no-underline hover:underline ${
             index < links.length - 1 ? "border-b border-line-soft" : ""
           }`}
         >
-          {link.label} <span aria-hidden="true">↗</span>
+          {link.label} <ArrowUpRight size={15} aria-hidden="true" />
         </a>
       ))}
     </div>

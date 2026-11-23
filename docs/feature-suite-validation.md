@@ -139,7 +139,7 @@ The pull request diff is the complete inventory. The main areas for review are:
 - Frontend behavior: [email display](../frontend/src/components/EmailAddress.tsx),
   [People directory](../frontend/src/components/PeopleDirectory.tsx),
   [personal analytics](../frontend/src/components/PersonalAnalytics.tsx),
-  [budget management](../frontend/src/components/BudgetManager.tsx), and their
+  [budget editing](../frontend/src/components/organization/PeopleTable.tsx), and their
   API/types, navigation, unit tests and browser fixtures.
 - Deployment and configuration: [environment example](../.env.example),
   [Docker/Compose](../deploy/docker-compose), [Helm chart](../deploy/helm/litegate),
