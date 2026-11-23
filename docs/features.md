@@ -85,8 +85,7 @@ sidebar grouped into **Workspace** (My key, and Analytics when enabled),
 **Manage** (Organization, Teams, Keys, People) and **System** (Audit log,
 Status); ordinary users get a top bar. On phones the sidebar becomes a scrolling row at the top.
 **Audit log** opens the audit table on the Status page. The sign-in page shows
-the logo and custom login text in a navy panel beside the sign-in form; on
-phones the panel sits above the form.
+the logo and custom login text above the sign-in form in one centred column.
 
 The administrator-only **People** page is useful for contractor access, SSO
 outages or migrations, break-glass administration, and role testing. It supports

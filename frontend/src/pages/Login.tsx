@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import LogoMark from "../components/LogoMark";
 import ThemeToggle from "../components/ThemeToggle";
 import { useAuth } from "../hooks/useAuth";
 import { buttonPrimary, fieldInput, fieldLabel } from "../components/ui";
@@ -74,14 +75,17 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas lg:flex-row">
-      <section
-        aria-label="LiteGate"
-        className="flex flex-col justify-between gap-6 bg-navy px-6 py-8 text-paper sm:px-10 lg:w-[44%] lg:max-w-[560px] lg:px-14 lg:py-14"
-      >
-        <div className="flex flex-col gap-6 lg:gap-10">
+    <div className="relative flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-12">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+      <main className="flex w-full max-w-[360px] flex-col items-center gap-7">
+        <section
+          aria-label="LiteGate"
+          className="flex flex-col items-center gap-4 text-center"
+        >
           {cfg?.logo_url ? (
-            <span className="inline-flex h-14 items-center self-start rounded-xl bg-paper px-3">
+            <span className="inline-flex h-14 items-center rounded-2xl bg-paper px-3 shadow-[0_1px_3px_rgb(0_0_0/0.1)] ring-1 ring-line-soft">
               <img
                 src={cfg.logo_url}
                 alt="Organization logo"
@@ -89,58 +93,36 @@ export default function Login() {
               />
             </span>
           ) : (
-            <span
-              aria-hidden="true"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-ice text-navy"
-            >
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-            </span>
+            <LogoMark
+              size={64}
+              className="rounded-[15px] shadow-[0_4px_12px_rgb(0_0_0/0.12),0_1px_2px_rgb(0_0_0/0.08)]"
+            />
           )}
           <div>
-            <h1 className="text-[28px] font-bold tracking-[-0.01em] lg:text-4xl">
+            <h1 className="text-[28px] font-bold tracking-[-0.02em] text-ink">
               LiteGate
             </h1>
-            <p className="mt-2 max-w-md whitespace-pre-line break-words text-[15px] leading-relaxed text-navy-text">
+            <p className="mt-1 max-w-sm whitespace-pre-line break-words text-[15px] leading-snug text-ink-4">
               {cfg?.login_text?.trim()
                 ? cfg.login_text
                 : "Sign in to your LiteLLM access portal"}
             </p>
           </div>
-        </div>
-        <p className="hidden text-[13px] text-navy-muted lg:block">
-          Access is granted through your organization
-        </p>
-      </section>
-
-      <main className="relative flex flex-1 items-center justify-center px-4 py-10 sm:px-8">
-        <div className="absolute right-4 top-4 rounded-lg border border-line bg-card">
-          <ThemeToggle />
-        </div>
-        <div className="flex w-full max-w-[380px] flex-col gap-5 rounded-2xl border border-line bg-card p-7 sm:p-9">
-          <h2 className="text-xl font-bold text-ink">Sign in</h2>
+        </section>
+        <div className="flex w-full flex-col gap-4 rounded-2xl border border-line-soft bg-card p-6 shadow-[0_1px_3px_rgb(0_0_0/0.04)]">
+          <h2 className="text-[17px] font-semibold text-ink">Sign in</h2>
 
           {isLoading && (
             <div className="h-11 w-full animate-pulse rounded-lg bg-well" />
           )}
 
           {isError && (
-            <div className="rounded-lg border border-danger-line bg-danger-tint p-3 text-sm text-danger">
+            <div className="rounded-xl bg-danger-tint px-3.5 py-3 text-sm text-danger">
               <p>Sign-in configuration is temporarily unavailable.</p>
               <button
                 type="button"
                 onClick={() => void refetch()}
-                className="mt-2 font-semibold underline underline-offset-2"
+                className="mt-1.5 font-medium underline underline-offset-2"
               >
                 Try again
               </button>
@@ -158,9 +140,9 @@ export default function Login() {
 
           {showDivider && (
             <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-line" />
-              <span className="text-xs text-ink-4">or</span>
-              <div className="h-px flex-1 bg-line" />
+              <div className="h-px flex-1 bg-line-soft" />
+              <span className="text-[13px] text-ink-4">or</span>
+              <div className="h-px flex-1 bg-line-soft" />
             </div>
           )}
 
@@ -205,11 +187,10 @@ export default function Login() {
               </button>
             </form>
           )}
-
-          <p className="text-center text-xs text-ink-4 lg:hidden">
-            Access is granted through your organization
-          </p>
         </div>
+        <p className="text-center text-[13px] text-ink-4">
+          Access is granted through your organization
+        </p>
       </main>
     </div>
   );

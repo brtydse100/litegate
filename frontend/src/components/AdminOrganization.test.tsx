@@ -289,6 +289,26 @@ describe("organization dashboard contracts", () => {
     ).toBeVisible();
   });
 
+  it("narrows to one department when one is clicked after All", async () => {
+    renderOrganization();
+    fireEvent.click(await screen.findByRole("button", { name: "All" }));
+    expect(
+      await screen.findByRole("button", { name: "Engineering", pressed: true }),
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Marketing", pressed: true }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Marketing", pressed: true }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Engineering", pressed: false }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "All", pressed: false }),
+    ).toBeVisible();
+  });
+
   it("refreshes All groups reports without requesting a group with an empty ID", async () => {
     renderOrganization();
     fireEvent.click(await screen.findByRole("button", { name: "All" }));

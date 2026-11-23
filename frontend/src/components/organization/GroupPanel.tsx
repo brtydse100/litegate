@@ -134,7 +134,7 @@ export default function GroupPanel({
           <div className="flex items-center gap-3">
             <span
               aria-hidden="true"
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-[10px] font-bold ${hue.tint} ${hue.ink}`}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-[10px] font-semibold ${hue.tint} ${hue.ink}`}
             >
               {groupInitials(group.name)}
             </span>
@@ -142,7 +142,7 @@ export default function GroupPanel({
               <h2
                 ref={heading}
                 tabIndex={-1}
-                className="text-lg font-bold text-ink outline-none"
+                className="text-lg font-semibold text-ink outline-none"
               >
                 {group.name}
               </h2>
@@ -163,7 +163,7 @@ export default function GroupPanel({
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-4 hover:bg-canvas"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-4 hover:bg-ink/[0.06]"
           >
             <X size={16} />
           </button>
@@ -184,7 +184,7 @@ export default function GroupPanel({
           </span>
           {used != null && (
             <span
-              className={`font-semibold ${used >= 80 ? "text-sand-ink" : "text-blue-ink"}`}
+              className={`font-semibold ${used >= 80 ? "text-orange-ink" : "text-blue-ink"}`}
             >
               {used}%
             </span>
@@ -208,8 +208,12 @@ export default function GroupPanel({
         <span className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-3">
           {ownSpendState === "ready" ? (
             <span>
-              <span style={{ color: "rgb(var(--ink-3))" }}>■</span> own{" "}
-              {shortMoney(ownSpend)}
+              <span
+                aria-hidden="true"
+                className="mr-1 inline-block h-2 w-2 rounded-sm"
+                style={{ background: "rgb(var(--ink-3))" }}
+              />
+              own {shortMoney(ownSpend)}
             </span>
           ) : ownSpendState === "loading" ? (
             <span>Loading team details...</span>
@@ -218,7 +222,11 @@ export default function GroupPanel({
           )}
           {subGroups.map((child) => (
             <span key={child.group.id}>
-              <span style={{ color: child.hue.color }}>■</span>{" "}
+              <span
+                aria-hidden="true"
+                className="mr-1 inline-block h-2 w-2 rounded-sm"
+                style={{ background: child.hue.color }}
+              />
               {child.group.name} {shortMoney(child.group.group_spend)}
             </span>
           ))}
@@ -339,7 +347,7 @@ export default function GroupPanel({
       )}
 
       {group.sync_error && (
-        <p role="alert" className="text-sm text-sand-ink">
+        <p role="alert" className="text-sm text-orange-ink">
           {group.sync_error}
         </p>
       )}
@@ -359,7 +367,7 @@ export default function GroupPanel({
             type="button"
             disabled={!dirty || save.isPending}
             onClick={() => save.mutate()}
-            className="min-h-11 flex-1 rounded-lg bg-navy px-4 font-semibold text-paper hover:bg-navy-2 disabled:opacity-50"
+            className="min-h-10 flex-1 rounded-lg bg-blue-solid px-4 text-sm font-medium text-paper transition-[filter] duration-150 hover:brightness-110 disabled:opacity-40"
           >
             {save.isPending ? "Saving…" : "Save changes"}
           </button>
@@ -371,7 +379,7 @@ export default function GroupPanel({
               setPerUser(null);
               save.reset();
             }}
-            className="min-h-11 rounded-lg border border-line-input bg-card px-4 text-ink-2 hover:bg-canvas"
+            className="min-h-11 rounded-lg bg-ink/[0.06] px-4 text-ink hover:bg-ink/10"
           >
             Cancel
           </button>

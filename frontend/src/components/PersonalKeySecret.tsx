@@ -89,12 +89,12 @@ function SecretContent({
     >
       <div
         className={`flex flex-wrap items-center gap-2 rounded-[10px] py-1.5 pl-4 pr-1.5 ${
-          secret ? "bg-mint-tint" : "bg-canvas"
+          secret ? "bg-green-tint" : "bg-well"
         }`}
       >
         <code
           className={`min-w-0 flex-[1_1_240px] break-all py-2 font-mono text-[15px] ${
-            secret ? "text-mint-ink" : "text-ink"
+            secret ? "text-green-ink" : "text-ink"
           }`}
         >
           {secret ?? preview}
@@ -112,7 +112,7 @@ function SecretContent({
                   ? "Hide API key"
                   : "Show API key"
             }
-            className="min-h-11 rounded-lg px-3.5 py-2 text-sm text-ink-2 hover:bg-well disabled:opacity-50"
+            className="min-h-11 rounded-lg px-3.5 py-2 text-sm text-ink-2 hover:bg-ink/[0.06] disabled:opacity-50"
           >
             {pending ? "Loading…" : secret ? "Hide" : "Show"}
           </button>
@@ -122,7 +122,7 @@ function SecretContent({
             type="button"
             onClick={() => void copy()}
             aria-label="Copy API key"
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line-input bg-card px-4 py-2 text-sm font-semibold text-ink hover:bg-canvas"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-ink/[0.06] px-4 py-2 text-sm font-semibold text-ink hover:bg-ink/10"
           >
             {copied ? <Check size={15} /> : <Copy size={15} />}
             {copied ? "Copied" : "Copy"}

@@ -228,7 +228,7 @@ export default function Home() {
       {portal.isError && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-ink-2"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-transparent bg-danger-tint px-4 py-3 text-sm text-ink-2"
         >
           Portal configuration is unavailable. Retry before creating or
           replacing a key.
@@ -248,7 +248,7 @@ export default function Home() {
         <DismissibleMessage
           role="alert"
           messageKey={(mutationError as Error).message}
-          className="rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger"
+          className="rounded-xl border border-transparent bg-danger-tint px-4 py-3 text-sm text-danger"
         >
           {(mutationError as Error).message}
         </DismissibleMessage>
@@ -268,7 +268,7 @@ export default function Home() {
       {operationsBlocked && (
         <DismissibleMessage
           messageKey="key-actions-paused"
-          className="rounded-xl border border-sand/40 bg-sand-tint px-4 py-3 text-sm text-sand-ink"
+          className="rounded-xl border border-transparent bg-orange-tint px-4 py-3 text-sm text-orange-ink"
         >
           Key actions are paused. Try again in {retryAfter || 1} seconds.
         </DismissibleMessage>
@@ -276,9 +276,9 @@ export default function Home() {
       {newKey && !newKeyIdentifier && (
         <section
           aria-label="New key"
-          className="flex flex-col gap-3 rounded-2xl border border-line bg-card p-6"
+          className="flex flex-col gap-3 rounded-2xl border border-line-soft bg-card p-6"
         >
-          <p className="text-sm font-semibold text-mint-ink">
+          <p className="text-sm font-semibold text-green-ink">
             Your API key is ready. Copy it before leaving this page.
           </p>
           <PersonalKeySecret
@@ -338,7 +338,7 @@ export default function Home() {
         {keys.isLoading ? (
           <div
             role="status"
-            className="h-80 animate-pulse rounded-2xl border border-line bg-card"
+            className="h-80 animate-pulse rounded-2xl border border-line-soft bg-card"
           >
             <span className="sr-only">Loading key information…</span>
           </div>
@@ -405,17 +405,17 @@ export default function Home() {
 
   if (!adminLayout) {
     const topLink =
-      "rounded-md px-1 py-2 text-navy-text no-underline hover:text-paper";
+      "rounded-md px-2 py-1.5 text-ink-3 no-underline transition-colors duration-150 hover:bg-ink/[0.06] hover:text-ink";
     return (
       <div className="min-h-screen bg-canvas text-ink">
-        <header className="bg-navy text-navy-ink">
+        <header className="sticky top-0 z-20 border-b border-line-soft bg-card/80 text-ink backdrop-blur-xl backdrop-saturate-150">
           <div className="mx-auto flex max-w-[1040px] flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-8">
             <Link to="/my-key" className="no-underline">
               <BrandMark logoUrl={config?.logo_url} />
             </Link>
             <nav
               aria-label="Primary navigation"
-              className="ml-auto flex flex-wrap items-center justify-end gap-x-[18px] gap-y-1 text-sm"
+              className="ml-auto flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-sm"
             >
               {demoSwitch}
               {analyticsEnabled &&
@@ -440,7 +440,7 @@ export default function Home() {
               )}
               <span
                 aria-hidden="true"
-                className="hidden h-5 w-px bg-navy-3 sm:block"
+                className="mx-1 hidden h-5 w-px bg-line sm:block"
               />
               <UserMenu
                 email={user?.email}

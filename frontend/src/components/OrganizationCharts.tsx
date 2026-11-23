@@ -63,36 +63,41 @@ function Card({
   return (
     <section
       aria-label={title}
-      className="flex min-w-0 flex-col gap-4 rounded-2xl border border-line bg-card p-5"
+      className="flex min-w-0 flex-col gap-4 bg-card p-5"
     >
       <div>
-        <h3 className="text-base font-semibold text-ink">{title}</h3>
+        <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
         <p className="mt-0.5 text-[13px] text-ink-4">{subtitle}</p>
       </div>
       {children}
       {tiles && tiles.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
+        <dl className="divide-y divide-line-soft border-t border-line-soft text-sm">
           {tiles.map((tile) => (
-            <div key={tile.caption} className="rounded-xl bg-canvas px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-4">
-                {tile.caption}
-              </p>
-              <p className="mt-1 truncate text-[15px] font-bold text-ink">
-                {tile.value}
-              </p>
-              <p className="truncate text-xs text-ink-4">{tile.sub}</p>
+            <div
+              key={tile.caption}
+              className="flex items-baseline justify-between gap-3 pt-2.5 [&:not(:last-child)]:pb-2.5"
+            >
+              <dt className="shrink-0 text-ink-4">{tile.caption}</dt>
+              <dd className="min-w-0 text-right">
+                <span className="block truncate font-semibold tabular-nums text-ink">
+                  {tile.value}
+                </span>
+                <span className="block truncate text-xs text-ink-4">
+                  {tile.sub}
+                </span>
+              </dd>
             </div>
           ))}
-        </div>
+        </dl>
       )}
     </section>
   );
 }
 
 const barTone: Record<UsageMetric, string> = {
-  spend: "bg-teal",
+  spend: "bg-blue",
   requests: "bg-blue",
-  tokens: "bg-periwinkle",
+  tokens: "bg-blue",
 };
 
 const unit: Record<UsageMetric, string> = {
@@ -167,7 +172,7 @@ function Tip({
     <div
       role="tooltip"
       style={style}
-      className={`pointer-events-none absolute z-10 whitespace-nowrap rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs shadow-lg ${className}`}
+      className={`pointer-events-none absolute z-10 whitespace-nowrap rounded-lg border border-line-soft bg-card px-2.5 py-1.5 text-xs shadow-lg ${className}`}
     >
       <p className="text-ink-4">{heading}</p>
       <p className="font-semibold text-ink">{value}</p>
@@ -250,7 +255,7 @@ export function BarCard({
             {bars.map((bar, index) => (
               <span
                 key={`${bar.label}-${index}`}
-                className={`min-w-0 flex-1 truncate text-center text-[11px] ${
+                className={`min-w-0 flex-1 truncate text-center text-xs ${
                   index === active ? "font-semibold text-ink-2" : "text-ink-4"
                 }`}
               >
@@ -265,12 +270,12 @@ export function BarCard({
 }
 
 const sliceColors = [
-  "rgb(var(--teal))",
   "rgb(var(--blue))",
-  "rgb(var(--periwinkle))",
+  "rgb(var(--teal))",
+  "rgb(var(--indigo))",
   "rgb(var(--cyan))",
-  "rgb(var(--mint))",
-  "rgb(var(--sand))",
+  "rgb(var(--green))",
+  "rgb(var(--orange))",
 ];
 
 /** A donut of shares, largest first, with a legend of percentages. */
@@ -355,14 +360,14 @@ export function DonutCard({
             </svg>
             {/* The centre reads the hovered slice, or the total at rest. */}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-              <p className="w-full truncate text-[11px] text-ink-4">
+              <p className="w-full truncate text-xs text-ink-4">
                 {current ? current.label : "Total"}
               </p>
-              <p className="text-sm font-bold text-ink">
+              <p className="text-sm font-semibold text-ink">
                 {metricValue(current ? current.value : total, metric)}
               </p>
               {current && (
-                <p className="text-[11px] text-ink-4">{share(current.value)}</p>
+                <p className="text-xs text-ink-4">{share(current.value)}</p>
               )}
             </div>
           </div>
@@ -372,7 +377,7 @@ export function DonutCard({
                 key={slice.label}
                 {...item(index)}
                 className={`flex items-center gap-2 rounded-md px-2 py-1 ${
-                  index === active ? "bg-canvas" : ""
+                  index === active ? "bg-well" : ""
                 }`}
               >
                 <span
@@ -411,7 +416,7 @@ export function UsageBars({
   const sorted = [...values].sort((a, b) => b[metric] - a[metric]);
   const max = Math.max(...sorted.map((row) => row[metric]), 0) || 1;
   return (
-    <section className="rounded-lg border border-line bg-card p-5 shadow-sm">
+    <section>
       <h2 className="text-sm font-semibold text-ink">{title}</h2>
       <div className="mt-4 space-y-4">
         {sorted.map((row) => {

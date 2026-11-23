@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { api } from "../api/client";
 import EmailAddress from "./EmailAddress";
 import DismissibleMessage from "./DismissibleMessage";
-import { MetricCard, PageHeader, Pill } from "./Page";
+import { PageHeader, Pill } from "./Page";
 import { buttonSecondary, card, cardHeader, cardTitle, tableHead } from "./ui";
 
 function Dependency({
@@ -20,33 +20,27 @@ function Dependency({
   detail: string;
   loading: boolean;
 }) {
+  const state = loading
+    ? "Checking…"
+    : ok === null
+      ? "Unknown"
+      : ok
+        ? "Operational"
+        : "Unavailable";
   return (
-    <MetricCard
-      accent={
-        loading || ok === null
-          ? "border-t-line-input"
-          : ok
-            ? "border-t-mint"
-            : "border-t-danger"
-      }
-      caption={name}
-      value={
-        <>
-          <span
-            aria-hidden="true"
-            className={`h-2 w-2 rounded-full ${loading || ok === null ? "bg-ink-5" : ok ? "bg-mint" : "bg-danger"}`}
-          />
-          {loading
-            ? "Checking…"
-            : ok === null
-              ? "Unknown"
-              : ok
-                ? "Operational"
-                : "Unavailable"}
-        </>
-      }
-      sub={detail}
-    />
+    <div className="flex items-center justify-between gap-4 px-5 py-3.5">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-ink">{name}</p>
+        <p className="mt-0.5 text-[13px] text-ink-4">{detail}</p>
+      </div>
+      <span className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-ink">
+        <span
+          aria-hidden="true"
+          className={`h-2 w-2 rounded-full ${loading || ok === null ? "bg-ink-5" : ok ? "bg-green" : "bg-danger"}`}
+        />
+        {state}
+      </span>
+    </div>
   );
 }
 
@@ -84,7 +78,6 @@ export default function AdminStatus() {
   return (
     <section className="flex w-full flex-col gap-6">
       <PageHeader
-        eyebrow="System"
         title="System status"
         description="Dependency readiness and recent administrator activity."
         actions={
@@ -111,7 +104,7 @@ export default function AdminStatus() {
         <DismissibleMessage
           role="alert"
           messageKey={(status.error as Error).message}
-          className="rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger"
+          className="rounded-xl border border-transparent bg-danger-tint px-4 py-3 text-sm text-danger"
         >
           {(status.error as Error).message}
         </DismissibleMessage>
@@ -121,8 +114,8 @@ export default function AdminStatus() {
         <div
           className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-sm ${
             status.data.ready
-              ? "border-mint/40 bg-mint-tint text-mint-ink"
-              : "border-danger-line bg-danger-tint text-danger"
+              ? "border-transparent bg-green-tint text-green-ink"
+              : "border-transparent bg-danger-tint text-danger"
           }`}
         >
           {status.data.ready ? (
@@ -141,7 +134,7 @@ export default function AdminStatus() {
         </div>
       )}
 
-      <div className="grid gap-3.5 md:grid-cols-2">
+      <div className={`${card} divide-y divide-line-soft`}>
         <Dependency
           name="LiteLLM gateway"
           loading={status.isLoading}
@@ -167,7 +160,7 @@ export default function AdminStatus() {
       </div>
 
       {warnings.length > 0 && (
-        <div className="rounded-xl border border-sand/40 bg-sand-tint px-4 py-3.5 text-sand-ink">
+        <div className="rounded-xl border border-transparent bg-orange-tint px-4 py-3.5 text-orange-ink">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <AlertTriangle size={16} aria-hidden="true" /> Deployment security
             warnings
@@ -195,7 +188,7 @@ export default function AdminStatus() {
           </div>
         </div>
         {audit.isLoading ? (
-          <div className="h-36 animate-pulse bg-canvas" />
+          <div className="h-36 animate-pulse bg-well" />
         ) : audit.error ? (
           <p role="alert" className="p-5 text-sm text-danger">
             {(audit.error as Error).message}

@@ -1,0 +1,557 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-23T12:00:00Z",
+  "title": "Design System: LiteGate",
+  "extensions": {
+    "colorMeta": {
+      "blue": {
+        "role": "primary",
+        "displayName": "System Blue",
+        "canonical": "oklch(60.3% 0.218 257)",
+        "dark": "#0A84FF",
+        "cssVar": "--blue",
+        "tonalRamp": [
+          "oklch(15% 0.091 257)",
+          "oklch(27% 0.129 257)",
+          "oklch(39% 0.167 257)",
+          "oklch(51% 0.205 257)",
+          "oklch(63% 0.192 257)",
+          "oklch(75% 0.154 257)",
+          "oklch(86% 0.120 257)",
+          "oklch(95% 0.091 257)"
+        ]
+      },
+      "blue-solid": {
+        "role": "primary",
+        "displayName": "Filled Blue",
+        "dark": "#0071E3",
+        "cssVar": "--blue-solid"
+      },
+      "blue-tint": {
+        "role": "primary",
+        "displayName": "Blue Wash",
+        "dark": "#102A4A",
+        "cssVar": "--blue-tint"
+      },
+      "blue-ink": {
+        "role": "primary",
+        "displayName": "Blue Ink",
+        "dark": "#6EAFFF",
+        "cssVar": "--blue-ink"
+      },
+      "green": {
+        "role": "secondary",
+        "displayName": "System Green",
+        "canonical": "oklch(73.0% 0.194 147)",
+        "dark": "#30D158",
+        "cssVar": "--green",
+        "tonalRamp": [
+          "oklch(15% 0.081 147)",
+          "oklch(27% 0.115 147)",
+          "oklch(39% 0.149 147)",
+          "oklch(51% 0.183 147)",
+          "oklch(63% 0.172 147)",
+          "oklch(75% 0.138 147)",
+          "oklch(86% 0.107 147)",
+          "oklch(95% 0.081 147)"
+        ]
+      },
+      "green-tint": {
+        "role": "secondary",
+        "displayName": "Green Wash",
+        "dark": "#12321C",
+        "cssVar": "--green-tint"
+      },
+      "green-ink": {
+        "role": "secondary",
+        "displayName": "Green Ink",
+        "dark": "#6EDC8C",
+        "cssVar": "--green-ink"
+      },
+      "orange": {
+        "role": "secondary",
+        "displayName": "System Orange",
+        "canonical": "oklch(76.5% 0.175 63)",
+        "dark": "#FF9F0A",
+        "cssVar": "--orange",
+        "tonalRamp": [
+          "oklch(15% 0.073 63)",
+          "oklch(27% 0.104 63)",
+          "oklch(39% 0.134 63)",
+          "oklch(51% 0.165 63)",
+          "oklch(63% 0.155 63)",
+          "oklch(75% 0.124 63)",
+          "oklch(86% 0.096 63)",
+          "oklch(95% 0.073 63)"
+        ]
+      },
+      "orange-tint": {
+        "role": "secondary",
+        "displayName": "Orange Wash",
+        "dark": "#3A260A",
+        "cssVar": "--orange-tint"
+      },
+      "orange-ink": {
+        "role": "secondary",
+        "displayName": "Orange Ink",
+        "dark": "#FFB95A",
+        "cssVar": "--orange-ink"
+      },
+      "orange-solid": {
+        "role": "secondary",
+        "displayName": "Filled Orange",
+        "dark": "#B25700",
+        "cssVar": "--orange-solid"
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "System Red",
+        "canonical": "oklch(55.3% 0.225 27)",
+        "dark": "#FF453A",
+        "cssVar": "--danger",
+        "tonalRamp": [
+          "oklch(15% 0.094 27)",
+          "oklch(27% 0.134 27)",
+          "oklch(39% 0.173 27)",
+          "oklch(51% 0.212 27)",
+          "oklch(63% 0.199 27)",
+          "oklch(75% 0.160 27)",
+          "oklch(86% 0.124 27)",
+          "oklch(95% 0.094 27)"
+        ]
+      },
+      "danger-tint": {
+        "role": "secondary",
+        "displayName": "Red Wash",
+        "dark": "#3C1616",
+        "cssVar": "--danger-tint"
+      },
+      "danger-line": {
+        "role": "secondary",
+        "displayName": "Red Hairline",
+        "dark": "#602626",
+        "cssVar": "--danger-line"
+      },
+      "teal": {
+        "role": "tertiary",
+        "displayName": "Category Teal",
+        "canonical": "oklch(70.0% 0.111 213)",
+        "dark": "#40C8E0",
+        "cssVar": "--teal",
+        "tonalRamp": [
+          "oklch(15% 0.046 213)",
+          "oklch(27% 0.066 213)",
+          "oklch(39% 0.085 213)",
+          "oklch(51% 0.104 213)",
+          "oklch(63% 0.098 213)",
+          "oklch(75% 0.079 213)",
+          "oklch(86% 0.061 213)",
+          "oklch(95% 0.046 213)"
+        ]
+      },
+      "cyan": {
+        "role": "tertiary",
+        "displayName": "Category Cyan",
+        "canonical": "oklch(70.7% 0.133 234)",
+        "dark": "#64D2FF",
+        "cssVar": "--cyan",
+        "tonalRamp": [
+          "oklch(15% 0.056 234)",
+          "oklch(27% 0.079 234)",
+          "oklch(39% 0.102 234)",
+          "oklch(51% 0.125 234)",
+          "oklch(63% 0.117 234)",
+          "oklch(75% 0.094 234)",
+          "oklch(86% 0.073 234)",
+          "oklch(95% 0.056 234)"
+        ]
+      },
+      "indigo": {
+        "role": "tertiary",
+        "displayName": "Category Indigo",
+        "canonical": "oklch(52.9% 0.191 278)",
+        "dark": "#706EF0",
+        "cssVar": "--indigo",
+        "tonalRamp": [
+          "oklch(15% 0.080 278)",
+          "oklch(27% 0.113 278)",
+          "oklch(39% 0.147 278)",
+          "oklch(51% 0.180 278)",
+          "oklch(63% 0.169 278)",
+          "oklch(75% 0.135 278)",
+          "oklch(86% 0.105 278)",
+          "oklch(95% 0.080 278)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Label",
+        "canonical": "oklch(23.2% 0.004 286)",
+        "dark": "#F5F5F7",
+        "cssVar": "--ink",
+        "tonalRamp": [
+          "oklch(15% 0.002 286)",
+          "oklch(27% 0.002 286)",
+          "oklch(39% 0.003 286)",
+          "oklch(51% 0.004 286)",
+          "oklch(63% 0.003 286)",
+          "oklch(75% 0.003 286)",
+          "oklch(86% 0.002 286)",
+          "oklch(95% 0.002 286)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Secondary Label",
+        "dark": "#DEDEE3",
+        "cssVar": "--ink-2"
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Tertiary Label",
+        "dark": "#C7C7CC",
+        "cssVar": "--ink-3"
+      },
+      "ink-4": {
+        "role": "neutral",
+        "displayName": "Quaternary Label",
+        "dark": "#98989D",
+        "cssVar": "--ink-4"
+      },
+      "ink-5": {
+        "role": "neutral",
+        "displayName": "Placeholder Grey",
+        "dark": "#6E6E73",
+        "cssVar": "--ink-5"
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Grouped Ground",
+        "canonical": "oklch(96.3% 0.007 286)",
+        "dark": "#000000",
+        "cssVar": "--canvas",
+        "tonalRamp": [
+          "oklch(15% 0.003 286)",
+          "oklch(27% 0.004 286)",
+          "oklch(39% 0.005 286)",
+          "oklch(51% 0.006 286)",
+          "oklch(63% 0.006 286)",
+          "oklch(75% 0.005 286)",
+          "oklch(86% 0.004 286)",
+          "oklch(95% 0.003 286)"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Section White",
+        "dark": "#1C1C1E",
+        "cssVar": "--card"
+      },
+      "well": {
+        "role": "neutral",
+        "displayName": "Well",
+        "dark": "#2C2C2E",
+        "cssVar": "--well"
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Sidebar Grey",
+        "dark": "#1C1C1E",
+        "cssVar": "--sidebar"
+      },
+      "segment": {
+        "role": "neutral",
+        "displayName": "Segment",
+        "dark": "#636366",
+        "cssVar": "--segment"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "dark": "#38383A",
+        "cssVar": "--line"
+      },
+      "line-soft": {
+        "role": "neutral",
+        "displayName": "Soft Hairline",
+        "dark": "#2C2C2E",
+        "cssVar": "--line-soft"
+      },
+      "line-input": {
+        "role": "neutral",
+        "displayName": "Field Stroke",
+        "dark": "#48484A",
+        "cssVar": "--line-input"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "White on Fill",
+        "dark": "#FFFFFF"
+      },
+      "danger-solid": {
+        "role": "secondary",
+        "displayName": "Filled Red",
+        "dark": "#D70015",
+        "cssVar": "--danger-solid"
+      }
+    },
+    "typographyMeta": {
+      "large-title": {
+        "displayName": "Large Title",
+        "purpose": "One per page, in the page header and on sign-in."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "The budget-left number on My key; the page's dominant fact."
+      },
+      "metric": {
+        "displayName": "Metric",
+        "purpose": "Metric tile figures."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Sub-sections on the user page."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Grouped-section titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default UI text, buttons, nav items, inputs."
+      },
+      "subhead": {
+        "displayName": "Subhead",
+        "purpose": "Field labels, metric captions, small buttons, detail lines."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Column heads, pills, compact segment labels, chart-centre labels. The 12px floor."
+      },
+      "group-label": {
+        "displayName": "Group Label",
+        "purpose": "Sidebar group headings, 12px semibold, sentence case."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Key prefixes, IDs, audit actions, URLs."
+      },
+      "brand": {
+        "displayName": "Brand",
+        "purpose": "Product name beside the mark; large user-page action label; sign-in card title."
+      }
+    },
+    "tokenSource": "RGB channels on :root and html.dark in frontend/src/index.css; use as rgb(var(--name)) or rgb(var(--name) / alpha).",
+    "shadows": [
+      {
+        "name": "segment-lift",
+        "value": "0 1px 2px rgb(0 0 0 / 0.12), 0 0 0 0.5px rgb(0 0 0 / 0.04)",
+        "purpose": "Selected segment in a segmented control."
+      },
+      {
+        "name": "mark-lift",
+        "value": "0 1px 2px rgb(0 0 0 / 0.15)",
+        "purpose": "The small blue brand tile."
+      },
+      {
+        "name": "popover",
+        "value": "0 10px 30px rgb(0 0 0 / 0.16), 0 1px 3px rgb(0 0 0 / 0.08)",
+        "purpose": "Account menu, paired with card at 95% and backdrop blur."
+      },
+      {
+        "name": "sheet",
+        "value": "0 25px 50px -12px rgb(0 0 0 / 0.25)",
+        "purpose": "Modal sheets over a 30% black scrim with 2px blur."
+      },
+      {
+        "name": "tooltip",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Chart tooltips."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control",
+        "value": "150ms ease",
+        "purpose": "Background, filter, opacity and colour changes on buttons, nav rows, segments and fields."
+      },
+      {
+        "name": "usage-bar",
+        "value": "width 300ms ease",
+        "purpose": "Spend bar fill."
+      },
+      {
+        "name": "press",
+        "value": "filter: brightness(0.95)",
+        "purpose": "Active state on regular buttons."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "durations 0.01ms",
+        "purpose": "All transitions and animations collapse under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Filled blue; the one main action on a screen.",
+      "html": "<button class=\"ds-btn-primary\">Create key</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px; border: none; border-radius: 8px; background: rgb(var(--blue-solid, 0 113 227)); color: #fff; font: 500 14px/20px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; cursor: pointer; transition: background-color 150ms, filter 150ms, opacity 150ms; } .ds-btn-primary:hover { filter: brightness(1.1); } .ds-btn-primary:active { filter: brightness(0.95); } .ds-btn-primary:focus-visible { outline: 2px solid rgb(var(--blue, 0 122 255) / 60%); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Grey button for every non-primary action.",
+      "html": "<button class=\"ds-btn-secondary\">Refresh</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px; border: none; border-radius: 8px; background: rgb(var(--ink, 29 29 31) / 0.06); color: rgb(var(--ink, 29 29 31)); font: 500 14px/20px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; cursor: pointer; transition: background-color 150ms, filter 150ms; } .ds-btn-secondary:hover { background: rgb(var(--ink, 29 29 31) / 0.1); } .ds-btn-secondary:active { filter: brightness(0.95); } .ds-btn-secondary:focus-visible { outline: 2px solid rgb(var(--blue, 0 122 255) / 60%); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Plain accent text for low-emphasis actions.",
+      "html": "<button class=\"ds-btn-ghost\">View details</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 16px; border: none; border-radius: 8px; background: transparent; color: rgb(var(--blue-ink, 0 92 196)); font: 500 14px/20px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; cursor: pointer; transition: background-color 150ms; } .ds-btn-ghost:hover { background: rgb(var(--blue-tint, 230 241 255)); } .ds-btn-ghost:focus-visible { outline: 2px solid rgb(var(--blue, 0 122 255) / 60%); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field-input",
+      "description": "Labelled input with blue stroke and soft ring on focus.",
+      "html": "<label class=\"ds-field\">Key name<input class=\"ds-input\" placeholder=\"e.g. laptop\"></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; font: 500 13px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; color: rgb(var(--ink-2, 58 58 60)); } .ds-input { min-height: 40px; width: 100%; padding: 0 12px; border: 1px solid rgb(var(--line-input, 199 199 204)); border-radius: 8px; background: rgb(var(--card, 255 255 255)); color: rgb(var(--ink, 29 29 31)); font: 400 14px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; transition: box-shadow 150ms; } .ds-input::placeholder { color: rgb(var(--ink-4, 106 106 112)); } .ds-input:focus { outline: none; border-color: rgb(var(--blue, 0 122 255)); box-shadow: 0 0 0 3px rgb(var(--blue, 0 122 255) / 25%); }"
+    },
+    {
+      "name": "Grouped Section",
+      "kind": "card",
+      "refersTo": "grouped-section",
+      "description": "White rounded block on the grey ground, with header row and hairline-separated rows.",
+      "html": "<section class=\"ds-section\"><header class=\"ds-section-head\"><h2>Your key</h2><button class=\"ds-btn-small\">Copy</button></header><div class=\"ds-row\"><span>Budget</span><span>$40.00</span></div><div class=\"ds-row\"><span>Models</span><span>12</span></div></section>",
+      "css": ".ds-section { border: 1px solid rgb(var(--line-soft, 229 229 234)); border-radius: 12px; background: rgb(var(--card, 255 255 255)); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; color: rgb(var(--ink, 29 29 31)); } .ds-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-bottom: 1px solid rgb(var(--line-soft, 229 229 234)); } .ds-section-head h2 { margin: 0; font-size: 15px; font-weight: 600; } .ds-row { display: flex; justify-content: space-between; padding: 12px 20px; font-size: 14px; border-bottom: 1px solid rgb(var(--line-soft, 229 229 234)); } .ds-row:last-child { border-bottom: none; } .ds-row span:first-child { color: rgb(var(--ink-4, 106 106 112)); } .ds-btn-small { min-height: 32px; padding: 0 12px; border: none; border-radius: 6px; background: rgb(var(--ink, 29 29 31) / 0.06); color: rgb(var(--ink, 29 29 31)); font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color 150ms; } .ds-btn-small:hover { background: rgb(var(--ink, 29 29 31) / 0.1); } .ds-btn-small:focus-visible { outline: 2px solid rgb(var(--blue, 0 122 255) / 60%); outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "pill",
+      "description": "Tint ground, ink text and a base-hue dot; ok, warn, bad, info, neutral.",
+      "html": "<span class=\"ds-pill ds-pill-ok\"><i></i>Active</span> <span class=\"ds-pill ds-pill-warn\"><i></i>Near limit</span> <span class=\"ds-pill ds-pill-bad\"><i></i>Blocked</span>",
+      "css": ".ds-pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 9999px; font: 500 12px/16px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; white-space: nowrap; } .ds-pill i { width: 6px; height: 6px; border-radius: 9999px; } .ds-pill-ok { background: rgb(var(--green-tint, 230 247 235)); color: rgb(var(--green-ink, 30 121 52)); } .ds-pill-ok i { background: rgb(var(--green, 52 199 89)); } .ds-pill-warn { background: rgb(var(--orange-tint, 255 243 224)); color: rgb(var(--orange-ink, 160 78 0)); } .ds-pill-warn i { background: rgb(var(--orange, 255 149 0)); } .ds-pill-bad { background: rgb(var(--danger-tint, 255 238 237)); color: rgb(var(--danger, 215 0 21)); } .ds-pill-bad i { background: rgb(var(--danger, 215 0 21)); } .ds-pill-info { background: rgb(var(--blue-tint, 230 241 255)); color: rgb(var(--blue-ink, 0 92 196)); } .ds-pill-info i { background: rgb(var(--blue, 0 122 255)); }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "custom",
+      "refersTo": "segmented-control",
+      "description": "Well track with a raised selected segment, for switching scope within a page.",
+      "html": "<div class=\"ds-seg\" role=\"group\"><button aria-pressed=\"true\">All</button><button aria-pressed=\"false\">Platform</button><button aria-pressed=\"false\">Infrastructure</button></div>",
+      "css": ".ds-seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 10px; background: rgb(var(--well, 236 236 240)); } .ds-seg button { min-height: 36px; padding: 0 14px; border: none; border-radius: 7px; background: transparent; color: rgb(var(--ink-3, 72 72 74)); font: 500 14px -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; cursor: pointer; transition: color 150ms, background-color 150ms; } .ds-seg button:hover { color: rgb(var(--ink, 29 29 31)); } .ds-seg button[aria-pressed=\"true\"] { background: rgb(var(--segment, 255 255 255)); color: rgb(var(--ink, 29 29 31)); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); } .ds-seg button:focus-visible { outline: 2px solid rgb(var(--blue, 0 122 255) / 60%); outline-offset: 2px; }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "sidebar",
+      "description": "Light macOS sidebar with 12px sentence-case group labels and a neutral-tint selected row whose icon stays blue.",
+      "html": "<nav class=\"ds-sidebar\"><p class=\"ds-group\">Manage</p><a class=\"ds-nav ds-nav-active\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"7.5\" cy=\"15.5\" r=\"5.5\"/><path d=\"m21 2-9.6 9.6\"/><path d=\"m15.5 7.5 3 3L22 7l-3-3\"/></svg>Keys</a><a class=\"ds-nav\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/></svg>People</a></nav>",
+      "css": ".ds-sidebar { display: flex; flex-direction: column; gap: 2px; width: 236px; padding: 20px 12px; background: rgb(var(--sidebar, 236 236 241)); border-right: 1px solid rgb(var(--line-soft, 229 229 234)); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; } .ds-group { margin: 16px 10px 4px; font-size: 12px; font-weight: 600; color: rgb(var(--ink-4, 106 106 112)); } .ds-nav { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; font-size: 14px; color: rgb(var(--ink, 29 29 31)); text-decoration: none; transition: background-color 150ms, color 150ms; } .ds-nav svg { color: rgb(var(--blue, 0 122 255)); } .ds-nav:hover { background: rgb(var(--ink, 29 29 31) / 0.05); } .ds-nav:focus-visible { outline: 2px solid rgb(var(--blue, 0 122 255) / 60%); outline-offset: 2px; } .ds-nav-active, .ds-nav-active:hover { background: rgb(var(--ink, 29 29 31) / 0.09); color: rgb(var(--ink, 29 29 31)); font-weight: 500; } .ds-nav-active svg { color: rgb(var(--blue, 0 122 255)); }"
+    },
+    {
+      "name": "Metric Tile",
+      "kind": "card",
+      "refersTo": "metric-card",
+      "description": "Caption, large tabular figure, detail line and optional usage bar.",
+      "html": "<div class=\"ds-metric\"><span class=\"ds-cap\">Budget left</span><span class=\"ds-fig\">$31.40</span><span class=\"ds-cap\">of $40.00 this month</span><span class=\"ds-bar\"><span style=\"width:22%\"></span></span></div>",
+      "css": ".ds-metric { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid rgb(var(--line-soft, 229 229 234)); border-radius: 12px; background: rgb(var(--card, 255 255 255)); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif; } .ds-cap { font-size: 13px; font-weight: 500; color: rgb(var(--ink-4, 106 106 112)); } .ds-fig { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: rgb(var(--ink, 29 29 31)); } .ds-bar { display: block; height: 6px; margin-top: 6px; border-radius: 9999px; background: rgb(var(--well, 236 236 240)); } .ds-bar span { display: block; height: 6px; border-radius: 9999px; background: rgb(var(--blue, 0 122 255)); transition: width 300ms; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Settings Pane",
+    "overview": "LiteGate reads as a native macOS utility that happens to live in a browser. The ground is Apple's grouped grey, content sits in white grouped sections separated by hairlines, and a single system blue carries every action and every focus ring. Chrome is quiet so the facts LiteLLM enforces (budget left, spend, the key itself) read first. A user signs in, sees one large figure and their key, and leaves; an owner or admin moves through a light sidebar and edits in place.\n\nThe system is deliberately un-branded beyond the blue mark: the system font stack, Apple's label greys, Apple's status hues and Apple's control shapes (segmented controls, grouped lists, sheets, filled and grey buttons). Selection in the sidebar is a quiet neutral tint, as in macOS Settings, so the only saturated colour on a resting screen is the one primary action. Density is moderate, comfortable on a desktop browser at work and still usable on a phone, where the sidebar becomes a scrolling top row.\n\nIt replaces, and refuses, the category default of a dark navy admin rail with coloured stat cards. Both light and dark themes are first-class, driven by one set of channel tokens; dark mode follows Apple's true-black grouped ground with elevated `#1C1C1E` sections.",
+    "keyCharacteristics": [
+      "Grouped grey canvas with white 12px-radius sections and hairline separators; true black with elevated grey sections in dark mode.",
+      "One accent: system blue for primary buttons, focus, links, icons and every single-series chart. Everything else interactive is neutral.",
+      "Status only in Apple's green, orange and red, always as tint ground plus ink text plus a dot.",
+      "System font stack throughout; large titles at 28px bold with tight tracking; nothing smaller than 12px.",
+      "Light sidebar with a neutral-tint selected row and blue icons; segmented controls for in-page switching.",
+      "Near-flat surfaces; shadow appears only on things that float (menus, sheets, tooltips, selected segments, the brand tile)."
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "UI accents are blue or neutral, nothing else. Primary action, focus, links and icons are blue; selection is a neutral tint; a chart with one series is blue. Teal, cyan and indigo exist only to separate categories.",
+        "section": "colors"
+      },
+      {
+        "name": "The Solid Variant Rule",
+        "body": "White text sits only on a `-solid` fill (`blue-solid`, `orange-solid`, `danger-solid`), never on the base hue. The base hue is for dots, bars, outlines and icons.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tint-Ink-Dot Rule",
+        "body": "Status is always tint ground, matching ink text and a base-hue dot. Never colour a whole card or a large figure by status.",
+        "section": "colors"
+      },
+      {
+        "name": "The Spend Threshold Rule",
+        "body": "Usage bars are blue below 80%, orange from 80%, red from 95%.",
+        "section": "colors"
+      },
+      {
+        "name": "The 12px Floor Rule",
+        "body": "No text is set below 12px. Caption and group labels are the smallest steps; anything that wants to be smaller is cut or moved into a tooltip.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "Every label, heading and group title is sentence case at normal tracking. Hierarchy is size and weight.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Money, counts and percentages that sit in tiles or figures use tabular numerals so they align and do not jitter on refresh.",
+        "section": "typography"
+      },
+      {
+        "name": "The Floats-Only Rule",
+        "body": "Only menus, sheets, tooltips, selected segments and the brand tile cast shadows. Grouped sections, metric tiles, inputs and sidebar rows are flat.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** use the large-title header (28px bold, -0.02em) at the top of every page with the primary grouped section directly beneath.",
+      "**Do** give each screen at most one Filled Blue primary button; everything else is grey or ghost.",
+      "**Do** put content in white 12px-radius grouped sections with `line-soft` hairlines on the Grouped Ground, with lists flush inside.",
+      "**Do** mark the current sidebar row with the neutral 9% Label tint and keep its icon blue.",
+      "**Do** use the segmented control for switching views or scopes within a page.",
+      "**Do** express status as tint ground, ink text and a base-hue dot, in green, orange or red only; sync problems are orange.",
+      "**Do** colour single-series charts blue and reserve teal, cyan and indigo for categorical series.",
+      "**Do** define every new colour as an RGB channel pair in both `:root` and `html.dark` and map it through the Tailwind config.",
+      "**Do** use tabular numerals for money, counts and percentages in tiles and figures.",
+      "**Do** keep 4.5:1 text contrast in both themes and a visible blue focus treatment on every control."
+    ],
+    "donts": [
+      "**Don't** bring back the dark navy admin rail or coloured stat cards; the sidebar is light and tiles are white.",
+      "**Don't** fill the selected sidebar row with solid blue; selection is neutral.",
+      "**Don't** put white text on a base hue; use the `-solid` variant.",
+      "**Don't** use teal, cyan or indigo for actions, selection, status or a single-series chart.",
+      "**Don't** set any text below 12px.",
+      "**Don't** nest a bordered box inside a grouped section, or split related facts into a grid of separate cards.",
+      "**Don't** draw legend swatches with text glyphs; draw the shape.",
+      "**Don't** use uppercase or letter-spaced labels, eyebrows or kickers above titles.",
+      "**Don't** add shadows to grouped sections, tiles, inputs or sidebar rows.",
+      "**Don't** introduce a web font; the system stack is the brand."
+    ]
+  }
+}

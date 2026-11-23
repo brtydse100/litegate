@@ -45,7 +45,7 @@ export function NumericPolicyInput({
             aria-label={`Decrease ${label}`}
             disabled={disabled || current <= 0}
             onClick={() => adjust(-1)}
-            className="px-2 text-ink-3 hover:bg-well focus-visible:outline-blue disabled:opacity-30"
+            className="px-2 text-ink-3 hover:bg-ink/[0.06] focus-visible:outline-blue disabled:opacity-30"
           >
             <Minus size={14} />
           </button>
@@ -54,7 +54,7 @@ export function NumericPolicyInput({
             aria-label={`Increase ${label}`}
             disabled={disabled}
             onClick={() => adjust(1)}
-            className="border-l border-line px-2 text-ink-3 hover:bg-well focus-visible:outline-blue disabled:opacity-30"
+            className="border-l border-line px-2 text-ink-3 hover:bg-ink/[0.06] focus-visible:outline-blue disabled:opacity-30"
           >
             <Plus size={14} />
           </button>
@@ -111,14 +111,14 @@ export function ModelChoices({
     ]),
   ].sort();
   return (
-    <fieldset className="min-w-0 space-y-3 rounded-xl border border-line bg-card p-3 text-xs text-ink-2 sm:col-span-2">
+    <fieldset className="min-w-0 space-y-3 rounded-xl border border-line-soft bg-card p-3 text-xs text-ink-2 sm:col-span-2">
       <legend className="px-1 font-semibold">Allowed models</legend>
       {status && (
         <p className="text-ink-4">
           {status}. Choose a replacement model policy for the selected keys.
         </p>
       )}
-      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-3 py-2">
+      <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 hover:bg-ink/[0.06]">
         <input
           type="checkbox"
           className="h-4 w-4 shrink-0 accent-blue"
@@ -130,13 +130,13 @@ export function ModelChoices({
         All allowed models
       </label>
       <div
-        className={`grid gap-1 rounded-lg border border-line bg-card p-1 sm:grid-cols-2 ${scrollable ? "max-h-48 overflow-y-auto" : ""}`}
+        className={`grid gap-1 border-t border-line-soft pt-2 sm:grid-cols-2 ${scrollable ? "max-h-48 overflow-y-auto" : ""}`}
       >
         {options.map((model) => (
           <label
             key={model}
             data-selected={!value.all && value.models.includes(model)}
-            className="policy-model-option flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-transparent px-2 py-2 hover:bg-canvas"
+            className="policy-model-option flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-transparent px-2 py-2 hover:bg-ink/[0.06]"
           >
             <input
               type="checkbox"
@@ -155,17 +155,17 @@ export function ModelChoices({
           </label>
         ))}
       </div>
-      <p className="text-[11px] text-ink-4">
+      <p className="text-xs text-ink-4">
         {value.all ? "All models allowed" : `${value.models.length} selected`}
       </p>
       {catalog.isPending && <p>Loading models...</p>}
       {catalog.isError && (
-        <p className="text-xs text-sand-ink">
+        <p className="text-xs text-orange-ink">
           Model choices are unavailable. Saved selections are still shown.
         </p>
       )}
       {!status && !value.all && !value.models.length && (
-        <p className="text-sand-ink">
+        <p className="text-orange-ink">
           Select at least one model or allow all models.
         </p>
       )}

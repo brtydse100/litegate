@@ -39,7 +39,7 @@ import {
 
 /** Team list columns, shared by the caption row and each team. */
 const teamColumns =
-  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] items-center gap-4";
+  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_17rem] items-center gap-4";
 import { metricValue } from "./OrganizationCharts";
 import { durationLabel } from "../keyBudget";
 import {
@@ -190,7 +190,7 @@ function TeamEditor({
 
   return (
     <div
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-30 flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]"
       role="dialog"
       ref={dialogRef}
       aria-modal="true"
@@ -201,7 +201,7 @@ function TeamEditor({
     >
       <form
         onSubmit={(event) => void submit(event)}
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-card p-5 shadow-2xl"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line-soft bg-card p-5 shadow-2xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -220,7 +220,7 @@ function TeamEditor({
             type="button"
             onClick={onClose}
             aria-label="Close team editor"
-            className="rounded p-1 text-ink-4 hover:bg-canvas hover:text-ink"
+            className="rounded p-1 text-ink-4 hover:bg-ink/[0.06] hover:text-ink"
           >
             <X size={18} />
           </button>
@@ -228,7 +228,7 @@ function TeamEditor({
         {existing && (
           <section
             aria-label="Current team settings"
-            className="mt-4 space-y-2 rounded-lg border border-line p-3"
+            className="mt-4 space-y-2 rounded-xl bg-well px-4 py-3"
           >
             <h4 className="text-sm font-semibold text-ink">
               Current team settings
@@ -363,7 +363,7 @@ function TeamEditor({
           />
         </div>
         {(modelError || error) && (
-          <p className="mt-4 rounded-lg border border-danger-line bg-danger-tint px-3 py-2 text-xs text-danger">
+          <p className="mt-4 rounded-lg border border-transparent bg-danger-tint px-3 py-2 text-xs text-danger">
             {modelError || error?.message}
           </p>
         )}
@@ -371,7 +371,7 @@ function TeamEditor({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-line px-4 py-2 text-sm text-ink-2 hover:bg-canvas"
+            className="rounded-lg bg-ink/[0.06] px-4 py-2 text-sm font-medium text-ink hover:bg-ink/10"
           >
             Cancel
           </button>
@@ -379,7 +379,7 @@ function TeamEditor({
             disabled={
               pending || savingPerUser || operationsBlocked || !alias.trim()
             }
-            className="rounded-lg bg-blue px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-blue-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {pending
               ? "Saving..."
@@ -414,7 +414,7 @@ function DeleteTeamDialog({
   const dialogRef = useDialogDismiss(onClose, pending);
   return (
     <div
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-30 flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]"
       role="dialog"
       ref={dialogRef}
       aria-modal="true"
@@ -423,7 +423,7 @@ function DeleteTeamDialog({
         if (event.target === event.currentTarget && !pending) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-2xl border border-danger-line bg-card p-5 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-line-soft bg-card p-5 shadow-2xl">
         <div className="flex items-start gap-3">
           <div className="rounded-lg bg-danger-tint p-2 text-danger">
             <ShieldAlert size={20} />
@@ -469,7 +469,7 @@ function DeleteTeamDialog({
             disabled={
               pending || operationsBlocked || confirmation !== team.team_id
             }
-            className="rounded-lg bg-danger-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-danger-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending
               ? "Deleting..."
@@ -582,7 +582,6 @@ export default function AdminTeams() {
   return (
     <section className="flex w-full flex-col gap-6">
       <PageHeader
-        eyebrow="Manage"
         title="LiteLLM team policy"
         description="Manage team budgets, model access, rate limits, and availability without opening the LiteLLM admin UI."
         actions={
@@ -606,7 +605,7 @@ export default function AdminTeams() {
       {operationsBlocked && (
         <DismissibleMessage
           messageKey="team-actions-paused"
-          className="rounded-xl border border-sand/40 bg-sand-tint px-4 py-3 text-sm text-sand-ink"
+          className="rounded-xl border border-transparent bg-orange-tint px-4 py-3 text-sm text-orange-ink"
         >
           Team actions are paused. Try again in {retryAfter || 1} seconds.
         </DismissibleMessage>
@@ -615,7 +614,7 @@ export default function AdminTeams() {
         <DismissibleMessage
           role="alert"
           messageKey={pageError.message}
-          className="rounded-xl border border-danger-line bg-danger-tint px-4 py-3 text-sm text-danger"
+          className="rounded-xl border border-transparent bg-danger-tint px-4 py-3 text-sm text-danger"
         >
           {pageError.message}
         </DismissibleMessage>
@@ -652,7 +651,7 @@ export default function AdminTeams() {
           </form>
         </div>
         {teams.isLoading ? (
-          <div className="h-48 animate-pulse bg-canvas" />
+          <div className="h-48 animate-pulse bg-well" />
         ) : teams.data?.teams.length ? (
           <div className="relative overflow-x-auto">
             <div
@@ -684,7 +683,7 @@ export default function AdminTeams() {
                     <div className="flex min-w-0 items-start gap-3">
                       <span
                         aria-hidden="true"
-                        className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-tint text-cyan-ink"
+                        className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-well text-ink-3"
                       >
                         <Building2 size={16} />
                       </span>
@@ -703,20 +702,20 @@ export default function AdminTeams() {
                           {team.organization_managed && (
                             <span
                               title="Managed by the organization hierarchy configuration, including Helm values"
-                              className="rounded-md bg-blue-tint px-2 py-0.5 text-[11px] font-semibold text-blue-ink"
+                              className="rounded-md bg-blue-tint px-2 py-0.5 text-xs font-semibold text-blue-ink"
                             >
                               Config managed
                             </span>
                           )}
                           {team.default_key_team && (
-                            <span className="rounded-md bg-blue-tint px-2 py-0.5 text-[11px] font-semibold text-blue-ink">
+                            <span className="rounded-md bg-blue-tint px-2 py-0.5 text-xs font-semibold text-blue-ink">
                               Default key team
                             </span>
                           )}
                           {team.mapped_groups.map((group) => (
                             <span
                               key={group}
-                              className="rounded-md bg-cyan-tint px-2 py-0.5 text-[11px] font-semibold text-cyan-ink"
+                              className="rounded-md bg-well px-2 py-0.5 text-xs font-medium text-ink-3"
                             >
                               SSO: {group}
                             </span>

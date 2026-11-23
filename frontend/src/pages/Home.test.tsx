@@ -464,7 +464,7 @@ describe("personal key storage", () => {
     const createdPanel = screen.getByText(
       "sk-synthetic-created",
     ).parentElement!;
-    expect(createdPanel).toHaveClass("bg-mint-tint");
+    expect(createdPanel).toHaveClass("bg-green-tint");
     fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "Show API key" }),

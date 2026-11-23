@@ -152,7 +152,7 @@ export default function PeopleTable({
       ) : (
         <div className="relative overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-canvas text-ink-4">
+            <thead className="bg-well text-ink-4">
               <tr>
                 <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">Team</th>
@@ -196,7 +196,9 @@ export default function PeopleTable({
                           : metricValue(user.budget_spend, "spend")}
                       </p>
                       {user.sync_error && (
-                        <p className="mt-1 text-sand-ink">{user.sync_error}</p>
+                        <p className="mt-1 text-orange-ink">
+                          {user.sync_error}
+                        </p>
                       )}
                     </td>
                     <td className="min-w-[15rem] px-4 py-3">
@@ -243,7 +245,7 @@ export default function PeopleTable({
                               <button
                                 disabled={save.isPending}
                                 aria-label={`Save allowance for ${name}`}
-                                className="h-9 rounded-lg border border-line-input px-3 font-semibold text-ink-2 hover:bg-canvas disabled:opacity-50"
+                                className="h-9 rounded-lg bg-ink/[0.06] px-3 font-medium text-ink hover:bg-ink/10 disabled:opacity-40"
                               >
                                 Save
                               </button>

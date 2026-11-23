@@ -99,7 +99,7 @@ export default function ModelBudgetEditor({
       </label>
       {rows !== undefined && (
         <>
-          <p className="text-sand-ink">
+          <p className="text-orange-ink">
             This replaces all per-model budgets on every selected key. Models
             omitted here lose their separate limit. Overall key budgets stay
             unchanged.

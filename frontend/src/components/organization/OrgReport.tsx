@@ -56,10 +56,10 @@ export default function OrgReport({
   return (
     <section
       aria-label="Usage report"
-      className="flex flex-col gap-5 rounded-xl border border-line bg-card p-5"
+      className="flex flex-col gap-5 rounded-xl border border-line-soft bg-card p-5"
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h2 className="text-base font-bold text-ink">Usage in {title}</h2>
+        <h2 className="text-base font-semibold text-ink">Usage in {title}</h2>
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs text-ink-4">
             From (UTC)
@@ -90,7 +90,7 @@ export default function OrgReport({
               onClick={onClose}
               aria-label="Close usage report"
               title="Close usage report"
-              className="grid h-10 w-10 place-items-center rounded-lg border border-line-input bg-card text-ink-3 hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue"
+              className="grid h-10 w-10 place-items-center rounded-lg bg-ink/[0.06] text-ink-3 hover:bg-ink/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue"
             >
               <X size={16} aria-hidden="true" />
             </button>
@@ -107,7 +107,7 @@ export default function OrgReport({
         <DismissibleMessage
           role="alert"
           messageKey={usage.error.message}
-          className="rounded-lg border border-danger-line bg-danger-tint p-4 text-sm text-danger"
+          className="rounded-lg border border-transparent bg-danger-tint p-4 text-sm text-danger"
         >
           {usage.error.message}{" "}
           <button
@@ -203,7 +203,7 @@ function UsageCards({
     undefined,
   );
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="-mx-5 grid gap-px border-y border-line-soft bg-line-soft md:grid-cols-2 md:[&>*:last-child:nth-child(odd)]:col-span-2">
       <BarCard
         title="Spend history"
         subtitle={`By week · ${range}`}

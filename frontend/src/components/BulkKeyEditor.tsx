@@ -365,12 +365,12 @@ export default function BulkKeyEditor({
     <details
       open={expanded ? true : undefined}
       onToggle={(event) => setEditorOpen(event.currentTarget.open)}
-      className="w-full rounded-xl border border-line bg-card"
+      className="w-full rounded-xl border border-line-soft bg-card"
     >
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-base font-bold text-ink">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-3.5 text-base font-semibold text-ink">
         <SlidersHorizontal size={16} /> Bulk edit key settings
         {targetCount > 0 && (
-          <span className="ml-auto rounded-full bg-blue-tint px-2.5 py-1 text-[10px] font-semibold text-blue-ink">
+          <span className="ml-auto rounded-full bg-blue-tint px-2.5 py-1 text-xs font-semibold text-blue-ink">
             {targetCount} selected
           </span>
         )}
@@ -387,21 +387,21 @@ export default function BulkKeyEditor({
               <p className="text-xs font-semibold text-ink">
                 Find and choose keys
               </p>
-              <p className="mt-0.5 text-[11px] text-ink-4">
+              <p className="mt-0.5 text-xs text-ink-4">
                 Search runs across the installation. Selections persist across
                 pages.
               </p>
             </div>
             {adminKeys.data && (
-              <span className="shrink-0 text-[10px] text-ink-4">
+              <span className="shrink-0 text-xs text-ink-4">
                 {adminKeys.data.total} results
               </span>
             )}
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-line bg-card">
-            <div className="space-y-3 border-b border-line bg-canvas p-3">
-              <div className="grid gap-2 sm:grid-cols-[1fr_12rem_9rem_auto]">
+          <div className="-mx-4 border-y border-line-soft">
+            <div className="space-y-3 border-b border-line-soft px-4 py-3">
+              <div className="grid gap-2 sm:grid-cols-[1fr_12rem_auto]">
                 <label className="relative">
                   <span className="sr-only">Search all keys</span>
                   <Search
@@ -433,20 +433,6 @@ export default function BulkKeyEditor({
                   className={inputClass}
                   placeholder="Exact team ID"
                 />
-                <select
-                  aria-label="Filter by blocked state"
-                  value={blockedFilter}
-                  onChange={(event) => {
-                    setBlockedFilter(event.target.value);
-                    setPage(1);
-                    selectAll.reset();
-                  }}
-                  className={inputClass}
-                >
-                  <option value="">Any status</option>
-                  <option value="false">Active only</option>
-                  <option value="true">Blocked only</option>
-                </select>
                 <button
                   type="button"
                   onClick={applySearch}
@@ -455,10 +441,50 @@ export default function BulkKeyEditor({
                   Search
                 </button>
               </div>
+              <div
+                role="group"
+                aria-label="Filter by blocked state"
+                className="flex flex-wrap gap-1.5"
+              >
+                {[
+                  { value: "", label: "All" },
+                  { value: "false", label: "Active" },
+                  { value: "true", label: "Blocked" },
+                ].map((chip) => {
+                  const active = blockedFilter === chip.value;
+                  return (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => {
+                        if (active) return;
+                        setBlockedFilter(chip.value);
+                        setPage(1);
+                        selectAll.reset();
+                      }}
+                      className={`inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors duration-150 ${
+                        active
+                          ? "bg-blue-tint text-blue-ink"
+                          : "bg-ink/[0.06] text-ink-3 hover:bg-ink/10 hover:text-ink"
+                      }`}
+                    >
+                      {chip.label}
+                      {/* Only the shown list has a count; others would cost
+                          extra requests. */}
+                      {active && adminKeys.data && (
+                        <span className="tabular-nums opacity-70">
+                          {adminKeys.data.total}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${selected.length ? "bg-blue-tint text-blue-ink" : "bg-canvas text-ink-4"}`}
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${selected.length ? "bg-blue-tint text-blue-ink" : "bg-well text-ink-4"}`}
                   >
                     {selected.length} selected
                   </span>
@@ -466,7 +492,7 @@ export default function BulkKeyEditor({
                     <button
                       type="button"
                       onClick={clearFilters}
-                      className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-ink-4 hover:bg-canvas hover:text-ink"
+                      className="flex items-center gap-1 rounded px-2 py-1 text-xs text-ink-4 hover:bg-ink/[0.06] hover:text-ink"
                     >
                       <X size={11} /> Clear filters
                     </button>
@@ -477,7 +503,7 @@ export default function BulkKeyEditor({
                     <button
                       type="button"
                       onClick={() => setSelected([])}
-                      className="rounded-lg px-2.5 py-1.5 text-[11px] text-ink-3 hover:bg-canvas hover:text-ink"
+                      className="rounded-lg px-2.5 py-1.5 text-xs text-ink-3 hover:bg-ink/[0.06] hover:text-ink"
                     >
                       Clear selection
                     </button>
@@ -486,7 +512,7 @@ export default function BulkKeyEditor({
                     type="button"
                     onClick={toggleAllKeys}
                     disabled={!adminKeys.data?.total || selectAll.isPending}
-                    className="rounded-lg border border-cyan/40 bg-cyan-tint px-2.5 py-1.5 text-[11px] font-medium text-cyan-ink hover:border-cyan disabled:cursor-not-allowed disabled:opacity-35"
+                    className="rounded-lg bg-blue-tint px-2.5 py-1.5 text-xs font-medium text-blue-ink hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     {selectAll.isPending
                       ? "Selecting..."
@@ -498,7 +524,7 @@ export default function BulkKeyEditor({
                     type="button"
                     onClick={toggleVisible}
                     disabled={!visibleTokens.length}
-                    className="rounded-lg border border-blue/30 bg-blue-tint px-2.5 py-1.5 text-[11px] font-medium text-blue-ink hover:border-blue disabled:cursor-not-allowed disabled:opacity-35"
+                    className="rounded-lg bg-blue-tint px-2.5 py-1.5 text-xs font-medium text-blue-ink hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     {allVisibleSelected
                       ? "Deselect page"
@@ -509,7 +535,7 @@ export default function BulkKeyEditor({
             </div>
 
             {adminKeys.isLoading ? (
-              <div className="h-44 animate-pulse bg-canvas" />
+              <div className="h-44 animate-pulse bg-well" />
             ) : adminKeys.error ? (
               <p className="p-4 text-xs text-danger">
                 {(adminKeys.error as Error).message}
@@ -529,7 +555,7 @@ export default function BulkKeyEditor({
                       return (
                         <div
                           key={token || index}
-                          className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border px-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue/50 ${!token ? "opacity-40" : isSelected ? "border-blue/60 bg-blue-tint/60" : "border-transparent hover:border-line hover:bg-canvas"}`}
+                          className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border px-3 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue/50 ${!token ? "opacity-40" : isSelected ? "border-blue/60 bg-blue-tint/60" : "border-transparent hover:bg-ink/[0.06]"}`}
                         >
                           <label
                             className={`group grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 transition md:grid-cols-[auto_minmax(0,2fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] md:gap-3 ${!token ? "cursor-not-allowed" : "cursor-pointer"}`}
@@ -544,7 +570,7 @@ export default function BulkKeyEditor({
                             />
                             <span
                               aria-hidden="true"
-                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${isSelected ? "border-blue bg-blue text-paper" : "border-line-input bg-card group-hover:border-blue/60"}`}
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${isSelected ? "border-blue bg-blue-solid text-paper" : "border-line-input bg-card group-hover:border-blue/60"}`}
                             >
                               {isSelected && (
                                 <Check size={13} strokeWidth={3} />
@@ -553,7 +579,7 @@ export default function BulkKeyEditor({
                             <span className="flex min-w-0 items-center gap-2.5">
                               <span
                                 aria-hidden="true"
-                                className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:flex ${isSelected ? "bg-blue text-paper" : "bg-blue-tint text-blue-ink"}`}
+                                className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:flex ${isSelected ? "bg-blue-solid text-paper" : "bg-blue-tint text-blue-ink"}`}
                               >
                                 <KeyRound size={15} />
                               </span>
@@ -583,7 +609,7 @@ export default function BulkKeyEditor({
                             <span className="col-span-2 col-start-2 min-w-0 md:col-span-1 md:col-start-auto">
                               {key.team_id ? (
                                 <span
-                                  className="inline-block max-w-full truncate rounded-md bg-cyan-tint px-2 py-0.5 text-xs font-medium text-cyan-ink"
+                                  className="inline-block max-w-full truncate rounded-md bg-well px-2 py-0.5 text-xs font-medium text-ink-3"
                                   title={key.team_id}
                                 >
                                   {key.team_id}
@@ -636,12 +662,12 @@ export default function BulkKeyEditor({
                     })}
                   </div>
                 </div>
-                <div className="flex items-center justify-between border-t border-line bg-canvas px-3 py-2.5 text-xs">
+                <div className="flex items-center justify-between border-t border-line-soft px-3 py-2.5 text-xs">
                   <button
                     type="button"
                     onClick={() => setPage((value) => Math.max(1, value - 1))}
                     disabled={page <= 1 || adminKeys.isFetching}
-                    className="rounded px-2 py-1 text-ink-3 hover:bg-well hover:text-ink disabled:opacity-30"
+                    className="rounded px-2 py-1 text-ink-3 hover:bg-ink/[0.06] hover:text-ink disabled:opacity-30"
                   >
                     Previous
                   </button>
@@ -656,7 +682,7 @@ export default function BulkKeyEditor({
                       page >= (adminKeys.data?.total_pages ?? 1) ||
                       adminKeys.isFetching
                     }
-                    className="rounded px-2 py-1 text-ink-3 hover:bg-well hover:text-ink disabled:opacity-30"
+                    className="rounded px-2 py-1 text-ink-3 hover:bg-ink/[0.06] hover:text-ink disabled:opacity-30"
                   >
                     Next
                   </button>
@@ -671,12 +697,12 @@ export default function BulkKeyEditor({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sand/40 bg-sand-tint p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div>
-              <p className="text-xs font-medium text-sand-ink">
+              <p className="text-sm font-medium text-ink">
                 Reset accumulated spend
               </p>
-              <p className="mt-0.5 text-[11px] text-ink-3">
+              <p className="mt-0.5 text-xs text-ink-4">
                 Select one or more keys. Their budgets, limits, and spend
                 histories are kept.
               </p>
@@ -685,7 +711,7 @@ export default function BulkKeyEditor({
               type="button"
               onClick={openResetDialog}
               disabled={!targetCount || operationsBlocked}
-              className="flex items-center gap-1.5 rounded-lg border border-sand/40 px-3 py-2 text-xs font-medium text-sand-ink hover:bg-sand-tint disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex min-h-8 items-center gap-1.5 rounded-md bg-orange-tint px-3 text-[13px] font-medium text-orange-ink hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <RotateCcw size={13} />
               {targetCount
@@ -695,7 +721,7 @@ export default function BulkKeyEditor({
           </div>
           {resetSpend.data && (
             <div
-              className={`rounded-lg border p-3 text-xs ${resetSpend.data.failed ? "border-sand/40 bg-sand-tint text-sand-ink" : "border-mint/40 bg-mint-tint text-mint-ink"}`}
+              className={`rounded-lg border p-3 text-xs ${resetSpend.data.failed ? "border-transparent bg-orange-tint text-orange-ink" : "border-transparent bg-green-tint text-green-ink"}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
@@ -708,14 +734,14 @@ export default function BulkKeyEditor({
                       type="button"
                       onClick={retryResetFailures}
                       disabled={resetSpend.isPending || operationsBlocked}
-                      className="rounded border border-sand/40 px-2 py-1 hover:bg-sand-tint disabled:opacity-40"
+                      className="rounded border border-orange/40 px-2 py-1 hover:bg-orange-tint disabled:opacity-40"
                     >
                       Retry failed
                     </button>
                     <button
                       type="button"
                       onClick={() => downloadResetFailures(resetSpend.data!)}
-                      className="flex items-center gap-1 rounded border border-sand/40 px-2 py-1 hover:bg-sand-tint"
+                      className="flex items-center gap-1 rounded border border-orange/40 px-2 py-1 hover:bg-orange-tint"
                     >
                       <Download size={11} /> Download failures
                     </button>
@@ -723,7 +749,7 @@ export default function BulkKeyEditor({
                 )}
               </div>
               {failedResetResults.length > 0 && (
-                <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] text-sand-ink">
+                <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto font-mono text-xs text-orange-ink">
                   {failedResetResults.map((result) => (
                     <li
                       key={result.key}
@@ -764,7 +790,7 @@ export default function BulkKeyEditor({
             {targetCount >
               visibleTokens.filter((token) => selectedSet.has(token))
                 .length && (
-              <p className="text-xs text-sand-ink">
+              <p className="text-xs text-orange-ink">
                 {targetCount -
                   visibleTokens.filter((token) => selectedSet.has(token))
                     .length}{" "}
@@ -796,7 +822,7 @@ export default function BulkKeyEditor({
               />
             </summary>
             <div className="grid gap-4 border-t border-line p-3 sm:grid-cols-2">
-              <p className="text-[11px] text-ink-4 sm:col-span-2">
+              <p className="text-xs text-ink-4 sm:col-span-2">
                 Saved values are filled in below. Only edited, filled fields are
                 changed. Mixed values differ between selected keys. Changing the
                 selection resets edits.
@@ -935,7 +961,7 @@ export default function BulkKeyEditor({
                 disabled={
                   update.isPending || operationsBlocked || targetCount === 0
                 }
-                className="rounded-lg bg-blue px-4 py-3 text-sm font-semibold text-paper shadow-lg hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+                className="rounded-lg bg-blue-solid px-4 py-3 text-sm font-medium text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
               >
                 {update.isPending
                   ? "Updating..."
@@ -950,13 +976,13 @@ export default function BulkKeyEditor({
         )}
         {error && <p className="text-xs text-danger sm:col-span-2">{error}</p>}
         {operationsBlocked && (
-          <p className="text-xs text-sand-ink sm:col-span-2">
+          <p className="text-xs text-orange-ink sm:col-span-2">
             Bulk updates are paused. Try again in {retryAfter || 1} seconds.
           </p>
         )}
         {update.data && (
           <div
-            className={`rounded-lg border p-3 text-xs sm:col-span-2 ${update.data.failed ? "border-sand/40 bg-sand-tint text-sand-ink" : "border-mint/40 bg-mint-tint text-mint-ink"}`}
+            className={`rounded-lg border p-3 text-xs sm:col-span-2 ${update.data.failed ? "border-transparent bg-orange-tint text-orange-ink" : "border-transparent bg-green-tint text-green-ink"}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span>
@@ -968,14 +994,14 @@ export default function BulkKeyEditor({
                     type="button"
                     onClick={retryFailures}
                     disabled={update.isPending || operationsBlocked}
-                    className="rounded border border-sand/40 px-2 py-1 hover:bg-sand-tint disabled:opacity-40"
+                    className="rounded border border-orange/40 px-2 py-1 hover:bg-orange-tint disabled:opacity-40"
                   >
                     Retry failed
                   </button>
                   <button
                     type="button"
                     onClick={() => downloadFailures(update.data!)}
-                    className="flex items-center gap-1 rounded border border-sand/40 px-2 py-1 hover:bg-sand-tint"
+                    className="flex items-center gap-1 rounded border border-orange/40 px-2 py-1 hover:bg-orange-tint"
                   >
                     <Download size={11} /> Download failures
                   </button>
@@ -983,7 +1009,7 @@ export default function BulkKeyEditor({
               )}
             </div>
             {failedResults.length > 0 && (
-              <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto font-mono text-[10px] text-sand-ink">
+              <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto font-mono text-xs text-orange-ink">
                 {failedResults.map((result) => (
                   <li
                     key={result.key}
@@ -1036,7 +1062,7 @@ function ResetSpendDialog({
   const dialogRef = useDialogDismiss(onClose, pending);
   return (
     <div
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-30 flex items-center justify-center bg-black/30 p-4 backdrop-blur-[2px]"
       role="dialog"
       ref={dialogRef}
       aria-modal="true"
@@ -1045,9 +1071,9 @@ function ResetSpendDialog({
         if (event.target === event.currentTarget && !pending) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-2xl border border-sand/40 bg-card p-5 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-line-soft bg-card p-5 shadow-2xl">
         <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-sand-tint p-2 text-sand-ink">
+          <div className="rounded-lg bg-orange-tint p-2 text-orange-ink">
             <RotateCcw size={20} />
           </div>
           <div className="min-w-0 flex-1">
@@ -1084,7 +1110,7 @@ function ResetSpendDialog({
             type="button"
             onClick={onReset}
             disabled={pending || operationsBlocked}
-            className="rounded-lg bg-sand-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-orange-solid px-4 py-2 text-sm font-semibold text-paper hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending
               ? "Resetting..."

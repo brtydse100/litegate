@@ -31,7 +31,7 @@ export default function EmailAddress({
         aria-label={`Copy email ${email}`}
         title="Copy email"
         onClick={(event) => void copy(event)}
-        className="shrink-0 rounded p-1 hover:bg-canvas focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue"
+        className="shrink-0 rounded p-1 hover:bg-ink/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue"
       >
         <Copy size={12} aria-hidden="true" />
       </button>

@@ -3,6 +3,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { BarChart3, Network } from "lucide-react";
 import { api } from "../api/client";
 import DismissibleMessage from "./DismissibleMessage";
+import Breadcrumb from "./organization/Breadcrumb";
 import GroupPanel from "./organization/GroupPanel";
 import OrgReport from "./organization/OrgReport";
 import PeopleTable from "./organization/PeopleTable";
@@ -55,33 +56,32 @@ function treeOrder(
 }
 
 function Metric({
-  accent,
   caption,
   children,
   sub,
   bar,
 }: {
-  accent: string;
   caption: string;
   children: React.ReactNode;
   sub: string;
   bar?: number | null;
 }) {
   return (
-    <div
-      className={`flex flex-col gap-1 rounded-[10px] border border-t-[3px] border-line bg-card px-[18px] pb-[18px] pt-4 ${accent}`}
-    >
-      <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-4">
+    // Phones: one grouped list, label left and figure right. Wider: tiles.
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-3 sm:flex sm:flex-col sm:items-stretch sm:gap-1 sm:rounded-xl sm:border sm:border-line-soft sm:bg-card sm:px-[18px] sm:py-4">
+      <span className="col-start-1 row-start-1 text-sm font-medium text-ink sm:text-[13px] sm:text-ink-4">
         {caption}
       </span>
-      <span className="inline-flex items-center gap-2.5 text-[28px] font-semibold text-ink">
+      <span className="col-start-2 row-span-2 row-start-1 inline-flex items-center gap-2 text-[17px] font-semibold tabular-nums text-ink sm:gap-2.5 sm:text-[26px] sm:tracking-[-0.01em]">
         {children}
       </span>
-      <span className="text-[13px] text-ink-3">{sub}</span>
+      <span className="col-start-1 row-start-2 text-[13px] text-ink-4">
+        {sub}
+      </span>
       {bar != null && (
-        <span className="mt-2 block h-1 rounded-sm bg-line-soft">
+        <span className="col-span-2 mt-2 block h-1.5 rounded-full bg-well">
           <span
-            className="block h-1 rounded-sm bg-teal"
+            className="block h-1.5 rounded-full bg-blue"
             style={{ width: `${Math.min(100, bar)}%` }}
           />
         </span>
@@ -240,6 +240,13 @@ export default function AdminOrganization({
   }, [wanted]);
 
   const selected = nodeId ? byId.get(nodeId) : undefined;
+  const trail: Group[] = [];
+  for (
+    let step = selected;
+    step;
+    step = step.parent_id ? byId.get(step.parent_id) : undefined
+  )
+    trail.unshift(step);
   if (nodeId && rootsQuery.data && !selected && !totals.isPending)
     setNodeId(null);
   const detail = useQuery({
@@ -357,7 +364,7 @@ export default function AdminOrganization({
         });
         if (selected) void detail.refetch();
       }}
-      className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas disabled:opacity-50"
+      className="min-h-10 rounded-lg bg-ink/[0.06] px-3 text-sm text-ink hover:bg-ink/10 disabled:opacity-50"
     >
       Refresh organization
     </button>
@@ -370,7 +377,7 @@ export default function AdminOrganization({
       <div className="flex flex-col items-start gap-3 p-8">
         <p
           role="alert"
-          className="rounded-lg border border-danger-line bg-danger-tint p-4 text-sm text-danger"
+          className="rounded-lg border border-transparent bg-danger-tint p-4 text-sm text-danger"
         >
           {rootsQuery.error.message}
         </p>
@@ -380,7 +387,7 @@ export default function AdminOrganization({
   if (!enabled)
     return (
       <div className="p-8">
-        <section className="rounded-xl border border-line bg-card p-8">
+        <section className="rounded-xl border border-line-soft bg-card p-8">
           <Network className="text-blue" aria-hidden="true" />
           <h1 className="mt-4 text-lg font-semibold text-ink">Organization</h1>
           <p className="mt-2 text-sm text-ink-4">
@@ -444,11 +451,11 @@ export default function AdminOrganization({
       : []),
     ...syncErrors.map((group) => ({
       key: `sync-${group.id}`,
-      tone: "bg-periwinkle",
+      tone: "bg-orange",
       title: `${group.name} policy not synced`,
       sub: group.sync_error ?? "",
       action: "View",
-      button: "bg-periwinkle-tint text-periwinkle-ink",
+      button: "bg-orange-tint text-orange-ink",
       onClick: () => select(group.id),
     })),
     // Budget warnings come last so they never push problems out of view.
@@ -463,11 +470,11 @@ export default function AdminOrganization({
       .sort((left, right) => right.used - left.used)
       .map(({ group, used }) => ({
         key: `budget-${group.id}`,
-        tone: "bg-sand",
+        tone: "bg-orange",
         title: `${group.name} at ${used}%`,
         sub: group.path.join(" › "),
         action: "Review",
-        button: "bg-sand-tint text-sand-ink",
+        button: "bg-orange-tint text-orange-ink",
         onClick: () => select(group.id),
       })),
   ];
@@ -541,7 +548,7 @@ export default function AdminOrganization({
       ref={reportButton}
       onClick={() => setAllGroupsReport((open) => !open)}
       aria-label={`${allGroupsReport ? "Hide report" : "Usage report"}, ${reportScope}, ${plural(reportUsers, "user")}`}
-      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-teal-solid px-3.5 text-sm font-semibold text-paper hover:brightness-90"
+      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-blue-solid px-3.5 text-sm font-semibold text-paper hover:brightness-110"
     >
       <BarChart3 size={15} aria-hidden="true" />
       {allGroupsReport ? "Hide report" : "Usage report"}
@@ -587,15 +594,16 @@ export default function AdminOrganization({
         />
       )}
       <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-[22px] px-4 py-7 sm:px-8">
+        <Breadcrumb trail={trail} onOpen={select} onClose={closeGroup} />
         <div className="flex flex-wrap items-end justify-between gap-3.5">
           <div>
-            <h1 className="text-xs font-semibold uppercase tracking-[0.06em] text-ink-4">
+            <h1 className="text-[28px] font-bold leading-tight tracking-[-0.02em] text-ink">
               Organization
             </h1>
-            <p className="mt-0.5 text-[28px] font-bold tracking-[-0.01em] text-ink">
+            <p className="mt-1 text-[15px] font-medium text-ink-2">
               {greeting(email)}
             </p>
-            <p className="mt-1 text-[15px] text-ink-3">
+            <p className="text-[15px] text-ink-4">
               {status.data && !status.data.ready
                 ? "The gateway is not ready."
                 : healthy
@@ -610,7 +618,7 @@ export default function AdminOrganization({
               {near.length > 0 && (
                 <>
                   {" "}
-                  <span className="font-semibold text-sand-ink">
+                  <span className="font-semibold text-orange-ink">
                     {plural(near.length, "group")}
                   </span>{" "}
                   {near.length === 1 ? "is" : "are"} at {NEAR}% or more of their
@@ -623,11 +631,11 @@ export default function AdminOrganization({
             {roots.length === 1 && rootLevel && (
               // One team (a team owner's): name it where the picker would be.
               <>
-                <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-4">
+                <span className="text-xs font-medium text-ink-4">
                   {rootLevel}
                 </span>
                 <span className="flex rounded-[10px] bg-well p-1">
-                  <span className="flex min-h-9 items-center rounded-[7px] bg-card px-3.5 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                  <span className="flex min-h-9 items-center rounded-[7px] bg-segment px-3.5 text-sm font-medium text-ink shadow-[0_1px_2px_rgb(0_0_0/0.12)]">
                     {roots[0].name}
                   </span>
                 </span>
@@ -636,7 +644,7 @@ export default function AdminOrganization({
             {roots.length > 1 && (
               <>
                 {rootLevel && (
-                  <span className="text-xs font-semibold uppercase tracking-[0.04em] text-ink-4">
+                  <span className="text-xs font-medium text-ink-4">
                     {rootLevel}
                   </span>
                 )}
@@ -656,7 +664,12 @@ export default function AdminOrganization({
                       id: item.id,
                       name: item.name,
                       pressed: activeIds.includes(item.id),
-                      onClick: () => toggleRoot(item.id),
+                      // From "All", a click narrows to that one; otherwise
+                      // clicks add or remove teams from the combination.
+                      onClick: () =>
+                        allActive
+                          ? chooseRoots([item.id])
+                          : toggleRoot(item.id),
                     })),
                   ].map((item) => (
                     <button
@@ -664,9 +677,9 @@ export default function AdminOrganization({
                       type="button"
                       aria-pressed={item.pressed}
                       onClick={item.onClick}
-                      className={`min-h-9 rounded-[7px] px-3.5 text-sm ${
+                      className={`min-h-9 rounded-[7px] px-3.5 text-sm font-medium transition-colors duration-150 ${
                         item.pressed
-                          ? "bg-card font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                          ? "bg-segment text-ink shadow-[0_1px_2px_rgb(0_0_0/0.12)]"
                           : "text-ink-3 hover:text-ink"
                       }`}
                     >
@@ -681,9 +694,8 @@ export default function AdminOrganization({
         </div>
 
         {activeRoots.length > 0 && (
-          <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="divide-y divide-line-soft overflow-hidden rounded-xl border border-line-soft bg-card sm:grid sm:grid-cols-2 sm:gap-3.5 sm:divide-y-0 sm:overflow-visible sm:rounded-none sm:border-0 sm:bg-transparent xl:grid-cols-4">
             <Metric
-              accent="border-t-teal"
               caption="Spend this period"
               sub={`of ${spendTarget == null ? "no target" : shortMoney(spendTarget)} · ${scopeName}${leafScope ? "" : " + all sub-groups"}`}
               bar={percent(combinedSpend, spendTarget)}
@@ -695,7 +707,6 @@ export default function AdminOrganization({
               )}
             </Metric>
             <Metric
-              accent="border-t-blue"
               caption="People"
               sub={
                 leafScope
@@ -706,7 +717,6 @@ export default function AdminOrganization({
               {combinedMembers.toLocaleString()}
             </Metric>
             <Metric
-              accent="border-t-sand"
               caption="Near budget"
               sub={`groups at ${NEAR}% or more used`}
             >
@@ -714,7 +724,6 @@ export default function AdminOrganization({
             </Metric>
             {isAdmin && (
               <Metric
-                accent="border-t-mint"
                 caption="LiteLLM gateway"
                 sub={
                   status.data
@@ -730,7 +739,7 @@ export default function AdminOrganization({
                     !status.data
                       ? "bg-ink-5"
                       : status.data.ready
-                        ? "bg-mint"
+                        ? "bg-green"
                         : "bg-danger"
                   }`}
                 />
@@ -743,7 +752,6 @@ export default function AdminOrganization({
             )}
             {!isAdmin && (
               <Metric
-                accent="border-t-mint"
                 caption="Team budget"
                 sub={
                   planned
@@ -769,7 +777,7 @@ export default function AdminOrganization({
           {activeRoots.length > 0 && directChildren.length > 0 && (
             <section
               aria-label="Spend split"
-              className="flex min-w-0 flex-[999_1_420px] flex-col gap-3.5 rounded-xl border border-line bg-card px-5 py-[18px]"
+              className="flex min-w-0 flex-[999_1_420px] flex-col gap-3.5 rounded-xl border border-line-soft bg-card px-5 py-[18px]"
             >
               <div className="flex flex-wrap justify-between gap-2 text-sm">
                 <span className="font-semibold text-ink">
@@ -828,7 +836,7 @@ export default function AdminOrganization({
 
           <section
             aria-label="Needs attention"
-            className="flex flex-[1_1_300px] flex-col rounded-xl border border-line bg-card px-5 py-4"
+            className="flex flex-[1_1_300px] flex-col rounded-xl border border-line-soft bg-card px-5 py-4"
           >
             <h2 className="mb-1.5 text-sm font-semibold text-ink">
               Needs attention
@@ -889,7 +897,7 @@ export default function AdminOrganization({
             messageKey={issues
               .map((issue) => `${issue.user_id}:${issue.error}`)
               .join("|")}
-            className="rounded-xl border border-sand/40 bg-sand-tint p-4 text-sm text-sand-ink"
+            className="rounded-xl border border-transparent bg-orange-tint p-4 text-sm text-orange-ink"
           >
             <p className="font-medium">Some memberships need attention</p>
             <ul className="mt-2 space-y-1">
@@ -916,7 +924,7 @@ export default function AdminOrganization({
                   type="button"
                   aria-pressed={nodeId === root.id}
                   onClick={() => select(root.id)}
-                  className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas"
+                  className="min-h-10 rounded-lg bg-ink/[0.06] px-3 text-sm text-ink hover:bg-ink/10"
                 >
                   Team details
                 </button>
@@ -929,11 +937,11 @@ export default function AdminOrganization({
         {activeRoots.length > 0 && !leafScope && (
           <section
             aria-label="Groups"
-            className="overflow-hidden rounded-xl border border-line bg-card"
+            className="overflow-hidden rounded-xl border border-line-soft bg-card"
           >
             <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line px-5 py-3.5">
               <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-base font-bold text-ink">
+                <h2 className="text-base font-semibold text-ink">
                   Groups in {tableRoot ? tableRoot.name : scopeName}
                 </h2>
                 {tableRoot && (
@@ -994,7 +1002,7 @@ export default function AdminOrganization({
                     if (expandAll) setExpanded(new Set());
                     setExpandAll((value) => !value);
                   }}
-                  className="min-h-10 rounded-lg border border-line-input bg-card px-3 text-sm text-ink-2 hover:bg-canvas"
+                  className="min-h-10 rounded-lg bg-ink/[0.06] px-3 text-sm text-ink hover:bg-ink/10"
                 >
                   {expandAll ? "Collapse all" : "Expand all"}
                 </button>
@@ -1003,7 +1011,7 @@ export default function AdminOrganization({
             </div>
             <div className="overflow-x-auto">
               <div
-                className={`${columns} border-b border-line-soft bg-canvas px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.04em] text-ink-4`}
+                className={`${columns} border-b border-line-soft px-5 py-2.5 text-xs font-medium text-ink-4`}
               >
                 <span>Group</span>
                 <span>People</span>
@@ -1028,9 +1036,7 @@ export default function AdminOrganization({
                       role="listitem"
                       key={group.id}
                       className={`relative ${columns} border-b border-line-soft px-5 py-[11px] text-sm text-ink ${
-                        active
-                          ? "bg-blue-tint/60 shadow-[inset_3px_0_0_rgb(var(--blue))]"
-                          : "hover:bg-canvas/70"
+                        active ? "bg-blue-tint" : "hover:bg-ink/[0.03]"
                       }`}
                     >
                       <button
@@ -1052,7 +1058,7 @@ export default function AdminOrganization({
                             aria-expanded={open}
                             aria-label={`${open ? "Collapse" : "Expand"} ${group.path.join(" → ")}`}
                             onClick={() => toggle(group)}
-                            className="pointer-events-auto relative z-10 -ml-1.5 inline-flex h-7 w-7 items-center justify-center rounded text-sm text-ink-3 hover:bg-well"
+                            className="pointer-events-auto relative z-10 -ml-1.5 inline-flex h-7 w-7 items-center justify-center rounded text-sm text-ink-3 hover:bg-ink/[0.06]"
                           >
                             <span aria-hidden="true">{open ? "▾" : "▸"}</span>
                           </button>
@@ -1061,10 +1067,10 @@ export default function AdminOrganization({
                         )}
                         <span
                           aria-hidden="true"
-                          className={`inline-flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] text-[11px] font-bold ${
+                          className={`inline-flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] text-xs font-semibold ${
                             depth(group) === 0
                               ? `${color.tint} ${color.ink}`
-                              : `bg-canvas ${color.ink}`
+                              : `bg-well ${color.ink}`
                           }`}
                         >
                           {groupInitials(group.name)}
@@ -1110,7 +1116,7 @@ export default function AdminOrganization({
                               </span>
                               {used != null && (
                                 <span
-                                  className={`font-semibold ${used >= NEAR ? "text-sand-ink" : "text-ink-3"}`}
+                                  className={`font-semibold ${used >= NEAR ? "text-orange-ink" : "text-ink-3"}`}
                                 >
                                   {used}%
                                 </span>
@@ -1167,12 +1173,11 @@ export default function AdminOrganization({
                   Spend totals are unavailable: {totals.error.message}
                 </p>
               )}
-              <p className="px-5 pb-3 pt-2.5 text-[13px] text-ink-4">
-                Sub-groups load when you open them
-                {levels.length - baseLevel - 2 > MAX_DEPTH
-                  ? " · deeper levels open in their own view"
-                  : ""}
-              </p>
+              {levels.length - baseLevel - 2 > MAX_DEPTH && (
+                <p className="px-5 pb-3 pt-2.5 text-[13px] text-ink-4">
+                  Deeper levels open in their own view
+                </p>
+              )}
             </div>
           </section>
         )}
