@@ -7,6 +7,41 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.22.0] - 2026-11-23
+
+### Added
+
+- The Organization page can combine several departments at once, with an
+  **All** choice. Cards, Needs attention, the spend split, the group table and
+  the usage report cover the selection. `GET /api/v1/organization/users` and
+  `/usage` accept a repeated `node` parameter (up to 50 groups, each
+  scope-checked), and each `by_group` usage entry gains a `daily` array.
+- The usage report shows Spend history, Requests history, Tokens by group and
+  Spend by model as small charts with exact values on hover, tap or arrow keys,
+  and it can be closed.
+- Team owners get the administrator-style sidebar and Organization page for
+  their own teams, a Team budget card, and in-place allowances in a People list.
+  The demo adds an **Owner** role with a team of people and a team of teams.
+- A breadcrumb shows the open group's path on the Organization page, and the
+  Keys list filters by All, Active or Blocked with chips.
+
+### Changed
+
+- The portal follows Apple's Human Interface Guidelines: the system font, one
+  blue accent, a light sidebar, large page titles, segmented controls and
+  flatter grouped sections in light and dark themes. The IBM Plex font packages
+  are removed.
+- LiteGate has a new default mark, an arched gateway with a key slot, on the
+  sign-in page, sidebar and top bar. A configured `logo_url` still replaces it.
+- Anyone with administrator or team-owner access keeps the sidebar on My key
+  and Analytics; ordinary users keep the top bar without an Admin link.
+
+### Fixed
+
+- In the department picker, clicking a team after **All** now shows just that
+  team instead of switching it off.
+- The usage report can be closed again, and level names pluralise correctly.
+
 ## [2.21.0] - 2026-11-20
 
 ### Changed
@@ -650,7 +685,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.21.0...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.22.0...HEAD
+[2.22.0]: https://github.com/brtydse100/litegate/compare/v2.21.0...v2.22.0
 [2.21.0]: https://github.com/brtydse100/litegate/compare/v2.20.3...v2.21.0
 [2.20.3]: https://github.com/brtydse100/litegate/compare/v2.20.2...v2.20.3
 [2.20.2]: https://github.com/brtydse100/litegate/compare/v2.20.1...v2.20.2
