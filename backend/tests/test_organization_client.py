@@ -178,7 +178,7 @@ async def test_root_sync_clears_and_verifies_only_the_default_member_cap(monkeyp
     monkeypatch.setattr(litellm, "get_team", AsyncMock(return_value=team))
     monkeypatch.setattr(litellm, "update_team", update)
     monkeypatch.setattr(upstream, "team_info", AsyncMock(side_effect=[original, verified]))
-    monkeypatch.setattr(litellm, "list_keys_filtered", AsyncMock(return_value={"keys": [], "total_pages": 1}))
+    monkeypatch.setattr(litellm, "list_keys", AsyncMock(return_value={"keys": [], "total_pages": 1}))
     if applied:
         result = await key_policy.finish_team(root)
         assert result["team_info"]["team_member_budget_table"]["rpm_limit"] == 10

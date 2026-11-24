@@ -9,7 +9,10 @@ import { AuthProvider } from "./hooks/useAuth";
 import "./index.css";
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+  // Returning to the tab does not reload every page; pages poll where needed.
+  defaultOptions: {
+    queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false },
+  },
 });
 
 applyStoredTheme();

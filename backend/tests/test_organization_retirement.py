@@ -1,4 +1,4 @@
-"""Ownership is evidence of creation, and cleanup never races a remote addition."""
+"""Ownership is evidence of creation, and cleanup deletes only verified-empty managed teams."""
 
 from importlib import import_module, util
 from unittest.mock import AsyncMock
@@ -34,7 +34,7 @@ async def test_unowned_adopted_team_never_becomes_cleanup_candidate(monkeypatch,
     monkeypatch.setattr(litellm, "get_team", AsyncMock(return_value={"team_id": "engineering"}))
     await upstream.sync_root(settings.organization_hierarchy.roots[0])
     assert service.owned_teams() == []
-    assert await service.assess_removed_teams() == []
+    assert await service.retire_removed_teams() == []
     litellm.delete_team.assert_not_awaited()
 
 
@@ -52,14 +52,34 @@ async def test_only_confirmed_creation_is_marked_owned(monkeypatch, retirement):
 
 
 @pytest.mark.asyncio
-async def test_empty_owned_removed_team_requires_atomic_upstream_delete(monkeypatch, retirement):
+async def test_empty_owned_removed_team_is_deleted_and_forgotten(monkeypatch, retirement):
     service = import_module("app.services.organization_retirement")
     service.mark_created("removed")
-    result = await service.assess_removed_teams()
-    assert result == [{"team_id": "removed", "status": "review_required", "reason": "atomic_delete_unavailable"}]
-    litellm.delete_team.assert_not_awaited()
+    result = await service.retire_removed_teams()
+    assert result == [{"team_id": "removed", "status": "deleted"}]
+    litellm.delete_team.assert_awaited_once_with("removed")
+    assert service.owned_teams() == []
     with local_users.connect() as db:
-        assert db.execute("SELECT count(*) FROM audit_events WHERE action='organization.retirement'").fetchone()[0] == 1
+        assert db.execute("SELECT count(*) FROM audit_events WHERE action='organization.team_deleted'").fetchone()[0] == 1
+
+
+@pytest.mark.asyncio
+async def test_cleanup_disabled_never_deletes(monkeypatch, retirement):
+    service = import_module("app.services.organization_retirement")
+    service.mark_created("removed")
+    monkeypatch.setattr(settings, "organization_cleanup_enabled", False)
+    assert await service.retire_removed_teams() == []
+    litellm.delete_team.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_without_configured_groups_nothing_is_deleted(monkeypatch, retirement):
+    service = import_module("app.services.organization_retirement")
+    service.mark_created("removed")
+    monkeypatch.setattr(settings, "organization_hierarchy", OrganizationHierarchy())
+    result = await service.retire_removed_teams()
+    assert result == [{"team_id": "removed", "status": "review_required", "reason": "empty"}]
+    litellm.delete_team.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -70,7 +90,7 @@ async def test_group_admin_team_reference_is_not_a_retirement_candidate(monkeypa
 
     assert "group-admin-user" not in service.configured_team_ids()
     assert await service.retirement_reason("removed") == "configured_reference"
-    assert await service.assess_removed_teams() == []
+    assert await service.retire_removed_teams() == []
     upstream.team_info.assert_not_awaited()
     litellm.delete_team.assert_not_awaited()
     with local_users.connect() as db:
@@ -86,12 +106,14 @@ async def test_repeated_passes_audit_a_candidate_only_when_its_reason_changes(mo
         with local_users.connect() as db:
             return [row[0] for row in db.execute("SELECT details_json FROM audit_events WHERE action='organization.retirement' ORDER BY id")]
 
+    keys = {"team_info": {"team_id": "removed", "members_with_roles": []}, "team_memberships": [], "keys": [{"token": "hash"}]}
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=keys))
     for _ in range(3):
-        assert (await service.assess_removed_teams())[0]["reason"] == "atomic_delete_unavailable"
+        assert (await service.retire_removed_teams())[0]["reason"] == "keys_present"
     assert len(events()) == 1
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": {"members_with_roles": [{"user_id": "late"}]}}))
-    await service.assess_removed_teams()
-    await service.assess_removed_teams()
+    await service.retire_removed_teams()
+    await service.retire_removed_teams()
     assert len(events()) == 2
     assert "remote_check_incomplete" in events()[1]
 
@@ -105,7 +127,7 @@ async def test_unknown_or_populated_remote_never_deletes(monkeypatch, retirement
     service = import_module("app.services.organization_retirement")
     service.mark_created("removed")
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=remote))
-    result = await service.assess_removed_teams()
+    result = await service.retire_removed_teams()
     assert result[0]["status"] == "review_required"
     litellm.delete_team.assert_not_awaited()
 

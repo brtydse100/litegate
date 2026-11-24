@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import {
@@ -10,16 +10,19 @@ import {
   User as UserIcon,
   Users,
 } from "lucide-react";
-import AdminKeys from "../components/AdminKeys";
 import DismissibleMessage from "../components/DismissibleMessage";
 import PersonalKeySecret from "../components/PersonalKeySecret";
 import { keyToken } from "../components/BulkKeyEditor";
-import AdminAudit from "../components/AdminAudit";
-import AdminStatus from "../components/AdminStatus";
-import AdminUsers from "../components/AdminUsers";
-import AdminTeams from "../components/AdminTeams";
-import PersonalAnalytics from "../components/PersonalAnalytics";
-import AdminOrganization from "../components/AdminOrganization";
+import { LoadingBlock, LoadingPage } from "../components/LoadingBlock";
+
+// Each page loads its code on first visit, so My key does not wait for admin pages.
+const AdminKeys = lazy(() => import("../components/AdminKeys"));
+const AdminAudit = lazy(() => import("../components/AdminAudit"));
+const AdminStatus = lazy(() => import("../components/AdminStatus"));
+const AdminUsers = lazy(() => import("../components/AdminUsers"));
+const AdminTeams = lazy(() => import("../components/AdminTeams"));
+const PersonalAnalytics = lazy(() => import("../components/PersonalAnalytics"));
+const AdminOrganization = lazy(() => import("../components/AdminOrganization"));
 import {
   AdminSidebar,
   BrandMark,
@@ -168,14 +171,14 @@ export default function Home() {
     (section === "/analytics" || section === "/organization") &&
     portal.isPending
   )
-    return <p role="status">Loading access…</p>;
+    return <LoadingPage label="Loading access…" />;
   if (
     section === "/organization" &&
     !isAdmin &&
     config?.organization_delegation_enabled &&
     organizationAccess.isPending
   )
-    return <p role="status">Checking organization access…</p>;
+    return <LoadingPage label="Checking organization access…" />;
   // Team owners get the sidebar layout; wait for their access instead of
   // flashing the ordinary top bar first.
   if (
@@ -183,7 +186,7 @@ export default function Home() {
     config?.organization_delegation_enabled &&
     organizationAccess.isPending
   )
-    return <p role="status">Loading access…</p>;
+    return <LoadingPage label="Loading access…" />;
   const adminSections = new Set([
     "/keys",
     "/users",
@@ -518,34 +521,42 @@ export default function Home() {
       />
       <div className="min-w-0 flex-1 md:flex md:flex-col">
         <main className="min-w-0 flex-1 md:overflow-y-auto">
-          {section === "/organization" && canViewOrganization ? (
-            <AdminOrganization
-              budgetsEnabled={!!config?.hierarchical_budgets_enabled}
-              email={user?.email}
-              isAdmin={isAdmin}
-            />
-          ) : section === "/my-key" || section === "/analytics" ? (
-            <div className="mx-auto max-w-[1080px] px-4 pb-14 pt-9 sm:px-8">
-              {section === "/analytics" ? <PersonalAnalytics /> : myKey}
-            </div>
-          ) : (
-            <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-8">
-              {section === "/users" && isAdmin ? (
-                <AdminUsers localUsersEnabled={localUsersEnabled} />
-              ) : section === "/teams" && isAdmin ? (
-                <AdminTeams />
-              ) : section === "/keys" && isAdmin ? (
-                <AdminKeys
-                  saveApiKeysInDb={config?.save_api_keys_in_db}
-                  enterpriseEnabled={config?.litellm_enterprise_enabled}
-                />
-              ) : section === "/status" && isAdmin ? (
-                <AdminStatus />
-              ) : section === "/audit" && isAdmin ? (
-                <AdminAudit />
-              ) : null}
-            </div>
-          )}
+          <Suspense
+            fallback={
+              <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-8">
+                <LoadingBlock label="Loading page…" className="h-64" />
+              </div>
+            }
+          >
+            {section === "/organization" && canViewOrganization ? (
+              <AdminOrganization
+                budgetsEnabled={!!config?.hierarchical_budgets_enabled}
+                email={user?.email}
+                isAdmin={isAdmin}
+              />
+            ) : section === "/my-key" || section === "/analytics" ? (
+              <div className="mx-auto max-w-[1080px] px-4 pb-14 pt-9 sm:px-8">
+                {section === "/analytics" ? <PersonalAnalytics /> : myKey}
+              </div>
+            ) : (
+              <div className="mx-auto w-full max-w-6xl px-4 py-7 sm:px-8">
+                {section === "/users" && isAdmin ? (
+                  <AdminUsers localUsersEnabled={localUsersEnabled} />
+                ) : section === "/teams" && isAdmin ? (
+                  <AdminTeams />
+                ) : section === "/keys" && isAdmin ? (
+                  <AdminKeys
+                    saveApiKeysInDb={config?.save_api_keys_in_db}
+                    enterpriseEnabled={config?.litellm_enterprise_enabled}
+                  />
+                ) : section === "/status" && isAdmin ? (
+                  <AdminStatus />
+                ) : section === "/audit" && isAdmin ? (
+                  <AdminAudit />
+                ) : null}
+              </div>
+            )}
+          </Suspense>
         </main>
       </div>
     </div>

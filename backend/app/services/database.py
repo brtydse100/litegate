@@ -110,8 +110,25 @@ def _organization_participants(db: sqlite3.Connection) -> None:
     )
 
 
+def _organization_team_bindings(db: sqlite3.Connection) -> None:
+    # Groups adopted by name keep their LiteLLM team across renames and moves.
+    # A row outlives its group so the adopted team remains a cleanup candidate.
+    db.execute(
+        """CREATE TABLE IF NOT EXISTS organization_team_bindings (
+            node_id TEXT PRIMARY KEY, team_id TEXT NOT NULL UNIQUE,
+            group_name TEXT NOT NULL, path_json TEXT NOT NULL, adopted_at TEXT NOT NULL)"""
+    )
+
+
 # Append migrations in order; each callable receives the same reserved transaction.
-MIGRATIONS = (_existing_stores, _analytics_store, _budget_store, _analytics_failures, _organization_participants)
+MIGRATIONS = (
+    _existing_stores,
+    _analytics_store,
+    _budget_store,
+    _analytics_failures,
+    _organization_participants,
+    _organization_team_bindings,
+)
 
 
 def _enable_wal(db: sqlite3.Connection, deadline: float) -> None:

@@ -6,7 +6,7 @@ from hashlib import sha256
 import json
 import re
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
 
 
 class OrganizationBudget(BaseModel):
@@ -71,6 +71,19 @@ class MembershipConflict(ValueError):
 class OrganizationHierarchy(BaseModel):
     model_config = ConfigDict(extra="forbid")
     levels: list[OrganizationLevel] = Field(default_factory=list, max_length=8)
+    # Group ID -> LiteLLM team adopted by name; explicit litellmTeamId still wins.
+    _team_bindings: dict[str, str] = PrivateAttr(default_factory=dict)
+
+    def bound(self, bindings: dict[str, str]) -> "OrganizationHierarchy":
+        """A copy whose groups use the given adopted LiteLLM teams."""
+        copy = self.model_copy()
+        copy.__dict__.pop("nodes", None)
+        copy._team_bindings = dict(bindings)
+        return copy
+
+    @property
+    def team_bindings(self) -> dict[str, str]:
+        return dict(self._team_bindings)
 
     @cached_property
     def nodes(self) -> dict[str, OrganizationNode]:
@@ -96,7 +109,7 @@ class OrganizationHierarchy(BaseModel):
                         raise ValueError(f"Top-level group {member.name} requires litellmTeamId")
                     path = (*parent.path, member.name) if parent else (member.name,)
                     node_id = sha256(json.dumps(path, ensure_ascii=False).encode()).hexdigest()[:24]
-                    team_id = member.litellmTeamId or f"litegate-org-{node_id}"
+                    team_id = member.litellmTeamId or self._team_bindings.get(node_id) or f"litegate-org-{node_id}"
                     if team_id in team_ids:
                         raise ValueError("Every organization group requires a distinct LiteLLM team ID")
                     team_ids.add(team_id)
@@ -145,6 +158,11 @@ class OrganizationHierarchy(BaseModel):
                 or claimed.intersection(group.casefold() for group in node.member.ssoGroups)
             ]
         )
+
+    @cached_property
+    def parent_ids(self) -> frozenset[str]:
+        """Groups that have at least one child group."""
+        return frozenset(node.parent_id for node in self.nodes.values() if node.parent_id)
 
     @property
     def roots(self) -> list[OrganizationNode]:

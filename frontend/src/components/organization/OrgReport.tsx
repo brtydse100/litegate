@@ -13,6 +13,7 @@ import {
 import type { OrganizationUsage, UsageMetrics } from "../../types/organization";
 import type { Group } from "./orgModel";
 import PeopleTable from "./PeopleTable";
+import { LoadingBlock } from "../LoadingBlock";
 
 const inputClass =
   "min-h-10 rounded-lg border border-line-input bg-card px-3 py-2 text-sm text-ink";
@@ -119,7 +120,9 @@ export default function OrgReport({
           </button>
         </DismissibleMessage>
       )}
-      {usage.isPending && <p className="text-sm text-ink-4">Loading usage…</p>}
+      {usage.isPending && (
+        <LoadingBlock label="Loading usage…" className="h-48" />
+      )}
       {usage.data && (
         <>
           <UsageCards

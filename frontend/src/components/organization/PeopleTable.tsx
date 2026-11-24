@@ -48,7 +48,9 @@ export default function PeopleTable({
     queryKey: ["organization-users", nodeKey, page],
     queryFn: () => api.organizationUsers(nodeIds, page),
     staleTime: 60000,
-    refetchInterval: 60000,
+    // Keep the current page on screen while the next page of the same group loads.
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[1] === nodeKey ? previous : undefined,
   });
   // Each member's planned allowance and the group it is planned in.
   const planned = new Map<string, { group: BudgetGroup; user: BudgetUser }>();

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { formatUsd as dollars } from "../formatUsd";
 import { PageHeader, UsageBar } from "./Page";
+import { LoadingBlock } from "./LoadingBlock";
 import { buttonSecondary, card, cardHeader, cardTitle, tableHead } from "./ui";
 
 const number = (value: number | null) =>
@@ -14,11 +15,7 @@ export default function PersonalAnalytics() {
     refetchInterval: 60_000,
   });
   if (query.isPending)
-    return (
-      <p role="status" className="text-sm text-ink-4">
-        Loading your analytics…
-      </p>
-    );
+    return <LoadingBlock label="Loading your analytics…" className="h-72" />;
   if (query.isError && !query.data)
     return (
       <div

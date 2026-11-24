@@ -190,7 +190,7 @@ async def test_admin_can_update_multiple_keys():
 async def test_admin_can_list_all_key_identifiers():
     actor = ApiActor(CurrentUser(user_id="admin", email="a@example.com", role="admin"))
     with patch(
-        "app.routers.api_v1.llm.list_key_identifiers",
+        "app.routers.api_v1.key_listing.list_key_identifiers",
         new=AsyncMock(return_value=["key-1", "key-2"]),
     ):
         result = await api_list_key_identifiers(actor)

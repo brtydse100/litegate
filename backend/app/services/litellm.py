@@ -20,6 +20,17 @@ from app.services.litellm_client import (
 )
 
 _logger = logging.getLogger(__name__)
+_key_writes = 0
+
+
+def key_writes() -> int:
+    """Count of key writes sent through LiteGate; cached key listings compare it."""
+    return _key_writes
+
+
+def _wrote_key() -> None:
+    global _key_writes
+    _key_writes += 1
 
 
 def _team_operation_error(e: httpx.HTTPStatusError) -> NoReturn:
@@ -376,6 +387,7 @@ async def generate_key(
     initial_spend: float = 0.0,
     key_alias: Optional[str] = None,
 ) -> dict:
+    _wrote_key()
     name = email.split("@")[0] if email else user_id.split(":")[-1]
     payload: dict[str, Any] = {"user_id": user_id, "key_alias": key_alias or f"{name}'s key"}
     if initial_spend > 0:
@@ -419,9 +431,13 @@ async def generate_key(
         _transport_error(e)
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
+    finally:
+        # Before and after: a listing that overlaps the write is not reused.
+        _wrote_key()
 
 
 async def delete_key(key: str) -> dict:
+    _wrote_key()
     try:
         async with _client() as client:
             r = await client.post(
@@ -441,6 +457,9 @@ async def delete_key(key: str) -> dict:
         _transport_error(e)
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
+    finally:
+        # Before and after: a listing that overlaps the write is not reused.
+        _wrote_key()
 
 
 async def list_user_keys(user_id: str) -> List[dict]:
@@ -450,7 +469,7 @@ async def list_user_keys(user_id: str) -> List[dict]:
     return user.get("keys", [])
 
 
-async def list_keys(page: int = 1, size: int = 50, user_id: Optional[str] = None) -> dict:
+async def list_keys(page: int = 1, size: int = 50, user_id: Optional[str] = None, team_id: Optional[str] = None) -> dict:
     """Return one bounded page from LiteLLM's key-management endpoint."""
     params: dict[str, Any] = {
         "page": page,
@@ -459,6 +478,8 @@ async def list_keys(page: int = 1, size: int = 50, user_id: Optional[str] = None
     }
     if user_id:
         params["user_id"] = user_id
+    if team_id:
+        params["team_id"] = team_id
     try:
         async with _client() as client:
             r = await client.get(
@@ -490,114 +511,6 @@ async def list_keys(page: int = 1, size: int = 50, user_id: Optional[str] = None
         raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
 
 
-async def list_all_keys(max_keys: int = 5000) -> list[dict]:
-    """Read an explicitly requested, safety-bounded installation key set."""
-    records: list[dict] = []
-    page = 1
-    while True:
-        result = await list_keys(page=page, size=100)
-        total = int(result.get("total", 0))
-        total_pages = max(1, int(result.get("total_pages", 1)))
-        if total > max_keys or total_pages > (max_keys + 99) // 100:
-            raise HTTPException(
-                status_code=409,
-                detail=f"This installation has more than the administrative safety limit of {max_keys} keys",
-            )
-        records.extend(key for key in result.get("keys", []) if isinstance(key, dict))
-        if len(records) > max_keys:
-            raise HTTPException(
-                status_code=409,
-                detail=f"This installation has more than the administrative safety limit of {max_keys} keys",
-            )
-        if page >= total_pages:
-            return records
-        page += 1
-
-
-def _filter_keys(
-    keys: list[dict],
-    *,
-    search: str = "",
-    team_id: str = "",
-    blocked: Optional[bool] = None,
-) -> list[dict]:
-    normalized_search = search.strip().casefold()
-    normalized_team = team_id.strip().casefold()
-    filtered: list[dict] = []
-    for key in keys:
-        if normalized_search:
-            values = (
-                key.get("key_alias"),
-                key.get("user_email"),
-                key.get("user_id"),
-                key.get("team_id"),
-                key.get("token"),
-                key.get("api_key"),
-                key.get("key"),
-            )
-            if not any(normalized_search in str(value).casefold() for value in values if value):
-                continue
-        if normalized_team and str(key.get("team_id") or "").casefold() != normalized_team:
-            continue
-        if blocked is not None and bool(key.get("blocked")) is not blocked:
-            continue
-        filtered.append(key)
-    return filtered
-
-
-async def list_keys_filtered(
-    *,
-    page: int = 1,
-    size: int = 50,
-    search: str = "",
-    team_id: str = "",
-    blocked: Optional[bool] = None,
-    max_keys: int = 5000,
-) -> dict:
-    """Return a global filtered page; unfiltered requests stay natively paginated."""
-    if not search.strip() and not team_id.strip() and blocked is None:
-        return await list_keys(page=page, size=size)
-    filtered = _filter_keys(
-        await list_all_keys(max_keys=max_keys),
-        search=search,
-        team_id=team_id,
-        blocked=blocked,
-    )
-    start = (page - 1) * size
-    total = len(filtered)
-    return {
-        "keys": filtered[start : start + size],
-        "page": page,
-        "size": size,
-        "total": total,
-        "total_pages": max(1, (total + size - 1) // size),
-    }
-
-
-async def list_key_identifiers(
-    max_keys: int = 5000,
-    *,
-    search: str = "",
-    team_id: str = "",
-    blocked: Optional[bool] = None,
-) -> list[str]:
-    """Return every key identifier through bounded, explicit pagination."""
-    identifiers: list[str] = []
-    seen: set[str] = set()
-    keys = _filter_keys(
-        await list_all_keys(max_keys=max_keys),
-        search=search,
-        team_id=team_id,
-        blocked=blocked,
-    )
-    for key in keys:
-        identifier = key.get("token") or key.get("api_key") or key.get("key")
-        if identifier and str(identifier) not in seen:
-            seen.add(str(identifier))
-            identifiers.append(str(identifier))
-    return identifiers
-
-
 async def get_key_info(key: str) -> Optional[dict]:
     """Validate a virtual key and return its metadata."""
     try:
@@ -621,6 +534,7 @@ async def get_key_info(key: str) -> Optional[dict]:
 
 async def update_key(key: str, settings_update: dict) -> dict:
     """Update one virtual key through LiteLLM's management API."""
+    _wrote_key()
     try:
         async with _client() as client:
             r = await client.post(
@@ -635,10 +549,14 @@ async def update_key(key: str, settings_update: dict) -> dict:
         _transport_error(e)
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
+    finally:
+        # Before and after: a listing that overlaps the write is not reused.
+        _wrote_key()
 
 
 async def reset_key_spend(key: str) -> dict:
     """Reset one virtual key's spend while preserving its spend logs."""
+    _wrote_key()
     try:
         async with _client() as client:
             r = await client.post(
@@ -653,6 +571,9 @@ async def reset_key_spend(key: str) -> dict:
         _transport_error(e)
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
+    finally:
+        # Before and after: a listing that overlaps the write is not reused.
+        _wrote_key()
 
 
 async def get_spend_logs(

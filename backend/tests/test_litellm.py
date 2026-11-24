@@ -1,8 +1,9 @@
+import asyncio
 import pytest
 import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
-from app.services import litellm
+from app.services import key_listing, litellm
 
 
 @pytest.mark.asyncio
@@ -234,7 +235,7 @@ async def test_list_key_identifiers_reads_every_page_and_deduplicates():
         },
     ]
     with patch("app.services.litellm.list_keys", new=AsyncMock(side_effect=pages)) as listing:
-        result = await litellm.list_key_identifiers()
+        result = await key_listing.list_key_identifiers()
 
     assert result == ["key-1", "key-2", "key-3"]
     assert [call.kwargs for call in listing.await_args_list] == [
@@ -254,7 +255,7 @@ async def test_list_key_identifiers_reads_every_page_and_deduplicates():
 async def test_list_key_identifiers_stops_above_safety_limit(page):
     with patch("app.services.litellm.list_keys", new=AsyncMock(return_value=page)):
         with pytest.raises(HTTPException) as exc:
-            await litellm.list_key_identifiers()
+            await key_listing.list_key_identifiers()
 
     assert exc.value.status_code == 409
 
@@ -266,8 +267,8 @@ async def test_global_key_search_filters_before_paginating():
         {"token": "key-2", "key_alias": "Production", "user_email": "bob@example.com", "team_id": "team-b", "blocked": True},
         {"token": "key-3", "key_alias": "Research backup", "user_email": "carol@example.com", "team_id": "team-a", "blocked": True},
     ]
-    with patch("app.services.litellm.list_all_keys", new=AsyncMock(return_value=keys)):
-        result = await litellm.list_keys_filtered(
+    with patch("app.services.key_listing.list_all_keys", new=AsyncMock(return_value=keys)):
+        result = await key_listing.list_keys_filtered(
             page=1,
             size=25,
             search="research",
@@ -285,8 +286,8 @@ async def test_filtered_identifier_selection_matches_search_scope():
         {"token": "key-1", "user_id": "alice", "team_id": "team-a"},
         {"token": "key-2", "user_id": "bob", "team_id": "team-b"},
     ]
-    with patch("app.services.litellm.list_all_keys", new=AsyncMock(return_value=keys)):
-        result = await litellm.list_key_identifiers(search="bob")
+    with patch("app.services.key_listing.list_all_keys", new=AsyncMock(return_value=keys)):
+        result = await key_listing.list_key_identifiers(search="bob")
 
     assert result == ["key-2"]
 
@@ -365,3 +366,45 @@ async def test_sync_user_team_memberships_only_adds_missing_teams():
         await sync_user_team_memberships("user-1", "user@example.com", ["team-existing", "team-new"])
 
     add.assert_awaited_once_with("user-1", "user@example.com", "team-new")
+
+
+@pytest.mark.asyncio
+async def test_key_search_reuses_listing_until_litegate_writes_a_key():
+    pages = AsyncMock(return_value={"keys": [{"token": "key-1", "key_alias": "Research"}], "total": 1, "total_pages": 1})
+    with patch("app.services.litellm.list_keys", new=pages):
+        await key_listing.list_keys_filtered(search="research")
+        await key_listing.list_key_identifiers(search="research")
+        assert pages.await_count == 1
+        litellm._wrote_key()
+        await key_listing.list_keys_filtered(search="research")
+        assert pages.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_key_listing_reads_later_pages_concurrently_and_deduplicates():
+    started, release = [], asyncio.Event()
+
+    async def page(*, page, size):
+        started.append(page)
+        if page > 1:
+            await release.wait() if len(started) < 3 else release.set()
+        return {"keys": [{"token": "shared"}, {"token": f"key-{page}"}], "total": 6, "total_pages": 3}
+
+    with patch("app.services.litellm.list_keys", new=page):
+        keys = await asyncio.wait_for(key_listing.list_all_keys(), timeout=5)  # Serial reads would never finish.
+
+    assert sorted(started) == [1, 2, 3]
+    assert [key["token"] for key in keys] == ["shared", "key-1", "key-2", "key-3"]
+
+
+@pytest.mark.asyncio
+async def test_team_key_reads_filter_on_the_server():
+    response = MagicMock(status_code=200)
+    response.raise_for_status = MagicMock()
+    response.json = MagicMock(return_value={"keys": [], "total_count": 0, "total_pages": 1})
+    with patch("httpx.AsyncClient") as client_class:
+        instance = AsyncMock()
+        instance.get.return_value = response
+        client_class.return_value.__aenter__.return_value = instance
+        await litellm.list_keys(page=1, size=100, team_id="team-a")
+    assert instance.get.await_args.kwargs["params"]["team_id"] == "team-a"

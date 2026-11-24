@@ -175,7 +175,8 @@ config:
   organizationAccessDesignations: {}
   # Native team ID -> canonical user IDs; LiteGate-scoped roles work without Enterprise.
   organizationGroupAdmins: {}
-  # Assessment/audit only for removed, installation-owned teams; never deletes teams.
+  # Remove moved members from old managed teams and delete emptied removed teams
+  # that LiteGate created or adopted; other teams are never changed.
   organizationCleanupEnabled: false
   # Seconds between full organization sweeps (60-86400); budget edits wake it sooner.
   organizationSyncIntervalSeconds: 900

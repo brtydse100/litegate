@@ -162,6 +162,9 @@ async def finalize_identity(identity: dict, node: OrganizationNode, keys: list[d
     changed = identity.get("policy") != policy(node) or identity.get("team_id") != node.team_id
     await asyncio.to_thread(store.synced, identity["user_id"], node.team_id, policy(node))
     if changed:
+        from app.services import organization_retirement
+
+        await organization_retirement.remove_stale_memberships(identity["user_id"], node)
         await asyncio.to_thread(
             audit.record,
             actor_id="system:organization",
@@ -309,7 +312,7 @@ async def reconciliation_attempt() -> bool:
         if settings.organization_cleanup_enabled:
             from app.services import organization_retirement
 
-            await organization_retirement.assess_removed_teams()
+            await organization_retirement.retire_removed_teams()
         return True
     except Exception:
         _logger.exception("Organization synchronization failed")

@@ -188,7 +188,7 @@ def test_participant_migration_counts_previously_signed_in_users_only(database_p
 
     # Simulate an install upgraded from the release before participants existed.
     with monkeypatch.context() as patch:
-        patch.setattr(database, "MIGRATIONS", database.MIGRATIONS[:-1])
+        patch.setattr(database, "MIGRATIONS", database.MIGRATIONS[:4])
         database.initialize()
     organization_store.remember("signed-in", "a@example.invalid", "sso", [])
     organization_store.remember("local-user", "b@example.invalid", "local", [])

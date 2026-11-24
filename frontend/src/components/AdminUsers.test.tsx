@@ -6,7 +6,10 @@ import AdminUsers from "./AdminUsers";
 
 afterEach(() => vi.restoreAllMocks());
 
-function setup(localUsersEnabled = true) {
+function setup(
+  localUsersEnabled = true,
+  accounts?: Awaited<ReturnType<typeof api.listUsers>>,
+) {
   vi.spyOn(api, "listPeople").mockResolvedValue({
     users: [],
     page: 1,
@@ -14,17 +17,19 @@ function setup(localUsersEnabled = true) {
     total: 0,
     total_pages: 0,
   });
-  vi.spyOn(api, "listUsers").mockResolvedValue([
-    {
-      username: "alice",
-      user_id: "local:alice",
-      email: "alice@example.com",
-      role: "user",
-      active: true,
-      created_at: "",
-      updated_at: "",
-    },
-  ]);
+  vi.spyOn(api, "listUsers").mockResolvedValue(
+    accounts ?? [
+      {
+        username: "alice",
+        user_id: "local:alice",
+        email: "alice@example.com",
+        role: "user",
+        active: true,
+        created_at: "",
+        updated_at: "",
+      },
+    ],
+  );
   vi.spyOn(api, "getOperationLimit").mockResolvedValue({
     limit: 5,
     remaining: 5,
@@ -99,4 +104,23 @@ it("explains a mutation cooldown inside the open reset dialog", async () => {
       name: "Reset password",
     }),
   ).toBeDisabled();
+});
+
+it("shows long account lists one page at a time", async () => {
+  const accounts = Array.from({ length: 30 }, (_, index) => ({
+    username: `user${String(index).padStart(2, "0")}`,
+    user_id: `local:user${index}`,
+    email: `user${index}@example.com`,
+    role: "user" as const,
+    active: true,
+    created_at: "",
+    updated_at: "",
+  }));
+  setup(true, accounts);
+  expect(await screen.findByText("user00")).toBeInTheDocument();
+  expect(screen.queryByText("user25")).not.toBeInTheDocument();
+  expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Next accounts page" }));
+  expect(screen.getByText("user25")).toBeInTheDocument();
+  expect(screen.queryByText("user00")).not.toBeInTheDocument();
 });

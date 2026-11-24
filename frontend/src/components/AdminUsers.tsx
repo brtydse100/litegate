@@ -22,6 +22,8 @@ import {
   tableHead,
 } from "./ui";
 
+const USERS_PAGE_SIZE = 25;
+
 export default function AdminUsers({
   localUsersEnabled = true,
 }: {
@@ -42,6 +44,17 @@ export default function AdminUsers({
     queryFn: api.listUsers,
     enabled: localUsersEnabled,
   });
+  // Long account lists render one page at a time.
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(
+    1,
+    Math.ceil((users.data?.length ?? 0) / USERS_PAGE_SIZE),
+  );
+  const currentPage = Math.min(page, pageCount);
+  const visibleUsers = (users.data ?? []).slice(
+    (currentPage - 1) * USERS_PAGE_SIZE,
+    currentPage * USERS_PAGE_SIZE,
+  );
   const create = useMutation({
     mutationFn: api.createUser,
     onSuccess: () => {
@@ -239,7 +252,7 @@ export default function AdminUsers({
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-soft">
-                {users.data.map((account) => (
+                {visibleUsers.map((account) => (
                   <tr key={account.username}>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
@@ -320,6 +333,31 @@ export default function AdminUsers({
                 ))}
               </tbody>
             </table>
+            {pageCount > 1 && (
+              <div className="flex items-center justify-between gap-3 border-t border-line-soft px-5 py-3 text-[13px] text-ink-4">
+                <button
+                  type="button"
+                  aria-label="Previous accounts page"
+                  disabled={currentPage <= 1}
+                  onClick={() => setPage(currentPage - 1)}
+                  className={buttonSmall}
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {currentPage} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Next accounts page"
+                  disabled={currentPage >= pageCount}
+                  onClick={() => setPage(currentPage + 1)}
+                  className={buttonSmall}
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <p className="p-6 text-center text-sm text-ink-4">

@@ -7,6 +7,7 @@ import Breadcrumb from "./organization/Breadcrumb";
 import GroupPanel from "./organization/GroupPanel";
 import OrgReport from "./organization/OrgReport";
 import PeopleTable from "./organization/PeopleTable";
+import { LoadingBlock } from "./LoadingBlock";
 import {
   groupInitials,
   hueFor,
@@ -254,7 +255,6 @@ export default function AdminOrganization({
     queryFn: () => api.organizationGroup(nodeId!),
     enabled: enabled && !!selected,
     staleTime: 60000,
-    refetchInterval: 60000,
   });
 
   function request(id: string) {
@@ -371,7 +371,12 @@ export default function AdminOrganization({
   );
 
   if (rootsQuery.isPending)
-    return <p className="p-8 text-sm text-ink-4">Loading organization…</p>;
+    return (
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 py-7 sm:px-8">
+        <LoadingBlock label="Loading organization…" className="h-28" />
+        <LoadingBlock label="Loading groups…" className="h-72" />
+      </div>
+    );
   if (rootsQuery.error)
     return (
       <div className="flex flex-col items-start gap-3 p-8">
