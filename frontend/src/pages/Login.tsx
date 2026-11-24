@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import LogoMark from "../components/LogoMark";
 import ThemeToggle from "../components/ThemeToggle";
 import { useAuth } from "../hooks/useAuth";
+import { useFavicon } from "../hooks/useFavicon";
 import { buttonPrimary, fieldInput, fieldLabel } from "../components/ui";
 
 interface AuthConfig {
@@ -50,6 +51,7 @@ export default function Login() {
     queryFn: fetchAuthConfig,
     staleTime: Infinity,
   });
+  useFavicon(cfg?.logo_url);
 
   const showSso = !isLoading && cfg?.sso_enabled;
   const showLocal = !isLoading && cfg?.local_enabled;
@@ -84,20 +86,12 @@ export default function Login() {
           aria-label="LiteGate"
           className="flex flex-col items-center gap-4 text-center"
         >
-          {cfg?.logo_url ? (
-            <span className="inline-flex h-14 items-center rounded-2xl bg-paper px-3 shadow-[0_1px_3px_rgb(0_0_0/0.1)] ring-1 ring-line-soft">
-              <img
-                src={cfg.logo_url}
-                alt="Organization logo"
-                className="h-10 max-w-[220px] object-contain"
-              />
-            </span>
-          ) : (
-            <LogoMark
-              size={64}
-              className="rounded-[15px] shadow-[0_4px_12px_rgb(0_0_0/0.12),0_1px_2px_rgb(0_0_0/0.08)]"
-            />
-          )}
+          <LogoMark
+            size={64}
+            src={cfg?.logo_url || undefined}
+            alt="Organization logo"
+            className="rounded-[15px] shadow-[0_4px_12px_rgb(0_0_0/0.12),0_1px_2px_rgb(0_0_0/0.08)]"
+          />
           <div>
             <h1 className="text-[28px] font-bold tracking-[-0.02em] text-ink">
               LiteGate
