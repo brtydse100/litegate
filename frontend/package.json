@@ -1,7 +1,7 @@
 {
   "name": "litegate",
   "private": true,
-  "version": "2.22.2",
+  "version": "2.23.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

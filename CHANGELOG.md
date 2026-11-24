@@ -7,6 +7,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.23.0] - 2026-11-24
+
+### Added
+
+- Restructuring the organization hierarchy reuses an existing LiteLLM team
+  with the same name instead of creating a duplicate, when the match is
+  unambiguous. Reuses and skipped reuses are audited
+  (`organization.team_adopted`, `organization.team_adoption_skipped`).
+
+### Changed
+
+- `organization_cleanup_enabled` now cleans up instead of only auditing: people
+  who moved leave their old managed teams, and removed teams that LiteGate
+  created or reused are deleted once empty (`organization.membership_removed`,
+  `organization.team_deleted`).
+- Key search reads LiteLLM pages concurrently and briefly reuses the result;
+  organization pages share one resolved member list; members already in sync
+  skip the background sync; a budget change applies in the background while
+  sign-ins wait briefly for it.
+- Pages show loading placeholders, admin pages load on first visit, returning
+  to the tab no longer reloads every page, and local accounts are paged.
+
 ## [2.22.2] - 2026-11-24
 
 ### Fixed
@@ -703,7 +725,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.22.2...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.23.0...HEAD
+[2.23.0]: https://github.com/brtydse100/litegate/compare/v2.22.2...v2.23.0
 [2.22.2]: https://github.com/brtydse100/litegate/compare/v2.22.1...v2.22.2
 [2.22.1]: https://github.com/brtydse100/litegate/compare/v2.22.0...v2.22.1
 [2.22.0]: https://github.com/brtydse100/litegate/compare/v2.21.0...v2.22.0
