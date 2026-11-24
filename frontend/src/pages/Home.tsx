@@ -14,6 +14,7 @@ import AdminKeys from "../components/AdminKeys";
 import DismissibleMessage from "../components/DismissibleMessage";
 import PersonalKeySecret from "../components/PersonalKeySecret";
 import { keyToken } from "../components/BulkKeyEditor";
+import AdminAudit from "../components/AdminAudit";
 import AdminStatus from "../components/AdminStatus";
 import AdminUsers from "../components/AdminUsers";
 import AdminTeams from "../components/AdminTeams";
@@ -189,6 +190,7 @@ export default function Home() {
     "/teams",
     "/organization",
     "/status",
+    "/audit",
     ...(analyticsEnabled ? ["/analytics"] : []),
   ]);
   if (location.pathname === "/") return <Navigate to="/my-key" replace />;
@@ -486,7 +488,7 @@ export default function Home() {
           {
             label: "System",
             items: [
-              { to: "/status#audit", label: "Audit log", icon: Clock3 },
+              { to: "/audit", label: "Audit log", icon: Clock3 },
               {
                 to: "/status",
                 label: "Status",
@@ -539,6 +541,8 @@ export default function Home() {
                 />
               ) : section === "/status" && isAdmin ? (
                 <AdminStatus />
+              ) : section === "/audit" && isAdmin ? (
+                <AdminAudit />
               ) : null}
             </div>
           )}

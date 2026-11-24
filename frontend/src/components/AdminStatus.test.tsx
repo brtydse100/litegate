@@ -1,8 +1,9 @@
-import { MemoryRouter, useNavigate } from "react-router-dom";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
+import AdminAudit from "./AdminAudit";
 import AdminStatus from "./AdminStatus";
 
 vi.mock("../api/client", () => ({
@@ -73,10 +74,9 @@ describe("administrator status contract", () => {
   });
 });
 
-describe("audit log navigation", () => {
-  const scrollIntoView = vi.fn();
-
+describe("separate Status and Audit log pages", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(api.getSystemStatus).mockResolvedValue({
       ready: true,
       dependencies: {
@@ -84,73 +84,64 @@ describe("audit log navigation", () => {
         litellm: { ok: true, detail: "ok" },
       },
     } as never);
-    vi.mocked(api.listAuditEvents).mockResolvedValue({ events: [] });
-    scrollIntoView.mockReset();
-    // jsdom has no scrollIntoView; add it for these tests only.
-    Element.prototype.scrollIntoView = scrollIntoView;
-  });
-
-  afterEach(() => {
-    delete (Element.prototype as Partial<Element>).scrollIntoView;
+    vi.mocked(api.listAuditEvents).mockResolvedValue({
+      events: [
+        {
+          id: 1,
+          occurred_at: "2026-11-20T10:00:00Z",
+          action: "key.regenerate",
+          target: "personal key",
+          actor_id: "demo-admin",
+          actor_email: "alex@example.com",
+          details: {},
+          outcome: "success",
+        },
+      ],
+    } as never);
   });
 
   function renderAt(entry: string) {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    let go: (to: string) => void = () => undefined;
-    function Navigator() {
-      const navigate = useNavigate();
-      go = (to) => navigate(to);
-      return null;
-    }
     render(
       <QueryClientProvider client={client}>
         <MemoryRouter initialEntries={[entry]}>
-          <Navigator />
-          <AdminStatus />
+          <Routes>
+            <Route path="/status" element={<AdminStatus />} />
+            <Route path="/audit" element={<AdminAudit />} />
+          </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    return (to: string) => act(() => go(to));
   }
 
-  it("scrolls to the audit once loaded and again on each repeat click", async () => {
-    const navigate = renderAt("/status#audit");
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
-    navigate("/status#audit");
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(2));
-  });
-
-  it("still scrolls to the audit section when the audit request fails", async () => {
-    vi.mocked(api.listAuditEvents).mockRejectedValue(new Error("Forbidden"));
-    renderAt("/status#audit");
-    expect(await screen.findByText("Forbidden")).toBeVisible();
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns to the top for plain Status", async () => {
-    const navigate = renderAt("/status#audit");
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
-    navigate("/status");
-    expect(window.scrollTo).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not jump back to the top when audit data arrives later", async () => {
-    let finish: (value: { events: never[] }) => void = () => undefined;
-    vi.mocked(api.listAuditEvents).mockReturnValue(
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-    );
+  it("shows readiness on Status without the audit history", async () => {
     renderAt("/status");
-    expect(window.scrollTo).toHaveBeenCalledTimes(1);
-    await act(async () => finish({ events: [] }));
     expect(
-      await screen.findByText(
-        /No administrator actions have been recorded yet/,
-      ),
+      await screen.findByText("LiteGate is ready to serve requests.", {
+        exact: false,
+      }),
     ).toBeVisible();
-    expect(window.scrollTo).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("region", { name: "Administrator audit history" }),
+    ).not.toBeInTheDocument();
+    expect(api.listAuditEvents).not.toHaveBeenCalled();
+  });
+
+  it("shows the audit history on its own page", async () => {
+    renderAt("/audit");
+    expect(
+      await screen.findByRole("heading", { name: "Audit log", level: 1 }),
+    ).toBeVisible();
+    expect(await screen.findByText("key.regenerate")).toBeVisible();
+    expect(api.getSystemStatus).not.toHaveBeenCalled();
+  });
+
+  it("sends old Status #audit links to the Audit log page", async () => {
+    renderAt("/status#audit");
+    expect(
+      await screen.findByRole("heading", { name: "Audit log", level: 1 }),
+    ).toBeVisible();
   });
 });
