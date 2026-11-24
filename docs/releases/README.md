@@ -7,6 +7,7 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.23.1](v2.23.1.md) | Browser-tab icon and custom logos shown in the mark's square tile |
 | [2.23.0](v2.23.0.md) | Teams reused by name on restructure, opt-in cleanup of removed teams, and faster admin pages |
 | [2.22.2](v2.22.2.md) | Faster, more reliable multi-platform image builds |
 | [2.22.1](v2.22.1.md) | Separate Audit log page and refreshed screenshots |
