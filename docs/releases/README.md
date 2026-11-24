@@ -7,6 +7,7 @@ For an exhaustive history, see the [changelog](../../CHANGELOG.md).
 
 | Version | Main change |
 | --- | --- |
+| [2.22.2](v2.22.2.md) | Faster, more reliable multi-platform image builds |
 | [2.22.1](v2.22.1.md) | Separate Audit log page and refreshed screenshots |
 | [2.22.0](v2.22.0.md) | Apple-style redesign, combined departments, compact usage report, and team-owner budget splitting |
 | [2.21.0](v2.21.0.md) | Redesigned portal, far fewer LiteLLM requests for large organizations, and a setup guide link |
