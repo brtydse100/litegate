@@ -1,11 +1,30 @@
-/** LiteGate mark: an arched gateway with a key slot, on a blue tile. */
+/**
+ * LiteGate mark: an arched gateway with a key slot, on a blue tile.
+ * A configured logo `src` replaces the mark in the same rounded square tile.
+ */
 export default function LogoMark({
   size,
   className = "",
+  src,
+  alt = "",
 }: {
   size: number;
   className?: string;
+  src?: string;
+  alt?: string;
 }) {
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        width={size}
+        height={size}
+        style={{ width: size, height: size, borderRadius: (size * 15) / 64 }}
+        className={`shrink-0 object-cover ${className}`}
+      />
+    );
+  }
   // Small sizes get a slightly larger slot so it stays readable.
   const small = size < 40;
   return (

@@ -33,6 +33,7 @@ import {
 } from "../components/AppChrome";
 import { api } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
+import { useFavicon } from "../hooks/useFavicon";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import {
   BudgetCard,
@@ -93,6 +94,7 @@ export default function Home() {
     queryFn: fetchPortalConfig,
     staleTime: Infinity,
   });
+  useFavicon(portal.data?.logo_url);
   const keys = useQuery({ queryKey: ["keys"], queryFn: api.listKeys });
   const { operationsBlocked, retryAfter, refreshOperationLimit } =
     useOperationLimit();

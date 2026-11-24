@@ -389,8 +389,9 @@ portal. Both settings are optional: an empty or whitespace-only `login_text`
 keeps **Sign in to your LiteLLM access portal**, and an empty `logo_url` keeps the
 default LiteGate mark (an arched gateway with a key slot). The page title,
 sign-in methods, and access rules stay the same.
-The logo sits on a small white tile on the sign-in page and in the sidebar,
-so dark artwork stays visible in both themes; a transparent PNG or SVG fits best.
+The logo fills the same rounded square tile as the default mark on the sign-in
+page and in the sidebar, and it also becomes the browser-tab icon. A square
+image with its own background fits best; wider images are cropped to the square.
 
 Use these backend settings in `config.yaml` (for Docker Compose, edit
 `deploy/docker-compose/config.yaml`):

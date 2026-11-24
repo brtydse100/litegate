@@ -16,17 +16,7 @@ import ThemeToggle from "./ThemeToggle";
 export function BrandMark({ logoUrl }: { logoUrl?: string }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-2.5 text-[17px] font-semibold tracking-[-0.01em] text-ink">
-      {logoUrl ? (
-        <span className="inline-flex h-8 shrink-0 items-center rounded-lg bg-paper px-1.5 ring-1 ring-line-soft">
-          <img
-            src={logoUrl}
-            alt=""
-            className="h-6 max-w-[120px] object-contain"
-          />
-        </span>
-      ) : (
-        <LogoMark size={28} />
-      )}
+      <LogoMark size={28} src={logoUrl} />
       LiteGate
     </span>
   );
