@@ -1,5 +1,7 @@
-# Stage 1: build the React frontend
-FROM node:20-alpine AS frontend-build
+# Stage 1: build the React frontend. Its output is static files that are the
+# same on every platform, so it runs once on the builder's own architecture
+# instead of under emulation for each target (arm64 npm ci could stall there).
+FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-build
 WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm ci --prefer-offline
