@@ -29,6 +29,7 @@ from app.routers.api_v1_models import router as models_router
 from app.services import (
     budget_key_guards,
     key_budgets,
+    key_listing,
     key_mutations,
     key_secrets,
     litellm as llm,
@@ -69,7 +70,7 @@ async def api_list_keys(
 ):
     if all_keys:
         _require_api_admin(actor)
-        result = await llm.list_keys_filtered(
+        result = await key_listing.list_keys_filtered(
             page=page,
             size=size,
             search=search,
@@ -95,7 +96,7 @@ async def api_list_key_identifiers(
 ):
     """List every key identifier for the administrator select-all control."""
     _require_api_admin(actor)
-    keys = await llm.list_key_identifiers(search=search, team_id=team_id, blocked=blocked)
+    keys = await key_listing.list_key_identifiers(search=search, team_id=team_id, blocked=blocked)
     return {"keys": keys, "total": len(keys)}
 
 

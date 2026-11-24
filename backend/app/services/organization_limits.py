@@ -57,7 +57,8 @@ def apply(state: dict | None = None) -> None:
             depth, bundle_index, member_index = positions[id(configured.nodes[node_id].member)]
             member = data["levels"][depth]["groups"][bundle_index]["members"][member_index]
             member.setdefault("budget", {})["perUser"] = allocation.dollars(value)
-        effective = OrganizationHierarchy.model_validate(data)
+        # Revalidation drops private state, so carry adopted LiteLLM teams over.
+        effective = OrganizationHierarchy.model_validate(data).bound(configured.team_bindings)
         _base, _effective = configured, effective
         settings.organization_hierarchy = effective
 

@@ -6,8 +6,10 @@ from fastapi import HTTPException
 
 from app.config import settings
 from app.organization import OrganizationNode
-from app.services import budget_pass, litellm_client, organization_key_policy as key_policy, organization_sync as sync
+from app.services import budget_enforcement, budget_pass, key_rotation_freeze, litellm_client
+from app.services import organization_key_policy as key_policy, organization_sync as sync
 from app.services import organization_client as upstream, organization_discovery as discovery, organization_store as store
+from app.services import organization_bindings as bindings
 
 
 async def reconcile() -> None:
@@ -18,6 +20,11 @@ async def reconcile() -> None:
     """
     if not settings.organization_hierarchy.levels:
         return
+    try:
+        # Reuse same-named teams before any group would get a new one.
+        await bindings.ensure()
+    except HTTPException as exc:
+        sync._logger.warning("Organization team reuse check failed; new teams wait for it: %s", exc.detail)
     verified = budget_pass.generation()
     identities = await asyncio.to_thread(store.list_identities)
     blocked = await discovery.refresh(identities, sync.lock_for, sync.resolve)
@@ -67,6 +74,24 @@ async def reconcile() -> None:
     await asyncio.gather(*(finish_team(node) for node in settings.organization_hierarchy.nodes.values()))
 
 
+async def _in_sync(identity: dict, node: OrganizationNode) -> bool:
+    """A settled member whose keys and memberships already match needs no writes.
+
+    Under enforced budgets every member still takes the full path, because
+    synchronization also records the spend that budget shares depend on.
+    """
+    if budget_enforcement.enforced() or sync.settled(identity) is None:
+        return False
+    keys = await budget_pass.keys(identity["user_id"])
+    if any(key_rotation_freeze.frozen(key) or not key_policy.matches(key, node) for key in keys):
+        return False
+    for ancestor in settings.organization_hierarchy.nodes.values():
+        if node.path[: len(ancestor.path)] == ancestor.path:
+            if upstream.membership(await upstream.team_info(ancestor.team_id), identity["user_id"]) is None:
+                return False
+    return True
+
+
 async def _reconcile_group(node_id: str, members: list[str]) -> None:
     prepared: dict[str, OrganizationNode] = {}
     semaphore = asyncio.Semaphore(5)
@@ -78,6 +103,8 @@ async def _reconcile_group(node_id: str, members: list[str]) -> None:
                 node = sync.resolve_identity(identity)
                 if node is None or node.id != node_id:
                     raise HTTPException(status_code=409, detail="Organization assignment changed during migration; retrying next pass")
+                if await _in_sync(identity, node):
+                    return
                 await sync.sync_identity(identity, await upstream.team_info(node.team_id), defer_finalization=True)
                 prepared[user_id] = node
             except HTTPException as exc:

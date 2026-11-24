@@ -14,6 +14,7 @@ decrease.
 
 import asyncio
 import contextvars
+import logging
 from contextlib import asynccontextmanager
 from functools import wraps
 from inspect import signature
@@ -25,7 +26,12 @@ from app.config import settings
 from app.organization import MembershipConflict
 from app.services import budget_enforcement as enforcement, budget_key_guards, key_spend, litellm, organization_store as store
 
+_logger = logging.getLogger(__name__)
 _gates = WeakKeyDictionary()
+# A background full pass started right after a cross-group edit, so sign-ins
+# briefly wait for it instead of each reading the whole installation.
+_settling: asyncio.Task | None = None
+SETTLE_WAIT = 10
 _observed = contextvars.ContextVar("budget_pass_keys", default=None)
 # Cross-group edits since the last full pass; a new process starts unverified.
 _generation = 1
@@ -48,6 +54,33 @@ def mark_clean(verified: int) -> None:
 
 def cross_group_pending() -> bool:
     return _clean < _generation
+
+
+def settle_soon() -> None:
+    """Apply a cross-group edit now in one background pass (one at a time)."""
+    global _settling
+    if _settling is None or _settling.done():
+        _settling = asyncio.get_running_loop().create_task(_settle())
+
+
+async def _settle() -> None:
+    while enforcement.enforced() and cross_group_pending():
+        verified = _generation
+        try:
+            await full_pass()
+        except Exception:
+            _logger.exception("Background budget pass failed; operations fall back to their own full pass")
+            return
+        mark_clean(verified)
+
+
+async def _await_settled() -> None:
+    task = _settling
+    if task is not None and not task.done():
+        try:
+            await asyncio.wait_for(asyncio.shield(task), SETTLE_WAIT)
+        except TimeoutError:
+            pass
 
 
 async def keys(user_id: str) -> list[dict]:
@@ -272,6 +305,8 @@ def serialized(function=None, *, provision=False):
         async def operation():
             return await function(*args, **kwargs)
 
+        if user_id is not None and cross_group_pending():
+            await _await_settled()
         if user_id is None or cross_group_pending():
             return await _run(None, operation, user_id=user_id)
         identities = await asyncio.to_thread(store.list_identities)

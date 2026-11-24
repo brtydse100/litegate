@@ -44,7 +44,12 @@ async def sync_root(root: OrganizationNode) -> dict:
     existing = await litellm.get_team(root.team_id)
     policy = {"max_budget": None, "budget_duration": root.duration}
     if existing is None:
-        from app.services import organization_retirement
+        from app.services import organization_bindings, organization_retirement
+
+        await organization_bindings.require(root)
+        adopted = settings.organization_hierarchy.nodes.get(root.id)
+        if adopted is not None and adopted.team_id != root.team_id:
+            return await sync_root(adopted)
 
         marker = uuid4().hex
         created = await litellm.create_team(

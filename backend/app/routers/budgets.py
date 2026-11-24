@@ -146,6 +146,7 @@ async def edit_envelope(node_id: str, body: EnvelopeEdit, actor: ApiActor = Depe
     state = await asyncio.to_thread(_edit, body.revision, actor, scope, lambda state, members: state["envelopes"].update({node_id: amount}))
     # Money may have moved between groups: apply every decrease before any raise.
     budget_pass.mark_cross_group_edit()
+    budget_pass.settle_soon()
     await record_audit(actor, "organization.budget_preview", node_id, details={"revision": state["revision"], "kind": "envelope"})
     organization_sync.request_reconciliation()
     return await _response(state, scope, actor)

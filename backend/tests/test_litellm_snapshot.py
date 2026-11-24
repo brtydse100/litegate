@@ -13,7 +13,7 @@ from tests.test_budget_enforcement import org  # noqa: F401 - fixture
 
 
 def use_bulk_listings(monkeypatch):
-    monkeypatch.setattr(litellm_snapshot.teams, "_load", litellm_snapshot._load_teams)
+    monkeypatch.setattr(litellm_snapshot.teams, "_load", litellm_snapshot.load_teams)
     monkeypatch.setattr(litellm_snapshot.keys_by_user, "_load", litellm_snapshot._load_keys)
 
 
@@ -120,7 +120,7 @@ async def test_team_listing_beyond_its_page_bound_fails_closed(monkeypatch):
     listing = AsyncMock(return_value=team_page([], total_pages=3))
     monkeypatch.setattr(litellm, "list_teams", listing)
     with pytest.raises(HTTPException) as raised:
-        await litellm_snapshot._load_teams()
+        await litellm_snapshot.load_teams()
     assert raised.value.status_code == 409
     assert listing.await_count == 1
 

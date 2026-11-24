@@ -325,7 +325,7 @@ async def test_removing_an_old_shared_cap_accepts_keys_capped_at_the_share(org, 
     )
     monkeypatch.setattr(key_policy.upstream, "team_info", AsyncMock(side_effect=lambda team: next(infos)))
     keys = [{"user_id": user, "team_id": "eng", "max_budget": 30, "budget_duration": None} for user in ("ann", "ben", "cat")]
-    monkeypatch.setattr(litellm, "list_keys_filtered", AsyncMock(return_value={"keys": keys, "total_pages": 1}))
+    monkeypatch.setattr(litellm, "list_keys", AsyncMock(return_value={"keys": keys, "total_pages": 1}))
     update = AsyncMock()
     monkeypatch.setattr(litellm, "update_team", update)
     await key_policy.finish_team(engineering)

@@ -114,9 +114,44 @@ parents, conflicting mappings, duplicate names, and invalid budgets are rejected
 Every group has its own distinct LiteLLM team. Roots require `litellmTeamId`;
 children may set one explicitly or use a deterministic `litegate-org-<path hash>`
 ID. LiteGate creates missing teams and preserves existing models and rate limits.
-Use explicit child IDs when group names may change: renaming a path changes an
-automatically generated ID and requires reviewing existing key assignments.
 Renaming a group also requires updating its children's `parent` names.
+
+### Restructuring: teams are reused by name
+
+Moving a child group under another parent changes its generated ID. Before
+creating a team, LiteGate looks for an existing LiteLLM team whose alias equals
+the group's name and reuses it when the match is unambiguous:
+
+- exactly one LiteLLM team has that alias;
+- exactly one configured group has that name, at any level; and
+- no other group, mapping or setting already uses that team.
+
+The adoption is stored, so later passes and restarts keep the same team, and it
+is audited as `organization.team_adopted`. When a rule fails, LiteGate creates a
+new team as before and audits `organization.team_adoption_skipped` with the
+reason (`ambiguous_alias`, `duplicate_group_name` or `already_bound`). An
+explicit `litellmTeamId` always wins. A renamed group no longer matches its old
+alias, so it gets a new team; set `litellmTeamId` to keep a team across renames.
+If LiteLLM's team list cannot be read, LiteGate does not create teams for
+children without an explicit ID until it can check.
+
+### Cleaning up after a restructure
+
+With `organization_cleanup_enabled: true`, LiteGate also empties and deletes teams
+it created or adopted once they leave the configuration. For example, if groups
+A, B and C become A and B, and C's people move to B:
+
+1. Each person's keys move to B with their spend, as for any group change.
+2. People who moved leave the teams outside their new path
+   (`organization.membership_removed`).
+3. C is deleted when a fresh read shows no members and no keys
+   (`organization.team_deleted`).
+
+Teams LiteGate never created or adopted, and teams referenced by other settings
+(SSO default team, key team, group mappings, designations and group
+administrators) are never changed. Keys or people LiteGate does not manage keep
+the team for review. Nothing is deleted while no groups are configured. See
+[removed group retirement](governance-and-analytics.md#removed-group-retirement).
 
 ### Docker and Compose
 

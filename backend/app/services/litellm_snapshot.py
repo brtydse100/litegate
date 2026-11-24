@@ -85,7 +85,7 @@ async def _pages(fetch: Callable[[int], Awaitable[dict]], items: str, max_pages:
     raise HTTPException(status_code=409, detail="Too many LiteLLM records for a bulk snapshot")
 
 
-async def _load_teams() -> dict:
+async def load_teams() -> dict:
     teams = await _pages(lambda page: litellm.list_teams(page=page, page_size=PAGE_SIZE), "teams", TEAM_PAGES)
     return {team["team_id"]: team for team in teams if isinstance(team.get("team_id"), str)}
 
@@ -108,7 +108,7 @@ async def _load_keys() -> dict:
     return owners
 
 
-teams = Snapshot(_load_teams)
+teams = Snapshot(load_teams)
 keys_by_user = Snapshot(_load_keys)
 
 

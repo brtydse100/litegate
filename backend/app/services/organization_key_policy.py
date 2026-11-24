@@ -113,7 +113,7 @@ async def finish_team(node: OrganizationNode) -> dict:
         return info
     if team["max_budget"] is not None or "team_member_budget" in changes:
         for page in range(1, 51):
-            result = await litellm.list_keys_filtered(page=page, size=100, team_id=node.team_id)
+            result = await litellm.list_keys(page=page, size=100, team_id=node.team_id)
             for key in result["keys"]:
                 owner = key.get("user_id") or ""
                 identity = await asyncio.to_thread(store.get, owner)

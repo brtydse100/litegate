@@ -252,19 +252,26 @@ validation. Neither polling nor a LiteGate configuration lock enforces inference
 
 ## Removed group retirement
 
-Cleanup currently means an opt-in **assessment and audit**, not automatic deletion.
-LiteGate records ownership only when its own create request is confirmed; it
-never adopts pre-existing/operator teams as disposable. Removed owned teams are
-checked for current configuration, local identity, remote membership, and key
-references. Unknown/incomplete checks are retained for review.
+Cleanup is opt-in (`organization_cleanup_enabled`). It changes only teams
+LiteGate created (recorded when its own create request is confirmed) or adopted
+by name during a restructure; other pre-existing and operator teams are never
+candidates. With each reconciliation pass, a candidate that is no longer
+configured or referenced by another setting is handled as follows:
 
-The upstream team-delete contract cannot condition deletion on still being empty.
-Deleting after an empty snapshot can race another actor adding a member or key.
-Automatic deletion therefore remains unfinished; the assessment records
-`review_required`, including `atomic_delete_unavailable` for an otherwise empty
-candidate, without risking unrelated records. The assessment runs with each
-reconciliation pass, but a candidate is audited only when first found or when its
-reason changes (and once more after an application restart).
+- Members whose synchronized group now lives in another team are removed from
+  it (`organization.membership_removed`). People moving between groups also
+  leave their old managed teams as part of their own synchronization.
+- When a fresh read shows no members, no memberships and no keys, the team is
+  deleted (`organization.team_deleted`) and forgotten.
+- Anything else (unknown members, keys, a local identity still pointing at it,
+  or an incomplete read) records `review_required` with the reason. A candidate
+  is audited only when first found or when its reason changes (and once more
+  after an application restart).
+
+LiteLLM's team delete cannot require the team to still be empty, so a member
+or key added directly in LiteLLM between the final check and the delete is
+removed with the team. Nothing is deleted while no organization groups are
+configured.
 
 ## Startup and upgrade reliability
 

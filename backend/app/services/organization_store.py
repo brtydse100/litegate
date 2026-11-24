@@ -6,6 +6,18 @@ from datetime import datetime, timezone
 from app.services.local_users import connect
 from app.services import database
 
+_version = 0
+
+
+def version() -> int:
+    """Changes on every identity write; cached organization views compare it."""
+    return _version
+
+
+def _changed() -> None:
+    global _version
+    _version += 1
+
 
 def init_db() -> None:
     database.initialize()
@@ -21,6 +33,7 @@ def remember(user_id: str, email: str, auth_source: str, groups: list[str]) -> N
             updated_at=excluded.updated_at""",
             (user_id, email, auth_source, json.dumps(groups), datetime.now(timezone.utc).isoformat()),
         )
+    _changed()
 
 
 def get(user_id: str) -> dict | None:
@@ -47,20 +60,24 @@ def synced(user_id: str, team_id: str, policy: dict) -> None:
             "UPDATE organization_identities SET team_id=?, policy_json=?, sync_error=NULL WHERE user_id=?",
             (team_id, json.dumps(policy, sort_keys=True), user_id),
         )
+    _changed()
 
 
 def bind_team(user_id: str, team_id: str) -> None:
     """Retain the root before an upstream mutation whose result may be uncertain."""
     with connect() as db:
         db.execute("UPDATE organization_identities SET team_id=? WHERE user_id=?", (team_id, user_id))
+    _changed()
 
 
 def failed(user_id: str, message: str) -> None:
     with connect() as db:
         db.execute("UPDATE organization_identities SET sync_error=? WHERE user_id=?", (message[:300], user_id))
+    _changed()
 
 
 def validated(user_id: str) -> None:
     """Clear a discovery failure only after fresh remote assignment validation."""
     with connect() as db:
         db.execute("UPDATE organization_identities SET sync_error=NULL WHERE user_id=?", (user_id,))
+    _changed()

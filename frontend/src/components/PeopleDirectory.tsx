@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { api } from "../api/client";
 import EmailAddress from "./EmailAddress";
+import { LoadingRows } from "./LoadingBlock";
 import { Pill } from "./Page";
 import {
   buttonSecondary,
@@ -72,11 +73,7 @@ export default function PeopleDirectory() {
           Search people
         </button>
       </form>
-      {people.isPending && (
-        <p role="status" className="px-5 py-4 text-sm text-ink-4">
-          Loading people...
-        </p>
-      )}
+      {people.isPending && <LoadingRows label="Loading people..." />}
       {people.error && (
         <p role="alert" className="px-5 py-4 text-sm text-danger">
           {people.error.message}

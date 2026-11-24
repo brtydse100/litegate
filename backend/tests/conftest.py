@@ -27,12 +27,23 @@ def isolated_organization_admin_cache(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def resolved_team_bindings(monkeypatch):
+    """Team reuse by name is checked once per process; tests that need it opt in."""
+    from app.services import organization_bindings
+
+    monkeypatch.setattr(organization_bindings, "_resolved", True)
+    monkeypatch.setattr(organization_bindings, "_skipped", {})
+
+
+@pytest.fixture(autouse=True)
 def isolated_report_and_pass_state(monkeypatch):
     """Overview status caching and verified budget passes are process-wide."""
-    from app.services import budget_pass, litellm_snapshot, organization_reports
+    from app.services import budget_pass, key_listing, litellm_snapshot, organization_members, organization_reports
 
     monkeypatch.setattr(organization_reports, "_status_cache", {})
     litellm_snapshot.clear()
+    key_listing.clear()
+    organization_members.clear()
 
     # Bulk listings are unavailable unless a test provides them, so existing
     # tests exercise the per-item fallback without network access.
@@ -43,3 +54,4 @@ def isolated_report_and_pass_state(monkeypatch):
         monkeypatch.setattr(snapshot, "_load", unavailable)
     monkeypatch.setattr(budget_pass, "_generation", 1)
     monkeypatch.setattr(budget_pass, "_clean", 0)
+    monkeypatch.setattr(budget_pass, "_settling", None)
