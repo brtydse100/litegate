@@ -183,17 +183,24 @@ function limit(value: number | null | undefined, money = false) {
 
 export function CurrentPolicySettings({
   settings,
+  hideReset = false,
 }: {
   settings: KeyInfo | TeamInfo;
+  /** Scheduled budget windows replace the reset period on the Teams page. */
+  hideReset?: boolean;
 }) {
   const entries = [
     ["Maximum budget", limit(settings.max_budget, true)],
-    [
-      "Budget reset",
-      settings.budget_duration === undefined
-        ? "Not provided"
-        : settings.budget_duration || "No reset",
-    ],
+    ...(hideReset
+      ? []
+      : [
+          [
+            "Budget reset",
+            settings.budget_duration === undefined
+              ? "Not provided"
+              : settings.budget_duration || "No reset",
+          ],
+        ]),
     [
       "Allowed models",
       Array.isArray(settings.models)

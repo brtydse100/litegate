@@ -372,6 +372,7 @@ describe("scheduled budget windows", () => {
         {
           team_id: "research",
           team_alias: "Research",
+          budget_duration: "30d",
           budget_limits: [
             { budget_duration: "sched:UTC:mon:08:00-13:00", max_budget: 5 },
           ],
@@ -418,8 +419,10 @@ describe("scheduled budget windows", () => {
     );
     expect(await screen.findByText("Budget windows (UTC)")).toBeVisible();
     expect(await screen.findByText(/\$1\.50 of \$5\.00/)).toBeVisible();
+    expect(screen.queryByText(/resets every/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog", { name: "Edit team" });
+    expect(within(dialog).queryByText("Budget reset")).not.toBeInTheDocument();
     expect(
       within(dialog).getByLabelText("Morning (Mon 08:00–13:00)"),
     ).toHaveValue(5);
@@ -439,9 +442,8 @@ describe("scheduled budget windows", () => {
       within(dialog).getByRole("button", { name: "Save changes" }),
     );
     await waitFor(() => expect(api.updateTeam).toHaveBeenCalled());
-    expect(vi.mocked(api.updateTeam).mock.calls[0][1].window_budgets).toEqual({
-      Morning: null,
-      Evening: 3,
-    });
+    const sent = vi.mocked(api.updateTeam).mock.calls[0][1];
+    expect(sent.window_budgets).toEqual({ Morning: null, Evening: 3 });
+    expect(sent).not.toHaveProperty("budget_duration");
   });
 });

@@ -183,7 +183,7 @@ function TeamEditor({
       const tpmLimit = optionalNumber(tpm);
       const rpmLimit = optionalNumber(rpm);
       if (maxBudget !== undefined) payload.max_budget = maxBudget;
-      if (budgetDuration.trim())
+      if (!budgetWindows && budgetDuration.trim())
         payload.budget_duration = budgetDuration.trim();
       if (tpmLimit !== undefined) payload.tpm_limit = tpmLimit;
       if (rpmLimit !== undefined) payload.rpm_limit = rpmLimit;
@@ -208,7 +208,10 @@ function TeamEditor({
       ...(!state.team.organization_managed
         ? {
             max_budget: nullableNumber(budget),
-            budget_duration: budgetDuration.trim() || null,
+            // With budget windows on, the old reset period is not shown or sent.
+            ...(!budgetWindows
+              ? { budget_duration: budgetDuration.trim() || null }
+              : {}),
           }
         : {}),
       ...(windowBudgets ? { window_budgets: windowBudgets } : {}),
@@ -263,7 +266,10 @@ function TeamEditor({
             <h4 className="text-sm font-semibold text-ink">
               Current team settings
             </h4>
-            <CurrentPolicySettings settings={existing} />
+            <CurrentPolicySettings
+              settings={existing}
+              hideReset={!!budgetWindows}
+            />
           </section>
         )}
         <DurationChoices id="team-budget-durations" />
@@ -315,24 +321,26 @@ function TeamEditor({
               }
             />
           )}
-          <label className="space-y-1 text-xs text-ink-3">
-            <span>Budget reset</span>
-            <input
-              disabled={existing?.organization_managed}
-              className={inputClass}
-              value={budgetDuration}
-              list="team-budget-durations"
-              onChange={(event) => setBudgetDuration(event.target.value)}
-              placeholder={
-                existing
-                  ? existing.budget_duration === undefined
-                    ? "Not provided"
-                    : existing.budget_duration || "No reset"
-                  : "For example 30d"
-              }
-              maxLength={32}
-            />
-          </label>
+          {!budgetWindows && (
+            <label className="space-y-1 text-xs text-ink-3">
+              <span>Budget reset</span>
+              <input
+                disabled={existing?.organization_managed}
+                className={inputClass}
+                value={budgetDuration}
+                list="team-budget-durations"
+                onChange={(event) => setBudgetDuration(event.target.value)}
+                placeholder={
+                  existing
+                    ? existing.budget_duration === undefined
+                      ? "Not provided"
+                      : existing.budget_duration || "No reset"
+                    : "For example 30d"
+                }
+                maxLength={32}
+              />
+            </label>
+          )}
           {budgetWindows && (
             <WindowBudgetFields
               schedule={budgetWindows}
@@ -781,7 +789,7 @@ export default function AdminTeams({
                         </span>
                       </p>
                       {used != null && <UsageBar percent={used} />}
-                      {team.budget_duration && (
+                      {!budgetWindows && team.budget_duration && (
                         <p className="text-xs text-ink-4">
                           {resetLabel(team.budget_duration)}
                         </p>
