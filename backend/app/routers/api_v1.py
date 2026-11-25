@@ -36,6 +36,7 @@ from app.services import (
     organization_sync,
     policy_schemas,
     policy_team_update,
+    team_budget_window,
 )
 from app.routers.api_v1_policy_schemas import router as policy_schemas_router
 from app.routers.team_policy_context import decorate_team as _decorate_team, team_config_references as _team_config_references
@@ -254,7 +255,7 @@ async def api_create_team(payload: TeamCreateRequest, actor: ApiActor = Depends(
     """Create a LiteLLM team with validated budget and access policy."""
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
-    changes = await policy_schemas.merge_settings("team_create", payload)
+    changes = team_budget_window.apply(await policy_schemas.merge_settings("team_create", payload), create=True)
     created = await llm.create_team(changes)
     await _record_audit(
         actor,
@@ -273,7 +274,7 @@ async def api_update_team(
 ):
     """Update a LiteLLM team's validated budget and access policy."""
     _require_api_admin(actor)
-    changes = await policy_schemas.merge_settings("team_update", payload)
+    changes = team_budget_window.apply(await policy_schemas.merge_settings("team_update", payload), create=False)
     organization_sync.guard_team(team_id, changes)
     check_key_rate_limit(actor.user.user_id)
     updated = await policy_team_update.update(team_id, changes) if payload.advanced_settings else await llm.update_team(team_id, changes)

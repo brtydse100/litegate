@@ -153,6 +153,9 @@ The bucket for users assigned directly to the selected group has `id: null` and
 the label `Direct members`; a child with that name has its own non-null ID.
 
 Helm-managed team budget changes, deletion, and member moves receive `409`.
+When `TEAM_BUDGET_DURATION` is set (nightly), team create and update use that
+`budget_duration`; sending a different value returns `422`, and
+`GET /api/portal-config` reports it as `team_budget_duration`.
 Bulk-key budget or team changes report per-item failures for managed keys.
 Personal `/api/keys` responses can add `organization_managed`, `user_budget`,
 `user_spend`, `user_budget_available`, `organization_path`, and `policy_error`.

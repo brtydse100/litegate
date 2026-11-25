@@ -121,6 +121,8 @@ hierarchical_budgets_enforced: false
 key_rotation_settle_seconds: 12
 # key_max_budget: 10.0
 # key_budget_duration: "30d"
+# Nightly: one reset window for every team (1d, 7d or 1mo).
+# team_budget_duration: "1mo"
 # key_models:
 #   - gpt-4
 #   - gpt-3.5-turbo

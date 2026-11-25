@@ -364,6 +364,29 @@ replacement. This prevents users from refreshing a per-key allowance by rotating
 the key. LiteLLM also tracks spend at user and team scope; configure those budgets
 as an additional shared ceiling when a person may own keys outside LiteGate.
 
+### Shared team budget window (nightly)
+
+`team_budget_duration` (`TEAM_BUDGET_DURATION`, Helm `config.teamBudgetDuration`)
+gives every team the same budget reset window. Each team keeps its own
+`max_budget`; leave it empty for unlimited. Accepted values are `1d`, `7d` and
+`1mo`. LiteLLM aligns these to calendar boundaries in its own
+`litellm_settings.timezone` (UTC by default): midnight, Monday midnight and the
+1st of the month. So every team resets at the same moment. Unset keeps today's
+per-team reset periods.
+
+When set:
+
+- New teams get the window; a create or update with a different
+  `budget_duration` returns `422`. The admin **Budget reset** field is read-only.
+- At startup LiteGate moves every other existing team onto the window, with
+  bounded concurrency. Each change writes a `team.budget_window_aligned` audit
+  event, and failures are logged and retried at the next start. LiteLLM sets the
+  next reset to the coming boundary and does not clear the current spend.
+- Every `organizationHierarchy` group must have the same budget `duration`;
+  otherwise LiteGate refuses to start.
+
+This setting is in nightly `dev-*` images only.
+
 ## Portal integration settings
 
 | Setting | Default | Purpose |

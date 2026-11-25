@@ -1,10 +1,10 @@
 import json
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Literal, Optional
 from urllib.parse import urlparse
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 from app.organization import OrganizationHierarchy
@@ -101,6 +101,9 @@ class Settings(BaseSettings):
     key_max_parallel_requests: Optional[int] = Field(default=None, ge=1)
     key_duration: Optional[str] = None
     key_team_id: Optional[str] = None
+    # One reset window shared by every team. LiteLLM aligns these durations to
+    # calendar boundaries (midnight, Monday, the 1st), so all teams reset together.
+    team_budget_duration: Optional[Literal["1d", "7d", "1mo"]] = None
     save_api_keys_in_db: bool = False
     organization_access_designations: dict[str, list[str]] = Field(default_factory=dict)
     organization_group_admins: dict[str, list[str]] = Field(default_factory=dict)
@@ -156,6 +159,23 @@ class Settings(BaseSettings):
             self.organization_hierarchy = OrganizationHierarchy.model_validate(value)
         except (OSError, ValueError) as exc:
             raise ValueError(f"Invalid organization_hierarchy_file {path}: {exc}") from exc
+        return self
+
+    @field_validator("team_budget_duration", mode="before")
+    @classmethod
+    def blank_team_budget_duration(cls, value):
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @model_validator(mode="after")
+    def validate_team_budget_duration(self):
+        window = self.team_budget_duration
+        if window is None:
+            return self
+        mismatched = sorted(node.id for node in self.organization_hierarchy.nodes.values() if node.duration != window)
+        if mismatched:
+            raise ValueError(
+                f"TEAM_BUDGET_DURATION={window} requires every organization group budget duration to be {window}; mismatched: {', '.join(mismatched[:5])}"
+            )
         return self
 
     @classmethod

@@ -664,6 +664,7 @@ All `config.yaml` keys map directly to environment variables (uppercased). You c
 | `support_ticket_url` | `SUPPORT_TICKET_URL` | `""` | Support ticket URL |
 | `key_max_budget` | `KEY_MAX_BUDGET` | `null` | Budget per key (USD) |
 | `key_budget_duration` | `KEY_BUDGET_DURATION` | `null` | Budget reset period |
+| `team_budget_duration` | `TEAM_BUDGET_DURATION` | `null` | Nightly: one reset window (`1d`, `7d`, `1mo`) for every team |
 | `key_models` | `KEY_MODELS` | `"[]"` | YAML list or JSON array of allowed models |
 | `key_tpm_limit` | `KEY_TPM_LIMIT` | `null` | Tokens per minute |
 | `key_rpm_limit` | `KEY_RPM_LIMIT` | `null` | Requests per minute |

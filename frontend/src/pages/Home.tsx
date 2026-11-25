@@ -60,6 +60,7 @@ interface PortalConfig {
   organization_delegation_enabled?: boolean;
   hierarchical_budgets_enabled?: boolean;
   litellm_enterprise_enabled: boolean;
+  team_budget_duration?: string | null;
 }
 
 async function fetchPortalConfig(): Promise<PortalConfig> {
@@ -545,7 +546,7 @@ export default function Home() {
                 {section === "/users" && isAdmin ? (
                   <AdminUsers localUsersEnabled={localUsersEnabled} />
                 ) : section === "/teams" && isAdmin ? (
-                  <AdminTeams />
+                  <AdminTeams budgetWindow={config?.team_budget_duration} />
                 ) : section === "/keys" && isAdmin ? (
                   <AdminKeys
                     saveApiKeysInDb={config?.save_api_keys_in_db}

@@ -13,6 +13,7 @@ from app.routers import api_v1, auth, keys, logs, organization, users
 from app.routers import people
 from app.routers import budgets
 from app.services import analytics, litellm, litellm_roles, local_users, organization_bindings, organization_limits, organization_sync
+from app.services import team_budget_window
 from app.version import VERSION
 
 
@@ -28,6 +29,8 @@ async def lifespan(_: FastAPI):
     # One pass that switches known people to LiteLLM's view-only role; it runs
     # beside startup, and anyone it misses switches at their next sign-in.
     roles_task = asyncio.create_task(litellm_roles.restrict_known_users())
+    # One pass that moves teams created before TEAM_BUDGET_DURATION onto it.
+    window_task = asyncio.create_task(team_budget_window.align_existing_teams())
     try:
         if settings.organization_hierarchy.levels or settings.organization_cleanup_enabled:
             started = await organization_sync.reconciliation_attempt()
@@ -40,7 +43,8 @@ async def lifespan(_: FastAPI):
             organization_task.cancel()
             await asyncio.gather(organization_task, return_exceptions=True)
         roles_task.cancel()
-        await asyncio.gather(roles_task, return_exceptions=True)
+        window_task.cancel()
+        await asyncio.gather(roles_task, window_task, return_exceptions=True)
         if analytics_task:
             analytics_task.cancel()
             await asyncio.gather(analytics_task, return_exceptions=True)
@@ -130,6 +134,7 @@ async def portal_config():
         "hierarchical_budgets_enabled": settings.hierarchical_budgets_enabled,
         "hierarchical_budgets_enforced": settings.hierarchical_budgets_enforced,
         "litellm_enterprise_enabled": settings.litellm_enterprise_enabled,
+        "team_budget_duration": settings.team_budget_duration,
     }
 
 

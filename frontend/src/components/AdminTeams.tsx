@@ -62,6 +62,13 @@ function nullableNumber(value: string): number | null {
   return value === "" ? null : Number(value);
 }
 
+// LiteLLM aligns these durations to calendar boundaries.
+const WINDOW_LABELS: Record<string, string> = {
+  "1d": "daily at midnight",
+  "7d": "weekly on Monday",
+  "1mo": "monthly on the 1st",
+};
+
 function currentLimitPlaceholder(value: number | null | undefined): string {
   return value === undefined
     ? "Not provided"
@@ -78,10 +85,13 @@ function TeamEditor({
   onClose,
   onCreate,
   onUpdate,
+  budgetWindow,
 }: {
   state: EditorState;
   pending: boolean;
   operationsBlocked: boolean;
+  /** TEAM_BUDGET_DURATION: one reset window LiteGate applies to every team. */
+  budgetWindow?: string | null;
   error?: Error | null;
   onClose: () => void;
   onCreate: (payload: TeamCreatePayload) => void;
@@ -154,7 +164,7 @@ function TeamEditor({
       const tpmLimit = optionalNumber(tpm);
       const rpmLimit = optionalNumber(rpm);
       if (maxBudget !== undefined) payload.max_budget = maxBudget;
-      if (budgetDuration.trim())
+      if (!budgetWindow && budgetDuration.trim())
         payload.budget_duration = budgetDuration.trim();
       if (tpmLimit !== undefined) payload.tpm_limit = tpmLimit;
       if (rpmLimit !== undefined) payload.rpm_limit = rpmLimit;
@@ -179,7 +189,9 @@ function TeamEditor({
       ...(!state.team.organization_managed
         ? {
             max_budget: nullableNumber(budget),
-            budget_duration: budgetDuration.trim() || null,
+            ...(!budgetWindow
+              ? { budget_duration: budgetDuration.trim() || null }
+              : {}),
           }
         : {}),
       tpm_limit: nullableNumber(tpm),
@@ -288,9 +300,9 @@ function TeamEditor({
           <label className="space-y-1 text-xs text-ink-3">
             <span>Budget reset</span>
             <input
-              disabled={existing?.organization_managed}
+              disabled={existing?.organization_managed || !!budgetWindow}
               className={inputClass}
-              value={budgetDuration}
+              value={budgetWindow || budgetDuration}
               list="team-budget-durations"
               onChange={(event) => setBudgetDuration(event.target.value)}
               placeholder={
@@ -303,6 +315,14 @@ function TeamEditor({
               maxLength={32}
             />
           </label>
+          {budgetWindow && (
+            <p className="text-xs text-ink-4 sm:col-span-2">
+              Every team resets together,{" "}
+              {WINDOW_LABELS[budgetWindow] ?? budgetWindow} (LiteLLM&apos;s
+              timezone), set by TEAM_BUDGET_DURATION. Leave the budget empty for
+              unlimited.
+            </p>
+          )}
           {perUserNode && (
             <p className="text-xs text-ink-4 sm:col-span-2">
               The per-user limit caps each member's key in this organization
@@ -483,7 +503,11 @@ function DeleteTeamDialog({
   );
 }
 
-export default function AdminTeams() {
+export default function AdminTeams({
+  budgetWindow,
+}: {
+  budgetWindow?: string | null;
+} = {}) {
   const queryClient = useQueryClient();
   const { operationsBlocked, retryAfter, refreshOperationLimit } =
     useOperationLimit();
@@ -842,6 +866,7 @@ export default function AdminTeams() {
           onClose={() => setEditor(null)}
           onCreate={(payload) => create.mutate(payload)}
           onUpdate={(id, payload) => update.mutate({ id, payload })}
+          budgetWindow={budgetWindow}
         />
       )}
       {deleteTarget && (

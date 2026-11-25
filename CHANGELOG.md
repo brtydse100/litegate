@@ -7,6 +7,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added (nightly, not in a stable release)
+
+- `TEAM_BUDGET_DURATION` gives every team one shared budget reset window
+  (`1d`, `7d` or `1mo`, aligned by LiteLLM) while each team keeps its own budget
+  or stays unlimited.
+
 ## [2.23.2] - 2026-11-25
 
 ### Security

@@ -316,3 +316,68 @@ describe("organization per-user limits", () => {
     );
   });
 });
+
+describe("installation-wide budget window", () => {
+  it("shows the shared reset as read-only and never sends a per-team reset", async () => {
+    vi.clearAllMocks();
+    vi.mocked(api.policySchemas).mockResolvedValue({
+      available: false,
+      schemas: {},
+    });
+    vi.mocked(api.getOperationLimit).mockResolvedValue({
+      limit: 5,
+      remaining: 5,
+      retry_after: 0,
+    });
+    vi.mocked(api.listModels).mockResolvedValue({ models: [] });
+    vi.mocked(api.updateTeam).mockResolvedValue({
+      team_id: "research",
+      models: [],
+      blocked: false,
+      members_with_roles: [],
+      mapped_groups: [],
+      default_key_team: false,
+    });
+    vi.mocked(api.listTeams).mockResolvedValue({
+      teams: [
+        {
+          team_id: "research",
+          team_alias: "Research",
+          max_budget: 300,
+          budget_duration: "1mo",
+          models: [],
+          blocked: false,
+          members_with_roles: [],
+          mapped_groups: [],
+          default_key_team: false,
+        },
+      ],
+      page: 1,
+      page_size: 25,
+      total: 1,
+      total_pages: 1,
+    });
+    render(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <AdminTeams budgetWindow="1mo" />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit team" });
+    const reset = within(dialog).getByLabelText("Budget reset");
+    expect(reset).toBeDisabled();
+    expect(reset).toHaveValue("1mo");
+    expect(within(dialog).getByText(/monthly on the 1st/)).toBeVisible();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Save changes" }),
+    );
+    await waitFor(() => expect(api.updateTeam).toHaveBeenCalled());
+    const payload = vi.mocked(api.updateTeam).mock.calls[0][1];
+    expect(payload).toHaveProperty("max_budget", 300);
+    expect(payload).not.toHaveProperty("budget_duration");
+  });
+});
