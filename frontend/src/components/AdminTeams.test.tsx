@@ -21,6 +21,7 @@ vi.mock("../api/client", () => ({
     deleteTeam: vi.fn(),
     moveTeamMember: vi.fn(),
     setGroupPerUser: vi.fn(),
+    teamBudgetWindows: vi.fn(),
   },
 }));
 
@@ -317,8 +318,8 @@ describe("organization per-user limits", () => {
   });
 });
 
-describe("installation-wide budget window", () => {
-  it("shows the shared reset as read-only and never sends a per-team reset", async () => {
+describe("scheduled budget windows", () => {
+  it("edits one amount per shared window and sends blanks as unlimited", async () => {
     vi.clearAllMocks();
     vi.mocked(api.policySchemas).mockResolvedValue({
       available: false,
@@ -330,6 +331,34 @@ describe("installation-wide budget window", () => {
       retry_after: 0,
     });
     vi.mocked(api.listModels).mockResolvedValue({ models: [] });
+    vi.mocked(api.teamBudgetWindows).mockResolvedValue({
+      team_id: "research",
+      timezone: "UTC",
+      windows: [
+        {
+          name: "Morning",
+          days: ["mon"],
+          start: "08:00",
+          end: "13:00",
+          label: "sched:UTC:mon:08:00-13:00",
+          max_budget: 5,
+          current_spend: 1.5,
+          active: true,
+          next_start: null,
+        },
+        {
+          name: "Evening",
+          days: ["mon"],
+          start: "18:00",
+          end: "22:00",
+          label: "sched:UTC:mon:18:00-22:00",
+          max_budget: null,
+          current_spend: null,
+          active: false,
+          next_start: null,
+        },
+      ],
+    });
     vi.mocked(api.updateTeam).mockResolvedValue({
       team_id: "research",
       models: [],
@@ -343,8 +372,9 @@ describe("installation-wide budget window", () => {
         {
           team_id: "research",
           team_alias: "Research",
-          max_budget: 300,
-          budget_duration: "1mo",
+          budget_limits: [
+            { budget_duration: "sched:UTC:mon:08:00-13:00", max_budget: 5 },
+          ],
           models: [],
           blocked: false,
           members_with_roles: [],
@@ -363,21 +393,55 @@ describe("installation-wide budget window", () => {
           new QueryClient({ defaultOptions: { queries: { retry: false } } })
         }
       >
-        <AdminTeams budgetWindow="1mo" />
+        <AdminTeams
+          budgetWindows={{
+            timezone: "UTC",
+            windows: [
+              {
+                name: "Morning",
+                days: ["mon"],
+                start: "08:00",
+                end: "13:00",
+                label: "sched:UTC:mon:08:00-13:00",
+              },
+              {
+                name: "Evening",
+                days: ["mon"],
+                start: "18:00",
+                end: "22:00",
+                label: "sched:UTC:mon:18:00-22:00",
+              },
+            ],
+          }}
+        />
       </QueryClientProvider>,
     );
-    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    expect(await screen.findByText("Budget windows (UTC)")).toBeVisible();
+    expect(await screen.findByText(/\$1\.50 of \$5\.00/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog", { name: "Edit team" });
-    const reset = within(dialog).getByLabelText("Budget reset");
-    expect(reset).toBeDisabled();
-    expect(reset).toHaveValue("1mo");
-    expect(within(dialog).getByText(/monthly on the 1st/)).toBeVisible();
+    expect(
+      within(dialog).getByLabelText("Morning (Mon 08:00–13:00)"),
+    ).toHaveValue(5);
+    fireEvent.change(
+      within(dialog).getByLabelText("Evening (Mon 18:00–22:00)"),
+      {
+        target: { value: "3" },
+      },
+    );
+    fireEvent.change(
+      within(dialog).getByLabelText("Morning (Mon 08:00–13:00)"),
+      {
+        target: { value: "" },
+      },
+    );
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Save changes" }),
     );
     await waitFor(() => expect(api.updateTeam).toHaveBeenCalled());
-    const payload = vi.mocked(api.updateTeam).mock.calls[0][1];
-    expect(payload).toHaveProperty("max_budget", 300);
-    expect(payload).not.toHaveProperty("budget_duration");
+    expect(vi.mocked(api.updateTeam).mock.calls[0][1].window_budgets).toEqual({
+      Morning: null,
+      Evening: 3,
+    });
   });
 });

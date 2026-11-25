@@ -24,6 +24,25 @@ export function durationDays(value?: string | null): number | null {
 }
 
 /** Human-readable period, e.g. `30 days` or `1 month`. */
+const RESET_WORDS: Record<string, string> = {
+  daily: "daily",
+  weekly: "weekly",
+  monthly: "monthly",
+  "1d": "daily",
+  "24h": "daily",
+  "1w": "weekly",
+  "1mo": "monthly",
+  "12mo": "yearly",
+};
+
+/** Team row reset text: "resets monthly", "resets every 30 days". */
+export function resetLabel(duration: string): string {
+  const word = RESET_WORDS[duration.trim().toLowerCase()];
+  if (word) return `resets ${word}`;
+  const label = durationLabel(duration);
+  return label ? `resets every ${label}` : "resets on a schedule";
+}
+
 export function durationLabel(value?: string | null): string | null {
   const match = value?.trim().match(/^(\d+)\s*(s|m|h|d|w|mo)$/i);
   if (!match) return value?.trim() || null;

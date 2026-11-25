@@ -194,8 +194,11 @@ config:
   # Uncomment only the limits LiteGate should apply.
   # keyMaxBudget: "10.0"
   # keyBudgetDuration: "30d"
-  # Nightly: one reset window for every team (1d, 7d or 1mo).
-  # teamBudgetDuration: "1mo"
+  # Nightly: budget windows every team shares (needs LiteLLM #54147).
+  # teamBudgetWindows:
+  #   timezone: Europe/Berlin
+  #   windows:
+  #     - {name: Morning, days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
   # keyModels: '["gpt-4","gpt-3.5-turbo"]'
   # keyDuration: "90d"
   # keyTpmLimit: "100000"

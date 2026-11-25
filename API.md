@@ -153,9 +153,14 @@ The bucket for users assigned directly to the selected group has `id: null` and
 the label `Direct members`; a child with that name has its own non-null ID.
 
 Helm-managed team budget changes, deletion, and member moves receive `409`.
-When `TEAM_BUDGET_DURATION` is set (nightly), team create and update use that
-`budget_duration`; sending a different value returns `422`, and
-`GET /api/portal-config` reports it as `team_budget_duration`.
+When `TEAM_BUDGET_WINDOWS` is set (nightly), team create and update accept
+`window_budgets` (`{"<window name>": amount or null}`, null = unlimited). This
+also works on Helm-managed teams. LiteGate turns it into scheduled
+`budget_limits` entries. Unknown window names, raw `budget_limits`, or
+`window_budgets` without a configured schedule return `422`.
+`GET /api/v1/teams/{team_id}/budget-windows` (administrators) returns each
+window's `max_budget`, `current_spend`, `active` and `next_start`, and
+`GET /api/portal-config` returns the schedule as `team_budget_windows`.
 Bulk-key budget or team changes report per-item failures for managed keys.
 Personal `/api/keys` responses can add `organization_managed`, `user_budget`,
 `user_spend`, `user_budget_available`, `organization_path`, and `policy_error`.

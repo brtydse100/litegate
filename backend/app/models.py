@@ -1,6 +1,6 @@
 from pydantic import BaseModel, PrivateAttr
 from pydantic import Field, field_validator, model_validator
-from typing import Optional, List, Any, Literal
+from typing import Annotated, Optional, List, Any, Literal
 from datetime import datetime
 
 
@@ -226,6 +226,10 @@ class ApiKeyCreateRequest(BaseModel):
     email: Optional[str] = Field(default=None, max_length=254)
 
 
+# Amount per scheduled budget window name; null is unlimited in that window.
+WindowBudgets = dict[str, Optional[Annotated[float, Field(ge=0, allow_inf_nan=False)]]]
+
+
 class TeamCreateRequest(BaseModel):
     advanced_settings: Optional[dict[str, Any]] = Field(default=None, max_length=100)
     team_alias: str = Field(min_length=1, max_length=128)
@@ -233,6 +237,7 @@ class TeamCreateRequest(BaseModel):
     models: List[str] = Field(default_factory=list)
     max_budget: Optional[float] = Field(default=None, ge=0)
     budget_duration: Optional[str] = Field(default=None, max_length=32)
+    window_budgets: Optional[WindowBudgets] = Field(default=None, max_length=24)
     tpm_limit: Optional[int] = Field(default=None, ge=0)
     rpm_limit: Optional[int] = Field(default=None, ge=0)
     blocked: bool = False
@@ -257,6 +262,7 @@ class TeamUpdateRequest(BaseModel):
     models: Optional[List[str]] = None
     max_budget: Optional[float] = Field(default=None, ge=0)
     budget_duration: Optional[str] = Field(default=None, max_length=32)
+    window_budgets: Optional[WindowBudgets] = Field(default=None, max_length=24)
     tpm_limit: Optional[int] = Field(default=None, ge=0)
     rpm_limit: Optional[int] = Field(default=None, ge=0)
     blocked: Optional[bool] = None

@@ -36,7 +36,7 @@ from app.services import (
     organization_sync,
     policy_schemas,
     policy_team_update,
-    team_budget_window,
+    team_budget_windows,
 )
 from app.routers.api_v1_policy_schemas import router as policy_schemas_router
 from app.routers.team_policy_context import decorate_team as _decorate_team, team_config_references as _team_config_references
@@ -255,8 +255,9 @@ async def api_create_team(payload: TeamCreateRequest, actor: ApiActor = Depends(
     """Create a LiteLLM team with validated budget and access policy."""
     _require_api_admin(actor)
     check_key_rate_limit(actor.user.user_id)
-    changes = team_budget_window.apply(await policy_schemas.merge_settings("team_create", payload), create=True)
-    created = await llm.create_team(changes)
+    changes = await policy_schemas.merge_settings("team_create", payload)
+    changes = await team_budget_windows.apply(None, changes, changes.pop("window_budgets", None))
+    created = await team_budget_windows.guarded(llm.create_team(changes), changes)
     await _record_audit(
         actor,
         "team.create",
@@ -274,10 +275,13 @@ async def api_update_team(
 ):
     """Update a LiteLLM team's validated budget and access policy."""
     _require_api_admin(actor)
-    changes = team_budget_window.apply(await policy_schemas.merge_settings("team_update", payload), create=False)
+    changes = await policy_schemas.merge_settings("team_update", payload)
+    window_budgets = changes.pop("window_budgets", None)
     organization_sync.guard_team(team_id, changes)
     check_key_rate_limit(actor.user.user_id)
-    updated = await policy_team_update.update(team_id, changes) if payload.advanced_settings else await llm.update_team(team_id, changes)
+    changes = await team_budget_windows.apply(team_id, changes, window_budgets)
+    update = policy_team_update.update(team_id, changes) if payload.advanced_settings else llm.update_team(team_id, changes)
+    updated = await team_budget_windows.guarded(update, changes)
     await _record_audit(actor, "team.update", team_id, details={"setting_fields": sorted(changes)})
     return _decorate_team(updated)
 

@@ -17,6 +17,7 @@ import { api } from "../api/client";
 import { useDialogDismiss } from "../hooks/useDialogDismiss";
 import { useOperationLimit } from "../hooks/useOperationLimit";
 import type {
+  BudgetWindowSchedule,
   TeamCreatePayload,
   TeamInfo,
   TeamUpdatePayload,
@@ -41,7 +42,12 @@ import {
 const teamColumns =
   "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_17rem] items-center gap-4";
 import { metricValue } from "./OrganizationCharts";
-import { durationLabel } from "../keyBudget";
+import { resetLabel } from "../keyBudget";
+import {
+  BudgetWindowsBanner,
+  TeamWindowUsage,
+  WindowBudgetFields,
+} from "./BudgetWindows";
 import {
   CurrentPolicySettings,
   DurationChoices,
@@ -62,13 +68,6 @@ function nullableNumber(value: string): number | null {
   return value === "" ? null : Number(value);
 }
 
-// LiteLLM aligns these durations to calendar boundaries.
-const WINDOW_LABELS: Record<string, string> = {
-  "1d": "daily at midnight",
-  "7d": "weekly on Monday",
-  "1mo": "monthly on the 1st",
-};
-
 function currentLimitPlaceholder(value: number | null | undefined): string {
   return value === undefined
     ? "Not provided"
@@ -85,13 +84,13 @@ function TeamEditor({
   onClose,
   onCreate,
   onUpdate,
-  budgetWindow,
+  budgetWindows,
 }: {
   state: EditorState;
   pending: boolean;
   operationsBlocked: boolean;
-  /** TEAM_BUDGET_DURATION: one reset window LiteGate applies to every team. */
-  budgetWindow?: string | null;
+  /** TEAM_BUDGET_WINDOWS: the schedule every team shares (nightly). */
+  budgetWindows?: BudgetWindowSchedule | null;
   error?: Error | null;
   onClose: () => void;
   onCreate: (payload: TeamCreatePayload) => void;
@@ -129,6 +128,25 @@ function TeamEditor({
     existing?.rpm_limit != null ? String(existing.rpm_limit) : "",
   );
   const [blocked, setBlocked] = useState(existing?.blocked ?? false);
+  const [windowAmounts, setWindowAmounts] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        (budgetWindows?.windows ?? []).map((window) => {
+          const cap = existing?.budget_limits?.find(
+            (limit) => limit.budget_duration === window.label,
+          )?.max_budget;
+          return [window.name, cap != null ? String(cap) : ""];
+        }),
+      ),
+  );
+  const windowBudgets = budgetWindows
+    ? Object.fromEntries(
+        budgetWindows.windows.map((window) => [
+          window.name,
+          nullableNumber(windowAmounts[window.name] ?? ""),
+        ]),
+      )
+    : undefined;
   const advanced = useRef<AdvancedPolicyHandle>(null);
   useEffect(() => {
     advanced.current?.setServerError(error);
@@ -159,12 +177,13 @@ function TeamEditor({
         models: modelList,
         blocked,
       };
+      if (windowBudgets) payload.window_budgets = windowBudgets;
       if (teamId.trim()) payload.team_id = teamId.trim();
       const maxBudget = optionalNumber(budget);
       const tpmLimit = optionalNumber(tpm);
       const rpmLimit = optionalNumber(rpm);
       if (maxBudget !== undefined) payload.max_budget = maxBudget;
-      if (!budgetWindow && budgetDuration.trim())
+      if (budgetDuration.trim())
         payload.budget_duration = budgetDuration.trim();
       if (tpmLimit !== undefined) payload.tpm_limit = tpmLimit;
       if (rpmLimit !== undefined) payload.rpm_limit = rpmLimit;
@@ -189,11 +208,10 @@ function TeamEditor({
       ...(!state.team.organization_managed
         ? {
             max_budget: nullableNumber(budget),
-            ...(!budgetWindow
-              ? { budget_duration: budgetDuration.trim() || null }
-              : {}),
+            budget_duration: budgetDuration.trim() || null,
           }
         : {}),
+      ...(windowBudgets ? { window_budgets: windowBudgets } : {}),
       tpm_limit: nullableNumber(tpm),
       rpm_limit: nullableNumber(rpm),
       blocked,
@@ -300,9 +318,9 @@ function TeamEditor({
           <label className="space-y-1 text-xs text-ink-3">
             <span>Budget reset</span>
             <input
-              disabled={existing?.organization_managed || !!budgetWindow}
+              disabled={existing?.organization_managed}
               className={inputClass}
-              value={budgetWindow || budgetDuration}
+              value={budgetDuration}
               list="team-budget-durations"
               onChange={(event) => setBudgetDuration(event.target.value)}
               placeholder={
@@ -315,13 +333,14 @@ function TeamEditor({
               maxLength={32}
             />
           </label>
-          {budgetWindow && (
-            <p className="text-xs text-ink-4 sm:col-span-2">
-              Every team resets together,{" "}
-              {WINDOW_LABELS[budgetWindow] ?? budgetWindow} (LiteLLM&apos;s
-              timezone), set by TEAM_BUDGET_DURATION. Leave the budget empty for
-              unlimited.
-            </p>
+          {budgetWindows && (
+            <WindowBudgetFields
+              schedule={budgetWindows}
+              values={windowAmounts}
+              onChange={(name, value) =>
+                setWindowAmounts((current) => ({ ...current, [name]: value }))
+              }
+            />
           )}
           {perUserNode && (
             <p className="text-xs text-ink-4 sm:col-span-2">
@@ -374,6 +393,7 @@ function TeamEditor({
               "tpm_limit",
               "rpm_limit",
               "blocked",
+              ...(budgetWindows ? ["budget_limits"] : []),
             ]}
             current={
               existing
@@ -504,9 +524,9 @@ function DeleteTeamDialog({
 }
 
 export default function AdminTeams({
-  budgetWindow,
+  budgetWindows,
 }: {
-  budgetWindow?: string | null;
+  budgetWindows?: BudgetWindowSchedule | null;
 } = {}) {
   const queryClient = useQueryClient();
   const { operationsBlocked, retryAfter, refreshOperationLimit } =
@@ -626,6 +646,7 @@ export default function AdminTeams({
         referenced by SSO mapping or <code>KEY_TEAM_ID</code> cannot be deleted
         until that configuration is changed.
       </Callout>
+      {budgetWindows && <BudgetWindowsBanner schedule={budgetWindows} />}
       {operationsBlocked && (
         <DismissibleMessage
           messageKey="team-actions-paused"
@@ -762,12 +783,11 @@ export default function AdminTeams({
                       {used != null && <UsageBar percent={used} />}
                       {team.budget_duration && (
                         <p className="text-xs text-ink-4">
-                          resets every{" "}
-                          {durationLabel(team.budget_duration)?.replace(
-                            /^1 /,
-                            "",
-                          )}
+                          {resetLabel(team.budget_duration)}
                         </p>
+                      )}
+                      {budgetWindows && (
+                        <TeamWindowUsage teamId={team.team_id} />
                       )}
                     </div>
                     <p className="text-[13px] text-ink-2">
@@ -866,7 +886,7 @@ export default function AdminTeams({
           onClose={() => setEditor(null)}
           onCreate={(payload) => create.mutate(payload)}
           onUpdate={(id, payload) => update.mutate({ id, payload })}
-          budgetWindow={budgetWindow}
+          budgetWindows={budgetWindows}
         />
       )}
       {deleteTarget && (

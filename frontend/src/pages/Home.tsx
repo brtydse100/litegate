@@ -14,6 +14,7 @@ import DismissibleMessage from "../components/DismissibleMessage";
 import PersonalKeySecret from "../components/PersonalKeySecret";
 import { keyToken } from "../components/BulkKeyEditor";
 import { LoadingBlock, LoadingPage } from "../components/LoadingBlock";
+import type { BudgetWindowSchedule } from "../types";
 
 // Each page loads its code on first visit, so My key does not wait for admin pages.
 const AdminKeys = lazy(() => import("../components/AdminKeys"));
@@ -60,7 +61,7 @@ interface PortalConfig {
   organization_delegation_enabled?: boolean;
   hierarchical_budgets_enabled?: boolean;
   litellm_enterprise_enabled: boolean;
-  team_budget_duration?: string | null;
+  team_budget_windows?: BudgetWindowSchedule | null;
 }
 
 async function fetchPortalConfig(): Promise<PortalConfig> {
@@ -546,7 +547,7 @@ export default function Home() {
                 {section === "/users" && isAdmin ? (
                   <AdminUsers localUsersEnabled={localUsersEnabled} />
                 ) : section === "/teams" && isAdmin ? (
-                  <AdminTeams budgetWindow={config?.team_budget_duration} />
+                  <AdminTeams budgetWindows={config?.team_budget_windows} />
                 ) : section === "/keys" && isAdmin ? (
                   <AdminKeys
                     saveApiKeysInDb={config?.save_api_keys_in_db}

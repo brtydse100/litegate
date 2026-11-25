@@ -364,26 +364,44 @@ replacement. This prevents users from refreshing a per-key allowance by rotating
 the key. LiteLLM also tracks spend at user and team scope; configure those budgets
 as an additional shared ceiling when a person may own keys outside LiteGate.
 
-### Shared team budget window (nightly)
+### Scheduled team budget windows (nightly)
 
-`team_budget_duration` (`TEAM_BUDGET_DURATION`, Helm `config.teamBudgetDuration`)
-gives every team the same budget reset window. Each team keeps its own
-`max_budget`; leave it empty for unlimited. Accepted values are `1d`, `7d` and
-`1mo`. LiteLLM aligns these to calendar boundaries in its own
-`litellm_settings.timezone` (UTC by default): midnight, Monday midnight and the
-1st of the month. So every team resets at the same moment. Unset keeps today's
-per-team reset periods.
+`team_budget_windows` (`TEAM_BUDGET_WINDOWS` as JSON, Helm
+`config.teamBudgetWindows`) defines one schedule of budget windows that every
+team shares. Each team then sets its own amount per window. A blank amount means
+no cap in that window.
 
-When set:
+```yaml
+team_budget_windows:
+  timezone: Europe/Berlin
+  windows:
+    - {name: Morning, days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
+    - {name: Afternoon, days: [mon, tue, wed, thu, fri], start: "13:00", end: "18:00"}
+    - {name: Overnight, start: "18:00", end: "08:00"}  # days default to every day
+```
 
-- New teams get the window; a create or update with a different
-  `budget_duration` returns `422`. The admin **Budget reset** field is read-only.
-- At startup LiteGate moves every other existing team onto the window, with
-  bounded concurrency. Each change writes a `team.budget_window_aligned` audit
-  event, and failures are logged and retried at the next start. LiteLLM sets the
-  next reset to the coming boundary and does not clear the current spend.
-- Every `organizationHierarchy` group must have the same budget `duration`;
-  otherwise LiteGate refuses to start.
+This needs a LiteLLM build with
+[BerriAI/litellm#54147](https://github.com/BerriAI/litellm/pull/54147). LiteLLM
+enforces each window as a team `budget_limits` entry with a `schedule`:
+
+- Spend starts at $0 each time a window opens.
+- Outside every window, no window cap applies.
+- An end at or before the start wraps past midnight.
+
+Startup validates the schedule with LiteLLM's rules: a known IANA timezone,
+`HH:MM` times, unique names and no overlapping windows.
+
+- Admins set amounts in the team dialog's **Budget per window** fields, or with
+  `window_budgets` on the team API. The Teams page shows the schedule, the window
+  open now and each team's spend in it. Organization-managed teams get the same
+  team-level window caps on top of their per-user key budgets.
+- Plain `budget_limits` entries a team already has are kept. Raw `budget_limits`
+  in Advanced settings is rejected while windows are configured.
+- When a window's name, days or times change, its old entries are removed from
+  every team at startup and audited as `team.budget_windows_pruned`. The changed
+  window starts out unlimited until amounts are set again.
+- If LiteLLM lacks the feature, team saves with window amounts fail with an
+  error naming the required LiteLLM change.
 
 This setting is in nightly `dev-*` images only.
 

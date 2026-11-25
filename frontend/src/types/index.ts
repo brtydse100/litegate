@@ -162,6 +162,7 @@ export interface TeamInfo {
   spend?: number | null;
   max_budget?: number | null;
   budget_duration?: string | null;
+  budget_limits?: { budget_duration?: string; max_budget?: number | null }[];
   tpm_limit?: number | null;
   rpm_limit?: number | null;
   models: string[];
@@ -194,6 +195,7 @@ export interface TeamCreatePayload {
   models: string[];
   max_budget?: number;
   budget_duration?: string;
+  window_budgets?: WindowBudgets;
   tpm_limit?: number;
   rpm_limit?: number;
   blocked: boolean;
@@ -205,9 +207,39 @@ export interface TeamUpdatePayload {
   models: string[];
   max_budget?: number | null;
   budget_duration?: string | null;
+  window_budgets?: WindowBudgets;
   tpm_limit: number | null;
   rpm_limit: number | null;
   blocked: boolean;
+}
+
+/** Amount per scheduled budget window name; null is unlimited. */
+export type WindowBudgets = Record<string, number | null>;
+
+/** One window of the installation-wide schedule (TEAM_BUDGET_WINDOWS). */
+export interface BudgetWindow {
+  name: string;
+  days: string[];
+  start: string;
+  end: string;
+  /** LiteLLM's budget_duration label for this window. */
+  label: string;
+}
+
+export interface BudgetWindowSchedule {
+  timezone: string;
+  windows: BudgetWindow[];
+}
+
+export interface TeamBudgetWindowUsage {
+  team_id: string;
+  timezone: string;
+  windows: (BudgetWindow & {
+    max_budget: number | null;
+    current_spend: number | null;
+    active: boolean | null;
+    next_start: string | null;
+  })[];
 }
 
 export interface TeamMemberMovePayload {
