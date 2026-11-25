@@ -6,3 +6,12 @@ model_list:
       api_key: sk-synthetic-integration-placeholder
       api_base: http://127.0.0.1:9
       mock_response: "Synthetic LiteGate integration response"
+
+# Recommended lockdown (docs/litellm-key-lockdown.md): only administrators, and
+# LiteGate through the master key, may create keys.
+litellm_settings:
+  key_generation_settings:
+    personal_key_generation:
+      allowed_user_roles: ["proxy_admin"]
+    team_key_generation:
+      allowed_team_member_roles: ["admin"]

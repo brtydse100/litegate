@@ -88,7 +88,7 @@ async def test_first_authenticated_login_creates_actual_subject_without_key(monk
     monkeypatch.setattr(litellm, "_client", connection)
     state = auth.oidc_svc.generate_state("oidc")
     assert (await auth.callback("code", state, state_cookie=state)).status_code == 307
-    assert writes == [{"user_id": "new-subject", "user_email": "alice@example.com", "auto_create_key": False}]
+    assert writes == [{"user_id": "new-subject", "user_email": "alice@example.com", "auto_create_key": False, "user_role": "internal_user_viewer"}]
     assert store.get("new-subject")["auth_source"] == "sso"
     from app.services import local_users
 

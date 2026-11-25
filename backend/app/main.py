@@ -12,7 +12,7 @@ from app.routers import analytics as analytics_router
 from app.routers import api_v1, auth, keys, logs, organization, users
 from app.routers import people
 from app.routers import budgets
-from app.services import analytics, litellm, local_users, organization_bindings, organization_limits, organization_sync
+from app.services import analytics, litellm, litellm_roles, local_users, organization_bindings, organization_limits, organization_sync
 from app.version import VERSION
 
 
@@ -25,6 +25,9 @@ async def lifespan(_: FastAPI):
     await litellm.start_client()
     organization_task = None
     analytics_task = None
+    # One pass that switches known people to LiteLLM's view-only role; it runs
+    # beside startup, and anyone it misses switches at their next sign-in.
+    roles_task = asyncio.create_task(litellm_roles.restrict_known_users())
     try:
         if settings.organization_hierarchy.levels or settings.organization_cleanup_enabled:
             started = await organization_sync.reconciliation_attempt()
@@ -36,6 +39,8 @@ async def lifespan(_: FastAPI):
         if organization_task:
             organization_task.cancel()
             await asyncio.gather(organization_task, return_exceptions=True)
+        roles_task.cancel()
+        await asyncio.gather(roles_task, return_exceptions=True)
         if analytics_task:
             analytics_task.cancel()
             await asyncio.gather(analytics_task, return_exceptions=True)

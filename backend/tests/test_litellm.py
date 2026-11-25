@@ -94,6 +94,7 @@ async def test_create_user_does_not_discard_an_automatically_created_key():
         "user_id": "user-1",
         "user_email": "user@example.com",
         "auto_create_key": False,
+        "user_role": "internal_user_viewer",
     }
 
 

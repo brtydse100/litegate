@@ -17,7 +17,8 @@ def _verify_owned(user: dict, reservation: dict) -> None:
     if (
         user.get("user_id") != reservation["user_id"]
         or str(user.get("user_email") or "").strip().casefold() != reservation["email"]
-        or user.get("user_role") != "internal_user"
+        # LiteGate now switches people to the view-only role; both are its own.
+        or user.get("user_role") not in ("internal_user", "internal_user_viewer")
         or not isinstance(metadata, dict)
         or metadata.get(remote.OWNER_FIELD) != reservation["ownership_token"]
     ):
