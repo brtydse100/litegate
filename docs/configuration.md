@@ -438,9 +438,11 @@ never reset a team's or key's total spend.
   Custom choices are stored in the team's LiteLLM metadata under
   `litegate_window_budgets`; LiteGate keeps no extra state.
 - The Teams page lists every window with the one open now highlighted (or, outside
-  every window, when the next one opens). Each team row shows only the open
-  window: its cap tagged `config` or `custom` and the spend so far. Outside every
-  window, the row says so and names the next window and the team's cap in it.
+  every window, when the next one opens), with each window's budget and the
+  time until the open one resets. Each team row shows only the open window:
+  spend of its cap, what is left, when it resets, and a `config` or `custom`
+  tag. Outside every window, the row says so and names the next window and the
+  team's cap in it. The team dialog shows the cap each choice gives the team.
   While windows are on, a team's own reset period is not shown. Organization-
   managed teams get the same team-level window caps on top of their per-user key
   budgets.

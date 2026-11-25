@@ -4,8 +4,10 @@ import {
   activeWindow,
   choicePayload,
   formatDays,
+  formatLeft,
   initialChoices,
   nextWindow,
+  openWindow,
 } from "./BudgetWindows";
 import { resetLabel } from "../keyBudget";
 
@@ -88,6 +90,21 @@ describe("scheduled budget windows", () => {
     });
     // Windows set in configuration for the team are never sent.
     expect(choicePayload(choices, { Overnight: 4 })).toEqual({ Morning: 7 });
+  });
+
+  it("counts the time left in the open window, also past midnight", () => {
+    // Wednesday 09:30 Berlin: the morning window ends at 13:00.
+    expect(
+      openWindow(schedule, new Date("2026-11-25T08:30:00Z"))?.minutesLeft,
+    ).toBe(210);
+    // Monday 03:00 Berlin, inside Sunday's overnight window until 08:00.
+    expect(
+      openWindow(schedule, new Date("2026-11-30T02:00:00Z"))?.minutesLeft,
+    ).toBe(300);
+    expect(formatLeft(210)).toBe("3h 30m");
+    expect(formatLeft(180)).toBe("3h");
+    expect(formatLeft(45)).toBe("45m");
+    expect(formatLeft(0)).toBe("1m");
   });
 
   it("summarizes days and reset periods in plain words", () => {

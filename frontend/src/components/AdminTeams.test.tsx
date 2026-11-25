@@ -446,16 +446,26 @@ describe("scheduled budget windows", () => {
       await screen.findByRole("heading", { name: "Budget windows" }),
     ).toBeVisible();
     expect(screen.getByText("Mon · UTC+2")).toBeVisible();
-    expect(await screen.findByText("$1.50 spent")).toBeVisible();
-    expect(screen.getByText("· $5.00 · custom")).toBeVisible();
+    // Spend against the cap, what is left, and where the cap comes from.
+    expect(await screen.findByText("$1.50")).toBeVisible();
+    expect(screen.getByText("of $5.00")).toBeVisible();
+    expect(screen.getByText("$3.50 left")).toBeVisible();
+    expect(screen.getByText("custom")).toBeVisible();
     // Only the open window is on the row; no reset warnings remain.
     expect(screen.queryByText(/\$12\.00/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/resets/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/resets every/)).not.toBeInTheDocument();
     expect(screen.queryByText(/KEY_BUDGET_DURATION/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog", { name: "Edit team" });
     expect(within(dialog).queryByText("Budget reset")).not.toBeInTheDocument();
-    expect(await within(dialog).findAllByText("config $40.00")).toHaveLength(1);
+    // Each window shows the cap the team gets with the current choice.
+    expect(
+      await within(dialog).findByText("Team cap $5.00 · config $40.00"),
+    ).toBeVisible();
+    expect(within(dialog).getByText("Team cap $12.00")).toBeVisible();
+    expect(
+      within(dialog).getByText("Team cap unlimited · from config"),
+    ).toBeVisible();
     // The configuration overrides 13:00–18:00 for this team, so it is read-only.
     expect(
       within(dialog).getByText("Set in config for this team"),
@@ -485,6 +495,12 @@ describe("scheduled budget windows", () => {
       within(dialog).getByLabelText("Custom cap for 18:00–22:00 (USD)"),
       { target: { value: "3" } },
     );
+    expect(
+      within(dialog).getByText("Team cap $40.00 · from config"),
+    ).toBeVisible();
+    expect(
+      within(dialog).getByText("Team cap $3.00 · config unlimited"),
+    ).toBeVisible();
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Save changes" }),
     );
@@ -500,11 +516,26 @@ describe("scheduled budget windows", () => {
     vi.setSystemTime(new Date("2026-11-25T10:00:00Z"));
     try {
       renderTeams(false);
-      expect(await screen.findByText(/\(\$5\.00 · custom\)/)).toBeVisible();
+      expect(await screen.findByText("Next Mon 08:00 · $5.00")).toBeVisible();
+      expect(screen.getByText("custom")).toBeVisible();
+      expect(screen.getByText("No window open · next Mon 08:00")).toBeVisible();
+      expect(screen.queryByText(/left/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("counts down to the reset of the open window", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // Monday 10:00 at UTC+2: the morning window resets at 13:00.
+    vi.setSystemTime(new Date("2026-11-30T08:00:00Z"));
+    try {
+      renderTeams(true);
       expect(
-        screen.getAllByText(/No window open · next Mon 08:00/),
-      ).toHaveLength(2);
-      expect(screen.queryByText(/spent/)).not.toBeInTheDocument();
+        await screen.findByText("$3.50 left · resets in 3h"),
+      ).toBeVisible();
+      expect(screen.getByText("Open now · resets in 3h")).toBeVisible();
+      expect(screen.getByText("$40.00 · 3h left")).toBeVisible();
     } finally {
       vi.useRealTimers();
     }
