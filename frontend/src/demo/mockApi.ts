@@ -210,6 +210,8 @@ let teams: TeamInfo[] = [
     team_alias: "Customer Support",
     spend: 44.15,
     max_budget: 120,
+    // As if team_budgets in TEAM_BUDGET_WINDOWS set these two windows.
+    window_config: demoOverrides([10, 10]),
     budget_duration: "monthly",
     tpm_limit: 90000,
     rpm_limit: 150,

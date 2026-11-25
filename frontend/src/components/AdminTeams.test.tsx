@@ -320,7 +320,7 @@ describe("organization per-user limits", () => {
 });
 
 describe("scheduled budget windows", () => {
-  it("lists every window with its default or team cap and edits the choice", async () => {
+  it("lists every window with its config or custom cap and edits the choice", async () => {
     vi.clearAllMocks();
     vi.mocked(api.policySchemas).mockResolvedValue({
       available: false,
@@ -341,6 +341,13 @@ describe("scheduled budget windows", () => {
         label: "sched:Etc/GMT-2:mon:08:00-13:00",
       },
       {
+        name: "Mon 13:00-18:00",
+        days: ["mon"],
+        start: "13:00",
+        end: "18:00",
+        label: "sched:Etc/GMT-2:mon:13:00-18:00",
+      },
+      {
         name: "Mon 18:00-22:00",
         days: ["mon"],
         start: "18:00",
@@ -353,7 +360,8 @@ describe("scheduled budget windows", () => {
       zone: "Etc/GMT-2",
       windows: [
         { ...windows[0], default_budget: 40 },
-        { ...windows[1], default_budget: null },
+        { ...windows[1], default_budget: 40 },
+        { ...windows[2], default_budget: null },
       ],
       key_budget_duration: "30d",
     });
@@ -365,15 +373,26 @@ describe("scheduled budget windows", () => {
         {
           ...windows[0],
           max_budget: 5,
-          source: "team",
+          source: "custom",
+          locked: false,
           current_spend: 1.5,
           active: true,
           next_start: null,
         },
         {
           ...windows[1],
+          max_budget: 12,
+          source: "config",
+          locked: true,
+          current_spend: null,
+          active: false,
+          next_start: null,
+        },
+        {
+          ...windows[2],
           max_budget: null,
-          source: "default",
+          source: "config",
+          locked: false,
           current_spend: null,
           active: false,
           next_start: null,
@@ -395,6 +414,7 @@ describe("scheduled budget windows", () => {
           team_alias: "Research",
           budget_duration: "30d",
           window_budgets: { "Mon 08:00-13:00": 5 },
+          window_config: { "Mon 13:00-18:00": 12 },
           models: [],
           blocked: false,
           members_with_roles: [],
@@ -431,11 +451,19 @@ describe("scheduled budget windows", () => {
     expect(screen.getByText("Total resets every 30 days")).toBeVisible();
     const rows = screen.getByRole("list", { name: "Budget windows" });
     expect(within(rows).getByText("Unlimited")).toBeVisible();
-    expect(within(rows).getAllByText(/default/)).toHaveLength(1);
+    expect(within(rows).getAllByText(/· config/)).toHaveLength(2);
+    expect(within(rows).getAllByText(/· custom/)).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog", { name: "Edit team" });
     expect(within(dialog).queryByText("Budget reset")).not.toBeInTheDocument();
-    expect(within(dialog).getByText("default $40.00")).toBeVisible();
+    expect(within(dialog).getByText("config $40.00")).toBeVisible();
+    // The configuration sets 13:00–18:00 for this team, so it is read-only.
+    expect(
+      within(dialog).getByText("Set in config for this team"),
+    ).toBeVisible();
+    expect(
+      within(dialog).queryByRole("group", { name: "Cap for 13:00–18:00" }),
+    ).not.toBeInTheDocument();
     const morning = within(dialog).getByRole("group", {
       name: "Cap for 08:00–13:00",
     });
@@ -448,7 +476,7 @@ describe("scheduled budget windows", () => {
     expect(
       within(dialog).getByLabelText("Custom cap for 08:00–13:00 (USD)"),
     ).toHaveValue(5);
-    fireEvent.click(within(morning).getByRole("button", { name: "Default" }));
+    fireEvent.click(within(morning).getByRole("button", { name: "Config" }));
     fireEvent.click(within(evening).getByRole("button", { name: "Custom" }));
     fireEvent.change(
       within(dialog).getByLabelText("Custom cap for 18:00–22:00 (USD)"),
@@ -460,7 +488,7 @@ describe("scheduled budget windows", () => {
     await waitFor(() => expect(api.updateTeam).toHaveBeenCalled());
     const sent = vi.mocked(api.updateTeam).mock.calls[0][1];
     expect(sent.window_budgets).toEqual({
-      "Mon 08:00-13:00": "default",
+      "Mon 08:00-13:00": "config",
       "Mon 18:00-22:00": 3,
     });
     expect(sent).not.toHaveProperty("budget_duration");

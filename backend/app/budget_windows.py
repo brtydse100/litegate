@@ -7,14 +7,16 @@ the rules here mirror LiteLLM's so a configuration it would reject never starts.
 """
 
 import re
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 
 Weekday = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 WEEKDAYS: tuple[str, ...] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 SCHEDULE_PREFIX = "sched:"
+Cap = Annotated[float, Field(ge=0, allow_inf_nan=False)]
+TeamId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
 _UTC_OFFSET = re.compile(r"UTC([+-])(\d{1,2})(?::00)?")
 _DAY = 24 * 60
 _WEEK = 7 * _DAY
@@ -56,6 +58,9 @@ class BudgetWindow(BaseModel):
     start: str
     end: str
     default_budget: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    # Caps set in configuration for specific team IDs; None is unlimited. These
+    # win over the default and over the admin UI, which shows them read-only.
+    team_budgets: dict[TeamId, Optional[Cap]] = Field(default_factory=dict, max_length=1000)
 
     @field_validator("days")
     @classmethod
@@ -128,7 +133,8 @@ class BudgetWindows(BaseModel):
 
     def public(self, defaults: bool = True) -> dict:
         """The schedule for the UI; default caps only for administrators."""
-        exclude = None if defaults else {"default_budget"}
+        # Per-team caps reach the UI only on each team (see team_budget_windows.decorate).
+        exclude = {"team_budgets"} if defaults else {"team_budgets", "default_budget"}
         return {
             "timezone": self.timezone,
             "zone": self.zone,

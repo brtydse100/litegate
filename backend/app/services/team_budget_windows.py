@@ -1,12 +1,13 @@
 """Each team's caps for the shared scheduled budget windows (nightly).
 
-LiteGate owns the schedule (``TEAM_BUDGET_WINDOWS``) and a default cap per
-window. A team follows each default unless it overrides that window with its
-own amount or with unlimited; the overrides live in the team's LiteLLM metadata
-under ``OVERRIDES``. A cap becomes a LiteLLM team ``budget_limits`` entry with
-that window's ``schedule``; no entry means unlimited in that window. Plain
-(unscheduled) ``budget_limits`` entries a team already has are always kept.
-Requires a LiteLLM build with BerriAI/litellm#54147.
+LiteGate owns the schedule (``TEAM_BUDGET_WINDOWS``). A team's cap in a window
+comes from, in order: the window's ``team_budgets`` entry for that team in
+configuration (read-only in the UI), a custom cap or unlimited an administrator
+chose, or the window's ``default_budget``. Custom choices live in the team's
+LiteLLM metadata under ``OVERRIDES``. A cap becomes a LiteLLM team
+``budget_limits`` entry with that window's ``schedule``; no entry means
+unlimited in that window. Plain (unscheduled) ``budget_limits`` entries a team
+already has are always kept. Requires a LiteLLM build with BerriAI/litellm#54147.
 """
 
 from collections.abc import Awaitable
@@ -19,7 +20,7 @@ from app.services import organization_client as upstream
 
 UNSUPPORTED = "LiteLLM rejected the scheduled budget windows; they need a LiteLLM build with BerriAI/litellm#54147"
 OVERRIDES = "litegate_window_budgets"
-DEFAULT = "default"
+CONFIG = "config"
 
 
 def entries(team: dict) -> list[dict]:
@@ -44,8 +45,14 @@ def amounts(team: dict) -> dict[str, float | None]:
     return {window.name: limits.get(config.label(window)) for window in config.windows}
 
 
+def configured(team_id: str | None) -> dict[str, float | None]:
+    """Windows whose cap configuration sets for this team (read-only in the UI)."""
+    windows = settings.team_budget_windows.windows
+    return {window.name: window.team_budgets[team_id] for window in windows if team_id and team_id in window.team_budgets}
+
+
 def overrides(team: dict) -> dict[str, float | None]:
-    """Windows where the team chose its own cap (None is unlimited) instead of the default."""
+    """Windows where an administrator chose a custom cap (None is unlimited)."""
     names = {window.name for window in settings.team_budget_windows.windows}
     stored = metadata(team).get(OVERRIDES)
     if isinstance(stored, dict):
@@ -58,9 +65,13 @@ def overrides(team: dict) -> dict[str, float | None]:
     return {name: cap for name, cap in amounts(team).items() if cap is not None}
 
 
-def caps(chosen: dict[str, float | None]) -> dict[str, float | None]:
-    """Each window's cap: the team's own choice, else the configured default."""
-    return {window.name: chosen.get(window.name, window.default_budget) for window in settings.team_budget_windows.windows}
+def caps(chosen: dict[str, float | None], team_id: str | None = None) -> dict[str, float | None]:
+    """Each window's cap: configuration for this team, else the custom choice, else the default."""
+    fixed = configured(team_id)
+    return {
+        window.name: fixed[window.name] if window.name in fixed else chosen.get(window.name, window.default_budget)
+        for window in settings.team_budget_windows.windows
+    }
 
 
 def merge(team: dict, wanted: dict[str, float | None]) -> list[dict]:
@@ -74,13 +85,17 @@ def merge(team: dict, wanted: dict[str, float | None]) -> list[dict]:
 
 
 def choose(team: dict, changes: dict[str, float | str | None]) -> dict[str, float | None]:
-    """The team's overrides after a request: an amount or None overrides, "default" follows."""
+    """The team's custom choices after a request: an amount or None is custom, "config" follows configuration."""
     chosen = overrides(team)
     unknown = sorted(set(changes) - set(caps({})))
     if unknown:
         raise HTTPException(status_code=422, detail=f"Unknown budget windows: {', '.join(unknown)}")
+    fixed = configured(team.get("team_id"))
+    locked = sorted(name for name, value in changes.items() if name in fixed and value != CONFIG)
+    if locked:
+        raise HTTPException(status_code=409, detail=f"Budget windows set in configuration for this team: {', '.join(locked)}")
     for name, value in changes.items():
-        if value == DEFAULT:
+        if value == CONFIG:
             chosen.pop(name, None)
         else:
             chosen[name] = value
@@ -90,7 +105,7 @@ def choose(team: dict, changes: dict[str, float | str | None]) -> dict[str, floa
 def synced(team: dict, chosen: dict[str, float | None], base: dict | None = None) -> dict:
     """The budget_limits and metadata that make LiteLLM enforce these choices."""
     return {
-        "budget_limits": merge(team, caps(chosen)),
+        "budget_limits": merge(team, caps(chosen, team.get("team_id"))),
         "metadata": {**(metadata(team) if base is None else base), OVERRIDES: chosen},
     }
 
@@ -106,7 +121,10 @@ async def apply(team_id: str | None, changes: dict, window_budgets: dict | None)
     # An update touching neither leaves the team's windows and metadata as they are.
     if team_id is not None and window_budgets is None and "metadata" not in changes:
         return changes
-    team = {} if team_id is None else (await upstream.team_info(team_id)).get("team_info") or {}
+    if team_id is None:
+        team = {"team_id": changes.get("team_id")}
+    else:
+        team = {"team_id": team_id, **((await upstream.team_info(team_id)).get("team_info") or {})}
     base = changes["metadata"] if isinstance(changes.get("metadata"), dict) else None
     return {**changes, **synced(team, choose(team, window_budgets or {}), base)}
 
@@ -123,8 +141,12 @@ async def guarded(operation: Awaitable[dict], changes: dict) -> dict:
 
 
 def decorate(team: dict) -> dict:
-    """The team's own window choices for the admin team dialog (absent: the default)."""
-    return {"window_budgets": overrides(team)} if settings.team_budget_windows else {}
+    """The team's custom choices and its configuration-set caps, for the team dialog."""
+    if settings.team_budget_windows is None:
+        return {}
+    fixed = configured(str(team.get("team_id") or ""))
+    custom = {name: value for name, value in overrides(team).items() if name not in fixed}
+    return {"window_budgets": custom, "window_config": fixed}
 
 
 async def usage(team_id: str) -> dict:
@@ -135,16 +157,18 @@ async def usage(team_id: str) -> dict:
     info = (await upstream.team_info(team_id)).get("team_info")
     if not isinstance(info, dict):
         raise HTTPException(status_code=404, detail="Team not found")
-    enforced, chosen = amounts(info), overrides(info)
+    enforced, chosen, fixed = amounts(info), overrides(info), configured(team_id)
     spent = info.get("budget_limits_usage") if isinstance(info.get("budget_limits_usage"), dict) else {}
     windows = []
     for window in config.public()["windows"]:
+        name = window["name"]
         current = spent.get(window["label"]) if isinstance(spent.get(window["label"]), dict) else {}
         windows.append(
             {
                 **window,
-                "max_budget": enforced[window["name"]],
-                "source": "team" if window["name"] in chosen else DEFAULT,
+                "max_budget": enforced[name],
+                "source": "custom" if name in chosen and name not in fixed else CONFIG,
+                "locked": name in fixed,
                 "current_spend": current.get("current_spend"),
                 "active": current.get("active"),
                 "next_start": current.get("next_start"),

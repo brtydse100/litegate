@@ -369,15 +369,26 @@ as an additional shared ceiling when a person may own keys outside LiteGate.
 `team_budget_windows` (`TEAM_BUDGET_WINDOWS` as JSON, Helm
 `config.teamBudgetWindows`) defines one schedule of budget windows that every
 team shares. A window is identified by its days and hours, such as
-`Mon-Fri 08:00-13:00`; `days` defaults to every day. Each window can have a
-`default_budget`: the cap every team gets in that window unless the team
-overrides it. Without `default_budget`, the default is no cap.
+`Mon-Fri 08:00-13:00`; `days` defaults to every day. A team's cap in a window
+comes from, in order:
+
+1. `team_budgets`: caps configuration sets for specific team IDs (`null` is
+   unlimited). These are read-only in the admin UI, and API changes to them
+   return `409`.
+2. A custom cap or unlimited chosen in the team dialog or with the team API.
+3. `default_budget`: the cap every other team gets. Without it, no cap.
 
 ```yaml
 team_budget_windows:
   timezone: UTC+2            # or an IANA name such as Europe/Berlin
   windows:
-    - {days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00", default_budget: 40}
+    - days: [mon, tue, wed, thu, fri]
+      start: "08:00"
+      end: "13:00"
+      default_budget: 40
+      team_budgets:
+        product: 15
+        research: null       # unlimited
     - {days: [mon, tue, wed, thu, fri], start: "13:00", end: "18:00", default_budget: 40}
     - {days: [mon, tue, wed, thu, fri], start: "18:00", end: "22:00"}
 ```
@@ -407,22 +418,25 @@ enforces each window as a team `budget_limits` entry with a `schedule`:
 Startup validates the schedule with LiteLLM's rules: a known timezone, `HH:MM`
 times and no overlapping windows.
 
-- In the team dialog, each window offers **Default**, **Custom** (an amount) or
-  **Unlimited**. The team API takes the same choice as `window_budgets`, keyed
-  by the window's days and hours, for example
-  `{"Mon-Fri 08:00-13:00": 15, "Mon-Fri 13:00-18:00": "default",
-  "Mon-Fri 18:00-22:00": null}`. A team's own choices are stored in its LiteLLM
+- In the team dialog, each window offers **Config** (the configured cap),
+  **Custom** (an amount) or **Unlimited**; windows `team_budgets` sets for the
+  team show "Set in config for this team" instead. The team API takes the same
+  choice as `window_budgets`, keyed by the window's days and hours, for example
+  `{"Mon-Fri 08:00-13:00": 15, "Mon-Fri 13:00-18:00": "config",
+  "Mon-Fri 18:00-22:00": null}`. Custom choices are stored in the team's LiteLLM
   metadata under `litegate_window_budgets`; LiteGate keeps no extra state.
 - The Teams page lists every window with the one open now highlighted (or,
   outside every window, when the next one opens). Each team row lists every
-  window's cap, marks the ones that follow the default, and shows the open
-  window's spend. Organization-managed teams get the same team-level window caps
+  window's cap tagged `config` or `custom`, and shows the open window's
+  spend. Organization-managed teams get the same team-level window caps
   on top of their per-user key budgets.
-- At startup, LiteGate rewrites every team whose caps differ from its choices
-  and the current defaults, audited as `team.budget_windows_synced`. That
-  applies changed defaults, removes windows that are no longer configured, and
-  gives teams created outside LiteGate (directly in LiteLLM or by the
-  organization sync) the defaults. A team that had window caps before defaults
+- At startup, LiteGate rewrites every team whose caps differ from the
+  configuration and its custom choices, audited as `team.budget_windows_synced`.
+  That applies changed `default_budget` and `team_budgets` values, removes
+  windows that are no longer configured, and gives teams created outside
+  LiteGate (directly in LiteLLM or by the organization sync) their configured
+  caps. Team IDs in `team_budgets` that LiteLLM does not have are logged as a
+  warning. A team that had window caps before defaults
   existed keeps them as its own choices; its blank windows follow the default.
 - Plain `budget_limits` entries a team already has are kept. Raw `budget_limits`
   in Advanced settings is rejected while windows are configured.

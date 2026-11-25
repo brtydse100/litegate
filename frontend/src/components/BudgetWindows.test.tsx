@@ -83,9 +83,11 @@ describe("scheduled budget windows", () => {
     });
     expect(choicePayload(choices)).toEqual({ Morning: 7, Overnight: null });
     expect(choicePayload(initialChoices(schedule, null))).toEqual({
-      Morning: "default",
-      Overnight: "default",
+      Morning: "config",
+      Overnight: "config",
     });
+    // Windows set in configuration for the team are never sent.
+    expect(choicePayload(choices, { Overnight: 4 })).toEqual({ Morning: 7 });
   });
 
   it("summarizes days and reset periods in plain words", () => {

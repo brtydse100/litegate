@@ -226,9 +226,9 @@ class ApiKeyCreateRequest(BaseModel):
     email: Optional[str] = Field(default=None, max_length=254)
 
 
-# Per scheduled budget window name: an amount, null for unlimited, or "default"
-# to follow the window's configured default cap.
-WindowBudgets = dict[str, Union[Annotated[float, Field(ge=0, allow_inf_nan=False)], Literal["default"], None]]
+# Per scheduled budget window name: an amount, null for unlimited, or "config"
+# to follow the configuration (team_budgets, else default_budget).
+WindowBudgets = dict[str, Union[Annotated[float, Field(ge=0, allow_inf_nan=False)], Literal["config"], None]]
 
 
 class TeamCreateRequest(BaseModel):

@@ -47,7 +47,7 @@ export const demoBudgetWindows: BudgetWindowSchedule = {
   })),
 };
 
-/** Seed overrides in window order; undefined follows the default, null is unlimited. */
+/** Seed caps in window order; undefined follows the config, null is unlimited. */
 export function demoOverrides(
   caps: (number | null | undefined)[],
 ): Record<string, number | null> {
@@ -66,7 +66,8 @@ export function applyWindowBudgets(
   const current = { ...(team.window_budgets ?? {}) };
   if (!windowBudgets || typeof windowBudgets !== "object") return current;
   for (const [name, value] of Object.entries(windowBudgets)) {
-    if (value === "default") delete current[name];
+    if (name in (team.window_config ?? {})) continue;
+    if (value === "config") delete current[name];
     else if (value === null || typeof value === "number") current[name] = value;
   }
   return current;
@@ -75,18 +76,26 @@ export function applyWindowBudgets(
 export function demoWindowUsage(team: TeamInfo): TeamBudgetWindowUsage {
   const open = activeWindow(demoBudgetWindows, new Date());
   const own = team.window_budgets ?? {};
+  const fixed = team.window_config ?? {};
   return {
     team_id: team.team_id,
     timezone: demoAdminBudgetWindows.timezone,
     zone: demoAdminBudgetWindows.zone,
     windows: demoAdminBudgetWindows.windows.map((item) => {
-      const overridden = item.name in own;
-      const cap = (overridden ? own[item.name] : item.default_budget) ?? null;
+      const locked = item.name in fixed;
+      const custom = !locked && item.name in own;
+      const cap =
+        (locked
+          ? fixed[item.name]
+          : custom
+            ? own[item.name]
+            : item.default_budget) ?? null;
       const active = item.name === open?.name;
       return {
         ...item,
         max_budget: cap,
-        source: overridden ? "team" : "default",
+        source: custom ? "custom" : "config",
+        locked,
         current_spend: active && cap != null ? Math.round(cap * 37) / 100 : 0,
         active,
         next_start: null,

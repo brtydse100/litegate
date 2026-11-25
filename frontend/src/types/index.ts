@@ -163,8 +163,10 @@ export interface TeamInfo {
   max_budget?: number | null;
   budget_duration?: string | null;
   budget_limits?: { budget_duration?: string; max_budget?: number | null }[];
-  /** Windows where the team overrides the default cap; null is unlimited. */
+  /** Windows where an admin set a custom cap; null is unlimited. */
   window_budgets?: Record<string, number | null>;
+  /** Windows whose cap the configuration sets for this team (read-only). */
+  window_config?: Record<string, number | null>;
   tpm_limit?: number | null;
   rpm_limit?: number | null;
   models: string[];
@@ -216,8 +218,8 @@ export interface TeamUpdatePayload {
 }
 
 /** Per scheduled budget window name: an amount, null for unlimited, or
- * "default" to follow the window's configured default cap. */
-export type WindowBudgets = Record<string, number | null | "default">;
+ * "config" to follow the configuration (team_budgets, else default_budget). */
+export type WindowBudgets = Record<string, number | null | "config">;
 
 /** One window of the installation-wide schedule (TEAM_BUDGET_WINDOWS). */
 export interface BudgetWindow {
@@ -250,8 +252,10 @@ export interface TeamBudgetWindowUsage {
   zone: string;
   windows: (BudgetWindow & {
     max_budget: number | null;
-    /** "team" when the team overrides this window, else "default". */
-    source: "team" | "default";
+    /** "custom" for a cap set in the team dialog, else "config". */
+    source: "config" | "custom";
+    /** The configuration sets this window's cap for this team. */
+    locked: boolean;
     current_spend: number | null;
     active: boolean | null;
     next_start: string | null;

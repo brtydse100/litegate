@@ -41,7 +41,7 @@ import {
 
 /** Team list columns, shared by the caption row and each team. */
 const teamColumns =
-  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(10.5rem,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_17rem] items-center gap-4";
+  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(11.5rem,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_17rem] items-center gap-4";
 import { metricValue } from "./OrganizationCharts";
 import { resetLabel } from "../keyBudget";
 import {
@@ -136,7 +136,7 @@ function TeamEditor({
     Record<string, WindowChoice>
   >(() => (budgetWindows ? initialChoices(budgetWindows, existing) : {}));
   const windowBudgets = budgetWindows
-    ? choicePayload(windowChoices)
+    ? choicePayload(windowChoices, existing?.window_config)
     : undefined;
   const advanced = useRef<AdvancedPolicyHandle>(null);
   useEffect(() => {
@@ -336,6 +336,7 @@ function TeamEditor({
             <WindowBudgetFields
               schedule={budgetWindows}
               values={windowChoices}
+              locked={existing?.window_config}
               onChange={(name, value) =>
                 setWindowChoices((current) => ({ ...current, [name]: value }))
               }
@@ -537,7 +538,7 @@ export default function AdminTeams({
   const [deleteTarget, setDeleteTarget] = useState<TeamInfo | null>(null);
   const [memberTeam, setMemberTeam] = useState<TeamInfo | null>(null);
 
-  // The public schedule omits default caps; administrators load them here.
+  // The public schedule omits configured caps; administrators load them here.
   const adminWindows = useQuery({
     queryKey: ["budget-windows"],
     queryFn: api.budgetWindows,

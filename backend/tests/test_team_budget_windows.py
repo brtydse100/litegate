@@ -94,12 +94,36 @@ def test_merge_keeps_plain_limits_and_omits_unlimited_windows():
     assert error.value.status_code == 422
 
 
-def with_defaults(monkeypatch, morning, afternoon):
+def with_defaults(monkeypatch, morning, afternoon, team_budgets=None):
     schedule = {
         **SCHEDULE,
-        "windows": [{**SCHEDULE["windows"][0], "default_budget": morning}, {**SCHEDULE["windows"][1], "default_budget": afternoon}],
+        "windows": [
+            {**SCHEDULE["windows"][0], "default_budget": morning, "team_budgets": team_budgets or {}},
+            {**SCHEDULE["windows"][1], "default_budget": afternoon},
+        ],
     }
     monkeypatch.setattr(settings, "team_budget_windows", BudgetWindows.model_validate(schedule))
+
+
+@pytest.mark.asyncio
+async def test_configured_team_caps_win_and_are_locked(monkeypatch):
+    with_defaults(monkeypatch, 40, 10, {"t1": 15, "research": None})
+    custom = {"team_id": "t1", "metadata": {windows.OVERRIDES: {"Mon-Fri 08:00-13:00": 2, "Mon-Fri 13:00-18:00": 3}}}
+    assert windows.caps(windows.overrides(custom), "t1") == {"Mon-Fri 08:00-13:00": 15, "Mon-Fri 13:00-18:00": 3}
+    assert windows.caps({}, "research") == {"Mon-Fri 08:00-13:00": None, "Mon-Fri 13:00-18:00": 10}
+    assert windows.decorate(custom) == {"window_budgets": {"Mon-Fri 13:00-18:00": 3}, "window_config": {"Mon-Fri 08:00-13:00": 15}}
+    with pytest.raises(HTTPException) as locked:
+        windows.choose(custom, {"Mon-Fri 08:00-13:00": 5})
+    assert locked.value.status_code == 409
+    assert windows.choose(custom, {"Mon-Fri 08:00-13:00": "config"}) == {"Mon-Fri 13:00-18:00": 3}
+    # Configuration also applies to a team created with a configured ID, and is hidden publicly.
+    created = await windows.apply(None, {"team_id": "research"}, None)
+    assert [entry["max_budget"] for entry in created["budget_limits"]] == [10]
+    assert "team_budgets" not in settings.team_budget_windows.public()["windows"][0]
+    with pytest.raises(ValidationError):
+        configured({**SCHEDULE, "windows": [{"start": "08:00", "end": "09:00", "team_budgets": {"": 1}}]})
+    with pytest.raises(ValidationError):
+        configured({**SCHEDULE, "windows": [{"start": "08:00", "end": "09:00", "team_budgets": {"t": -1}}]})
 
 
 def test_teams_follow_defaults_unless_they_override(monkeypatch):
@@ -110,7 +134,7 @@ def test_teams_follow_defaults_unless_they_override(monkeypatch):
     # Teams capped before defaults existed keep their caps as overrides; blanks follow the default.
     legacy = {"budget_limits": [{"budget_duration": AFTERNOON, "max_budget": 7}]}
     assert windows.caps(windows.overrides(legacy)) == {"Mon-Fri 08:00-13:00": 40, "Mon-Fri 13:00-18:00": 7}
-    chosen = windows.choose(marked, {"Mon-Fri 08:00-13:00": 2, "Mon-Fri 13:00-18:00": "default"})
+    chosen = windows.choose(marked, {"Mon-Fri 08:00-13:00": 2, "Mon-Fri 13:00-18:00": "config"})
     assert chosen == {"Mon-Fri 08:00-13:00": 2}
     update = windows.synced(marked, chosen)
     assert [entry["max_budget"] for entry in update["budget_limits"]] == [2, 10]
@@ -207,12 +231,12 @@ async def test_usage_reports_each_window(monkeypatch):
     morning, afternoon = response.json()["windows"]
     assert (morning["max_budget"], morning["current_spend"], morning["active"]) == (5, 1.5, True)
     assert (afternoon["max_budget"], afternoon["current_spend"]) == (None, None)
-    assert (morning["source"], afternoon["source"]) == ("team", "default")
+    assert (morning["source"], afternoon["source"]) == ("custom", "config")
 
 
 @pytest.mark.asyncio
-async def test_startup_syncs_defaults_and_drops_removed_windows(monkeypatch):
-    with_defaults(monkeypatch, None, 6)
+async def test_startup_syncs_defaults_and_drops_removed_windows(monkeypatch, caplog):
+    with_defaults(monkeypatch, None, 6, {"plain": 4, "ghost": 1})
     teams = [
         {
             "team_id": "current",
@@ -233,7 +257,8 @@ async def test_startup_syncs_defaults_and_drops_removed_windows(monkeypatch):
     old, plain = (call.args for call in update.await_args_list)
     assert old[0] == "old" and [entry.get("budget_duration") or entry["max_budget"] for entry in old[1]["budget_limits"]] == ["7d", 6]
     assert old[1]["metadata"] == {"owner": "ops", windows.OVERRIDES: {}}
-    assert plain[0] == "plain" and [entry["max_budget"] for entry in plain[1]["budget_limits"]] == [6]
+    assert plain[0] == "plain" and [entry["max_budget"] for entry in plain[1]["budget_limits"]] == [4, 6]
+    assert "teams not found in LiteLLM: ghost" in caplog.text
     with local_users.connect() as db:
         rows = db.execute("SELECT target, outcome FROM audit_events WHERE action='team.budget_windows_synced'").fetchall()
     assert sorted(tuple(row) for row in rows) == [("old", "success"), ("plain", "success")]

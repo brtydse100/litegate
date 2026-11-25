@@ -28,23 +28,31 @@ def _enforced(team: dict) -> dict[str, float | None]:
 def needs_sync(team: dict) -> bool:
     config = settings.team_budget_windows
     chosen = overrides(team)
-    wanted = {config.label(window): cap for window in config.windows if (cap := caps(chosen)[window.name]) is not None}
+    limits = caps(chosen, team["team_id"])
+    wanted = {config.label(window): limits[window.name] for window in config.windows if limits[window.name] is not None}
     return _enforced(team) != wanted or metadata(team).get(OVERRIDES) != chosen
 
 
 async def _teams() -> list[dict]:
-    teams = []
+    teams, seen, complete = [], set(), False
     for page in range(1, MAX_PAGES + 1):
         result = await litellm.list_teams(page=page, page_size=PAGE_SIZE)
-        teams += [team for team in result["teams"] if isinstance(team, dict) and team.get("team_id") and needs_sync(team)]
+        listed = [team for team in result["teams"] if isinstance(team, dict) and team.get("team_id")]
+        seen.update(team["team_id"] for team in listed)
+        teams += [team for team in listed if needs_sync(team)]
         if result.get("total_pages", 1) <= page:
-            return teams
-    _logger.warning("Budget window sync stopped after %d teams", MAX_PAGES * PAGE_SIZE)
+            complete = True
+            break
+    if not complete:
+        _logger.warning("Budget window sync stopped after %d teams", MAX_PAGES * PAGE_SIZE)
+    missing = sorted({team_id for window in settings.team_budget_windows.windows for team_id in window.team_budgets} - seen)
+    if complete and missing:
+        _logger.warning("TEAM_BUDGET_WINDOWS sets caps for teams not found in LiteLLM: %s", ", ".join(missing))
     return teams
 
 
 async def sync_team_windows() -> int:
-    """Rewrite each team whose window caps differ from its choices and the defaults."""
+    """Rewrite each team whose window caps differ from configuration and its custom choices."""
     if settings.team_budget_windows is None:
         return 0
     try:
@@ -71,7 +79,7 @@ async def sync_team_windows() -> int:
                 action="team.budget_windows_synced",
                 target=team["team_id"],
                 outcome=outcome,
-                details={"before": _enforced(team), "caps": caps(chosen)},
+                details={"before": _enforced(team), "caps": caps(chosen, team["team_id"])},
             )
             return outcome == "success"
 

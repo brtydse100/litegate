@@ -181,9 +181,9 @@ export function BudgetWindowsBanner({
           })}
         </ol>
         <p className="mt-3 text-xs text-ink-4">
-          Every team follows these windows. Each window has a default cap that a
-          team can override in the team dialog. Spend starts at $0 when a window
-          opens, and outside these hours there is no cap.
+          Every team follows these windows. Caps come from the configuration
+          unless a team has a custom cap from the team dialog. Spend starts at
+          $0 when a window opens, and outside these hours there is no cap.
         </p>
         {keyResetPeriod && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-orange-ink">
@@ -202,8 +202,8 @@ export function BudgetWindowsBanner({
   );
 }
 
-/** One team row: every window's cap and whether it is the default, the open
- * one marked with its spend. */
+/** One team row: every window's cap and whether it comes from the
+ * configuration or a custom choice, the open one marked with its spend. */
 export function TeamWindowUsage({ teamId }: { teamId: string }) {
   const now = useMinuteClock();
   const usage = useQuery({
@@ -247,9 +247,10 @@ export function TeamWindowUsage({ teamId }: { teamId: string }) {
                 {capped
                   ? metricValue(window.max_budget ?? 0, "spend")
                   : "Unlimited"}
-                {window.source === "default" && (
-                  <span className="font-normal text-ink-4"> · default</span>
-                )}
+                <span className="font-normal text-ink-4">
+                  {" "}
+                  · {window.source}
+                </span>
               </span>
             </span>
             {open && capped && (
@@ -272,11 +273,11 @@ export function TeamWindowUsage({ teamId }: { teamId: string }) {
 }
 
 export type WindowChoice =
-  | { mode: "default" }
+  | { mode: "config" }
   | { mode: "unlimited" }
   | { mode: "custom"; amount: string };
 
-/** The dialog's starting choice per window, from the team's overrides. */
+/** The dialog's starting choice per window, from the team's custom caps. */
 export function initialChoices(
   schedule: BudgetWindowSchedule,
   team: TeamInfo | null,
@@ -284,7 +285,7 @@ export function initialChoices(
   const own = team?.window_budgets ?? {};
   return Object.fromEntries(
     schedule.windows.map((window): [string, WindowChoice] => {
-      if (!(window.name in own)) return [window.name, { mode: "default" }];
+      if (!(window.name in own)) return [window.name, { mode: "config" }];
       const amount = own[window.name];
       return [
         window.name,
@@ -296,24 +297,27 @@ export function initialChoices(
   );
 }
 
-/** The request's window_budgets. */
+/** The request's window_budgets; windows set in configuration are not sent. */
 export function choicePayload(
   choices: Record<string, WindowChoice>,
+  locked: Record<string, number | null> = {},
 ): WindowBudgets {
   return Object.fromEntries(
-    Object.entries(choices).map(([name, choice]) => [
-      name,
-      choice.mode === "default"
-        ? "default"
-        : choice.mode === "unlimited"
-          ? null
-          : Number(choice.amount),
-    ]),
+    Object.entries(choices)
+      .filter(([name]) => !(name in locked))
+      .map(([name, choice]) => [
+        name,
+        choice.mode === "config"
+          ? "config"
+          : choice.mode === "unlimited"
+            ? null
+            : Number(choice.amount),
+      ]),
   );
 }
 
 const CHOICES: { mode: WindowChoice["mode"]; label: string }[] = [
-  { mode: "default", label: "Default" },
+  { mode: "config", label: "Config" },
   { mode: "custom", label: "Custom" },
   { mode: "unlimited", label: "Unlimited" },
 ];
@@ -326,14 +330,26 @@ function segment(active: boolean): string {
   }`;
 }
 
-/** Team editor: per shared window, follow the default, a custom cap or unlimited. */
+function capText(cap: number | null | undefined): string {
+  return cap === undefined
+    ? "…"
+    : cap == null
+      ? "unlimited"
+      : metricValue(cap, "spend");
+}
+
+/** Team editor: per shared window, the configured cap, a custom cap or
+ * unlimited. Windows the configuration sets for this team are read-only. */
 export function WindowBudgetFields({
   schedule,
   values,
+  locked = {},
   onChange,
 }: {
   schedule: BudgetWindowSchedule;
   values: Record<string, WindowChoice>;
+  /** Caps the configuration sets for this team (team_budgets). */
+  locked?: Record<string, number | null>;
   onChange: (name: string, value: WindowChoice) => void;
 }) {
   const shared = sharedDays(schedule.windows);
@@ -345,24 +361,37 @@ export function WindowBudgetFields({
       </legend>
       <p className="text-xs text-ink-4">
         Every team shares these windows. A team follows each window&apos;s
-        default cap unless you choose a custom cap or unlimited here.
+        configured cap unless you choose a custom cap or unlimited here.
       </p>
       <ul className="divide-y divide-line-soft">
         {schedule.windows.map((window) => {
-          const choice = values[window.name] ?? { mode: "default" };
           const hours = hoursLabel(window, shared);
-          const fallback =
-            window.default_budget === undefined
-              ? "…"
-              : window.default_budget == null
-                ? "unlimited"
-                : metricValue(window.default_budget, "spend");
+          if (window.name in locked)
+            return (
+              <li
+                key={window.name}
+                className="flex flex-wrap items-center justify-between gap-2 py-2.5 last:pb-0"
+              >
+                <p className="text-[13px] tabular-nums text-ink">
+                  <span className="font-medium">{hours}</span>{" "}
+                  <span className="text-xs text-ink-4">
+                    {capText(locked[window.name])}
+                  </span>
+                </p>
+                <span className="text-xs text-ink-3">
+                  Set in config for this team
+                </span>
+              </li>
+            );
+          const choice = values[window.name] ?? { mode: "config" };
           return (
             <li key={window.name} className="space-y-2 py-2.5 last:pb-0">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[13px] tabular-nums text-ink">
                   <span className="font-medium">{hours}</span>{" "}
-                  <span className="text-xs text-ink-4">default {fallback}</span>
+                  <span className="text-xs text-ink-4">
+                    config {capText(window.default_budget)}
+                  </span>
                 </p>
                 <div
                   role="group"
