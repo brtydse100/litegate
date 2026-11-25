@@ -48,13 +48,10 @@ function hoursLabel(window: BudgetWindow, shared: string | null): string {
   return shared ? `${window.start}–${window.end}` : windowSummary(window);
 }
 
-/** The window covering `now` in the schedule's timezone, or null. */
-export function activeWindow(
-  schedule: BudgetWindowSchedule,
-  now: Date,
-): BudgetWindow | null {
+/** Minutes since Monday 00:00 in the schedule's timezone. */
+function weekMinute(timezone: string, now: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: schedule.timezone,
+    timeZone: timezone,
     weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
@@ -63,8 +60,32 @@ export function activeWindow(
   const part = (type: string) =>
     parts.find((item) => item.type === type)?.value ?? "";
   const day = WEEKDAYS.indexOf(part("weekday").slice(0, 3).toLowerCase());
-  const current =
-    day * DAY_MINUTES + Number(part("hour")) * 60 + Number(part("minute"));
+  return day * DAY_MINUTES + Number(part("hour")) * 60 + Number(part("minute"));
+}
+
+/** The next window to open after `now`, and the weekday it opens on. */
+export function nextWindow(
+  schedule: BudgetWindowSchedule,
+  now: Date,
+): { window: BudgetWindow; day: string } | null {
+  const current = weekMinute(schedule.timezone, now);
+  let best: { window: BudgetWindow; day: string; wait: number } | null = null;
+  for (const window of schedule.windows)
+    for (const day of window.days) {
+      const start = WEEKDAYS.indexOf(day) * DAY_MINUTES + minutes(window.start);
+      const wait =
+        (start - current + WEEK_MINUTES) % WEEK_MINUTES || WEEK_MINUTES;
+      if (!best || wait < best.wait) best = { window, day, wait };
+    }
+  return best && { window: best.window, day: dayName(best.day) };
+}
+
+/** The window covering `now` in the schedule's timezone, or null. */
+export function activeWindow(
+  schedule: BudgetWindowSchedule,
+  now: Date,
+): BudgetWindow | null {
+  const current = weekMinute(schedule.timezone, now);
   return (
     schedule.windows.find((window) =>
       window.days.some((name) => {
@@ -92,53 +113,43 @@ function useMinuteClock(): Date {
   return now;
 }
 
-/** Teams page summary of the shared schedule and the window open right now. */
+/** Teams page summary: only the window open now, or when the next opens. */
 export function BudgetWindowsBanner({
   schedule,
 }: {
   schedule: BudgetWindowSchedule;
 }) {
-  const current = activeWindow(schedule, useMinuteClock());
-  const shared = sharedDays(schedule.windows);
-  const weekendCovered = schedule.windows.some((window) =>
-    window.days.some((day) => day === "sat" || day === "sun"),
-  );
+  const now = useMinuteClock();
+  const current = activeWindow(schedule, now);
+  const next = current ? null : nextWindow(schedule, now);
   return (
-    <Callout
-      tone="info"
-      title={`Budget windows${shared ? ` · ${shared}` : ""} (${schedule.timezone})`}
-    >
-      <p>
-        Every team shares these hours. Each team sets its own cap per window; a
-        blank cap is unlimited. Spend starts at $0 when a window opens. Outside
-        these hours{weekendCovered ? "" : ", including weekends,"} there is no
-        cap.
-      </p>
-      <ul className="mt-2 flex flex-wrap gap-2">
-        {schedule.windows.map((window) => {
-          const open = window.name === current?.name;
-          return (
-            <li
-              key={window.name}
-              className={`rounded-md border px-2 py-1 text-xs ${open ? "border-blue bg-card font-semibold text-blue-ink" : "border-line bg-card text-ink-2"}`}
-            >
-              {hoursLabel(window, shared)}
-              {open && " · open now"}
-            </li>
-          );
-        })}
-      </ul>
-      {!current && (
-        <p className="mt-2 text-xs">
-          No window is open right now, so no window caps apply.
+    <Callout tone="info" title={`Budget windows (${schedule.timezone})`}>
+      {current ? (
+        <p>
+          <span className="font-semibold">
+            Open now: {windowSummary(current)}.
+          </span>{" "}
+          Each team&apos;s cap for this window applies until {current.end}; a
+          blank cap is unlimited.
+        </p>
+      ) : (
+        <p>
+          <span className="font-semibold">No window open · no cap.</span>
+          {next &&
+            ` Next: ${next.day} ${next.window.start}–${next.window.end}.`}
         </p>
       )}
+      <p className="mt-1 text-xs">
+        Every team shares the same windows and sets its own cap per window in
+        the team dialog. Spend starts at $0 when a window opens.
+      </p>
     </Callout>
   );
 }
 
-/** One team row's spend and cap in each window, read from LiteLLM. */
+/** One team row: only the open window's spend and cap, read from LiteLLM. */
 export function TeamWindowUsage({ teamId }: { teamId: string }) {
+  const now = useMinuteClock();
   const usage = useQuery({
     // Under "teams" so every team save also refreshes the window caps.
     queryKey: ["teams", "budget-windows", teamId],
@@ -146,28 +157,25 @@ export function TeamWindowUsage({ teamId }: { teamId: string }) {
     staleTime: 30_000,
   });
   if (usage.isPending)
-    return <p className="text-xs text-ink-4">Loading windows…</p>;
+    return <p className="text-xs text-ink-4">Loading window…</p>;
   if (usage.isError)
-    return <p className="text-xs text-danger">Windows unavailable</p>;
-  if (usage.data.windows.every((window) => window.max_budget == null))
-    return <p className="text-xs text-ink-4">No window caps</p>;
-  const shared = sharedDays(usage.data.windows);
+    return <p className="text-xs text-danger">Window unavailable</p>;
+  // LiteLLM marks a capped open window; an uncapped one is found by the clock.
+  const openName =
+    usage.data.windows.find((window) => window.active)?.name ??
+    activeWindow(usage.data, now)?.name;
+  const open = usage.data.windows.find((window) => window.name === openName);
+  if (!open)
+    return <p className="text-xs text-ink-4">No window open · no cap</p>;
   return (
-    <ul className="space-y-0.5 text-xs text-ink-3">
-      {usage.data.windows.map((window) => (
-        <li key={window.name}>
-          <span className={window.active ? "font-semibold text-ink" : ""}>
-            {hoursLabel(window, shared)}
-          </span>{" "}
-          {window.max_budget == null
-            ? "· unlimited"
-            : window.active
-              ? `· ${metricValue(window.current_spend ?? 0, "spend")} of ${metricValue(window.max_budget, "spend")}`
-              : `· ${metricValue(window.max_budget, "spend")} cap`}
-          {window.active && <span className="text-blue-ink"> · open</span>}
-        </li>
-      ))}
-    </ul>
+    <p className="text-xs text-ink-3">
+      <span className="font-semibold text-ink">
+        {open.start}–{open.end}
+      </span>{" "}
+      {open.max_budget == null
+        ? "· no cap"
+        : `· ${metricValue(open.active ? (open.current_spend ?? 0) : 0, "spend")} of ${metricValue(open.max_budget, "spend")}`}
+    </p>
   );
 }
 

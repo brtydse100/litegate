@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BudgetWindowSchedule } from "../types";
-import { activeWindow, formatDays } from "./BudgetWindows";
+import { activeWindow, formatDays, nextWindow } from "./BudgetWindows";
 import { resetLabel } from "../keyBudget";
 
 const weekdays = ["mon", "tue", "wed", "thu", "fri"];
@@ -36,6 +36,18 @@ describe("scheduled budget windows", () => {
     );
     // Wednesday 15:00 Berlin is in no window.
     expect(activeWindow(schedule, new Date("2026-11-25T14:00:00Z"))).toBeNull();
+  });
+
+  it("names the next window to open", () => {
+    // Wednesday 15:00 Berlin: the overnight window opens at 18:00 the same day.
+    const next = nextWindow(schedule, new Date("2026-11-25T14:00:00Z"));
+    expect(next?.window.name).toBe("Overnight");
+    expect(next?.day).toBe("Wed");
+    // Saturday 10:00 Berlin with weekday mornings only: next is Monday.
+    const weekdays = { ...schedule, windows: [schedule.windows[0]] };
+    expect(nextWindow(weekdays, new Date("2026-11-28T09:00:00Z"))?.day).toBe(
+      "Mon",
+    );
   });
 
   it("summarizes days and reset periods in plain words", () => {

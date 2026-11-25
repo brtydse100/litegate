@@ -417,8 +417,7 @@ describe("scheduled budget windows", () => {
         />
       </QueryClientProvider>,
     );
-    expect(await screen.findByText("Budget windows · Mon (UTC)")).toBeVisible();
-    expect(screen.getByText(/including weekends/)).toBeVisible();
+    expect(await screen.findByText("Budget windows (UTC)")).toBeVisible();
     expect(await screen.findByText(/\$1\.50 of \$5\.00/)).toBeVisible();
     expect(screen.queryByText(/Morning/)).not.toBeInTheDocument();
     expect(await screen.findByText(/\$1\.50 of \$5\.00/)).toBeVisible();
