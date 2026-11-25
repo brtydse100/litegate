@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [2.23.2] - 2026-11-25
+
 ### Security
 
 - People are provisioned in LiteLLM with the view-only `internal_user_viewer`
@@ -747,7 +749,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - LiteGate can be built as one container containing the React frontend, Nginx, and FastAPI backend.
 - A public `linux/amd64` container package is available as `ghcr.io/brtydse100/litegate:2.0.0` and `:latest`; other architectures can build locally with the included Docker Compose configuration.
 
-[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.23.1...HEAD
+[Unreleased]: https://github.com/brtydse100/litegate/compare/v2.23.2...HEAD
+[2.23.2]: https://github.com/brtydse100/litegate/compare/v2.23.1...v2.23.2
 [2.23.1]: https://github.com/brtydse100/litegate/compare/v2.23.0...v2.23.1
 [2.23.0]: https://github.com/brtydse100/litegate/compare/v2.22.2...v2.23.0
 [2.22.2]: https://github.com/brtydse100/litegate/compare/v2.22.1...v2.22.2
