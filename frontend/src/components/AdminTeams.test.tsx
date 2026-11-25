@@ -336,7 +336,7 @@ describe("scheduled budget windows", () => {
       timezone: "UTC",
       windows: [
         {
-          name: "Morning",
+          name: "Mon 08:00-13:00",
           days: ["mon"],
           start: "08:00",
           end: "13:00",
@@ -347,7 +347,7 @@ describe("scheduled budget windows", () => {
           next_start: null,
         },
         {
-          name: "Evening",
+          name: "Mon 18:00-22:00",
           days: ["mon"],
           start: "18:00",
           end: "22:00",
@@ -399,14 +399,14 @@ describe("scheduled budget windows", () => {
             timezone: "UTC",
             windows: [
               {
-                name: "Morning",
+                name: "Mon 08:00-13:00",
                 days: ["mon"],
                 start: "08:00",
                 end: "13:00",
                 label: "sched:UTC:mon:08:00-13:00",
               },
               {
-                name: "Evening",
+                name: "Mon 18:00-22:00",
                 days: ["mon"],
                 start: "18:00",
                 end: "22:00",
@@ -417,33 +417,31 @@ describe("scheduled budget windows", () => {
         />
       </QueryClientProvider>,
     );
-    expect(await screen.findByText("Budget windows (UTC)")).toBeVisible();
+    expect(await screen.findByText("Budget windows · Mon (UTC)")).toBeVisible();
+    expect(screen.getByText(/including weekends/)).toBeVisible();
+    expect(await screen.findByText(/\$1\.50 of \$5\.00/)).toBeVisible();
+    expect(screen.queryByText(/Morning/)).not.toBeInTheDocument();
     expect(await screen.findByText(/\$1\.50 of \$5\.00/)).toBeVisible();
     expect(screen.queryByText(/resets every/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog", { name: "Edit team" });
     expect(within(dialog).queryByText("Budget reset")).not.toBeInTheDocument();
-    expect(
-      within(dialog).getByLabelText("Morning (Mon 08:00–13:00)"),
-    ).toHaveValue(5);
-    fireEvent.change(
-      within(dialog).getByLabelText("Evening (Mon 18:00–22:00)"),
-      {
-        target: { value: "3" },
-      },
-    );
-    fireEvent.change(
-      within(dialog).getByLabelText("Morning (Mon 08:00–13:00)"),
-      {
-        target: { value: "" },
-      },
-    );
+    expect(within(dialog).getByLabelText("08:00–13:00")).toHaveValue(5);
+    fireEvent.change(within(dialog).getByLabelText("18:00–22:00"), {
+      target: { value: "3" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("08:00–13:00"), {
+      target: { value: "" },
+    });
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Save changes" }),
     );
     await waitFor(() => expect(api.updateTeam).toHaveBeenCalled());
     const sent = vi.mocked(api.updateTeam).mock.calls[0][1];
-    expect(sent.window_budgets).toEqual({ Morning: null, Evening: 3 });
+    expect(sent.window_budgets).toEqual({
+      "Mon 08:00-13:00": null,
+      "Mon 18:00-22:00": 3,
+    });
     expect(sent).not.toHaveProperty("budget_duration");
   });
 });

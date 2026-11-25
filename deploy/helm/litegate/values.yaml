@@ -198,7 +198,7 @@ config:
   # teamBudgetWindows:
   #   timezone: Europe/Berlin
   #   windows:
-  #     - {name: Morning, days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
+  #     - {days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
   # keyModels: '["gpt-4","gpt-3.5-turbo"]'
   # keyDuration: "90d"
   # keyTpmLimit: "100000"

@@ -20,8 +20,8 @@ AFTERNOON = "sched:Europe/Berlin:mon,tue,wed,thu,fri:13:00-18:00"
 SCHEDULE = {
     "timezone": "Europe/Berlin",
     "windows": [
-        {"name": "Morning", "days": ["mon", "tue", "wed", "thu", "fri"], "start": "08:00", "end": "13:00"},
-        {"name": "Afternoon", "days": ["fri", "thu", "wed", "tue", "mon"], "start": "13:00", "end": "18:00"},
+        {"days": ["mon", "tue", "wed", "thu", "fri"], "start": "08:00", "end": "13:00"},
+        {"days": ["fri", "thu", "wed", "tue", "mon"], "start": "13:00", "end": "18:00"},
     ],
 }
 
@@ -64,13 +64,13 @@ def test_labels_match_litellm_and_blank_disables():
     "change",
     [
         {"timezone": "Mars/Base"},
-        {"windows": [{"name": "A", "start": "08:00", "end": "13:00"}, {"name": "B", "start": "12:00", "end": "14:00"}]},
-        {"windows": [{"name": "A", "start": "08:00", "end": "09:00"}, {"name": "a", "start": "10:00", "end": "11:00"}]},
-        {"windows": [{"name": "A", "start": "8:00", "end": "09:00"}]},
+        {"windows": [{"start": "08:00", "end": "13:00"}, {"start": "12:00", "end": "14:00"}]},
+        {"windows": [{"days": [], "start": "08:00", "end": "09:00"}]},
+        {"windows": [{"start": "8:00", "end": "09:00"}]},
         {
             "windows": [
-                {"name": "Late", "days": ["sun"], "start": "22:00", "end": "06:00"},
-                {"name": "Early", "days": ["mon"], "start": "05:00", "end": "07:00"},
+                {"days": ["sun"], "start": "22:00", "end": "06:00"},
+                {"days": ["mon"], "start": "05:00", "end": "07:00"},
             ]
         },
     ],
@@ -82,13 +82,13 @@ def test_invalid_schedules_fail_at_startup(change):
 
 def test_merge_keeps_plain_limits_and_omits_unlimited_windows():
     current = {"budget_limits": [{"budget_duration": "7d", "max_budget": 50, "reset_at": None}, {"budget_duration": MORNING, "max_budget": 5}]}
-    assert windows.amounts(current) == {"Morning": 5, "Afternoon": None}
-    assert windows.merge(current, {"Afternoon": 3}) == [
+    assert windows.amounts(current) == {"Mon-Fri 08:00-13:00": 5, "Mon-Fri 13:00-18:00": None}
+    assert windows.merge(current, {"Mon-Fri 13:00-18:00": 3}) == [
         {"budget_duration": "7d", "max_budget": 50},
         {"max_budget": 5, "schedule": {"timezone": "Europe/Berlin", "days": ["mon", "tue", "wed", "thu", "fri"], "start": "08:00", "end": "13:00"}},
         {"max_budget": 3, "schedule": {"timezone": "Europe/Berlin", "days": ["mon", "tue", "wed", "thu", "fri"], "start": "13:00", "end": "18:00"}},
     ]
-    assert windows.merge(current, {"Morning": None}) == [{"budget_duration": "7d", "max_budget": 50}]
+    assert windows.merge(current, {"Mon-Fri 08:00-13:00": None}) == [{"budget_duration": "7d", "max_budget": 50}]
     with pytest.raises(HTTPException) as error:
         windows.merge(current, {"Evening": 1})
     assert error.value.status_code == 422
@@ -102,8 +102,10 @@ async def test_create_and_update_write_scheduled_entries(monkeypatch):
     monkeypatch.setattr(litellm, "update_team", update)
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=team({"budget_duration": MORNING, "max_budget": 5})))
     async with client() as browser:
-        created = await browser.post("/api/v1/teams", json={"team_alias": "T", "window_budgets": {"Morning": 2, "Afternoon": None}}, headers=admin())
-        updated = await browser.patch("/api/v1/teams/t1", json={"window_budgets": {"Afternoon": 7}}, headers=admin())
+        created = await browser.post(
+            "/api/v1/teams", json={"team_alias": "T", "window_budgets": {"Mon-Fri 08:00-13:00": 2, "Mon-Fri 13:00-18:00": None}}, headers=admin()
+        )
+        updated = await browser.patch("/api/v1/teams/t1", json={"window_budgets": {"Mon-Fri 13:00-18:00": 7}}, headers=admin())
         plain = await browser.patch("/api/v1/teams/t1", json={"max_budget": 9}, headers=admin())
     assert created.status_code == 201 and updated.status_code == 200 and plain.status_code == 200
     assert [entry["max_budget"] for entry in create.await_args.args[0]["budget_limits"]] == [2]
@@ -119,7 +121,7 @@ async def test_raw_budget_limits_and_unconfigured_windows_are_rejected(monkeypat
     assert raw.value.status_code == 422
     monkeypatch.setattr(settings, "team_budget_windows", None)
     with pytest.raises(HTTPException) as off:
-        await windows.apply(None, {}, {"Morning": 1})
+        await windows.apply(None, {}, {"Mon-Fri 08:00-13:00": 1})
     assert off.value.status_code == 422
     assert await windows.apply(None, {"budget_limits": []}, None) == {"budget_limits": []}
 
@@ -147,7 +149,7 @@ async def test_managed_teams_get_window_caps_but_not_plain_budget_edits(monkeypa
     monkeypatch.setattr(litellm, "update_team", update)
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=team()))
     async with client() as browser:
-        caps = await browser.patch("/api/v1/teams/engineering", json={"window_budgets": {"Morning": 4}}, headers=admin())
+        caps = await browser.patch("/api/v1/teams/engineering", json={"window_budgets": {"Mon-Fri 08:00-13:00": 4}}, headers=admin())
         plain = await browser.patch("/api/v1/teams/engineering", json={"max_budget": 4}, headers=admin())
     assert caps.status_code == 200
     assert plain.status_code == 409
@@ -194,5 +196,21 @@ async def test_portal_config_exposes_the_schedule(monkeypatch):
         enabled = (await browser.get("/api/portal-config")).json()["team_budget_windows"]
         monkeypatch.setattr(settings, "team_budget_windows", None)
         disabled = (await browser.get("/api/portal-config")).json()["team_budget_windows"]
-    assert [window["name"] for window in enabled["windows"]] == ["Morning", "Afternoon"]
+    assert [window["name"] for window in enabled["windows"]] == ["Mon-Fri 08:00-13:00", "Mon-Fri 13:00-18:00"]
     assert disabled is None
+
+
+def test_windows_are_named_by_days_and_hours():
+    config = configured(
+        {
+            "timezone": "UTC",
+            "windows": [
+                {"days": ["sat", "sun"], "start": "00:00", "end": "00:00"},
+                {"days": ["mon", "tue", "wed", "thu"], "start": "22:00", "end": "06:00"},
+                {"days": ["tue", "mon", "wed"], "start": "09:00", "end": "10:00"},
+            ],
+        }
+    ).team_budget_windows
+    assert [window.name for window in config.windows] == ["Sat, Sun 00:00-00:00", "Mon-Thu 22:00-06:00", "Mon-Wed 09:00-10:00"]
+    with pytest.raises(ValidationError):
+        configured({"timezone": "UTC", "windows": [{"name": "Morning", "start": "08:00", "end": "09:00"}]})

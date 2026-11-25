@@ -8,11 +8,11 @@ import type {
 // Synthetic scheduled budget windows for the demo; no LiteLLM is involved.
 
 const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri"];
-const EVERY_DAY = [...WEEKDAYS, "sat", "sun"];
 
-function window(name: string, days: string[], start: string, end: string) {
+// Weekdays only, so weekends (and weekday nights) have no window cap.
+function window(days: string[], start: string, end: string) {
   return {
-    name,
+    name: `Mon-Fri ${start}-${end}`,
     days,
     start,
     end,
@@ -23,22 +23,21 @@ function window(name: string, days: string[], start: string, end: string) {
 export const demoBudgetWindows: BudgetWindowSchedule = {
   timezone: "Europe/Berlin",
   windows: [
-    window("Morning", WEEKDAYS, "08:00", "13:00"),
-    window("Afternoon", WEEKDAYS, "13:00", "18:00"),
-    window("Overnight", EVERY_DAY, "18:00", "08:00"),
+    window(WEEKDAYS, "08:00", "13:00"),
+    window(WEEKDAYS, "13:00", "18:00"),
+    window(WEEKDAYS, "18:00", "22:00"),
   ],
 };
 
-/** Seed caps by window name; a missing name is unlimited. */
+/** Seed caps in window order; null is unlimited. */
 export function demoBudgetLimits(
-  caps: Record<string, number>,
+  caps: (number | null)[],
 ): TeamInfo["budget_limits"] {
-  return demoBudgetWindows.windows
-    .filter((item) => caps[item.name] != null)
-    .map((item) => ({
-      budget_duration: item.label,
-      max_budget: caps[item.name],
-    }));
+  return demoBudgetWindows.windows.flatMap((item, index) =>
+    caps[index] != null
+      ? [{ budget_duration: item.label, max_budget: caps[index] }]
+      : [],
+  );
 }
 
 /** Apply a create/update request's window_budgets to a team's budget_limits. */
@@ -54,13 +53,13 @@ export function applyWindowBudgets(
       limit.max_budget,
     ]),
   );
-  const caps: Record<string, number> = {};
-  for (const item of demoBudgetWindows.windows) {
-    const requested = (windowBudgets as Record<string, unknown>)[item.name];
-    const value = requested === undefined ? current[item.label] : requested;
-    if (typeof value === "number") caps[item.name] = value;
-  }
-  return demoBudgetLimits(caps);
+  return demoBudgetLimits(
+    demoBudgetWindows.windows.map((item) => {
+      const requested = (windowBudgets as Record<string, unknown>)[item.name];
+      const value = requested === undefined ? current[item.label] : requested;
+      return typeof value === "number" ? value : null;
+    }),
+  );
 }
 
 export function demoWindowUsage(team: TeamInfo): TeamBudgetWindowUsage {

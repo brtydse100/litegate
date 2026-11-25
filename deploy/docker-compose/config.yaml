@@ -125,8 +125,8 @@ key_rotation_settle_seconds: 12
 # team_budget_windows:
 #   timezone: Europe/Berlin
 #   windows:
-#     - {name: Morning, days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
-#     - {name: Afternoon, days: [mon, tue, wed, thu, fri], start: "13:00", end: "18:00"}
+#     - {days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
+#     - {days: [mon, tue, wed, thu, fri], start: "13:00", end: "18:00"}
 # key_models:
 #   - gpt-4
 #   - gpt-3.5-turbo

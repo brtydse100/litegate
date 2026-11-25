@@ -368,17 +368,22 @@ as an additional shared ceiling when a person may own keys outside LiteGate.
 
 `team_budget_windows` (`TEAM_BUDGET_WINDOWS` as JSON, Helm
 `config.teamBudgetWindows`) defines one schedule of budget windows that every
-team shares. Each team then sets its own amount per window. A blank amount means
-no cap in that window.
+team shares. A window is identified by its days and hours, such as
+`Mon-Fri 08:00-13:00`; `days` defaults to every day. Each team then sets its own
+cap per window. A blank cap means no cap in that window.
 
 ```yaml
 team_budget_windows:
   timezone: Europe/Berlin
   windows:
-    - {name: Morning, days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
-    - {name: Afternoon, days: [mon, tue, wed, thu, fri], start: "13:00", end: "18:00"}
-    - {name: Overnight, start: "18:00", end: "08:00"}  # days default to every day
+    - {days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
+    - {days: [mon, tue, wed, thu, fri], start: "13:00", end: "18:00"}
 ```
+
+With weekday-only windows like these, weekends (and weekday hours outside the
+windows) have no cap. To cap weekends, add a window such as
+`{days: [sat, sun], start: "00:00", end: "00:00"}` (a whole day); a team that
+leaves it blank stays unlimited on weekends.
 
 This needs a LiteLLM build with
 [BerriAI/litellm#54147](https://github.com/BerriAI/litellm/pull/54147). LiteLLM
@@ -389,15 +394,16 @@ enforces each window as a team `budget_limits` entry with a `schedule`:
 - An end at or before the start wraps past midnight.
 
 Startup validates the schedule with LiteLLM's rules: a known IANA timezone,
-`HH:MM` times, unique names and no overlapping windows.
+`HH:MM` times and no overlapping windows.
 
-- Admins set amounts in the team dialog's **Budget per window** fields, or with
-  `window_budgets` on the team API. The Teams page shows the schedule, the window
-  open now and each team's spend in it. Organization-managed teams get the same
+- Admins set caps in the team dialog's **Budget per window** fields (one per
+  window's hours), or with `window_budgets` on the team API, keyed by the
+  window's days and hours, for example `{"Mon-Fri 08:00-13:00": 15}`. The Teams
+  page shows the schedule, the window open now and each team's spend in it. Organization-managed teams get the same
   team-level window caps on top of their per-user key budgets.
 - Plain `budget_limits` entries a team already has are kept. Raw `budget_limits`
   in Advanced settings is rejected while windows are configured.
-- When a window's name, days or times change, its old entries are removed from
+- When a window's days or times change, its old entries are removed from
   every team at startup and audited as `team.budget_windows_pruned`. The changed
   window starts out unlimited until amounts are set again.
 - If LiteLLM lacks the feature, team saves with window amounts fail with an

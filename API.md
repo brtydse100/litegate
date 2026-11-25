@@ -154,9 +154,10 @@ the label `Direct members`; a child with that name has its own non-null ID.
 
 Helm-managed team budget changes, deletion, and member moves receive `409`.
 When `TEAM_BUDGET_WINDOWS` is set (nightly), team create and update accept
-`window_budgets` (`{"<window name>": amount or null}`, null = unlimited). This
+`window_budgets` (`{"Mon-Fri 08:00-13:00": amount or null}`, keyed by each
+window's days and hours; null = unlimited). This
 also works on Helm-managed teams. LiteGate turns it into scheduled
-`budget_limits` entries. Unknown window names, raw `budget_limits`, or
+`budget_limits` entries. Unknown windows, raw `budget_limits`, or
 `window_budgets` without a configured schedule return `422`.
 `GET /api/v1/teams/{team_id}/budget-windows` (administrators) returns each
 window's `max_budget`, `current_spend`, `active` and `next_start`, and

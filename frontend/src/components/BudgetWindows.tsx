@@ -37,6 +37,17 @@ export function windowSummary(window: BudgetWindow): string {
   return `${formatDays(window.days)} ${window.start}–${window.end}`;
 }
 
+/** Days every window shares ("Mon–Fri"), or null when they differ. */
+export function sharedDays(windows: BudgetWindow[]): string | null {
+  const days = new Set(windows.map((window) => formatDays(window.days)));
+  return days.size === 1 ? [...days][0] : null;
+}
+
+/** "08:00–13:00" when the days are shown once elsewhere, else with days. */
+function hoursLabel(window: BudgetWindow, shared: string | null): string {
+  return shared ? `${window.start}–${window.end}` : windowSummary(window);
+}
+
 /** The window covering `now` in the schedule's timezone, or null. */
 export function activeWindow(
   schedule: BudgetWindowSchedule,
@@ -88,12 +99,20 @@ export function BudgetWindowsBanner({
   schedule: BudgetWindowSchedule;
 }) {
   const current = activeWindow(schedule, useMinuteClock());
+  const shared = sharedDays(schedule.windows);
+  const weekendCovered = schedule.windows.some((window) =>
+    window.days.some((day) => day === "sat" || day === "sun"),
+  );
   return (
-    <Callout tone="info" title={`Budget windows (${schedule.timezone})`}>
+    <Callout
+      tone="info"
+      title={`Budget windows${shared ? ` · ${shared}` : ""} (${schedule.timezone})`}
+    >
       <p>
-        Every team shares these windows. Each team sets its own amount per
-        window; a blank amount is unlimited. Spend starts at $0 when a window
-        opens, and outside every window no window cap applies.
+        Every team shares these hours. Each team sets its own cap per window; a
+        blank cap is unlimited. Spend starts at $0 when a window opens. Outside
+        these hours{weekendCovered ? "" : ", including weekends,"} there is no
+        cap.
       </p>
       <ul className="mt-2 flex flex-wrap gap-2">
         {schedule.windows.map((window) => {
@@ -103,7 +122,7 @@ export function BudgetWindowsBanner({
               key={window.name}
               className={`rounded-md border px-2 py-1 text-xs ${open ? "border-blue bg-card font-semibold text-blue-ink" : "border-line bg-card text-ink-2"}`}
             >
-              {window.name} · {windowSummary(window)}
+              {hoursLabel(window, shared)}
               {open && " · open now"}
             </li>
           );
@@ -132,12 +151,13 @@ export function TeamWindowUsage({ teamId }: { teamId: string }) {
     return <p className="text-xs text-danger">Windows unavailable</p>;
   if (usage.data.windows.every((window) => window.max_budget == null))
     return <p className="text-xs text-ink-4">No window caps</p>;
+  const shared = sharedDays(usage.data.windows);
   return (
     <ul className="space-y-0.5 text-xs text-ink-3">
       {usage.data.windows.map((window) => (
         <li key={window.name}>
           <span className={window.active ? "font-semibold text-ink" : ""}>
-            {window.name}
+            {hoursLabel(window, shared)}
           </span>{" "}
           {window.max_budget == null
             ? "· unlimited"
@@ -161,10 +181,12 @@ export function WindowBudgetFields({
   values: Record<string, string>;
   onChange: (name: string, value: string) => void;
 }) {
+  const shared = sharedDays(schedule.windows);
   return (
     <fieldset className="space-y-2 rounded-lg border border-line p-3 sm:col-span-2">
       <legend className="px-1 text-xs font-semibold text-ink-2">
-        Budget per window (USD, {schedule.timezone})
+        Budget per window (USD{shared ? `, ${shared}` : ""}, {schedule.timezone}
+        )
       </legend>
       <p className="text-xs text-ink-4">
         The windows are shared by every team. Leave an amount empty for
@@ -174,7 +196,7 @@ export function WindowBudgetFields({
         {schedule.windows.map((window) => (
           <NumericPolicyInput
             key={window.name}
-            label={`${window.name} (${windowSummary(window)})`}
+            label={hoursLabel(window, shared)}
             value={values[window.name] ?? ""}
             onValueChange={(value) => onChange(window.name, value)}
             step="any"

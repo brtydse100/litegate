@@ -24,9 +24,20 @@ def _minutes(value: str) -> int:
     return int(hours) * 60 + int(minutes)
 
 
+def _format_days(days: list[str]) -> str:
+    """ "Every day", "Mon-Fri" or "Mon, Sat", matching the admin UI."""
+    if len(days) == len(WEEKDAYS):
+        return "Every day"
+    indexes = [WEEKDAYS.index(day) for day in days]
+    if len(indexes) >= 3 and indexes == list(range(indexes[0], indexes[-1] + 1)):
+        return f"{days[0].title()}-{days[-1].title()}"
+    return ", ".join(day.title() for day in days)
+
+
 class BudgetWindow(BaseModel):
+    """A recurring period identified by its days and hours, such as "Mon-Fri 08:00-13:00"."""
+
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-    name: str = Field(min_length=1, max_length=64)
     days: list[Weekday] = Field(default_factory=lambda: list(WEEKDAYS), min_length=1)
     start: str
     end: str
@@ -44,6 +55,11 @@ class BudgetWindow(BaseModel):
         if not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value):
             raise ValueError("start and end are local 'HH:MM' times")
         return value
+
+    @property
+    def name(self) -> str:
+        """The window's key in window_budgets, e.g. "Mon-Fri 08:00-13:00"."""
+        return f"{_format_days(self.days)} {self.start}-{self.end}"
 
     def length(self) -> int:
         """Minutes per period; an end at or before the start wraps past midnight."""
@@ -74,9 +90,6 @@ class BudgetWindows(BaseModel):
 
     @model_validator(mode="after")
     def distinct_windows(self):
-        names = [window.name.casefold() for window in self.windows]
-        if len(set(names)) != len(names):
-            raise ValueError("Budget window names must be unique")
         intervals = sorted((start, end, window.name) for window in self.windows for start, end in window.weekly_intervals())
         for (_, first_end, first), (second_start, _, second) in zip(intervals, intervals[1:]):
             if second_start < first_end:
@@ -93,5 +106,5 @@ class BudgetWindows(BaseModel):
     def public(self) -> dict:
         return {
             "timezone": self.timezone,
-            "windows": [{**window.model_dump(), "label": self.label(window)} for window in self.windows],
+            "windows": [{**window.model_dump(), "name": window.name, "label": self.label(window)} for window in self.windows],
         }
