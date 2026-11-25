@@ -327,6 +327,9 @@ export const api = {
       },
     ),
 
+  budgetWindows: () =>
+    request<import("../types").AdminBudgetWindows>("/v1/budget-windows"),
+
   teamBudgetWindows: (teamId: string) =>
     request<import("../types").TeamBudgetWindowUsage>(
       `/v1/teams/${encodeURIComponent(teamId)}/budget-windows`,

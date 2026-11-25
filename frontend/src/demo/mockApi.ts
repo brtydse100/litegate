@@ -2,7 +2,8 @@ import type { AuditEvent, KeyInfo, LocalUser, TeamInfo, User } from "../types";
 import { demoAdvancedSettings, demoPolicySchemas } from "./policySchemas";
 import {
   applyWindowBudgets,
-  demoBudgetLimits,
+  demoAdminBudgetWindows,
+  demoOverrides,
   demoBudgetWindows,
   demoWindowUsage,
 } from "./budgetWindows";
@@ -172,8 +173,7 @@ let teams: TeamInfo[] = [
     team_alias: "Platform Engineering",
     spend: 182.6,
     max_budget: 600,
-    budget_duration: "monthly",
-    budget_limits: demoBudgetLimits([40, 40, null]),
+    window_budgets: demoOverrides([]),
     tpm_limit: 300000,
     rpm_limit: 500,
     models: ["gpt-5", "claude-sonnet-4", "gemini-2.5-pro"],
@@ -192,8 +192,7 @@ let teams: TeamInfo[] = [
     team_alias: "Product",
     spend: 96.4,
     max_budget: 300,
-    budget_duration: "monthly",
-    budget_limits: demoBudgetLimits([15, 15, 5]),
+    window_budgets: demoOverrides([15, 15, 5]),
     tpm_limit: 180000,
     rpm_limit: 300,
     models: ["gpt-5", "claude-sonnet-4"],
@@ -741,7 +740,10 @@ async function mockResponse(request: Request): Promise<Response> {
       members_count: 0,
       keys_count: 0,
     };
-    created.budget_limits = applyWindowBudgets(created, payload.window_budgets);
+    created.window_budgets = applyWindowBudgets(
+      created,
+      payload.window_budgets,
+    );
     teams = [...teams, created];
     return json(created, 201);
   }
@@ -761,6 +763,7 @@ async function mockResponse(request: Request): Promise<Response> {
       destination_membership_existed: false,
     });
   }
+  if (path === "/api/v1/budget-windows") return json(demoAdminBudgetWindows);
   if (path.startsWith("/api/v1/teams/") && path.endsWith("/budget-windows")) {
     const team = teams.find(
       (item) => item.team_id === decodeURIComponent(path.split("/")[4]),
@@ -780,7 +783,7 @@ async function mockResponse(request: Request): Promise<Response> {
         updated = {
           ...team,
           ...payload,
-          budget_limits: applyWindowBudgets(team, windowBudgets),
+          window_budgets: applyWindowBudgets(team, windowBudgets),
         } as TeamInfo;
         return updated;
       });

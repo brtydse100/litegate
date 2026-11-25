@@ -1,6 +1,6 @@
 from pydantic import BaseModel, PrivateAttr
 from pydantic import Field, field_validator, model_validator
-from typing import Annotated, Optional, List, Any, Literal
+from typing import Annotated, Optional, List, Any, Literal, Union
 from datetime import datetime
 
 
@@ -226,8 +226,9 @@ class ApiKeyCreateRequest(BaseModel):
     email: Optional[str] = Field(default=None, max_length=254)
 
 
-# Amount per scheduled budget window name; null is unlimited in that window.
-WindowBudgets = dict[str, Optional[Annotated[float, Field(ge=0, allow_inf_nan=False)]]]
+# Per scheduled budget window name: an amount, null for unlimited, or "default"
+# to follow the window's configured default cap.
+WindowBudgets = dict[str, Union[Annotated[float, Field(ge=0, allow_inf_nan=False)], Literal["default"], None]]
 
 
 class TeamCreateRequest(BaseModel):

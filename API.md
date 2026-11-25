@@ -154,14 +154,21 @@ the label `Direct members`; a child with that name has its own non-null ID.
 
 Helm-managed team budget changes, deletion, and member moves receive `409`.
 When `TEAM_BUDGET_WINDOWS` is set (nightly), team create and update accept
-`window_budgets` (`{"Mon-Fri 08:00-13:00": amount or null}`, keyed by each
-window's days and hours; null = unlimited). This
-also works on Helm-managed teams. LiteGate turns it into scheduled
-`budget_limits` entries. Unknown windows, raw `budget_limits`, or
-`window_budgets` without a configured schedule return `422`.
+`window_budgets` (`{"Mon-Fri 08:00-13:00": amount, null or "default"}`, keyed
+by each window's days and hours; null = unlimited, `"default"` = follow the
+window's configured `default_budget`). This also works on Helm-managed teams.
+LiteGate turns it into scheduled `budget_limits` entries and records the
+team's choices in its LiteLLM metadata (`litegate_window_budgets`); a created
+team gets every default it does not override. Unknown windows, raw
+`budget_limits`, or `window_budgets` without a configured schedule return `422`.
+Team list responses include each team's own choices as `window_budgets`.
+`GET /api/v1/budget-windows` (administrators) returns the schedule with each
+window's `default_budget` and the configured `key_budget_duration`.
 `GET /api/v1/teams/{team_id}/budget-windows` (administrators) returns each
-window's `max_budget`, `current_spend`, `active` and `next_start`, and
-`GET /api/portal-config` returns the schedule as `team_budget_windows`.
+window's `max_budget`, `source` (`team` or `default`), `current_spend`,
+`active` and `next_start`. `GET /api/portal-config` returns the schedule
+without default caps as `team_budget_windows`; its `timezone` is as configured
+(for example `UTC+2`) and `zone` is the IANA zone LiteLLM uses (`Etc/GMT-2`).
 Bulk-key budget or team changes report per-item failures for managed keys.
 Personal `/api/keys` responses can add `organization_managed`, `user_budget`,
 `user_spend`, `user_budget_available`, `organization_path`, and `policy_error`.

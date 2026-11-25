@@ -369,21 +369,30 @@ as an additional shared ceiling when a person may own keys outside LiteGate.
 `team_budget_windows` (`TEAM_BUDGET_WINDOWS` as JSON, Helm
 `config.teamBudgetWindows`) defines one schedule of budget windows that every
 team shares. A window is identified by its days and hours, such as
-`Mon-Fri 08:00-13:00`; `days` defaults to every day. Each team then sets its own
-cap per window. A blank cap means no cap in that window.
+`Mon-Fri 08:00-13:00`; `days` defaults to every day. Each window can have a
+`default_budget`: the cap every team gets in that window unless the team
+overrides it. Without `default_budget`, the default is no cap.
 
 ```yaml
 team_budget_windows:
-  timezone: Europe/Berlin
+  timezone: UTC+2            # or an IANA name such as Europe/Berlin
   windows:
-    - {days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
-    - {days: [mon, tue, wed, thu, fri], start: "13:00", end: "18:00"}
+    - {days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00", default_budget: 40}
+    - {days: [mon, tue, wed, thu, fri], start: "13:00", end: "18:00", default_budget: 40}
+    - {days: [mon, tue, wed, thu, fri], start: "18:00", end: "22:00"}
 ```
+
+`timezone` takes an IANA name (`Europe/Berlin`, `America/New_York`, `UTC`) or
+a whole-hour offset from `UTC-12` to `UTC+14` (`UTC+2`, `UTC-5`). An offset is a
+fixed clock that never changes for daylight saving; LiteGate sends it to
+LiteLLM as the matching `Etc/GMT` zone (`UTC+2` becomes `Etc/GMT-2`, since
+`Etc/GMT` inverts the sign). Use an IANA name when windows should follow
+daylight saving. Half-hour offsets such as `UTC+5:30` are not supported.
 
 With weekday-only windows like these, weekends (and weekday hours outside the
 windows) have no cap. To cap weekends, add a window such as
-`{days: [sat, sun], start: "00:00", end: "00:00"}` (a whole day); a team that
-leaves it blank stays unlimited on weekends.
+`{days: [sat, sun], start: "00:00", end: "00:00", default_budget: 20}` (a whole
+day).
 
 This needs a LiteLLM build with
 [BerriAI/litellm#54147](https://github.com/BerriAI/litellm/pull/54147). LiteLLM
@@ -392,24 +401,33 @@ enforces each window as a team `budget_limits` entry with a `schedule`:
 - Spend starts at $0 each time a window opens.
 - Outside every window, no window cap applies.
 - An end at or before the start wraps past midnight.
+- Windows never reset a team's or key's total spend. A team `budget_duration`
+  or `KEY_BUDGET_DURATION` still does, so the Teams page warns about both.
 
-Startup validates the schedule with LiteLLM's rules: a known IANA timezone,
-`HH:MM` times and no overlapping windows.
+Startup validates the schedule with LiteLLM's rules: a known timezone, `HH:MM`
+times and no overlapping windows.
 
-- Admins set caps in the team dialog's **Budget per window** fields (one per
-  window's hours), or with `window_budgets` on the team API, keyed by the
-  window's days and hours, for example `{"Mon-Fri 08:00-13:00": 15}`. The Teams
-  page lists every window with the one open now highlighted (or, outside every
-  window, when the next one opens), and each team row lists its cap per window
-  with the open window's spend. Organization-managed teams get the same
-  team-level window caps on top of their per-user key budgets.
+- In the team dialog, each window offers **Default**, **Custom** (an amount) or
+  **Unlimited**. The team API takes the same choice as `window_budgets`, keyed
+  by the window's days and hours, for example
+  `{"Mon-Fri 08:00-13:00": 15, "Mon-Fri 13:00-18:00": "default",
+  "Mon-Fri 18:00-22:00": null}`. A team's own choices are stored in its LiteLLM
+  metadata under `litegate_window_budgets`; LiteGate keeps no extra state.
+- The Teams page lists every window with the one open now highlighted (or,
+  outside every window, when the next one opens). Each team row lists every
+  window's cap, marks the ones that follow the default, and shows the open
+  window's spend. Organization-managed teams get the same team-level window caps
+  on top of their per-user key budgets.
+- At startup, LiteGate rewrites every team whose caps differ from its choices
+  and the current defaults, audited as `team.budget_windows_synced`. That
+  applies changed defaults, removes windows that are no longer configured, and
+  gives teams created outside LiteGate (directly in LiteLLM or by the
+  organization sync) the defaults. A team that had window caps before defaults
+  existed keeps them as its own choices; its blank windows follow the default.
 - Plain `budget_limits` entries a team already has are kept. Raw `budget_limits`
   in Advanced settings is rejected while windows are configured.
-- When a window's days or times change, its old entries are removed from
-  every team at startup and audited as `team.budget_windows_pruned`. The changed
-  window starts out unlimited until amounts are set again.
-- If LiteLLM lacks the feature, team saves with window amounts fail with an
-  error naming the required LiteLLM change.
+- If LiteLLM lacks the feature, team saves fail with an error naming the
+  required LiteLLM change.
 
 This setting is in nightly `dev-*` images only.
 

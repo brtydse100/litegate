@@ -163,6 +163,8 @@ export interface TeamInfo {
   max_budget?: number | null;
   budget_duration?: string | null;
   budget_limits?: { budget_duration?: string; max_budget?: number | null }[];
+  /** Windows where the team overrides the default cap; null is unlimited. */
+  window_budgets?: Record<string, number | null>;
   tpm_limit?: number | null;
   rpm_limit?: number | null;
   models: string[];
@@ -213,8 +215,9 @@ export interface TeamUpdatePayload {
   blocked: boolean;
 }
 
-/** Amount per scheduled budget window name; null is unlimited. */
-export type WindowBudgets = Record<string, number | null>;
+/** Per scheduled budget window name: an amount, null for unlimited, or
+ * "default" to follow the window's configured default cap. */
+export type WindowBudgets = Record<string, number | null | "default">;
 
 /** One window of the installation-wide schedule (TEAM_BUDGET_WINDOWS). */
 export interface BudgetWindow {
@@ -224,18 +227,31 @@ export interface BudgetWindow {
   end: string;
   /** LiteLLM's budget_duration label for this window. */
   label: string;
+  /** Default cap for teams that do not override it (admin view only). */
+  default_budget?: number | null;
 }
 
 export interface BudgetWindowSchedule {
+  /** As configured, e.g. "Europe/Berlin" or "UTC+2". */
   timezone: string;
+  /** IANA zone used for the clock, e.g. "Etc/GMT-2" for "UTC+2". */
+  zone: string;
   windows: BudgetWindow[];
+}
+
+/** Administrator view: the schedule with default caps and the key reset period. */
+export interface AdminBudgetWindows extends BudgetWindowSchedule {
+  key_budget_duration: string | null;
 }
 
 export interface TeamBudgetWindowUsage {
   team_id: string;
   timezone: string;
+  zone: string;
   windows: (BudgetWindow & {
     max_budget: number | null;
+    /** "team" when the team overrides this window, else "default". */
+    source: "team" | "default";
     current_spend: number | null;
     active: boolean | null;
     next_start: string | null;

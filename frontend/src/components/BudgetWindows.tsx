@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import type { BudgetWindow, BudgetWindowSchedule } from "../types";
+import type {
+  BudgetWindow,
+  BudgetWindowSchedule,
+  TeamInfo,
+  WindowBudgets,
+} from "../types";
+import { resetLabel } from "../keyBudget";
 import { Pill, UsageBar } from "./Page";
 import { card, cardHeader, cardTitle, toneDot } from "./ui";
 import { metricValue } from "./OrganizationCharts";
@@ -69,7 +75,7 @@ export function nextWindow(
   schedule: BudgetWindowSchedule,
   now: Date,
 ): { window: BudgetWindow; day: string } | null {
-  const current = weekMinute(schedule.timezone, now);
+  const current = weekMinute(schedule.zone, now);
   let best: { window: BudgetWindow; day: string; wait: number } | null = null;
   for (const window of schedule.windows)
     for (const day of window.days) {
@@ -86,7 +92,7 @@ export function activeWindow(
   schedule: BudgetWindowSchedule,
   now: Date,
 ): BudgetWindow | null {
-  const current = weekMinute(schedule.timezone, now);
+  const current = weekMinute(schedule.zone, now);
   return (
     schedule.windows.find((window) =>
       window.days.some((name) => {
@@ -117,8 +123,11 @@ function useMinuteClock(): Date {
 /** Teams page schedule: every shared window, with the open one raised. */
 export function BudgetWindowsBanner({
   schedule,
+  keyResetPeriod,
 }: {
   schedule: BudgetWindowSchedule;
+  /** KEY_BUDGET_DURATION, which still zeroes key totals. */
+  keyResetPeriod?: string | null;
 }) {
   const now = useMinuteClock();
   const current = activeWindow(schedule, now);
@@ -172,16 +181,29 @@ export function BudgetWindowsBanner({
           })}
         </ol>
         <p className="mt-3 text-xs text-ink-4">
-          Each team sets its own cap per window in the team dialog; a blank cap
-          is unlimited. Spend starts at $0 when a window opens, and outside
-          these hours there is no cap.
+          Every team follows these windows. Each window has a default cap that a
+          team can override in the team dialog. Spend starts at $0 when a window
+          opens, and outside these hours there is no cap.
         </p>
+        {keyResetPeriod && (
+          <p className="mt-2 flex items-start gap-1.5 text-xs text-orange-ink">
+            <span
+              aria-hidden="true"
+              className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${toneDot.warn}`}
+            />
+            <span>
+              Each key&apos;s total still {resetLabel(keyResetPeriod)}{" "}
+              (KEY_BUDGET_DURATION). Windows never reset totals.
+            </span>
+          </p>
+        )}
       </div>
     </section>
   );
 }
 
-/** One team row: every window's cap, the open one marked with its spend. */
+/** One team row: every window's cap and whether it is the default, the open
+ * one marked with its spend. */
 export function TeamWindowUsage({ teamId }: { teamId: string }) {
   const now = useMinuteClock();
   const usage = useQuery({
@@ -194,8 +216,6 @@ export function TeamWindowUsage({ teamId }: { teamId: string }) {
     return <p className="text-xs text-ink-4">Loading windows…</p>;
   if (usage.isError)
     return <p className="text-xs text-danger">Windows unavailable</p>;
-  if (usage.data.windows.every((window) => window.max_budget == null))
-    return <p className="text-xs text-ink-4">No window caps</p>;
   // LiteLLM marks a capped open window; an uncapped one is found by the clock.
   const openName =
     usage.data.windows.find((window) => window.active)?.name ??
@@ -226,7 +246,10 @@ export function TeamWindowUsage({ teamId }: { teamId: string }) {
               <span className={open ? "font-semibold text-ink" : "text-ink-4"}>
                 {capped
                   ? metricValue(window.max_budget ?? 0, "spend")
-                  : "No cap"}
+                  : "Unlimited"}
+                {window.source === "default" && (
+                  <span className="font-normal text-ink-4"> · default</span>
+                )}
               </span>
             </span>
             {open && capped && (
@@ -248,15 +271,70 @@ export function TeamWindowUsage({ teamId }: { teamId: string }) {
   );
 }
 
-/** Team editor: one amount per shared window; blank is unlimited. */
+export type WindowChoice =
+  | { mode: "default" }
+  | { mode: "unlimited" }
+  | { mode: "custom"; amount: string };
+
+/** The dialog's starting choice per window, from the team's overrides. */
+export function initialChoices(
+  schedule: BudgetWindowSchedule,
+  team: TeamInfo | null,
+): Record<string, WindowChoice> {
+  const own = team?.window_budgets ?? {};
+  return Object.fromEntries(
+    schedule.windows.map((window): [string, WindowChoice] => {
+      if (!(window.name in own)) return [window.name, { mode: "default" }];
+      const amount = own[window.name];
+      return [
+        window.name,
+        amount == null
+          ? { mode: "unlimited" }
+          : { mode: "custom", amount: String(amount) },
+      ];
+    }),
+  );
+}
+
+/** The request's window_budgets. */
+export function choicePayload(
+  choices: Record<string, WindowChoice>,
+): WindowBudgets {
+  return Object.fromEntries(
+    Object.entries(choices).map(([name, choice]) => [
+      name,
+      choice.mode === "default"
+        ? "default"
+        : choice.mode === "unlimited"
+          ? null
+          : Number(choice.amount),
+    ]),
+  );
+}
+
+const CHOICES: { mode: WindowChoice["mode"]; label: string }[] = [
+  { mode: "default", label: "Default" },
+  { mode: "custom", label: "Custom" },
+  { mode: "unlimited", label: "Unlimited" },
+];
+
+function segment(active: boolean): string {
+  return `min-h-7 flex-1 whitespace-nowrap rounded-md px-2.5 text-xs font-medium transition-colors duration-150 ${
+    active
+      ? "bg-segment text-ink shadow-[0_1px_2px_rgb(0_0_0/0.12),0_0_0_0.5px_rgb(0_0_0/0.04)]"
+      : "text-ink-3 hover:text-ink"
+  }`;
+}
+
+/** Team editor: per shared window, follow the default, a custom cap or unlimited. */
 export function WindowBudgetFields({
   schedule,
   values,
   onChange,
 }: {
   schedule: BudgetWindowSchedule;
-  values: Record<string, string>;
-  onChange: (name: string, value: string) => void;
+  values: Record<string, WindowChoice>;
+  onChange: (name: string, value: WindowChoice) => void;
 }) {
   const shared = sharedDays(schedule.windows);
   return (
@@ -266,21 +344,67 @@ export function WindowBudgetFields({
         )
       </legend>
       <p className="text-xs text-ink-4">
-        The windows are shared by every team. Leave an amount empty for
-        unlimited in that window.
+        Every team shares these windows. A team follows each window&apos;s
+        default cap unless you choose a custom cap or unlimited here.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {schedule.windows.map((window) => (
-          <NumericPolicyInput
-            key={window.name}
-            label={hoursLabel(window, shared)}
-            value={values[window.name] ?? ""}
-            onValueChange={(value) => onChange(window.name, value)}
-            step="any"
-            placeholder="Unlimited"
-          />
-        ))}
-      </div>
+      <ul className="divide-y divide-line-soft">
+        {schedule.windows.map((window) => {
+          const choice = values[window.name] ?? { mode: "default" };
+          const hours = hoursLabel(window, shared);
+          const fallback =
+            window.default_budget === undefined
+              ? "…"
+              : window.default_budget == null
+                ? "unlimited"
+                : metricValue(window.default_budget, "spend");
+          return (
+            <li key={window.name} className="space-y-2 py-2.5 last:pb-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[13px] tabular-nums text-ink">
+                  <span className="font-medium">{hours}</span>{" "}
+                  <span className="text-xs text-ink-4">default {fallback}</span>
+                </p>
+                <div
+                  role="group"
+                  aria-label={`Cap for ${hours}`}
+                  className="flex w-full items-center rounded-lg bg-ink/[0.06] p-0.5 sm:w-auto"
+                >
+                  {CHOICES.map((item) => (
+                    <button
+                      key={item.mode}
+                      type="button"
+                      aria-pressed={choice.mode === item.mode}
+                      className={segment(choice.mode === item.mode)}
+                      onClick={() =>
+                        choice.mode !== item.mode &&
+                        onChange(
+                          window.name,
+                          item.mode === "custom"
+                            ? { mode: "custom", amount: "" }
+                            : { mode: item.mode },
+                        )
+                      }
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {choice.mode === "custom" && (
+                <NumericPolicyInput
+                  label={`Custom cap for ${hours} (USD)`}
+                  value={choice.amount}
+                  onValueChange={(amount) =>
+                    onChange(window.name, { mode: "custom", amount })
+                  }
+                  step="any"
+                  required
+                />
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </fieldset>
   );
 }

@@ -195,10 +195,11 @@ config:
   # keyMaxBudget: "10.0"
   # keyBudgetDuration: "30d"
   # Nightly: budget windows every team shares (needs LiteLLM #54147).
+  # timezone: an IANA name (Europe/Berlin) or a whole-hour offset (UTC+2).
   # teamBudgetWindows:
-  #   timezone: Europe/Berlin
+  #   timezone: UTC+2
   #   windows:
-  #     - {days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00"}
+  #     - {days: [mon, tue, wed, thu, fri], start: "08:00", end: "13:00", default_budget: 40}
   # keyModels: '["gpt-4","gpt-3.5-turbo"]'
   # keyDuration: "90d"
   # keyTpmLimit: "100000"

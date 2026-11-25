@@ -7,7 +7,7 @@ the rules here mirror LiteLLM's so a configuration it would reject never starts.
 """
 
 import re
-from typing import Literal
+from typing import Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 Weekday = Literal["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 WEEKDAYS: tuple[str, ...] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 SCHEDULE_PREFIX = "sched:"
+_UTC_OFFSET = re.compile(r"UTC([+-])(\d{1,2})(?::00)?")
 _DAY = 24 * 60
 _WEEK = 7 * _DAY
 
@@ -22,6 +23,19 @@ _WEEK = 7 * _DAY
 def _minutes(value: str) -> int:
     hours, minutes = value.split(":")
     return int(hours) * 60 + int(minutes)
+
+
+def utc_offset_zone(value: str) -> str:
+    """The IANA zone for a whole-hour "UTC+2"-style offset (Etc/GMT inverts the sign)."""
+    match = _UTC_OFFSET.fullmatch(value)
+    if match is None:
+        return value
+    sign, hours = match.group(1), int(match.group(2))
+    if hours == 0:
+        return "UTC"
+    if hours > (14 if sign == "+" else 12):
+        raise ValueError(f"UTC offsets run from UTC-12 to UTC+14, not '{value}'")
+    return f"Etc/GMT{'-' if sign == '+' else '+'}{hours}"
 
 
 def _format_days(days: list[str]) -> str:
@@ -41,6 +55,7 @@ class BudgetWindow(BaseModel):
     days: list[Weekday] = Field(default_factory=lambda: list(WEEKDAYS), min_length=1)
     start: str
     end: str
+    default_budget: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
 
     @field_validator("days")
     @classmethod
@@ -75,6 +90,8 @@ class BudgetWindow(BaseModel):
 
 
 class BudgetWindows(BaseModel):
+    """The shared schedule; ``timezone`` is an IANA name or a whole-hour "UTC+2"."""
+
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     timezone: str
     windows: list[BudgetWindow] = Field(min_length=1, max_length=24)
@@ -82,8 +99,9 @@ class BudgetWindows(BaseModel):
     @field_validator("timezone")
     @classmethod
     def known_timezone(cls, value: str) -> str:
+        zone = utc_offset_zone(value)
         try:
-            ZoneInfo(value)
+            ZoneInfo(zone)
         except (ZoneInfoNotFoundError, ValueError) as exc:
             raise ValueError(f"Unknown timezone '{value}'") from exc
         return value
@@ -96,15 +114,23 @@ class BudgetWindows(BaseModel):
                 raise ValueError(f"Budget windows overlap: {first} and {second}")
         return self
 
+    @property
+    def zone(self) -> str:
+        """The IANA zone LiteLLM receives, e.g. "Etc/GMT-2" for "UTC+2"."""
+        return utc_offset_zone(self.timezone)
+
     def label(self, window: BudgetWindow) -> str:
         """The budget_duration LiteLLM derives for this window's schedule."""
-        return f"{SCHEDULE_PREFIX}{self.timezone}:{','.join(window.days)}:{window.start}-{window.end}"
+        return f"{SCHEDULE_PREFIX}{self.zone}:{','.join(window.days)}:{window.start}-{window.end}"
 
     def schedule(self, window: BudgetWindow) -> dict:
-        return {"timezone": self.timezone, "days": list(window.days), "start": window.start, "end": window.end}
+        return {"timezone": self.zone, "days": list(window.days), "start": window.start, "end": window.end}
 
-    def public(self) -> dict:
+    def public(self, defaults: bool = True) -> dict:
+        """The schedule for the UI; default caps only for administrators."""
+        exclude = None if defaults else {"default_budget"}
         return {
             "timezone": self.timezone,
-            "windows": [{**window.model_dump(), "name": window.name, "label": self.label(window)} for window in self.windows],
+            "zone": self.zone,
+            "windows": [{**window.model_dump(exclude=exclude), "name": window.name, "label": self.label(window)} for window in self.windows],
         }

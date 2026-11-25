@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { BudgetWindowSchedule } from "../types";
-import { activeWindow, formatDays, nextWindow } from "./BudgetWindows";
+import {
+  activeWindow,
+  choicePayload,
+  formatDays,
+  initialChoices,
+  nextWindow,
+} from "./BudgetWindows";
 import { resetLabel } from "../keyBudget";
 
 const weekdays = ["mon", "tue", "wed", "thu", "fri"];
 const schedule: BudgetWindowSchedule = {
   timezone: "Europe/Berlin",
+  zone: "Europe/Berlin",
   windows: [
     {
       name: "Morning",
@@ -48,6 +55,37 @@ describe("scheduled budget windows", () => {
     expect(nextWindow(weekdays, new Date("2026-11-28T09:00:00Z"))?.day).toBe(
       "Mon",
     );
+  });
+
+  it("runs a UTC+2 schedule on the fixed Etc/GMT-2 clock", () => {
+    const fixed = { ...schedule, timezone: "UTC+2", zone: "Etc/GMT-2" };
+    // Wednesday 06:30 UTC is 08:30 at UTC+2, in the morning window.
+    expect(activeWindow(fixed, new Date("2026-11-25T06:30:00Z"))?.name).toBe(
+      "Morning",
+    );
+    expect(activeWindow(fixed, new Date("2026-11-25T11:30:00Z"))).toBeNull();
+  });
+
+  it("turns dialog choices into window_budgets and back", () => {
+    const team = {
+      team_id: "t",
+      models: [],
+      blocked: false,
+      members_with_roles: [],
+      mapped_groups: [],
+      default_key_team: false,
+      window_budgets: { Morning: 7, Overnight: null },
+    };
+    const choices = initialChoices(schedule, team);
+    expect(choices).toEqual({
+      Morning: { mode: "custom", amount: "7" },
+      Overnight: { mode: "unlimited" },
+    });
+    expect(choicePayload(choices)).toEqual({ Morning: 7, Overnight: null });
+    expect(choicePayload(initialChoices(schedule, null))).toEqual({
+      Morning: "default",
+      Overnight: "default",
+    });
   });
 
   it("summarizes days and reset periods in plain words", () => {

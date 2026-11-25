@@ -36,17 +36,21 @@ import {
   cardTitle,
   fieldInput,
   tableHead,
+  toneDot,
 } from "./ui";
 
 /** Team list columns, shared by the caption row and each team. */
 const teamColumns =
-  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_17rem] items-center gap-4";
+  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(10.5rem,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_17rem] items-center gap-4";
 import { metricValue } from "./OrganizationCharts";
 import { resetLabel } from "../keyBudget";
 import {
   BudgetWindowsBanner,
   TeamWindowUsage,
   WindowBudgetFields,
+  choicePayload,
+  initialChoices,
+  type WindowChoice,
 } from "./BudgetWindows";
 import {
   CurrentPolicySettings,
@@ -128,24 +132,11 @@ function TeamEditor({
     existing?.rpm_limit != null ? String(existing.rpm_limit) : "",
   );
   const [blocked, setBlocked] = useState(existing?.blocked ?? false);
-  const [windowAmounts, setWindowAmounts] = useState<Record<string, string>>(
-    () =>
-      Object.fromEntries(
-        (budgetWindows?.windows ?? []).map((window) => {
-          const cap = existing?.budget_limits?.find(
-            (limit) => limit.budget_duration === window.label,
-          )?.max_budget;
-          return [window.name, cap != null ? String(cap) : ""];
-        }),
-      ),
-  );
+  const [windowChoices, setWindowChoices] = useState<
+    Record<string, WindowChoice>
+  >(() => (budgetWindows ? initialChoices(budgetWindows, existing) : {}));
   const windowBudgets = budgetWindows
-    ? Object.fromEntries(
-        budgetWindows.windows.map((window) => [
-          window.name,
-          nullableNumber(windowAmounts[window.name] ?? ""),
-        ]),
-      )
+    ? choicePayload(windowChoices)
     : undefined;
   const advanced = useRef<AdvancedPolicyHandle>(null);
   useEffect(() => {
@@ -344,9 +335,9 @@ function TeamEditor({
           {budgetWindows && (
             <WindowBudgetFields
               schedule={budgetWindows}
-              values={windowAmounts}
+              values={windowChoices}
               onChange={(name, value) =>
-                setWindowAmounts((current) => ({ ...current, [name]: value }))
+                setWindowChoices((current) => ({ ...current, [name]: value }))
               }
             />
           )}
@@ -546,6 +537,14 @@ export default function AdminTeams({
   const [deleteTarget, setDeleteTarget] = useState<TeamInfo | null>(null);
   const [memberTeam, setMemberTeam] = useState<TeamInfo | null>(null);
 
+  // The public schedule omits default caps; administrators load them here.
+  const adminWindows = useQuery({
+    queryKey: ["budget-windows"],
+    queryFn: api.budgetWindows,
+    enabled: !!budgetWindows,
+    staleTime: Infinity,
+  });
+  const schedule = budgetWindows ? (adminWindows.data ?? budgetWindows) : null;
   const teams = useQuery({
     queryKey: ["teams", page, search],
     queryFn: () => api.listTeams(page, 25, search),
@@ -654,7 +653,12 @@ export default function AdminTeams({
         referenced by SSO mapping or <code>KEY_TEAM_ID</code> cannot be deleted
         until that configuration is changed.
       </Callout>
-      {budgetWindows && <BudgetWindowsBanner schedule={budgetWindows} />}
+      {schedule && (
+        <BudgetWindowsBanner
+          schedule={schedule}
+          keyResetPeriod={adminWindows.data?.key_budget_duration}
+        />
+      )}
       {operationsBlocked && (
         <DismissibleMessage
           messageKey="team-actions-paused"
@@ -794,6 +798,16 @@ export default function AdminTeams({
                           {resetLabel(team.budget_duration)}
                         </p>
                       )}
+                      {/* Windows never zero totals, but a team reset period still does. */}
+                      {budgetWindows && team.budget_duration && (
+                        <p className="flex items-center gap-1.5 text-xs text-orange-ink">
+                          <span
+                            aria-hidden="true"
+                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${toneDot.warn}`}
+                          />
+                          Total {resetLabel(team.budget_duration)}
+                        </p>
+                      )}
                       {budgetWindows && (
                         <TeamWindowUsage teamId={team.team_id} />
                       )}
@@ -894,7 +908,7 @@ export default function AdminTeams({
           onClose={() => setEditor(null)}
           onCreate={(payload) => create.mutate(payload)}
           onUpdate={(id, payload) => update.mutate({ id, payload })}
-          budgetWindows={budgetWindows}
+          budgetWindows={schedule}
         />
       )}
       {deleteTarget && (

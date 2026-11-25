@@ -10,8 +10,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Added (nightly, not in a stable release)
 
 - `TEAM_BUDGET_WINDOWS` defines scheduled budget windows (for example
-  Mon–Fri 08:00–13:00) that every team shares. Each team sets its own amount per
-  window or leaves it unlimited. Needs LiteLLM with BerriAI/litellm#54147.
+  Mon–Fri 08:00–13:00) that every team shares, each with an optional default
+  cap. A team follows each default or overrides it with its own cap or
+  unlimited. The timezone can be an IANA name or a whole-hour offset such as
+  `UTC+2`. The Teams page warns when a team or key reset period still zeroes
+  totals. Needs LiteLLM with BerriAI/litellm#54147.
 
 ## [2.23.2] - 2026-11-25
 

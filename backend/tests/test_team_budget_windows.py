@@ -13,7 +13,7 @@ from app.main import app
 from app.organization import OrganizationHierarchy
 from app.rate_limit import _key_ops
 from app.routers import auth
-from app.services import litellm, local_users, organization_client as upstream, team_budget_windows as windows
+from app.services import litellm, local_users, organization_client as upstream, team_budget_window_sync, team_budget_windows as windows
 
 MORNING = "sched:Europe/Berlin:mon,tue,wed,thu,fri:08:00-13:00"
 AFTERNOON = "sched:Europe/Berlin:mon,tue,wed,thu,fri:13:00-18:00"
@@ -83,34 +83,73 @@ def test_invalid_schedules_fail_at_startup(change):
 def test_merge_keeps_plain_limits_and_omits_unlimited_windows():
     current = {"budget_limits": [{"budget_duration": "7d", "max_budget": 50, "reset_at": None}, {"budget_duration": MORNING, "max_budget": 5}]}
     assert windows.amounts(current) == {"Mon-Fri 08:00-13:00": 5, "Mon-Fri 13:00-18:00": None}
-    assert windows.merge(current, {"Mon-Fri 13:00-18:00": 3}) == [
+    assert windows.merge(current, {"Mon-Fri 08:00-13:00": 5, "Mon-Fri 13:00-18:00": 3}) == [
         {"budget_duration": "7d", "max_budget": 50},
         {"max_budget": 5, "schedule": {"timezone": "Europe/Berlin", "days": ["mon", "tue", "wed", "thu", "fri"], "start": "08:00", "end": "13:00"}},
         {"max_budget": 3, "schedule": {"timezone": "Europe/Berlin", "days": ["mon", "tue", "wed", "thu", "fri"], "start": "13:00", "end": "18:00"}},
     ]
     assert windows.merge(current, {"Mon-Fri 08:00-13:00": None}) == [{"budget_duration": "7d", "max_budget": 50}]
     with pytest.raises(HTTPException) as error:
-        windows.merge(current, {"Evening": 1})
+        windows.choose(current, {"Evening": 1})
     assert error.value.status_code == 422
+
+
+def with_defaults(monkeypatch, morning, afternoon):
+    schedule = {
+        **SCHEDULE,
+        "windows": [{**SCHEDULE["windows"][0], "default_budget": morning}, {**SCHEDULE["windows"][1], "default_budget": afternoon}],
+    }
+    monkeypatch.setattr(settings, "team_budget_windows", BudgetWindows.model_validate(schedule))
+
+
+def test_teams_follow_defaults_unless_they_override(monkeypatch):
+    with_defaults(monkeypatch, 40, 10)
+    marked = {"metadata": {"owner": "ops", windows.OVERRIDES: {"Mon-Fri 13:00-18:00": None, "Gone 01:00-02:00": 3}}}
+    assert windows.overrides(marked) == {"Mon-Fri 13:00-18:00": None}
+    assert windows.caps(windows.overrides(marked)) == {"Mon-Fri 08:00-13:00": 40, "Mon-Fri 13:00-18:00": None}
+    # Teams capped before defaults existed keep their caps as overrides; blanks follow the default.
+    legacy = {"budget_limits": [{"budget_duration": AFTERNOON, "max_budget": 7}]}
+    assert windows.caps(windows.overrides(legacy)) == {"Mon-Fri 08:00-13:00": 40, "Mon-Fri 13:00-18:00": 7}
+    chosen = windows.choose(marked, {"Mon-Fri 08:00-13:00": 2, "Mon-Fri 13:00-18:00": "default"})
+    assert chosen == {"Mon-Fri 08:00-13:00": 2}
+    update = windows.synced(marked, chosen)
+    assert [entry["max_budget"] for entry in update["budget_limits"]] == [2, 10]
+    assert update["metadata"] == {"owner": "ops", windows.OVERRIDES: {"Mon-Fri 08:00-13:00": 2}}
 
 
 @pytest.mark.asyncio
 async def test_create_and_update_write_scheduled_entries(monkeypatch):
+    with_defaults(monkeypatch, None, 6)
     create = AsyncMock(return_value={"team_id": "t1"})
     update = AsyncMock(return_value={"team_id": "t1"})
     monkeypatch.setattr(litellm, "create_team", create)
     monkeypatch.setattr(litellm, "update_team", update)
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=team({"budget_duration": MORNING, "max_budget": 5})))
     async with client() as browser:
-        created = await browser.post(
-            "/api/v1/teams", json={"team_alias": "T", "window_budgets": {"Mon-Fri 08:00-13:00": 2, "Mon-Fri 13:00-18:00": None}}, headers=admin()
-        )
+        created = await browser.post("/api/v1/teams", json={"team_alias": "T", "window_budgets": {"Mon-Fri 08:00-13:00": 2}}, headers=admin())
+        bare = await browser.post("/api/v1/teams", json={"team_alias": "U"}, headers=admin())
         updated = await browser.patch("/api/v1/teams/t1", json={"window_budgets": {"Mon-Fri 13:00-18:00": 7}}, headers=admin())
+        unlimited = await browser.patch("/api/v1/teams/t1", json={"window_budgets": {"Mon-Fri 08:00-13:00": None}}, headers=admin())
         plain = await browser.patch("/api/v1/teams/t1", json={"max_budget": 9}, headers=admin())
-    assert created.status_code == 201 and updated.status_code == 200 and plain.status_code == 200
-    assert [entry["max_budget"] for entry in create.await_args.args[0]["budget_limits"]] == [2]
+    assert {created.status_code, bare.status_code} == {201} and {updated.status_code, unlimited.status_code, plain.status_code} == {200}
+    assert [entry["max_budget"] for entry in create.await_args_list[0].args[0]["budget_limits"]] == [2, 6]
+    assert [entry["max_budget"] for entry in create.await_args_list[1].args[0]["budget_limits"]] == [6]
+    assert create.await_args_list[1].args[0]["metadata"] == {windows.OVERRIDES: {}}
     assert [entry["max_budget"] for entry in update.await_args_list[0].args[1]["budget_limits"]] == [5, 7]
-    assert "budget_limits" not in update.await_args_list[1].args[1]
+    assert [entry["max_budget"] for entry in update.await_args_list[1].args[1]["budget_limits"]] == [6]
+    assert "budget_limits" not in update.await_args_list[2].args[1]
+
+
+def test_utc_offsets_become_fixed_iana_zones():
+    config = configured({**SCHEDULE, "timezone": "UTC+2"}).team_budget_windows
+    assert config.public()["timezone"] == "UTC+2" and config.public()["zone"] == "Etc/GMT-2"
+    assert config.label(config.windows[0]) == "sched:Etc/GMT-2:mon,tue,wed,thu,fri:08:00-13:00"
+    assert config.schedule(config.windows[0])["timezone"] == "Etc/GMT-2"
+    assert configured({**SCHEDULE, "timezone": "UTC-5"}).team_budget_windows.zone == "Etc/GMT+5"
+    assert configured({**SCHEDULE, "timezone": "UTC+0"}).team_budget_windows.zone == "UTC"
+    for invalid in ("UTC+15", "UTC-13", "UTC+5:30"):
+        with pytest.raises(ValidationError):
+            configured({**SCHEDULE, "timezone": invalid})
 
 
 @pytest.mark.asyncio
@@ -168,26 +207,36 @@ async def test_usage_reports_each_window(monkeypatch):
     morning, afternoon = response.json()["windows"]
     assert (morning["max_budget"], morning["current_spend"], morning["active"]) == (5, 1.5, True)
     assert (afternoon["max_budget"], afternoon["current_spend"]) == (None, None)
+    assert (morning["source"], afternoon["source"]) == ("team", "default")
 
 
 @pytest.mark.asyncio
-async def test_startup_prunes_windows_dropped_from_the_schedule(monkeypatch):
+async def test_startup_syncs_defaults_and_drops_removed_windows(monkeypatch):
+    with_defaults(monkeypatch, None, 6)
     teams = [
-        {"team_id": "current", "budget_limits": [{"budget_duration": MORNING, "max_budget": 5}]},
+        {
+            "team_id": "current",
+            "budget_limits": [{"budget_duration": MORNING, "max_budget": 5}, {"budget_duration": AFTERNOON, "max_budget": 6}],
+            "metadata": {windows.OVERRIDES: {"Mon-Fri 08:00-13:00": 5}},
+        },
         {
             "team_id": "old",
             "budget_limits": [{"budget_duration": "7d", "max_budget": 9}, {"budget_duration": "sched:UTC:mon:01:00-02:00", "max_budget": 1}],
+            "metadata": {"owner": "ops", windows.OVERRIDES: {}},
         },
         {"team_id": "plain"},
     ]
     monkeypatch.setattr(litellm, "list_teams", AsyncMock(return_value={"teams": teams, "total_pages": 1}))
     update = AsyncMock()
     monkeypatch.setattr(litellm, "update_team", update)
-    assert await windows.prune_stale_windows() == 1
-    update.assert_awaited_once_with("old", {"budget_limits": [{"budget_duration": "7d", "max_budget": 9}]})
+    assert await team_budget_window_sync.sync_team_windows() == 2
+    old, plain = (call.args for call in update.await_args_list)
+    assert old[0] == "old" and [entry.get("budget_duration") or entry["max_budget"] for entry in old[1]["budget_limits"]] == ["7d", 6]
+    assert old[1]["metadata"] == {"owner": "ops", windows.OVERRIDES: {}}
+    assert plain[0] == "plain" and [entry["max_budget"] for entry in plain[1]["budget_limits"]] == [6]
     with local_users.connect() as db:
-        row = db.execute("SELECT target, outcome FROM audit_events WHERE action='team.budget_windows_pruned'").fetchone()
-    assert tuple(row) == ("old", "success")
+        rows = db.execute("SELECT target, outcome FROM audit_events WHERE action='team.budget_windows_synced'").fetchall()
+    assert sorted(tuple(row) for row in rows) == [("old", "success"), ("plain", "success")]
 
 
 @pytest.mark.asyncio
@@ -198,6 +247,20 @@ async def test_portal_config_exposes_the_schedule(monkeypatch):
         disabled = (await browser.get("/api/portal-config")).json()["team_budget_windows"]
     assert [window["name"] for window in enabled["windows"]] == ["Mon-Fri 08:00-13:00", "Mon-Fri 13:00-18:00"]
     assert disabled is None
+
+
+@pytest.mark.asyncio
+async def test_default_caps_are_admin_only(monkeypatch):
+    with_defaults(monkeypatch, 40, None)
+    monkeypatch.setattr(settings, "key_budget_duration", "30d")
+    user = {"Authorization": "Bearer " + auth._make_jwt("u", "u@example.com")}
+    async with client() as browser:
+        public = (await browser.get("/api/portal-config")).json()["team_budget_windows"]
+        schedule = await browser.get("/api/v1/budget-windows", headers=admin())
+        denied = await browser.get("/api/v1/budget-windows", headers=user)
+    assert all("default_budget" not in window for window in public["windows"])
+    assert [window["default_budget"] for window in schedule.json()["windows"]] == [40, None]
+    assert schedule.json()["key_budget_duration"] == "30d" and denied.status_code == 403
 
 
 def test_windows_are_named_by_days_and_hours():

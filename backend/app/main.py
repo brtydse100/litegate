@@ -14,7 +14,7 @@ from app.routers import people
 from app.routers import budgets
 from app.routers import api_v1_budget_windows
 from app.services import analytics, litellm, litellm_roles, local_users, organization_bindings, organization_limits, organization_sync
-from app.services import team_budget_windows
+from app.services import team_budget_window_sync
 from app.version import VERSION
 
 
@@ -31,7 +31,7 @@ async def lifespan(_: FastAPI):
     # beside startup, and anyone it misses switches at their next sign-in.
     roles_task = asyncio.create_task(litellm_roles.restrict_known_users())
     # One pass that removes team windows dropped from TEAM_BUDGET_WINDOWS.
-    windows_task = asyncio.create_task(team_budget_windows.prune_stale_windows())
+    windows_task = asyncio.create_task(team_budget_window_sync.sync_team_windows())
     try:
         if settings.organization_hierarchy.levels or settings.organization_cleanup_enabled:
             started = await organization_sync.reconciliation_attempt()
@@ -136,7 +136,7 @@ async def portal_config():
         "hierarchical_budgets_enabled": settings.hierarchical_budgets_enabled,
         "hierarchical_budgets_enforced": settings.hierarchical_budgets_enforced,
         "litellm_enterprise_enabled": settings.litellm_enterprise_enabled,
-        "team_budget_windows": settings.team_budget_windows.public() if settings.team_budget_windows else None,
+        "team_budget_windows": settings.team_budget_windows.public(defaults=False) if settings.team_budget_windows else None,
     }
 
 
