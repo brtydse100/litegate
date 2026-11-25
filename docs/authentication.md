@@ -321,6 +321,9 @@ virtual key cannot authorize `PATCH /api/v1/keys/bulk`.
 - Bulk updates use a five-request concurrency bound.
 - Included Nginx configurations set CSP, anti-clickjacking, MIME-sniffing, and
   referrer headers.
+- People are provisioned in LiteLLM with the view-only `internal_user_viewer`
+  role, so they cannot create keys outside LiteGate. Also apply LiteLLM's
+  key-creation setting; see [Lock down key creation in LiteLLM](litellm-key-lockdown.md).
 
 For production, replace all examples, use HTTPS, restrict configuration access,
 rotate secrets regularly, and use the verified database backup procedure rather

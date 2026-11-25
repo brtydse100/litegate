@@ -7,6 +7,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- People are provisioned in LiteLLM with the view-only `internal_user_viewer`
+  role. Existing people with the plain `internal_user` role are switched at
+  sign-in and once at startup (`litellm.user_role_restricted`), so their keys
+  can no longer create unlimited keys outside LiteGate. Administrators and other
+  roles are unchanged. A new guide shows the matching LiteLLM
+  `key_generation_settings`.
+
 ## [2.23.1] - 2026-11-24
 
 ### Added

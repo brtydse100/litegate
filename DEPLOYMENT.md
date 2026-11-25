@@ -13,6 +13,8 @@ Browser → host port 80 → nginx (container port 8080)
 ```
 
 Everything runs in one container. You point it at your existing LiteLLM instance.
+Also restrict key creation in that LiteLLM so people cannot create unlimited
+keys around LiteGate: see [Lock down key creation in LiteLLM](docs/litellm-key-lockdown.md).
 
 ---
 

@@ -15,6 +15,13 @@ This file provides guidance to coding agents working in this repository.
 
 - Run `format`, `lint`, and `typecheck` (see **Commands**; the backend has formatting only); fix all violations before showing the user anything. Never fix a violation by disabling a rule.
 
+## Agent working rules
+
+- **Research with smaller models.** When searching or researching a topic, delegate it to a subagent running a smaller, faster model.
+- **Compact subagent results.** Before using data returned by smaller agents, condense it to the essentials (conclusions, file paths, key snippets); no raw dumps.
+- **Fan out when it helps.** Run parallel subagents for independent pieces of work when that gives a better result or saves time.
+- **Ask, don't assume.** If you don't know something, ask the user. Never make design decisions alone.
+- **Check UI changes carefully.** For any UI change, exercise every affected option and button in the running app and check how each one looks.
 
 ## Scope & Code Change Policy
 

@@ -36,6 +36,16 @@ def _existing_row(query: str, params: tuple) -> dict | None:
         return dict(row) if row else None
 
 
+def bound_user_ids() -> list[str]:
+    """LiteLLM users bound to an SSO subject; empty before the store exists."""
+    if not local_users._db_path().exists():
+        return []
+    with database.connect(read_only=True) as db:
+        if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sso_bindings'").fetchone():
+            return []
+        return [row[0] for row in db.execute("SELECT DISTINCT user_id FROM sso_bindings")]
+
+
 def lookup_binding(provider: str, subject: str) -> dict | None:
     return _existing_row("SELECT * FROM sso_bindings WHERE provider=? AND subject=?", (provider, subject))
 

@@ -82,7 +82,26 @@ async def create_user(user_id: str, email: str) -> dict:
                     "user_id": user_id,
                     "user_email": email,
                     "auto_create_key": False,
+                    # View-only: keys are created through LiteGate, never in LiteLLM.
+                    "user_role": "internal_user_viewer",
                 },
+                headers=_headers(),
+                timeout=10,
+            )
+            r.raise_for_status()
+            return r.json()
+    except httpx.TransportError as e:
+        _transport_error(e)
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"LiteLLM returned {e.response.status_code}")
+
+
+async def update_user_role(user_id: str, role: str) -> dict:
+    try:
+        async with _client() as client:
+            r = await client.post(
+                f"{settings.litellm_url}/user/update",
+                json={"user_id": user_id, "user_role": role},
                 headers=_headers(),
                 timeout=10,
             )
@@ -96,9 +115,12 @@ async def create_user(user_id: str, email: str) -> dict:
 
 async def ensure_user_exists(user_id: str, email: str) -> Optional[dict]:
     """Check existence in one call; create only if missing. Returns None if LiteLLM unreachable."""
+    from app.services import litellm_roles
+
     try:
         user = await get_user(user_id)
         if user is not None:
+            await litellm_roles.restrict(user_id, user)
             return user
         return await create_user(user_id, email)
     except Exception:
