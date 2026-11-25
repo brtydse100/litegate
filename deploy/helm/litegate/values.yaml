@@ -199,12 +199,19 @@ config:
   # teamBudgetWindows:
   #   timezone: UTC+2
   #   windows:
-  #     - days: [mon, tue, wed, thu, fri]
+  #     - id: weekday-morning
+  #       days: [mon, tue, wed, thu, fri]
   #       start: "08:00"
   #       end: "13:00"
-  #       default_budget: 40
-  #       team_budgets:        # per team ID; wins over the UI, null = unlimited
-  #         product: 15
+  #       budget: 40
+  #     - id: weekend
+  #       days: [sat, sun]
+  #       start: "00:00"
+  #       end: "00:00"
+  #       budget: 10
+  #   teams:
+  #     product:
+  #       weekday-morning: 15
   # keyModels: '["gpt-4","gpt-3.5-turbo"]'
   # keyDuration: "90d"
   # keyTpmLimit: "100000"

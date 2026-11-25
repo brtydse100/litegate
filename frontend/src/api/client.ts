@@ -328,7 +328,7 @@ export const api = {
     ),
 
   budgetWindows: () =>
-    request<import("../types").AdminBudgetWindows>("/v1/budget-windows"),
+    request<import("../types").BudgetWindowSchedule>("/v1/budget-windows"),
 
   teamBudgetWindows: (teamId: string) =>
     request<import("../types").TeamBudgetWindowUsage>(

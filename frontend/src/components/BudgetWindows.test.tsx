@@ -15,14 +15,14 @@ const schedule: BudgetWindowSchedule = {
   zone: "Europe/Berlin",
   windows: [
     {
-      name: "Morning",
+      id: "Morning",
       days: weekdays,
       start: "08:00",
       end: "13:00",
       label: "m",
     },
     {
-      name: "Overnight",
+      id: "Overnight",
       days: [...weekdays, "sat", "sun"],
       start: "18:00",
       end: "08:00",
@@ -34,11 +34,11 @@ const schedule: BudgetWindowSchedule = {
 describe("scheduled budget windows", () => {
   it("finds the open window in the schedule's timezone, including past midnight", () => {
     // Wednesday 2026-11-25 09:30 in Berlin (UTC+1).
-    expect(activeWindow(schedule, new Date("2026-11-25T08:30:00Z"))?.name).toBe(
+    expect(activeWindow(schedule, new Date("2026-11-25T08:30:00Z"))?.id).toBe(
       "Morning",
     );
     // Monday 03:00 Berlin belongs to Sunday's overnight period.
-    expect(activeWindow(schedule, new Date("2026-11-30T02:00:00Z"))?.name).toBe(
+    expect(activeWindow(schedule, new Date("2026-11-30T02:00:00Z"))?.id).toBe(
       "Overnight",
     );
     // Wednesday 15:00 Berlin is in no window.
@@ -48,7 +48,7 @@ describe("scheduled budget windows", () => {
   it("names the next window to open", () => {
     // Wednesday 15:00 Berlin: the overnight window opens at 18:00 the same day.
     const next = nextWindow(schedule, new Date("2026-11-25T14:00:00Z"));
-    expect(next?.window.name).toBe("Overnight");
+    expect(next?.window.id).toBe("Overnight");
     expect(next?.day).toBe("Wed");
     // Saturday 10:00 Berlin with weekday mornings only: next is Monday.
     const weekdays = { ...schedule, windows: [schedule.windows[0]] };
@@ -60,7 +60,7 @@ describe("scheduled budget windows", () => {
   it("runs a UTC+2 schedule on the fixed Etc/GMT-2 clock", () => {
     const fixed = { ...schedule, timezone: "UTC+2", zone: "Etc/GMT-2" };
     // Wednesday 06:30 UTC is 08:30 at UTC+2, in the morning window.
-    expect(activeWindow(fixed, new Date("2026-11-25T06:30:00Z"))?.name).toBe(
+    expect(activeWindow(fixed, new Date("2026-11-25T06:30:00Z"))?.id).toBe(
       "Morning",
     );
     expect(activeWindow(fixed, new Date("2026-11-25T11:30:00Z"))).toBeNull();

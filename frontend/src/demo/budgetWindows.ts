@@ -1,6 +1,5 @@
 import { activeWindow } from "../components/BudgetWindows";
 import type {
-  AdminBudgetWindows,
   BudgetWindowSchedule,
   TeamBudgetWindowUsage,
   TeamInfo,
@@ -10,36 +9,41 @@ import type {
 
 const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri"];
 
-// Weekdays only, so weekends (and weekday nights) have no window cap.
-function window(start: string, end: string, defaultBudget: number | null) {
+function window(
+  id: string,
+  days: string[],
+  start: string,
+  end: string,
+  budget: number | null,
+) {
   return {
-    name: `Mon-Fri ${start}-${end}`,
-    days: WEEKDAYS,
+    id,
+    days,
     start,
     end,
-    label: `sched:Etc/GMT-2:${WEEKDAYS.join(",")}:${start}-${end}`,
-    default_budget: defaultBudget,
+    label: `sched:Etc/GMT-2:${days.join(",")}:${start}-${end}`,
+    budget,
   };
 }
 
-/** Administrator view, with default caps and a key reset period to warn about. */
-export const demoAdminBudgetWindows: AdminBudgetWindows = {
+/** Administrator view, with each window's budget. Weekday nights have no window. */
+export const demoAdminBudgetWindows: BudgetWindowSchedule = {
   timezone: "UTC+2",
   zone: "Etc/GMT-2",
   windows: [
-    window("08:00", "13:00", 40),
-    window("13:00", "18:00", 40),
-    window("18:00", "22:00", null),
+    window("weekday-morning", WEEKDAYS, "08:00", "13:00", 40),
+    window("weekday-afternoon", WEEKDAYS, "13:00", "18:00", 40),
+    window("weekday-evening", WEEKDAYS, "18:00", "22:00", null),
+    window("weekend", ["sat", "sun"], "00:00", "00:00", 10),
   ],
-  key_budget_duration: "30d",
 };
 
-/** The public portal-config copy leaves the default caps out. */
+/** The public portal-config copy leaves the budgets out. */
 export const demoBudgetWindows: BudgetWindowSchedule = {
   timezone: demoAdminBudgetWindows.timezone,
   zone: demoAdminBudgetWindows.zone,
   windows: demoAdminBudgetWindows.windows.map((item) => ({
-    name: item.name,
+    id: item.id,
     days: item.days,
     start: item.start,
     end: item.end,
@@ -53,7 +57,7 @@ export function demoOverrides(
 ): Record<string, number | null> {
   return Object.fromEntries(
     demoAdminBudgetWindows.windows.flatMap((item, index) =>
-      caps[index] !== undefined ? [[item.name, caps[index]]] : [],
+      caps[index] !== undefined ? [[item.id, caps[index]]] : [],
     ),
   );
 }
@@ -82,15 +86,11 @@ export function demoWindowUsage(team: TeamInfo): TeamBudgetWindowUsage {
     timezone: demoAdminBudgetWindows.timezone,
     zone: demoAdminBudgetWindows.zone,
     windows: demoAdminBudgetWindows.windows.map((item) => {
-      const locked = item.name in fixed;
-      const custom = !locked && item.name in own;
+      const locked = item.id in fixed;
+      const custom = !locked && item.id in own;
       const cap =
-        (locked
-          ? fixed[item.name]
-          : custom
-            ? own[item.name]
-            : item.default_budget) ?? null;
-      const active = item.name === open?.name;
+        (locked ? fixed[item.id] : custom ? own[item.id] : item.budget) ?? null;
+      const active = item.id === open?.id;
       return {
         ...item,
         max_budget: cap,

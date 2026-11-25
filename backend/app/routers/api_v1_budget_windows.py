@@ -13,11 +13,11 @@ router = APIRouter(prefix="/v1", tags=["api-v1"])
 
 @router.get("/budget-windows")
 async def api_budget_windows(actor: Annotated[ApiActor, Depends(get_api_actor)]):
-    """The shared schedule with its default caps, and the key reset period that still zeroes key totals."""
+    """The shared schedule with each window's budget."""
     require_api_admin(actor)
     if settings.team_budget_windows is None:
         raise HTTPException(status_code=404, detail="Scheduled budget windows are not configured")
-    return {**settings.team_budget_windows.public(), "key_budget_duration": settings.key_budget_duration or None}
+    return settings.team_budget_windows.public()
 
 
 @router.get("/teams/{team_id}/budget-windows")

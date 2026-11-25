@@ -136,7 +136,7 @@ async def portal_config():
         "hierarchical_budgets_enabled": settings.hierarchical_budgets_enabled,
         "hierarchical_budgets_enforced": settings.hierarchical_budgets_enforced,
         "litellm_enterprise_enabled": settings.litellm_enterprise_enabled,
-        "team_budget_windows": settings.team_budget_windows.public(defaults=False) if settings.team_budget_windows else None,
+        "team_budget_windows": settings.team_budget_windows.public(caps=False) if settings.team_budget_windows else None,
     }
 
 

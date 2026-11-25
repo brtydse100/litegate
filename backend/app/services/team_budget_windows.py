@@ -1,9 +1,9 @@
 """Each team's caps for the shared scheduled budget windows (nightly).
 
 LiteGate owns the schedule (``TEAM_BUDGET_WINDOWS``). A team's cap in a window
-comes from, in order: the window's ``team_budgets`` entry for that team in
-configuration (read-only in the UI), a custom cap or unlimited an administrator
-chose, or the window's ``default_budget``. Custom choices live in the team's
+comes from, in order: the team's entry in the configuration's ``teams`` block
+(read-only in the UI), a custom cap or unlimited an administrator chose, or the
+window's ``budget``. Windows are keyed by their configured ``id``. Custom choices live in the team's
 LiteLLM metadata under ``OVERRIDES``. A cap becomes a LiteLLM team
 ``budget_limits`` entry with that window's ``schedule``; no entry means
 unlimited in that window. Plain (unscheduled) ``budget_limits`` entries a team
@@ -42,18 +42,17 @@ def amounts(team: dict) -> dict[str, float | None]:
     if config is None:
         return {}
     limits = {entry.get("budget_duration"): entry.get("max_budget") for entry in entries(team)}
-    return {window.name: limits.get(config.label(window)) for window in config.windows}
+    return {window.id: limits.get(config.label(window)) for window in config.windows}
 
 
 def configured(team_id: str | None) -> dict[str, float | None]:
     """Windows whose cap configuration sets for this team (read-only in the UI)."""
-    windows = settings.team_budget_windows.windows
-    return {window.name: window.team_budgets[team_id] for window in windows if team_id and team_id in window.team_budgets}
+    return dict(settings.team_budget_windows.teams.get(team_id or "", {}))
 
 
 def overrides(team: dict) -> dict[str, float | None]:
     """Windows where an administrator chose a custom cap (None is unlimited)."""
-    names = {window.name for window in settings.team_budget_windows.windows}
+    names = {window.id for window in settings.team_budget_windows.windows}
     stored = metadata(team).get(OVERRIDES)
     if isinstance(stored, dict):
         return {
@@ -69,8 +68,7 @@ def caps(chosen: dict[str, float | None], team_id: str | None = None) -> dict[st
     """Each window's cap: configuration for this team, else the custom choice, else the default."""
     fixed = configured(team_id)
     return {
-        window.name: fixed[window.name] if window.name in fixed else chosen.get(window.name, window.default_budget)
-        for window in settings.team_budget_windows.windows
+        window.id: fixed[window.id] if window.id in fixed else chosen.get(window.id, window.budget) for window in settings.team_budget_windows.windows
     }
 
 
@@ -79,8 +77,8 @@ def merge(team: dict, wanted: dict[str, float | None]) -> list[dict]:
     config = settings.team_budget_windows
     limits = [{name: value for name, value in entry.items() if value is not None} for entry in entries(team) if not scheduled(entry)]
     for window in config.windows:
-        if wanted.get(window.name) is not None:
-            limits.append({"max_budget": wanted[window.name], "schedule": config.schedule(window)})
+        if wanted.get(window.id) is not None:
+            limits.append({"max_budget": wanted[window.id], "schedule": config.schedule(window)})
     return limits
 
 
@@ -161,7 +159,7 @@ async def usage(team_id: str) -> dict:
     spent = info.get("budget_limits_usage") if isinstance(info.get("budget_limits_usage"), dict) else {}
     windows = []
     for window in config.public()["windows"]:
-        name = window["name"]
+        name = window["id"]
         current = spent.get(window["label"]) if isinstance(spent.get(window["label"]), dict) else {}
         windows.append(
             {

@@ -320,7 +320,31 @@ describe("organization per-user limits", () => {
 });
 
 describe("scheduled budget windows", () => {
-  it("lists every window with its config or custom cap and edits the choice", async () => {
+  const windows = [
+    {
+      id: "morning",
+      days: ["mon"],
+      start: "08:00",
+      end: "13:00",
+      label: "sched:Etc/GMT-2:mon:08:00-13:00",
+    },
+    {
+      id: "afternoon",
+      days: ["mon"],
+      start: "13:00",
+      end: "18:00",
+      label: "sched:Etc/GMT-2:mon:13:00-18:00",
+    },
+    {
+      id: "evening",
+      days: ["mon"],
+      start: "18:00",
+      end: "22:00",
+      label: "sched:Etc/GMT-2:mon:18:00-22:00",
+    },
+  ];
+
+  function renderTeams(morningOpen: boolean) {
     vi.clearAllMocks();
     vi.mocked(api.policySchemas).mockResolvedValue({
       available: false,
@@ -332,38 +356,14 @@ describe("scheduled budget windows", () => {
       retry_after: 0,
     });
     vi.mocked(api.listModels).mockResolvedValue({ models: [] });
-    const windows = [
-      {
-        name: "Mon 08:00-13:00",
-        days: ["mon"],
-        start: "08:00",
-        end: "13:00",
-        label: "sched:Etc/GMT-2:mon:08:00-13:00",
-      },
-      {
-        name: "Mon 13:00-18:00",
-        days: ["mon"],
-        start: "13:00",
-        end: "18:00",
-        label: "sched:Etc/GMT-2:mon:13:00-18:00",
-      },
-      {
-        name: "Mon 18:00-22:00",
-        days: ["mon"],
-        start: "18:00",
-        end: "22:00",
-        label: "sched:Etc/GMT-2:mon:18:00-22:00",
-      },
-    ];
     vi.mocked(api.budgetWindows).mockResolvedValue({
       timezone: "UTC+2",
       zone: "Etc/GMT-2",
       windows: [
-        { ...windows[0], default_budget: 40 },
-        { ...windows[1], default_budget: 40 },
-        { ...windows[2], default_budget: null },
+        { ...windows[0], budget: 40 },
+        { ...windows[1], budget: 40 },
+        { ...windows[2], budget: null },
       ],
-      key_budget_duration: "30d",
     });
     vi.mocked(api.teamBudgetWindows).mockResolvedValue({
       team_id: "research",
@@ -375,8 +375,8 @@ describe("scheduled budget windows", () => {
           max_budget: 5,
           source: "custom",
           locked: false,
-          current_spend: 1.5,
-          active: true,
+          current_spend: morningOpen ? 1.5 : 0,
+          active: morningOpen,
           next_start: null,
         },
         {
@@ -413,8 +413,8 @@ describe("scheduled budget windows", () => {
           team_id: "research",
           team_alias: "Research",
           budget_duration: "30d",
-          window_budgets: { "Mon 08:00-13:00": 5 },
-          window_config: { "Mon 13:00-18:00": 12 },
+          window_budgets: { morning: 5 },
+          window_config: { afternoon: 12 },
           models: [],
           blocked: false,
           members_with_roles: [],
@@ -438,29 +438,32 @@ describe("scheduled budget windows", () => {
         />
       </QueryClientProvider>,
     );
+  }
+
+  it("shows only the open window on the row and edits config or custom caps", async () => {
+    renderTeams(true);
     expect(
       await screen.findByRole("heading", { name: "Budget windows" }),
     ).toBeVisible();
     expect(screen.getByText("Mon · UTC+2")).toBeVisible();
     expect(await screen.findByText("$1.50 spent")).toBeVisible();
-    expect(
-      await screen.findByText(
-        /total still resets every 30 days \(KEY_BUDGET_DURATION\)/,
-      ),
-    ).toBeVisible();
-    expect(screen.getByText("Total resets every 30 days")).toBeVisible();
-    const rows = screen.getByRole("list", { name: "Budget windows" });
-    expect(within(rows).getByText("Unlimited")).toBeVisible();
-    expect(within(rows).getAllByText(/· config/)).toHaveLength(2);
-    expect(within(rows).getAllByText(/· custom/)).toHaveLength(1);
+    expect(screen.getByText("· $5.00 · custom")).toBeVisible();
+    // Only the open window is on the row; no reset warnings remain.
+    expect(screen.queryByText(/\$12\.00/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/resets/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/KEY_BUDGET_DURATION/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog", { name: "Edit team" });
     expect(within(dialog).queryByText("Budget reset")).not.toBeInTheDocument();
-    expect(within(dialog).getByText("config $40.00")).toBeVisible();
-    // The configuration sets 13:00–18:00 for this team, so it is read-only.
+    expect(await within(dialog).findAllByText("config $40.00")).toHaveLength(1);
+    // The configuration overrides 13:00–18:00 for this team, so it is read-only.
     expect(
       within(dialog).getByText("Set in config for this team"),
     ).toBeVisible();
+    expect(within(dialog).getByText("13:00–18:00")).toHaveAttribute(
+      "title",
+      "afternoon",
+    );
     expect(
       within(dialog).queryByRole("group", { name: "Cap for 13:00–18:00" }),
     ).not.toBeInTheDocument();
@@ -487,10 +490,23 @@ describe("scheduled budget windows", () => {
     );
     await waitFor(() => expect(api.updateTeam).toHaveBeenCalled());
     const sent = vi.mocked(api.updateTeam).mock.calls[0][1];
-    expect(sent.window_budgets).toEqual({
-      "Mon 08:00-13:00": "config",
-      "Mon 18:00-22:00": 3,
-    });
+    expect(sent.window_budgets).toEqual({ morning: "config", evening: 3 });
     expect(sent).not.toHaveProperty("budget_duration");
+  });
+
+  it("says when no window is open and which cap comes next", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    // Wednesday 12:00 at UTC+2: no window until Monday 08:00.
+    vi.setSystemTime(new Date("2026-11-25T10:00:00Z"));
+    try {
+      renderTeams(false);
+      expect(await screen.findByText(/\(\$5\.00 · custom\)/)).toBeVisible();
+      expect(
+        screen.getAllByText(/No window open · next Mon 08:00/),
+      ).toHaveLength(2);
+      expect(screen.queryByText(/spent/)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

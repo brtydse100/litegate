@@ -226,8 +226,8 @@ class ApiKeyCreateRequest(BaseModel):
     email: Optional[str] = Field(default=None, max_length=254)
 
 
-# Per scheduled budget window name: an amount, null for unlimited, or "config"
-# to follow the configuration (team_budgets, else default_budget).
+# Per scheduled budget window id: an amount, null for unlimited, or "config"
+# to follow the configuration (the teams block, else the window's budget).
 WindowBudgets = dict[str, Union[Annotated[float, Field(ge=0, allow_inf_nan=False)], Literal["config"], None]]
 
 

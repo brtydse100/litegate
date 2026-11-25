@@ -4,10 +4,10 @@ import { api } from "../api/client";
 import type {
   BudgetWindow,
   BudgetWindowSchedule,
+  TeamBudgetWindowUsage,
   TeamInfo,
   WindowBudgets,
 } from "../types";
-import { resetLabel } from "../keyBudget";
 import { Pill, UsageBar } from "./Page";
 import { card, cardHeader, cardTitle, toneDot } from "./ui";
 import { metricValue } from "./OrganizationCharts";
@@ -40,8 +40,15 @@ export function formatDays(days: string[]): string {
   return indexes.map((index) => dayName(WEEKDAYS[index])).join(", ");
 }
 
+/** "08:00–13:00", or "all day" for a window that runs a full 24 hours. */
+function hourRange(window: BudgetWindow): string {
+  return window.start === window.end
+    ? "all day"
+    : `${window.start}–${window.end}`;
+}
+
 export function windowSummary(window: BudgetWindow): string {
-  return `${formatDays(window.days)} ${window.start}–${window.end}`;
+  return `${formatDays(window.days)} ${hourRange(window)}`;
 }
 
 /** Days every window shares ("Mon–Fri"), or null when they differ. */
@@ -52,7 +59,7 @@ export function sharedDays(windows: BudgetWindow[]): string | null {
 
 /** "08:00–13:00" when the days are shown once elsewhere, else with days. */
 function hoursLabel(window: BudgetWindow, shared: string | null): string {
-  return shared ? `${window.start}–${window.end}` : windowSummary(window);
+  return shared ? hourRange(window) : windowSummary(window);
 }
 
 /** Minutes since Monday 00:00 in the schedule's timezone. */
@@ -123,11 +130,8 @@ function useMinuteClock(): Date {
 /** Teams page schedule: every shared window, with the open one raised. */
 export function BudgetWindowsBanner({
   schedule,
-  keyResetPeriod,
 }: {
   schedule: BudgetWindowSchedule;
-  /** KEY_BUDGET_DURATION, which still zeroes key totals. */
-  keyResetPeriod?: string | null;
 }) {
   const now = useMinuteClock();
   const current = activeWindow(schedule, now);
@@ -157,12 +161,13 @@ export function BudgetWindowsBanner({
       <div className="px-5 py-4">
         <ol className="flex flex-wrap gap-1 rounded-[10px] bg-well p-1">
           {schedule.windows.map((window) => {
-            const open = window.name === current?.name;
+            const open = window.id === current?.id;
             return (
               <li
-                key={window.name}
+                key={window.id}
+                title={window.id}
                 aria-current={open ? "time" : undefined}
-                className={`flex min-h-9 flex-1 basis-32 items-center justify-center gap-2 rounded-[7px] px-3 text-[13px] tabular-nums ${
+                className={`flex min-h-9 flex-1 basis-32 items-center justify-center gap-2 whitespace-nowrap rounded-[7px] px-3 text-[13px] tabular-nums ${
                   open
                     ? "bg-segment font-semibold text-ink shadow-[0_1px_2px_rgb(0_0_0/0.12),0_0_0_0.5px_rgb(0_0_0/0.04)]"
                     : "font-medium text-ink-3"
@@ -185,25 +190,21 @@ export function BudgetWindowsBanner({
           unless a team has a custom cap from the team dialog. Spend starts at
           $0 when a window opens, and outside these hours there is no cap.
         </p>
-        {keyResetPeriod && (
-          <p className="mt-2 flex items-start gap-1.5 text-xs text-orange-ink">
-            <span
-              aria-hidden="true"
-              className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${toneDot.warn}`}
-            />
-            <span>
-              Each key&apos;s total still {resetLabel(keyResetPeriod)}{" "}
-              (KEY_BUDGET_DURATION). Windows never reset totals.
-            </span>
-          </p>
-        )}
       </div>
     </section>
   );
 }
 
-/** One team row: every window's cap and whether it comes from the
- * configuration or a custom choice, the open one marked with its spend. */
+function capLabel(window: TeamBudgetWindowUsage["windows"][number]): string {
+  const cap =
+    window.max_budget != null
+      ? metricValue(window.max_budget, "spend")
+      : "Unlimited";
+  return `${cap} · ${window.source}`;
+}
+
+/** One team row: only the window open now, with its cap, where the cap comes
+ * from and the spend so far; otherwise when the next window opens. */
 export function TeamWindowUsage({ teamId }: { teamId: string }) {
   const now = useMinuteClock();
   const usage = useQuery({
@@ -213,62 +214,59 @@ export function TeamWindowUsage({ teamId }: { teamId: string }) {
     staleTime: 30_000,
   });
   if (usage.isPending)
-    return <p className="text-xs text-ink-4">Loading windows…</p>;
+    return <p className="text-xs text-ink-4">Loading window…</p>;
   if (usage.isError)
-    return <p className="text-xs text-danger">Windows unavailable</p>;
+    return <p className="text-xs text-danger">Window unavailable</p>;
+  const windows = usage.data.windows;
   // LiteLLM marks a capped open window; an uncapped one is found by the clock.
-  const openName =
-    usage.data.windows.find((window) => window.active)?.name ??
-    activeWindow(usage.data, now)?.name;
-  const shared = sharedDays(usage.data.windows);
+  const openId =
+    windows.find((window) => window.active)?.id ??
+    activeWindow(usage.data, now)?.id;
+  const open = windows.find((window) => window.id === openId);
+  const shared = sharedDays(windows);
+  if (!open) {
+    const next = nextWindow(usage.data, now);
+    const upcoming = windows.find((window) => window.id === next?.window.id);
+    return (
+      <p className="text-xs tabular-nums text-ink-4" title={upcoming?.id}>
+        No window open
+        {next && upcoming && (
+          <>
+            {" "}
+            · next {next.day} {upcoming.start}{" "}
+            <span className="whitespace-nowrap">({capLabel(upcoming)})</span>
+          </>
+        )}
+      </p>
+    );
+  }
+  const spent = open.active ? (open.current_spend ?? 0) : 0;
   return (
-    <ul
-      className="mt-0.5 space-y-0.5 text-xs tabular-nums"
-      aria-label="Budget windows"
-    >
-      {usage.data.windows.map((window) => {
-        const open = window.name === openName;
-        const spent = open && window.active ? (window.current_spend ?? 0) : 0;
-        const capped = window.max_budget != null;
-        return (
-          <li key={window.name}>
-            <span className="flex items-center justify-between gap-2 whitespace-nowrap">
-              <span
-                className={`flex items-center gap-1.5 ${open ? "font-semibold text-ink" : "text-ink-4"}`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${open ? toneDot.ok : "bg-transparent"}`}
-                />
-                {hoursLabel(window, shared)}
-                {open && <span className="sr-only"> (open now)</span>}
-              </span>
-              <span className={open ? "font-semibold text-ink" : "text-ink-4"}>
-                {capped
-                  ? metricValue(window.max_budget ?? 0, "spend")
-                  : "Unlimited"}
-                <span className="font-normal text-ink-4">
-                  {" "}
-                  · {window.source}
-                </span>
-              </span>
-            </span>
-            {open && capped && (
-              <span className="mb-1 ml-3 mt-1 block">
-                <UsageBar
-                  percent={
-                    window.max_budget ? (spent / window.max_budget) * 100 : 100
-                  }
-                />
-                <span className="mt-0.5 block text-ink-3">
-                  {metricValue(spent, "spend")} spent
-                </span>
-              </span>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+    <div className="text-xs tabular-nums" title={open.id}>
+      <p className="flex flex-wrap items-center gap-x-1.5 font-semibold text-ink">
+        <span
+          aria-hidden="true"
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${toneDot.ok}`}
+        />
+        <span>
+          <span className="sr-only">Open window </span>
+          {hoursLabel(open, shared)}
+        </span>
+        <span className="whitespace-nowrap font-normal text-ink-3">
+          · {capLabel(open)}
+        </span>
+      </p>
+      {open.max_budget != null && (
+        <div className="mb-1 ml-3 mt-1">
+          <UsageBar
+            percent={open.max_budget ? (spent / open.max_budget) * 100 : 100}
+          />
+          <p className="mt-0.5 text-ink-3">
+            {metricValue(spent, "spend")} spent
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -285,10 +283,10 @@ export function initialChoices(
   const own = team?.window_budgets ?? {};
   return Object.fromEntries(
     schedule.windows.map((window): [string, WindowChoice] => {
-      if (!(window.name in own)) return [window.name, { mode: "config" }];
-      const amount = own[window.name];
+      if (!(window.id in own)) return [window.id, { mode: "config" }];
+      const amount = own[window.id];
       return [
-        window.name,
+        window.id,
         amount == null
           ? { mode: "unlimited" }
           : { mode: "custom", amount: String(amount) },
@@ -366,16 +364,18 @@ export function WindowBudgetFields({
       <ul className="divide-y divide-line-soft">
         {schedule.windows.map((window) => {
           const hours = hoursLabel(window, shared);
-          if (window.name in locked)
+          if (window.id in locked)
             return (
               <li
-                key={window.name}
+                key={window.id}
                 className="flex flex-wrap items-center justify-between gap-2 py-2.5 last:pb-0"
               >
                 <p className="text-[13px] tabular-nums text-ink">
-                  <span className="font-medium">{hours}</span>{" "}
+                  <span className="font-medium" title={window.id}>
+                    {hours}
+                  </span>{" "}
                   <span className="text-xs text-ink-4">
-                    {capText(locked[window.name])}
+                    {capText(locked[window.id])}
                   </span>
                 </p>
                 <span className="text-xs text-ink-3">
@@ -383,14 +383,16 @@ export function WindowBudgetFields({
                 </span>
               </li>
             );
-          const choice = values[window.name] ?? { mode: "config" };
+          const choice = values[window.id] ?? { mode: "config" };
           return (
-            <li key={window.name} className="space-y-2 py-2.5 last:pb-0">
+            <li key={window.id} className="space-y-2 py-2.5 last:pb-0">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[13px] tabular-nums text-ink">
-                  <span className="font-medium">{hours}</span>{" "}
+                  <span className="font-medium" title={window.id}>
+                    {hours}
+                  </span>{" "}
                   <span className="text-xs text-ink-4">
-                    config {capText(window.default_budget)}
+                    config {capText(window.budget)}
                   </span>
                 </p>
                 <div
@@ -407,7 +409,7 @@ export function WindowBudgetFields({
                       onClick={() =>
                         choice.mode !== item.mode &&
                         onChange(
-                          window.name,
+                          window.id,
                           item.mode === "custom"
                             ? { mode: "custom", amount: "" }
                             : { mode: item.mode },
@@ -424,7 +426,7 @@ export function WindowBudgetFields({
                   label={`Custom cap for ${hours} (USD)`}
                   value={choice.amount}
                   onValueChange={(amount) =>
-                    onChange(window.name, { mode: "custom", amount })
+                    onChange(window.id, { mode: "custom", amount })
                   }
                   step="any"
                   required

@@ -36,12 +36,11 @@ import {
   cardTitle,
   fieldInput,
   tableHead,
-  toneDot,
 } from "./ui";
 
 /** Team list columns, shared by the caption row and each team. */
 const teamColumns =
-  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(11.5rem,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_17rem] items-center gap-4";
+  "grid min-w-[976px] grid-cols-[minmax(0,2.2fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)_17rem] items-center gap-4";
 import { metricValue } from "./OrganizationCharts";
 import { resetLabel } from "../keyBudget";
 import {
@@ -654,12 +653,7 @@ export default function AdminTeams({
         referenced by SSO mapping or <code>KEY_TEAM_ID</code> cannot be deleted
         until that configuration is changed.
       </Callout>
-      {schedule && (
-        <BudgetWindowsBanner
-          schedule={schedule}
-          keyResetPeriod={adminWindows.data?.key_budget_duration}
-        />
-      )}
+      {schedule && <BudgetWindowsBanner schedule={schedule} />}
       {operationsBlocked && (
         <DismissibleMessage
           messageKey="team-actions-paused"
@@ -797,16 +791,6 @@ export default function AdminTeams({
                       {!budgetWindows && team.budget_duration && (
                         <p className="text-xs text-ink-4">
                           {resetLabel(team.budget_duration)}
-                        </p>
-                      )}
-                      {/* Windows never zero totals, but a team reset period still does. */}
-                      {budgetWindows && team.budget_duration && (
-                        <p className="flex items-center gap-1.5 text-xs text-orange-ink">
-                          <span
-                            aria-hidden="true"
-                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${toneDot.warn}`}
-                          />
-                          Total {resetLabel(team.budget_duration)}
                         </p>
                       )}
                       {budgetWindows && (

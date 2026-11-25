@@ -29,7 +29,7 @@ def needs_sync(team: dict) -> bool:
     config = settings.team_budget_windows
     chosen = overrides(team)
     limits = caps(chosen, team["team_id"])
-    wanted = {config.label(window): limits[window.name] for window in config.windows if limits[window.name] is not None}
+    wanted = {config.label(window): limits[window.id] for window in config.windows if limits[window.id] is not None}
     return _enforced(team) != wanted or metadata(team).get(OVERRIDES) != chosen
 
 
@@ -45,7 +45,7 @@ async def _teams() -> list[dict]:
             break
     if not complete:
         _logger.warning("Budget window sync stopped after %d teams", MAX_PAGES * PAGE_SIZE)
-    missing = sorted({team_id for window in settings.team_budget_windows.windows for team_id in window.team_budgets} - seen)
+    missing = sorted(set(settings.team_budget_windows.teams) - seen)
     if complete and missing:
         _logger.warning("TEAM_BUDGET_WINDOWS sets caps for teams not found in LiteLLM: %s", ", ".join(missing))
     return teams

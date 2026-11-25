@@ -20,8 +20,8 @@ AFTERNOON = "sched:Europe/Berlin:mon,tue,wed,thu,fri:13:00-18:00"
 SCHEDULE = {
     "timezone": "Europe/Berlin",
     "windows": [
-        {"days": ["mon", "tue", "wed", "thu", "fri"], "start": "08:00", "end": "13:00"},
-        {"days": ["fri", "thu", "wed", "tue", "mon"], "start": "13:00", "end": "18:00"},
+        {"id": "morning", "days": ["mon", "tue", "wed", "thu", "fri"], "start": "08:00", "end": "13:00"},
+        {"id": "afternoon", "days": ["fri", "thu", "wed", "tue", "mon"], "start": "13:00", "end": "18:00"},
     ],
 }
 
@@ -64,13 +64,19 @@ def test_labels_match_litellm_and_blank_disables():
     "change",
     [
         {"timezone": "Mars/Base"},
-        {"windows": [{"start": "08:00", "end": "13:00"}, {"start": "12:00", "end": "14:00"}]},
-        {"windows": [{"days": [], "start": "08:00", "end": "09:00"}]},
-        {"windows": [{"start": "8:00", "end": "09:00"}]},
+        {"windows": [{"id": "a", "start": "08:00", "end": "13:00"}, {"id": "b", "start": "12:00", "end": "14:00"}]},
+        {"windows": [{"id": "a", "days": [], "start": "08:00", "end": "09:00"}]},
+        {"windows": [{"id": "a", "start": "8:00", "end": "09:00"}]},
+        {"windows": [{"id": "a", "start": "08:00", "end": "09:00"}, {"id": "a", "start": "10:00", "end": "11:00"}]},
+        {"windows": [{"id": "Morning Shift", "start": "08:00", "end": "09:00"}]},
+        {"windows": [{"start": "08:00", "end": "09:00"}]},
+        {"teams": {"product": {"evening": 5}}},
+        {"teams": {"product": {"morning": -1}}},
+        {"teams": {"": {"morning": 1}}},
         {
             "windows": [
-                {"days": ["sun"], "start": "22:00", "end": "06:00"},
-                {"days": ["mon"], "start": "05:00", "end": "07:00"},
+                {"id": "a", "days": ["sun"], "start": "22:00", "end": "06:00"},
+                {"id": "b", "days": ["mon"], "start": "05:00", "end": "07:00"},
             ]
         },
     ],
@@ -82,63 +88,57 @@ def test_invalid_schedules_fail_at_startup(change):
 
 def test_merge_keeps_plain_limits_and_omits_unlimited_windows():
     current = {"budget_limits": [{"budget_duration": "7d", "max_budget": 50, "reset_at": None}, {"budget_duration": MORNING, "max_budget": 5}]}
-    assert windows.amounts(current) == {"Mon-Fri 08:00-13:00": 5, "Mon-Fri 13:00-18:00": None}
-    assert windows.merge(current, {"Mon-Fri 08:00-13:00": 5, "Mon-Fri 13:00-18:00": 3}) == [
+    assert windows.amounts(current) == {"morning": 5, "afternoon": None}
+    assert windows.merge(current, {"morning": 5, "afternoon": 3}) == [
         {"budget_duration": "7d", "max_budget": 50},
         {"max_budget": 5, "schedule": {"timezone": "Europe/Berlin", "days": ["mon", "tue", "wed", "thu", "fri"], "start": "08:00", "end": "13:00"}},
         {"max_budget": 3, "schedule": {"timezone": "Europe/Berlin", "days": ["mon", "tue", "wed", "thu", "fri"], "start": "13:00", "end": "18:00"}},
     ]
-    assert windows.merge(current, {"Mon-Fri 08:00-13:00": None}) == [{"budget_duration": "7d", "max_budget": 50}]
+    assert windows.merge(current, {"morning": None}) == [{"budget_duration": "7d", "max_budget": 50}]
     with pytest.raises(HTTPException) as error:
         windows.choose(current, {"Evening": 1})
     assert error.value.status_code == 422
 
 
-def with_defaults(monkeypatch, morning, afternoon, team_budgets=None):
+def with_defaults(monkeypatch, morning, afternoon, teams=None):
     schedule = {
         **SCHEDULE,
-        "windows": [
-            {**SCHEDULE["windows"][0], "default_budget": morning, "team_budgets": team_budgets or {}},
-            {**SCHEDULE["windows"][1], "default_budget": afternoon},
-        ],
+        "windows": [{**SCHEDULE["windows"][0], "budget": morning}, {**SCHEDULE["windows"][1], "budget": afternoon}],
+        "teams": teams or {},
     }
     monkeypatch.setattr(settings, "team_budget_windows", BudgetWindows.model_validate(schedule))
 
 
 @pytest.mark.asyncio
 async def test_configured_team_caps_win_and_are_locked(monkeypatch):
-    with_defaults(monkeypatch, 40, 10, {"t1": 15, "research": None})
-    custom = {"team_id": "t1", "metadata": {windows.OVERRIDES: {"Mon-Fri 08:00-13:00": 2, "Mon-Fri 13:00-18:00": 3}}}
-    assert windows.caps(windows.overrides(custom), "t1") == {"Mon-Fri 08:00-13:00": 15, "Mon-Fri 13:00-18:00": 3}
-    assert windows.caps({}, "research") == {"Mon-Fri 08:00-13:00": None, "Mon-Fri 13:00-18:00": 10}
-    assert windows.decorate(custom) == {"window_budgets": {"Mon-Fri 13:00-18:00": 3}, "window_config": {"Mon-Fri 08:00-13:00": 15}}
+    with_defaults(monkeypatch, 40, 10, {"t1": {"morning": 15}, "research": {"morning": None}})
+    custom = {"team_id": "t1", "metadata": {windows.OVERRIDES: {"morning": 2, "afternoon": 3}}}
+    assert windows.caps(windows.overrides(custom), "t1") == {"morning": 15, "afternoon": 3}
+    assert windows.caps({}, "research") == {"morning": None, "afternoon": 10}
+    assert windows.decorate(custom) == {"window_budgets": {"afternoon": 3}, "window_config": {"morning": 15}}
     with pytest.raises(HTTPException) as locked:
-        windows.choose(custom, {"Mon-Fri 08:00-13:00": 5})
+        windows.choose(custom, {"morning": 5})
     assert locked.value.status_code == 409
-    assert windows.choose(custom, {"Mon-Fri 08:00-13:00": "config"}) == {"Mon-Fri 13:00-18:00": 3}
+    assert windows.choose(custom, {"morning": "config"}) == {"afternoon": 3}
     # Configuration also applies to a team created with a configured ID, and is hidden publicly.
     created = await windows.apply(None, {"team_id": "research"}, None)
     assert [entry["max_budget"] for entry in created["budget_limits"]] == [10]
-    assert "team_budgets" not in settings.team_budget_windows.public()["windows"][0]
-    with pytest.raises(ValidationError):
-        configured({**SCHEDULE, "windows": [{"start": "08:00", "end": "09:00", "team_budgets": {"": 1}}]})
-    with pytest.raises(ValidationError):
-        configured({**SCHEDULE, "windows": [{"start": "08:00", "end": "09:00", "team_budgets": {"t": -1}}]})
+    assert "teams" not in settings.team_budget_windows.public()
 
 
 def test_teams_follow_defaults_unless_they_override(monkeypatch):
     with_defaults(monkeypatch, 40, 10)
-    marked = {"metadata": {"owner": "ops", windows.OVERRIDES: {"Mon-Fri 13:00-18:00": None, "Gone 01:00-02:00": 3}}}
-    assert windows.overrides(marked) == {"Mon-Fri 13:00-18:00": None}
-    assert windows.caps(windows.overrides(marked)) == {"Mon-Fri 08:00-13:00": 40, "Mon-Fri 13:00-18:00": None}
+    marked = {"metadata": {"owner": "ops", windows.OVERRIDES: {"afternoon": None, "gone": 3}}}
+    assert windows.overrides(marked) == {"afternoon": None}
+    assert windows.caps(windows.overrides(marked)) == {"morning": 40, "afternoon": None}
     # Teams capped before defaults existed keep their caps as overrides; blanks follow the default.
     legacy = {"budget_limits": [{"budget_duration": AFTERNOON, "max_budget": 7}]}
-    assert windows.caps(windows.overrides(legacy)) == {"Mon-Fri 08:00-13:00": 40, "Mon-Fri 13:00-18:00": 7}
-    chosen = windows.choose(marked, {"Mon-Fri 08:00-13:00": 2, "Mon-Fri 13:00-18:00": "config"})
-    assert chosen == {"Mon-Fri 08:00-13:00": 2}
+    assert windows.caps(windows.overrides(legacy)) == {"morning": 40, "afternoon": 7}
+    chosen = windows.choose(marked, {"morning": 2, "afternoon": "config"})
+    assert chosen == {"morning": 2}
     update = windows.synced(marked, chosen)
     assert [entry["max_budget"] for entry in update["budget_limits"]] == [2, 10]
-    assert update["metadata"] == {"owner": "ops", windows.OVERRIDES: {"Mon-Fri 08:00-13:00": 2}}
+    assert update["metadata"] == {"owner": "ops", windows.OVERRIDES: {"morning": 2}}
 
 
 @pytest.mark.asyncio
@@ -150,10 +150,10 @@ async def test_create_and_update_write_scheduled_entries(monkeypatch):
     monkeypatch.setattr(litellm, "update_team", update)
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=team({"budget_duration": MORNING, "max_budget": 5})))
     async with client() as browser:
-        created = await browser.post("/api/v1/teams", json={"team_alias": "T", "window_budgets": {"Mon-Fri 08:00-13:00": 2}}, headers=admin())
+        created = await browser.post("/api/v1/teams", json={"team_alias": "T", "window_budgets": {"morning": 2}}, headers=admin())
         bare = await browser.post("/api/v1/teams", json={"team_alias": "U"}, headers=admin())
-        updated = await browser.patch("/api/v1/teams/t1", json={"window_budgets": {"Mon-Fri 13:00-18:00": 7}}, headers=admin())
-        unlimited = await browser.patch("/api/v1/teams/t1", json={"window_budgets": {"Mon-Fri 08:00-13:00": None}}, headers=admin())
+        updated = await browser.patch("/api/v1/teams/t1", json={"window_budgets": {"afternoon": 7}}, headers=admin())
+        unlimited = await browser.patch("/api/v1/teams/t1", json={"window_budgets": {"morning": None}}, headers=admin())
         plain = await browser.patch("/api/v1/teams/t1", json={"max_budget": 9}, headers=admin())
     assert {created.status_code, bare.status_code} == {201} and {updated.status_code, unlimited.status_code, plain.status_code} == {200}
     assert [entry["max_budget"] for entry in create.await_args_list[0].args[0]["budget_limits"]] == [2, 6]
@@ -184,7 +184,7 @@ async def test_raw_budget_limits_and_unconfigured_windows_are_rejected(monkeypat
     assert raw.value.status_code == 422
     monkeypatch.setattr(settings, "team_budget_windows", None)
     with pytest.raises(HTTPException) as off:
-        await windows.apply(None, {}, {"Mon-Fri 08:00-13:00": 1})
+        await windows.apply(None, {}, {"morning": 1})
     assert off.value.status_code == 422
     assert await windows.apply(None, {"budget_limits": []}, None) == {"budget_limits": []}
 
@@ -212,7 +212,7 @@ async def test_managed_teams_get_window_caps_but_not_plain_budget_edits(monkeypa
     monkeypatch.setattr(litellm, "update_team", update)
     monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value=team()))
     async with client() as browser:
-        caps = await browser.patch("/api/v1/teams/engineering", json={"window_budgets": {"Mon-Fri 08:00-13:00": 4}}, headers=admin())
+        caps = await browser.patch("/api/v1/teams/engineering", json={"window_budgets": {"morning": 4}}, headers=admin())
         plain = await browser.patch("/api/v1/teams/engineering", json={"max_budget": 4}, headers=admin())
     assert caps.status_code == 200
     assert plain.status_code == 409
@@ -236,12 +236,12 @@ async def test_usage_reports_each_window(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_startup_syncs_defaults_and_drops_removed_windows(monkeypatch, caplog):
-    with_defaults(monkeypatch, None, 6, {"plain": 4, "ghost": 1})
+    with_defaults(monkeypatch, None, 6, {"plain": {"morning": 4}, "ghost": {"afternoon": 1}})
     teams = [
         {
             "team_id": "current",
             "budget_limits": [{"budget_duration": MORNING, "max_budget": 5}, {"budget_duration": AFTERNOON, "max_budget": 6}],
-            "metadata": {windows.OVERRIDES: {"Mon-Fri 08:00-13:00": 5}},
+            "metadata": {windows.OVERRIDES: {"morning": 5}},
         },
         {
             "team_id": "old",
@@ -270,35 +270,34 @@ async def test_portal_config_exposes_the_schedule(monkeypatch):
         enabled = (await browser.get("/api/portal-config")).json()["team_budget_windows"]
         monkeypatch.setattr(settings, "team_budget_windows", None)
         disabled = (await browser.get("/api/portal-config")).json()["team_budget_windows"]
-    assert [window["name"] for window in enabled["windows"]] == ["Mon-Fri 08:00-13:00", "Mon-Fri 13:00-18:00"]
+    assert [window["id"] for window in enabled["windows"]] == ["morning", "afternoon"]
     assert disabled is None
 
 
 @pytest.mark.asyncio
 async def test_default_caps_are_admin_only(monkeypatch):
     with_defaults(monkeypatch, 40, None)
-    monkeypatch.setattr(settings, "key_budget_duration", "30d")
     user = {"Authorization": "Bearer " + auth._make_jwt("u", "u@example.com")}
     async with client() as browser:
         public = (await browser.get("/api/portal-config")).json()["team_budget_windows"]
         schedule = await browser.get("/api/v1/budget-windows", headers=admin())
         denied = await browser.get("/api/v1/budget-windows", headers=user)
-    assert all("default_budget" not in window for window in public["windows"])
-    assert [window["default_budget"] for window in schedule.json()["windows"]] == [40, None]
-    assert schedule.json()["key_budget_duration"] == "30d" and denied.status_code == 403
+    assert all("budget" not in window for window in public["windows"])
+    assert [window["budget"] for window in schedule.json()["windows"]] == [40, None]
+    assert "key_budget_duration" not in schedule.json() and denied.status_code == 403
 
 
-def test_windows_are_named_by_days_and_hours():
+def test_weekend_and_single_day_windows_and_team_overrides_by_id():
     config = configured(
         {
             "timezone": "UTC",
             "windows": [
-                {"days": ["sat", "sun"], "start": "00:00", "end": "00:00"},
-                {"days": ["mon", "tue", "wed", "thu"], "start": "22:00", "end": "06:00"},
-                {"days": ["tue", "mon", "wed"], "start": "09:00", "end": "10:00"},
+                {"id": "weekend", "days": ["sat", "sun"], "start": "00:00", "end": "00:00", "budget": 10},
+                {"id": "nights", "days": ["mon", "tue", "wed", "thu"], "start": "22:00", "end": "06:00"},
+                {"id": "friday", "days": ["fri"], "start": "09:00", "end": "17:00", "budget": 5},
             ],
+            "teams": {"product": {"friday": 20}, "research": {"weekend": None}},
         }
     ).team_budget_windows
-    assert [window.name for window in config.windows] == ["Sat, Sun 00:00-00:00", "Mon-Thu 22:00-06:00", "Mon-Wed 09:00-10:00"]
-    with pytest.raises(ValidationError):
-        configured({"timezone": "UTC", "windows": [{"name": "Morning", "start": "08:00", "end": "09:00"}]})
+    assert [window.id for window in config.windows] == ["weekend", "nights", "friday"]
+    assert config.teams == {"product": {"friday": 20}, "research": {"weekend": None}}
