@@ -417,10 +417,12 @@ describe("scheduled budget windows", () => {
         />
       </QueryClientProvider>,
     );
-    expect(await screen.findByText("Budget windows (UTC)")).toBeVisible();
-    expect(await screen.findByText(/\$1\.50 of \$5\.00/)).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Budget windows" }),
+    ).toBeVisible();
+    expect(screen.getByText("Mon · UTC")).toBeVisible();
+    expect(await screen.findByText("$1.50 spent")).toBeVisible();
     expect(screen.queryByText(/Morning/)).not.toBeInTheDocument();
-    expect(await screen.findByText(/\$1\.50 of \$5\.00/)).toBeVisible();
     expect(screen.queryByText(/resets every/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     const dialog = screen.getByRole("dialog", { name: "Edit team" });

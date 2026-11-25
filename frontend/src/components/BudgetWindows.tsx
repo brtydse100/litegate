@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { BudgetWindow, BudgetWindowSchedule } from "../types";
-import { Callout } from "./Page";
+import { Pill, UsageBar } from "./Page";
+import { card, cardHeader, cardTitle, toneDot } from "./ui";
 import { metricValue } from "./OrganizationCharts";
 import { NumericPolicyInput } from "./PolicySettings";
 
@@ -113,7 +114,7 @@ function useMinuteClock(): Date {
   return now;
 }
 
-/** Teams page summary: only the window open now, or when the next opens. */
+/** Teams page schedule: every shared window, with the open one raised. */
 export function BudgetWindowsBanner({
   schedule,
 }: {
@@ -122,32 +123,65 @@ export function BudgetWindowsBanner({
   const now = useMinuteClock();
   const current = activeWindow(schedule, now);
   const next = current ? null : nextWindow(schedule, now);
+  const shared = sharedDays(schedule.windows);
   return (
-    <Callout tone="info" title={`Budget windows (${schedule.timezone})`}>
-      {current ? (
-        <p>
-          <span className="font-semibold">
-            Open now: {windowSummary(current)}.
-          </span>{" "}
-          Each team&apos;s cap for this window applies until {current.end}; a
-          blank cap is unlimited.
+    <section aria-labelledby="budget-windows-title" className={card}>
+      <header className={cardHeader}>
+        <div className="min-w-0">
+          <h2 id="budget-windows-title" className={cardTitle}>
+            Budget windows
+          </h2>
+          <p className="text-xs text-ink-4">
+            {shared ? `${shared} · ` : ""}
+            {schedule.timezone}
+          </p>
+        </div>
+        {current ? (
+          <Pill tone="ok">Open now · until {current.end}</Pill>
+        ) : (
+          <Pill>
+            No window open
+            {next && ` · next ${next.day} ${next.window.start}`}
+          </Pill>
+        )}
+      </header>
+      <div className="px-5 py-4">
+        <ol className="flex flex-wrap gap-1 rounded-[10px] bg-well p-1">
+          {schedule.windows.map((window) => {
+            const open = window.name === current?.name;
+            return (
+              <li
+                key={window.name}
+                aria-current={open ? "time" : undefined}
+                className={`flex min-h-9 flex-1 basis-32 items-center justify-center gap-2 rounded-[7px] px-3 text-[13px] tabular-nums ${
+                  open
+                    ? "bg-segment font-semibold text-ink shadow-[0_1px_2px_rgb(0_0_0/0.12),0_0_0_0.5px_rgb(0_0_0/0.04)]"
+                    : "font-medium text-ink-3"
+                }`}
+              >
+                {open && (
+                  <span
+                    aria-hidden="true"
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${toneDot.ok}`}
+                  />
+                )}
+                {hoursLabel(window, shared)}
+                {open && <span className="sr-only"> (open now)</span>}
+              </li>
+            );
+          })}
+        </ol>
+        <p className="mt-3 text-xs text-ink-4">
+          Each team sets its own cap per window in the team dialog; a blank cap
+          is unlimited. Spend starts at $0 when a window opens, and outside
+          these hours there is no cap.
         </p>
-      ) : (
-        <p>
-          <span className="font-semibold">No window open · no cap.</span>
-          {next &&
-            ` Next: ${next.day} ${next.window.start}–${next.window.end}.`}
-        </p>
-      )}
-      <p className="mt-1 text-xs">
-        Every team shares the same windows and sets its own cap per window in
-        the team dialog. Spend starts at $0 when a window opens.
-      </p>
-    </Callout>
+      </div>
+    </section>
   );
 }
 
-/** One team row: only the open window's spend and cap, read from LiteLLM. */
+/** One team row: every window's cap, the open one marked with its spend. */
 export function TeamWindowUsage({ teamId }: { teamId: string }) {
   const now = useMinuteClock();
   const usage = useQuery({
@@ -157,25 +191,60 @@ export function TeamWindowUsage({ teamId }: { teamId: string }) {
     staleTime: 30_000,
   });
   if (usage.isPending)
-    return <p className="text-xs text-ink-4">Loading window…</p>;
+    return <p className="text-xs text-ink-4">Loading windows…</p>;
   if (usage.isError)
-    return <p className="text-xs text-danger">Window unavailable</p>;
+    return <p className="text-xs text-danger">Windows unavailable</p>;
+  if (usage.data.windows.every((window) => window.max_budget == null))
+    return <p className="text-xs text-ink-4">No window caps</p>;
   // LiteLLM marks a capped open window; an uncapped one is found by the clock.
   const openName =
     usage.data.windows.find((window) => window.active)?.name ??
     activeWindow(usage.data, now)?.name;
-  const open = usage.data.windows.find((window) => window.name === openName);
-  if (!open)
-    return <p className="text-xs text-ink-4">No window open · no cap</p>;
+  const shared = sharedDays(usage.data.windows);
   return (
-    <p className="text-xs text-ink-3">
-      <span className="font-semibold text-ink">
-        {open.start}–{open.end}
-      </span>{" "}
-      {open.max_budget == null
-        ? "· no cap"
-        : `· ${metricValue(open.active ? (open.current_spend ?? 0) : 0, "spend")} of ${metricValue(open.max_budget, "spend")}`}
-    </p>
+    <ul
+      className="mt-0.5 space-y-0.5 text-xs tabular-nums"
+      aria-label="Budget windows"
+    >
+      {usage.data.windows.map((window) => {
+        const open = window.name === openName;
+        const spent = open && window.active ? (window.current_spend ?? 0) : 0;
+        const capped = window.max_budget != null;
+        return (
+          <li key={window.name}>
+            <span className="flex items-center justify-between gap-2 whitespace-nowrap">
+              <span
+                className={`flex items-center gap-1.5 ${open ? "font-semibold text-ink" : "text-ink-4"}`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${open ? toneDot.ok : "bg-transparent"}`}
+                />
+                {hoursLabel(window, shared)}
+                {open && <span className="sr-only"> (open now)</span>}
+              </span>
+              <span className={open ? "font-semibold text-ink" : "text-ink-4"}>
+                {capped
+                  ? metricValue(window.max_budget ?? 0, "spend")
+                  : "No cap"}
+              </span>
+            </span>
+            {open && capped && (
+              <span className="mb-1 ml-3 mt-1 block">
+                <UsageBar
+                  percent={
+                    window.max_budget ? (spent / window.max_budget) * 100 : 100
+                  }
+                />
+                <span className="mt-0.5 block text-ink-3">
+                  {metricValue(spent, "spend")} spent
+                </span>
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

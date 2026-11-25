@@ -399,8 +399,9 @@ Startup validates the schedule with LiteLLM's rules: a known IANA timezone,
 - Admins set caps in the team dialog's **Budget per window** fields (one per
   window's hours), or with `window_budgets` on the team API, keyed by the
   window's days and hours, for example `{"Mon-Fri 08:00-13:00": 15}`. The Teams
-  page shows only the window open now (or, outside every window, when the next
-  one opens) and each team's spend and cap in it. Organization-managed teams get the same
+  page lists every window with the one open now highlighted (or, outside every
+  window, when the next one opens), and each team row lists its cap per window
+  with the open window's spend. Organization-managed teams get the same
   team-level window caps on top of their per-user key budgets.
 - Plain `budget_limits` entries a team already has are kept. Raw `budget_limits`
   in Advanced settings is rejected while windows are configured.
