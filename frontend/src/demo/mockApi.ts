@@ -1,6 +1,13 @@
 import type { AuditEvent, KeyInfo, LocalUser, TeamInfo, User } from "../types";
 import { demoAdvancedSettings, demoPolicySchemas } from "./policySchemas";
 import {
+  applyWindowBudgets,
+  demoAdminBudgetWindows,
+  demoOverrides,
+  demoBudgetWindows,
+  demoWindowUsage,
+} from "./budgetWindows";
+import {
   organizationOverview,
   organizationChildren,
   organizationGroup,
@@ -166,7 +173,7 @@ let teams: TeamInfo[] = [
     team_alias: "Platform Engineering",
     spend: 182.6,
     max_budget: 600,
-    budget_duration: "monthly",
+    window_budgets: demoOverrides([]),
     tpm_limit: 300000,
     rpm_limit: 500,
     models: ["gpt-5", "claude-sonnet-4", "gemini-2.5-pro"],
@@ -185,7 +192,7 @@ let teams: TeamInfo[] = [
     team_alias: "Product",
     spend: 96.4,
     max_budget: 300,
-    budget_duration: "monthly",
+    window_budgets: demoOverrides([15, 15, 5]),
     tpm_limit: 180000,
     rpm_limit: 300,
     models: ["gpt-5", "claude-sonnet-4"],
@@ -203,6 +210,8 @@ let teams: TeamInfo[] = [
     team_alias: "Customer Support",
     spend: 44.15,
     max_budget: 120,
+    // As if the teams block in TEAM_BUDGET_WINDOWS overrode these two windows.
+    window_config: demoOverrides([10, 10]),
     budget_duration: "monthly",
     tpm_limit: 90000,
     rpm_limit: 150,
@@ -493,6 +502,7 @@ async function mockResponse(request: Request): Promise<Response> {
       hierarchical_budgets_enabled: true,
       // Synthetic budgets only; demo mode never connects to a LiteLLM proxy.
       litellm_enterprise_enabled: true,
+      team_budget_windows: demoBudgetWindows,
     });
   if (path === "/api/keys/operation-limit")
     return json({ limit: 10, remaining: 10, retry_after: 0 });
@@ -732,6 +742,10 @@ async function mockResponse(request: Request): Promise<Response> {
       members_count: 0,
       keys_count: 0,
     };
+    created.window_budgets = applyWindowBudgets(
+      created,
+      payload.window_budgets,
+    );
     teams = [...teams, created];
     return json(created, 201);
   }
@@ -751,14 +765,28 @@ async function mockResponse(request: Request): Promise<Response> {
       destination_membership_existed: false,
     });
   }
+  if (path === "/api/v1/budget-windows") return json(demoAdminBudgetWindows);
+  if (path.startsWith("/api/v1/teams/") && path.endsWith("/budget-windows")) {
+    const team = teams.find(
+      (item) => item.team_id === decodeURIComponent(path.split("/")[4]),
+    );
+    return team
+      ? json(demoWindowUsage(team))
+      : json({ detail: "Team not found" }, 404);
+  }
   if (path.startsWith("/api/v1/teams/")) {
     const teamId = decodeURIComponent(path.split("/").pop() ?? "");
     if (method === "PATCH") {
-      const payload = demoAdvancedSettings(await body(request));
+      const { window_budgets: windowBudgets, ...payload } =
+        demoAdvancedSettings(await body(request));
       let updated = teams.find((team) => team.team_id === teamId);
       teams = teams.map((team) => {
         if (team.team_id !== teamId) return team;
-        updated = { ...team, ...payload } as TeamInfo;
+        updated = {
+          ...team,
+          ...payload,
+          window_budgets: applyWindowBudgets(team, windowBudgets),
+        } as TeamInfo;
         return updated;
       });
       return updated ? json(updated) : json({ detail: "Team not found" }, 404);

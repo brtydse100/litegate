@@ -327,6 +327,14 @@ export const api = {
       },
     ),
 
+  budgetWindows: () =>
+    request<import("../types").BudgetWindowSchedule>("/v1/budget-windows"),
+
+  teamBudgetWindows: (teamId: string) =>
+    request<import("../types").TeamBudgetWindowUsage>(
+      `/v1/teams/${encodeURIComponent(teamId)}/budget-windows`,
+    ),
+
   deleteTeam: (teamId: string) =>
     request<{ deleted: boolean; team_id: string }>(
       `/v1/teams/${encodeURIComponent(teamId)}`,

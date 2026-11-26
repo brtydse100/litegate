@@ -7,6 +7,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added (nightly, not in a stable release)
+
+- `TEAM_BUDGET_WINDOWS` defines scheduled budget windows (for example
+  weekday mornings or weekends) that every team shares. Each window has an
+  `id` and a `budget`; a `teams` block overrides caps by window id for only the
+  teams that differ, and the UI shows those read-only. Admins can set a custom
+  cap or unlimited for other windows. Team rows show only the open window.
+  The timezone can be an IANA name or a whole-hour offset such as `UTC+2`.
+  Needs LiteLLM with BerriAI/litellm#54147.
+
 ## [2.23.2] - 2026-11-25
 
 ### Security

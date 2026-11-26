@@ -101,6 +101,9 @@ data:
   {{- if .Values.config.keyBudgetDuration }}
   KEY_BUDGET_DURATION: {{ .Values.config.keyBudgetDuration | quote }}
   {{- end }}
+  {{- if .Values.config.teamBudgetWindows }}
+  TEAM_BUDGET_WINDOWS: {{ .Values.config.teamBudgetWindows | toJson | quote }}
+  {{- end }}
   {{- if .Values.config.keyModels }}
   KEY_MODELS: {{ .Values.config.keyModels | quote }}
   {{- end }}

@@ -1,7 +1,7 @@
 """Configuration ownership metadata shared by team management endpoints."""
 
 from app.config import settings
-from app.services import organization_limits
+from app.services import organization_limits, team_budget_windows
 
 
 def team_config_references(team_id: str) -> tuple[list[str], bool]:
@@ -25,4 +25,5 @@ def decorate_team(team: dict) -> dict:
         "organization_node_id": node.id if node else None,
         "organization_per_user": node.per_user if node else None,
         "organization_per_user_override": organization_limits.override(node.id) if node else None,
+        **team_budget_windows.decorate(team),
     }

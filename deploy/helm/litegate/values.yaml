@@ -194,6 +194,24 @@ config:
   # Uncomment only the limits LiteGate should apply.
   # keyMaxBudget: "10.0"
   # keyBudgetDuration: "30d"
+  # Nightly: budget windows every team shares (needs LiteLLM #54147).
+  # timezone: an IANA name (Europe/Berlin) or a whole-hour offset (UTC+2).
+  # teamBudgetWindows:
+  #   timezone: UTC+2
+  #   windows:
+  #     - id: weekday-morning
+  #       days: [mon, tue, wed, thu, fri]
+  #       start: "08:00"
+  #       end: "13:00"
+  #       budget: 40
+  #     - id: weekend
+  #       days: [sat, sun]
+  #       start: "00:00"
+  #       end: "00:00"
+  #       budget: 10
+  #   teams:
+  #     product:
+  #       weekday-morning: 15
   # keyModels: '["gpt-4","gpt-3.5-turbo"]'
   # keyDuration: "90d"
   # keyTpmLimit: "100000"

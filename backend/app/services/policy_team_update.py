@@ -6,6 +6,7 @@ import math
 from fastapi import HTTPException
 
 from app.services import litellm, organization_client as upstream
+from app.services.team_budget_windows import OVERRIDES
 
 MEMBER_FIELDS = {
     "team_member_budget": "max_budget",
@@ -25,6 +26,11 @@ async def update(team_id: str, changes: dict) -> dict:
         # LiteLLM's metadata-backed field conversion can otherwise replace the
         # existing metadata wholesale. This server-owned copy is never audited.
         forwarded["metadata"] = copy.deepcopy(metadata)
+        # The budget-window choices this request just set are the one key
+        # LiteGate itself writes here; keep them rather than the stale copy.
+        requested = changes.get("metadata")
+        if isinstance(requested, dict) and OVERRIDES in requested:
+            forwarded["metadata"][OVERRIDES] = copy.deepcopy(requested[OVERRIDES])
         if metadata.get("team_member_budget_id") and not any(field in changes for field in MEMBER_FIELDS):
             budget = current.get("team_member_budget_table")
             if not isinstance(budget, dict):

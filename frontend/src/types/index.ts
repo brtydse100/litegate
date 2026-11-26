@@ -162,6 +162,11 @@ export interface TeamInfo {
   spend?: number | null;
   max_budget?: number | null;
   budget_duration?: string | null;
+  budget_limits?: { budget_duration?: string; max_budget?: number | null }[];
+  /** Windows where an admin set a custom cap; null is unlimited. */
+  window_budgets?: Record<string, number | null>;
+  /** Windows whose cap the configuration sets for this team (read-only). */
+  window_config?: Record<string, number | null>;
   tpm_limit?: number | null;
   rpm_limit?: number | null;
   models: string[];
@@ -194,6 +199,7 @@ export interface TeamCreatePayload {
   models: string[];
   max_budget?: number;
   budget_duration?: string;
+  window_budgets?: WindowBudgets;
   tpm_limit?: number;
   rpm_limit?: number;
   blocked: boolean;
@@ -205,9 +211,51 @@ export interface TeamUpdatePayload {
   models: string[];
   max_budget?: number | null;
   budget_duration?: string | null;
+  window_budgets?: WindowBudgets;
   tpm_limit: number | null;
   rpm_limit: number | null;
   blocked: boolean;
+}
+
+/** Per scheduled budget window id: an amount, null for unlimited, or
+ * "config" to follow the configuration (the teams block, else the window's budget). */
+export type WindowBudgets = Record<string, number | null | "config">;
+
+/** One window of the installation-wide schedule (TEAM_BUDGET_WINDOWS). */
+export interface BudgetWindow {
+  /** The window's configured id, e.g. "weekday-morning". */
+  id: string;
+  days: string[];
+  start: string;
+  end: string;
+  /** LiteLLM's budget_duration label for this window. */
+  label: string;
+  /** Default cap for teams that do not override it (admin view only). */
+  budget?: number | null;
+}
+
+export interface BudgetWindowSchedule {
+  /** As configured, e.g. "Europe/Berlin" or "UTC+2". */
+  timezone: string;
+  /** IANA zone used for the clock, e.g. "Etc/GMT-2" for "UTC+2". */
+  zone: string;
+  windows: BudgetWindow[];
+}
+
+export interface TeamBudgetWindowUsage {
+  team_id: string;
+  timezone: string;
+  zone: string;
+  windows: (BudgetWindow & {
+    max_budget: number | null;
+    /** "custom" for a cap set in the team dialog, else "config". */
+    source: "config" | "custom";
+    /** The configuration sets this window's cap for this team. */
+    locked: boolean;
+    current_spend: number | null;
+    active: boolean | null;
+    next_start: string | null;
+  })[];
 }
 
 export interface TeamMemberMovePayload {

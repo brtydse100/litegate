@@ -121,6 +121,24 @@ hierarchical_budgets_enforced: false
 key_rotation_settle_seconds: 12
 # key_max_budget: 10.0
 # key_budget_duration: "30d"
+# Nightly: budget windows every team shares (needs LiteLLM #54147).
+# timezone: an IANA name (Europe/Berlin) or a whole-hour offset (UTC+2).
+# team_budget_windows:
+#   timezone: UTC+2
+#   windows:
+#     - id: weekday-morning
+#       days: [mon, tue, wed, thu, fri]
+#       start: "08:00"
+#       end: "13:00"
+#       budget: 40
+#     - id: weekend
+#       days: [sat, sun]
+#       start: "00:00"
+#       end: "00:00"
+#       budget: 10
+#   teams:
+#     product:
+#       weekday-morning: 15
 # key_models:
 #   - gpt-4
 #   - gpt-3.5-turbo
