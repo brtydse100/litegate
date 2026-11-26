@@ -1,0 +1,188 @@
+name: Publish nightly image
+
+# Nightly channel: every push to the `nightly` branch publishes an immutable
+# `nightly-YYYYMMDD-<sha>` image and git tag, moves the `nightly` image alias,
+# and creates a GitHub pre-release. It never touches `latest`, `edge` or
+# version tags; stable releases come only from `publish-container.yml`.
+
+on:
+  push:
+    branches: [nightly]
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/brtydse100/litegate
+
+jobs:
+  publish:
+    name: Build and publish nightly
+    if: github.ref == 'refs/heads/nightly'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Name this nightly
+        id: nightly
+        shell: bash
+        run: |
+          set -euo pipefail
+          short="$(git rev-parse --short=7 "$GITHUB_SHA")"
+          date="$(date -u +%Y-%m-%d)"
+          tag="nightly-${date//-/}-$short"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+          echo "date=$date" >> "$GITHUB_OUTPUT"
+          # Tags are immutable: a commit already published today is left alone.
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "Nightly $tag already exists; leaving it unchanged."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check versions and docs
+        if: steps.nightly.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/version.py --check
+          python scripts/check_docs.py
+          test -f docs/releases/nightly.md
+
+      - name: Set up Docker Buildx
+        if: steps.nightly.outputs.skip != 'true'
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Set up QEMU
+        if: steps.nightly.outputs.skip != 'true'
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Log in to GitHub Container Registry
+        if: steps.nightly.outputs.skip != 'true'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        if: steps.nightly.outputs.skip != 'true'
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=${{ steps.nightly.outputs.tag }}
+          labels: |
+            org.opencontainers.image.title=LiteGate nightly
+            org.opencontainers.image.description=A lightweight self-service portal for LiteLLM API keys (nightly build)
+
+      - name: Build and push image
+        if: steps.nightly.outputs.skip != 'true'
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: deploy/docker-compose/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          pull: true
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
+
+      - name: Verify image revision
+        if: steps.nightly.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.nightly.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(docker buildx imagetools inspect "$IMAGE_NAME:$TAG" \
+            --format '{{ index (index .Image "linux/amd64").Config.Labels "org.opencontainers.image.revision" }}')"
+          echo "Image revision: $revision"
+          test "$revision" = "$GITHUB_SHA"
+
+      - name: Tag the commit
+        if: steps.nightly.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.nightly.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous="$(git tag --list 'nightly-*' --sort=-creatordate | head -n 1)"
+          echo "PREVIOUS=$previous" >> "$GITHUB_ENV"
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+
+      - name: Move the nightly alias
+        if: steps.nightly.outputs.skip != 'true'
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin nightly:refs/remotes/origin/nightly
+          if [[ "$GITHUB_SHA" != "$(git rev-parse origin/nightly)" ]]; then
+            echo "nightly moved since this image was built; leaving the alias unchanged."
+            exit 0
+          fi
+          docker buildx imagetools create --tag "$IMAGE_NAME:nightly" "$IMAGE_NAME@$IMAGE_DIGEST"
+
+      - name: Create the pre-release
+        if: steps.nightly.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.nightly.outputs.tag }}
+          SHORT: ${{ steps.nightly.outputs.short }}
+          DATE: ${{ steps.nightly.outputs.date }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/nightly.md"
+          python scripts/release_body.py docs/releases/nightly.md "$notes"
+          {
+            echo
+            echo "## Image"
+            echo
+            echo '```bash'
+            echo "docker pull $IMAGE_NAME:$TAG"
+            echo '```'
+            echo
+            echo "\`$IMAGE_NAME:nightly\` always points to the newest nightly."
+            echo
+            if [[ -n "$PREVIOUS" ]]; then
+              echo "## Changes since $PREVIOUS"
+              echo
+              git log --no-merges --format='- %s (%h)' "$PREVIOUS..$GITHUB_SHA"
+              echo
+              echo "**Full Changelog**: https://github.com/$GITHUB_REPOSITORY/compare/$PREVIOUS...$TAG"
+            else
+              echo "**Commits**: https://github.com/$GITHUB_REPOSITORY/commits/$TAG"
+            fi
+          } >> "$notes"
+          gh release create "$TAG" \
+            --verify-tag \
+            --prerelease \
+            --latest=false \
+            --title "LiteGate nightly $DATE ($SHORT)" \
+            --notes-file "$notes"
