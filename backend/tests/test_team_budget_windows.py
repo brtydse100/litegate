@@ -301,3 +301,20 @@ def test_weekend_and_single_day_windows_and_team_overrides_by_id():
     ).team_budget_windows
     assert [window.id for window in config.windows] == ["weekend", "nights", "friday"]
     assert config.teams == {"product": {"friday": 20}, "research": {"weekend": None}}
+
+
+@pytest.mark.asyncio
+async def test_advanced_updates_keep_the_new_window_choices(monkeypatch):
+    from app.services import policy_team_update
+
+    with_defaults(monkeypatch, 40, 10)
+    current = {"team_id": "t1", "metadata": {"owner": "ops", windows.OVERRIDES: {"morning": 5}}}
+    monkeypatch.setattr(upstream, "team_info", AsyncMock(return_value={"team_info": current}))
+    update = AsyncMock(return_value={"team_id": "t1"})
+    monkeypatch.setattr(litellm, "update_team", update)
+    changes = await windows.apply("t1", {"team_alias": "T"}, {"morning": None})
+    await policy_team_update.update("t1", changes)
+    sent = update.await_args.args[1]
+    # Other metadata is still the server's copy; the window choice is the new one.
+    assert sent["metadata"] == {"owner": "ops", windows.OVERRIDES: {"morning": None}}
+    assert [entry["max_budget"] for entry in sent["budget_limits"]] == [10]
