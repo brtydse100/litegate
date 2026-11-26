@@ -127,6 +127,16 @@ is available.
 
 ## Release notes and publication
 
+- **Nightly channel.** Features that wait on a change outside LiteGate (for
+  example an unmerged LiteLLM PR) target the `nightly` branch, never `main`.
+  Every push to `nightly` runs `publish-nightly.yml`, which publishes an
+  immutable `nightly-YYYYMMDD-<short SHA>` image and git tag, moves the
+  `nightly` image alias, and creates a GitHub pre-release from
+  `docs/releases/nightly.md` (keep its Highlights current). It never touches
+  `latest`, `edge` or version tags. PRs into `nightly` use
+  `dev-<feature>-<short SHA>` preview images and are not followed by a stable
+  release; merge `main` into `nightly` to keep it current. Move a feature to
+  `main` only once its outside dependency has shipped.
 - To cut a release, follow the `release` skill in
   [.claude/skills/release/SKILL.md](.claude/skills/release/SKILL.md).
 - Every PR must have an immutable preview Git tag and published Docker image
